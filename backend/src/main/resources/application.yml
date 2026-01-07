@@ -5,16 +5,37 @@ spring:
   application:
     name: smart-rental
   datasource:
+    # URL kết nối MariaDB, lưu ý port 3307
     url: jdbc:mariadb://localhost:3307/smart_rental_db?useSSL=false&serverTimezone=UTC
     username: root
     password: root
+    # Driver chuẩn của MariaDB
     driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
     hibernate:
+      # Tự động cập nhật schema DB khi có thay đổi Entity
       ddl-auto: update
-    show-sql: true
+    show-sql: true # Hiển thị câu lệnh SQL trong console
     properties:
       hibernate:
+        # Dialect tối ưu cho MariaDB
         dialect: org.hibernate.dialect.MariaDBDialect
-        format_sql: true
+        format_sql: true # Format SQL cho dễ đọc
+
+  # Cấu hình upload file (nếu cần dùng sau này)
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# --- CẤU HÌNH TÙY CHỈNH ---
+# JWT Config (Bắt buộc phải có để chạy JwtTokenProvider)
+jwt:
+  secret: "7u7KqQ4TQXtK5vXvKDGZ9h3jHfYZ8vWqLxP9xJv0C7z7Fj8xE1JvY7TqHkQzU2JmO2XxZs7NfUqR2BvV7hTzN2RwXqQwWmR8"
+  expiration: 86400000        # 1 ngày
+  refreshExpiration: 2592000000 # 30 ngày
+
+# File Storage
+file:
+  upload-dir: "uploads/"
