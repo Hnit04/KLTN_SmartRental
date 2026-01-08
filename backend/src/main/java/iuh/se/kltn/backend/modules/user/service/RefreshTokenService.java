@@ -1,6 +1,6 @@
 package iuh.se.kltn.backend.modules.user.service;
 
-import iuh.se.kltn.backend.common.exception.ResourceNotFoundException; // Sử dụng lại Exception của bạn
+import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.modules.user.entity.RefreshToken;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.RefreshTokenRepository;
@@ -29,21 +29,16 @@ public class RefreshTokenService {
         return refreshTokenRepository.findByToken(token);
     }
 
-    @Transactional // Quan trọng: Đảm bảo xóa cũ -> tạo mới thành công cả 2 hoặc rollback
+    @Transactional
     public RefreshToken createRefreshToken(Long userId) {
-        // Tìm User an toàn, ném lỗi nếu không thấy thay vì dùng .get() gây NullPointer
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        RefreshToken refreshToken = refreshTokenRepository.findByUser(user)
+                .orElse(new RefreshToken());
 
-        // Xóa token cũ của user này (nếu logic là 1 thiết bị login 1 lần)
-        refreshTokenRepository.deleteByUser(user);
-
-        // Tạo token mới
-        RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
         refreshToken.setToken(UUID.randomUUID().toString());
-
         return refreshTokenRepository.save(refreshToken);
     }
 

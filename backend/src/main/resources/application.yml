@@ -6,7 +6,7 @@ spring:
     name: smart-rental
   datasource:
     # URL kết nối MariaDB, lưu ý port 3307
-    url: jdbc:mariadb://localhost:3307/smart_rental_db?useSSL=false&serverTimezone=UTC
+    url: jdbc:mariadb://localhost:3307/smart_rental_db?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8
     username: root
     password: root
     # Driver chuẩn của MariaDB
