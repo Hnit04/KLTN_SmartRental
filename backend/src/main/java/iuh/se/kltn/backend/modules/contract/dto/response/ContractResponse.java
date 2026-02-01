@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.contract.dto.response;
 
+import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import lombok.Data;
@@ -21,9 +22,14 @@ public class ContractResponse {
 
     private ContractStatus status;
     private DepositStatus depositStatus;
+    private ContractSignMethod signMethod;
 
-    // Thông tin Blockchain
+    // Thông tin nội dung
+    private String contentUrl;
     private String contractHash;
+
+
     private String smartContractAddress;
+    private String deployTxHash;
     private LocalDateTime signDate;
 }

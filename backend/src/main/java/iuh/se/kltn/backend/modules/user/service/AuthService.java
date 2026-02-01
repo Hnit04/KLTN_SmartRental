@@ -51,7 +51,9 @@ public class AuthService {
                 && userRepository.existsByWalletAddress(request.getWalletAddress())) {
             throw new RuntimeException("Ví này đã được sử dụng!");
         }
-
+        if (request.getRole() == Role.ADMIN) {
+            throw new RuntimeException("Không thể đăng ký tài khoản Admin công khai!");
+        }
         User newUser;
         if (request.getRole() == Role.LANDLORD) {
             newUser = new Landlord();

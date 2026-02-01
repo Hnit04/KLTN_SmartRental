@@ -59,12 +59,15 @@ public class ContractService {
         contract.setActualPrice(room.getPrice());
         contract.setDepositAmount(request.getDepositAmount());
 
+
+        contract.setSignMethod(request.getSignMethod());
+
         contract.setStatus(ContractStatus.PENDING_SIGNATURE);
         contract.setDepositStatus(DepositStatus.UNPAID);
 
         String rawData = "CONTRACT-" + room.getId() + "-" + tenantId + "-" + UUID.randomUUID();
         contract.setContractHash(calculateSHA256(rawData));
-        contract.setContentUrl("https://fake-s3-url.com/contract.pdf");
+        contract.setContentUrl("https://smart-rental-storage.com/contracts/sample.pdf");
 
         Contract saved = contractRepository.save(contract);
         return mapToResponse(saved);

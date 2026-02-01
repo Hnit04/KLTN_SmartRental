@@ -16,4 +16,5 @@ public class UserProfileResponse {
     private Role role;
     private KYCStatus kycStatus;
     private int reputationScore;
+    private String businessLicenseUrl;
 }

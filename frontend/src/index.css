@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* --- TONE NÂU ẤM (WARM BROWN / ELEGANT) --- */
+    
+    /* Nền màu kem phấn nhạt (thay vì trắng tinh) */
+    --background: 35 30% 98%;
+    /* Chữ màu nâu đậm (thay vì đen tuyền) */
+    --foreground: 20 14% 15%;
+
+    --card: 35 30% 99%;
+    --card-foreground: 20 14% 15%;
+
+    --popover: 35 30% 99%;
+    --popover-foreground: 20 14% 15%;
+
+    /* MÀU CHỦ ĐẠO: Nâu đồng/Nâu đất ấm */
+    --primary: 28 45% 45%;
+    --primary-foreground: 35 30% 98%; /* Chữ trắng kem trên nền nâu */
+
+    /* Màu phụ: Nâu be nhạt */
+    --secondary: 30 25% 94%;
+    --secondary-foreground: 28 45% 45%;
+
+    --muted: 30 20% 94%;
+    --muted-foreground: 25 5% 45%;
+
+    --accent: 30 25% 94%;
+    --accent-foreground: 28 45% 45%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Viền màu nâu nhạt */
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
+    
+    --ring: 28 45% 45%; /* Viền focus trùng màu chủ đạo */
+    
+    --radius: 0.625rem; /* Bo góc mềm mại hơn (10px) */
+
+    /* Sidebar Variables */
+    --sidebar-background: 35 30% 97%;
+    --sidebar-foreground: 20 14% 15%;
+    --sidebar-primary: 28 45% 45%;
+    --sidebar-primary-foreground: 35 30% 98%;
+    --sidebar-accent: 30 20% 92%;
+    --sidebar-accent-foreground: 28 45% 45%;
+    --sidebar-border: 30 15% 88%;
+    --sidebar-ring: 28 45% 45%;
+  }
+
+  .dark {
+    /* Dark mode cho tone nâu (Nâu Chocolate đậm) */
+    --background: 20 14% 8%;
+    --foreground: 35 30% 98%;
+
+    --card: 20 14% 10%;
+    --card-foreground: 35 30% 98%;
+
+    --popover: 20 14% 10%;
+    --popover-foreground: 35 30% 98%;
+
+    --primary: 28 45% 55%; /* Nâu sáng hơn chút trên nền tối */
+    --primary-foreground: 20 14% 8%;
+
+    --secondary: 20 14% 16%;
+    --secondary-foreground: 35 30% 98%;
+
+    --muted: 20 14% 16%;
+    --muted-foreground: 30 10% 65%;
+
+    --accent: 20 14% 16%;
+    --accent-foreground: 35 30% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 20 14% 16%;
+    --input: 20 14% 16%;
+    --ring: 28 45% 55%;
+    
+    --sidebar-background: 20 14% 9%;
+    --sidebar-foreground: 35 30% 98%;
+    --sidebar-primary: 28 45% 55%;
+    --sidebar-primary-foreground: 20 14% 8%;
+    --sidebar-accent: 20 14% 16%;
+    --sidebar-accent-foreground: 35 30% 98%;
+    --sidebar-border: 20 14% 16%;
+    --sidebar-ring: 28 45% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", system-ui, sans-serif; /* Đảm bảo font chữ */
+  }
+}
