@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.user.service;
 
 import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import org.modelmapper.ModelMapper;
@@ -17,13 +18,14 @@ public class UserService {
     @Autowired
     private ModelMapper modelMapper;
 
-    // Lấy thông tin user hiện tại (Dựa vào ID trong Token)
     public UserProfileResponse getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-
-        // Convert từ Entity sang DTO để giấu pass
-        return modelMapper.map(user, UserProfileResponse.class);
+        UserProfileResponse response = modelMapper.map(user, UserProfileResponse.class);
+        if (user instanceof Landlord) {
+            response.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
+        }
+        return response;
     }
 
     // Cập nhật ví MetaMask

@@ -39,7 +39,10 @@ public class BillService {
         if (contract.getStatus() != ContractStatus.ACTIVE) {
             throw new RuntimeException("Hợp đồng này không còn hiệu lực!");
         }
-
+        if (request.getNewElecIndex() < request.getOldElecIndex() ||
+                request.getNewWaterIndex() < request.getOldWaterIndex()) {
+            throw new RuntimeException("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
+        }
         // Tính tiền
         Property property = contract.getRoom().getProperty();
 

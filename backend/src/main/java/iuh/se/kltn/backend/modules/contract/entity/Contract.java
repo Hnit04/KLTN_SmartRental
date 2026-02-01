@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.contract.entity;
 
+import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.property.entity.Room;
@@ -37,8 +38,8 @@ public class Contract {
 
     private Double actualPrice;
     private Double depositAmount;
-
-    // --- Blockchain Info ---
+    @Enumerated(EnumType.STRING)
+    private ContractSignMethod signMethod;
     private String contentUrl;
     private String contractHash;
     private String smartContractAddress;
