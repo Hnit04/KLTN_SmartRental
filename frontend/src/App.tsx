@@ -3,35 +3,27 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Import Layouts
 import MainLayout from './components/layout/MainLayout';
+import PublicLayout from './components/layout/PublicLayout'; // <-- Import mới
 
-// Import Pages (Public)
+// Import Pages
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ContactPage from './pages/ContactPage';
+import HelpCenter from './pages/HelpCenter';
+import FAQPage from './pages/FAQPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
 
-
-// Component bảo vệ Route
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
-  
+  if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
-// Component ngăn user đã login quay lại trang login/register
 const PublicRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
-
   if (isLoading) return null;
-
-  // Nếu đã login thì đẩy về dashboard
   return isAuthenticated ? <Navigate to="/dashboard" /> : <Outlet />;
 };
 
@@ -40,26 +32,32 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* ─── PUBLIC ROUTES (Ai cũng xem được) ───────────────────────────── */}
-          <Route path="/" element={<HomePage />} />
           
-          {/* ─── AUTH ROUTES (Chỉ xem khi CHƯA login) ───────────────────────── */}
+          {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/help" element={<HelpCenter />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+          </Route>
+
+          {/* ─── GROUP: AUTH PAGES (Login/Register) ─── */}
           <Route element={<PublicRoute />}>
+             {/* Auth pages thường không cần Header/Footer rườm rà, hoặc dùng layout riêng */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
 
-          {/* ─── PROTECTED ROUTES (Phải login mới xem được) ─────────────────── */}
+          {/* ─── GROUP: PROTECTED PAGES (Dashboard Admin) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              
-              {/* Các route khác (Bỏ comment khi đã tạo file) */}
-              {/* <Route path="/contracts" element={<ContractList />} /> */}
-              {/* <Route path="/contracts/create" element={<CreateContract />} /> */}
+              {/* Nếu PropertyList ở đây là bản quản lý (Admin), nó sẽ dùng Sidebar */}
+              {/* <Route path="/properties" element={<PropertyList />} /> */}
             </Route>
           </Route>
 
-          {/* ─── FALLBACK (Nhập link linh tinh thì về trang chủ) ────────────── */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
