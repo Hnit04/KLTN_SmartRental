@@ -16,6 +16,12 @@ public class PropertyController {
     @Autowired
     private PropertyService propertyService;
 
+    // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public - Ai cũng xem được)
+    @GetMapping
+    public ResponseEntity<?> getAllProperties() {
+        return ResponseEntity.ok(propertyService.getAllProperties());
+    }
+
     // Tạo Khu trọ mới
     @PostMapping
     public ResponseEntity<?> createProperty(@AuthenticationPrincipal UserPrincipal currentUser,
@@ -31,15 +37,20 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.addRoom(currentUser.getId(), propertyId, request));
     }
 
-    // Xem danh sách nhà của chu tro
+    // Xem danh sách nhà của chu tro (Của chính user đang đăng nhập)
     @GetMapping("/mine")
     public ResponseEntity<?> getMyProperties(@AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(propertyService.getMyProperties(currentUser.getId()));
     }
 
-    // Xem danh sách phòng của một khu trọ
+    // Xem danh sách phòng của một khu trọ cụ thể
     @GetMapping("/{propertyId}/rooms")
     public ResponseEntity<?> getRooms(@PathVariable Long propertyId) {
         return ResponseEntity.ok(propertyService.getRoomsByProperty(propertyId));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getPropertyDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(propertyService.getPropertyById(id));
     }
 }

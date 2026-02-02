@@ -1,19 +1,22 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+// Lưu ý: Nếu bạn đã tạo component custom ở bước trước thì dùng: import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sonner"; 
 
-// Import Layouts
-import MainLayout from './components/layout/MainLayout';
-import PublicLayout from './components/layout/PublicLayout'; // <-- Import mới
+import MainLayout from "./components/layout/MainLayout";
+import PublicLayout from "./components/layout/PublicLayout";
+import PropertyDetailPage from "./pages/PropertyDetailPage";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ContactPage from "./pages/ContactPage";
+import HelpCenter from "./pages/HelpCenter";
+import FAQPage from "./pages/FAQPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
 
-// Import Pages
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ContactPage from './pages/ContactPage';
-import HelpCenter from './pages/HelpCenter';
-import FAQPage from './pages/FAQPage';
-import PrivacyPage from './pages/PrivacyPage';
-import TermsPage from './pages/TermsPage';
+// 1. IMPORT TRANG DANH SÁCH PHÒNG
+import PropertiesPage from "./pages/PropertiesPage";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -23,8 +26,18 @@ const ProtectedRoute = () => {
 
 const PublicRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
   if (isLoading) return null;
-  return isAuthenticated ? <Navigate to="/dashboard" /> : <Outlet />;
+
+  if (
+    isAuthenticated &&
+    (location.pathname === "/login" || location.pathname === "/register")
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
 };
 
 function App() {
@@ -32,10 +45,13 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
+            
+            {/* 2. THÊM ROUTE CHO TRANG PHÒNG */}
+            <Route path="/properties" element={<PropertiesPage />} />
+            <Route path="/properties/:id" element={<PropertyDetailPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/help" element={<HelpCenter />} />
             <Route path="/faq" element={<FAQPage />} />
@@ -43,24 +59,31 @@ function App() {
             <Route path="/terms" element={<TermsPage />} />
           </Route>
 
-          {/* ─── GROUP: AUTH PAGES (Login/Register) ─── */}
+          {/* ─── GROUP: AUTH PAGES ─── */}
           <Route element={<PublicRoute />}>
-             {/* Auth pages thường không cần Header/Footer rườm rà, hoặc dùng layout riêng */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
 
-          {/* ─── GROUP: PROTECTED PAGES (Dashboard Admin) ─── */}
+          {/* ─── GROUP: PROTECTED PAGES (Dashboard) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              {/* Nếu PropertyList ở đây là bản quản lý (Admin), nó sẽ dùng Sidebar */}
-              {/* <Route path="/properties" element={<PropertyList />} /> */}
+              {/* <Route path="/dashboard" element={<Dashboard />} /> */}
             </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+
+      {/* 🔥 TOASTER DUY NHẤT */}
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={5000}
+        visibleToasts={5}
+      />
     </AuthProvider>
   );
 }
