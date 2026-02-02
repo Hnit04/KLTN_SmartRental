@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 
 import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
-
+import PropertyDetailPage from "./pages/PropertyDetailPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -51,7 +51,7 @@ function App() {
             
             {/* 2. THÊM ROUTE CHO TRANG PHÒNG */}
             <Route path="/properties" element={<PropertiesPage />} />
-            
+            <Route path="/properties/:id" element={<PropertyDetailPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/help" element={<HelpCenter />} />
             <Route path="/faq" element={<FAQPage />} />
