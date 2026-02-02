@@ -40,31 +40,39 @@ export interface TenantPreference {
 // Property types
 export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
 
+// src/types/property.ts
+
 export interface Property {
-  id: string;
-  name: string;
-  address: string;
-  cityCode: string;
-  districtCode: string;
-  wardCode: string;
-  status: string;
-  basePrice: number;
+  id: number;
+  name: string;            // Map với Property.java: name
+  address: string;         // Map với Property.java: address
+  district: string;        // Map với Property.java: district
+  city: string;            // Map với Property.java: city
+  description: string;
+  
+  // Giá dịch vụ (Map với Property.java)
+  elecPrice: number;       
   waterPrice: number;
-  electricPrice: number;
-  description?: string;
-  mediaDataHash?: string;
-  rooms?: Room[];
+  internetPrice: number;
+  
+  images: string[];        // Map với Property.java: images (List<String>)
+  landlordName?: string;   
+  
+  // UI Fields (Backend chưa trả về, nhưng cần để hiển thị Card)
+  minPrice?: number;       // Giá phòng thấp nhất trong khu
+  maxPrice?: number;       // Giá phòng cao nhất trong khu
+  totalRooms?: number;     // Tổng số phòng
+  availableRooms?: number; // Số phòng còn trống
 }
 
 export interface Room {
-  id: string;
+  id: number;
   name: string;
   price: number;
-  area?: number;
-  status: RoomStatus;
-  amenities?: string;
-  mediaDataHash?: string;
-  propertyId: string;
+  area: number;
+  status: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
+  images: string[];
+  amenities: string[];
 }
 
 // Contract types
