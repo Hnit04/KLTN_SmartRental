@@ -1,84 +1,71 @@
-// src/context/AuthContext.tsx
-import { createContext, useState, useEffect, useContext } from 'react';
-import type { ReactNode } from 'react';
-import { authApi, type UserRaw, type LoginResponse } from '@/api/api/authApi';
-import type { User } from '@/types'; // Import User chuẩn từ Global Types
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { User, LoginResponse } from '../types/auth'; // Import đúng đường dẫn types
+import { authApi } from '../api/api/authApi'; // Import đúng đường dẫn api
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (data: LoginResponse) => void;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  register: (data: any) => Promise<void>; // Thêm nếu cần dùng ở RegisterPage
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// [QUAN TRỌNG] Hàm chuyển đổi dữ liệu Backend -> Frontend
-const mapUser = (raw: UserRaw): User => {
-  return {
-    id: raw.id,
-    email: raw.email,
-    username: raw.username,
-    fullName: raw.fullname, // Map: fullname (API) -> fullName (App)
-    phoneNumber: raw.phoneNumber,
-    role: raw.role,
-    kycStatus: raw.kycStatus as any, // Cast kiểu nếu string backend chưa chuẩn Enum
-    createdAt: new Date().toISOString(), // Fake nếu backend thiếu
-  };
-};
-
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        try {
-          const rawUser = await authApi.getCurrentUser();
-          const appUser = mapUser(rawUser); // Map dữ liệu trước khi set state
-          setUser(appUser);
-          setIsAuthenticated(true);
-        } catch (err) {
-          console.error('Init auth failed:', err);
-          localStorage.removeItem('accessToken');
-        }
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('accessToken');
+    if (storedUser && token) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Lỗi parse user từ storage", e);
+        localStorage.removeItem('user');
       }
-      setIsLoading(false);
-    };
-    initAuth();
+    }
+    setIsLoading(false);
   }, []);
 
-  const login = (data: LoginResponse) => {
-    localStorage.setItem('accessToken', data.accessToken);
-    // Nếu có refresh token thì lưu luôn
-    if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
-    
-    const appUser = mapUser(data.user); // Map dữ liệu
-    setUser(appUser);
-    setIsAuthenticated(true);
+  const login = async (username: string, password: string) => {
+    try {
+      // Gọi API từ authApi
+      const data: LoginResponse = await authApi.login({ username, password });
+      
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      
+      // Map dữ liệu LoginResponse sang User
+      const userData: User = {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        role: data.role,
+        fullName: data.username,
+        kycStatus: 'NOT_VERIFIED',
+        reputationScore: 0,
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
+    }
   };
 
   const logout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
     setUser(null);
-    setIsAuthenticated(false);
-  };
-
-  // Hàm dummy register để fix lỗi bên RegisterPage
-  const register = async (data: any) => {
-     // Gọi API register thật ở đây
-     console.log("Registering...", data);
-     // Sau khi register xong thường sẽ auto login hoặc bắt login lại
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -86,6 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

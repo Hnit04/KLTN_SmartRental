@@ -1,11 +1,28 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, useNavigate } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { Home, Star } from "lucide-react";
+import { 
+  Home, 
+  Star, 
+  LogOut, 
+  LayoutDashboard, 
+  User as UserIcon 
+} from "lucide-react";
+// 1. Import hook useAuth
+import { useAuth } from "../../context/AuthContext";
 
 export default function PublicLayout() {
+  // 2. Lấy thông tin user và hàm logout
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* ─── HEADER (Dùng chung) ─── */}
+      {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2">
@@ -30,23 +47,57 @@ export default function PublicLayout() {
             </Link>
           </nav>
 
+          {/* 3. Phần hiển thị Động theo trạng thái đăng nhập */}
           <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">Đăng nhập</Button>
-            </Link>
-            <Link to="/register">
-              <Button size="sm">Đăng ký</Button>
-            </Link>
+            {isAuthenticated && user ? (
+              // --- GIAO DIỆN KHI ĐÃ ĐĂNG NHẬP ---
+              <>
+                <div className="hidden md:flex flex-col items-end mr-2">
+                  <span className="text-sm font-medium leading-none">
+                    {user.fullName || user.username}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1 uppercase">
+                    {user.role}
+                  </span>
+                </div>
+                
+                <Link to="/dashboard">
+                  <Button variant="default" size="sm" className="gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleLogout}
+                  title="Đăng xuất"
+                >
+                  <LogOut className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+                </Button>
+              </>
+            ) : (
+              // --- GIAO DIỆN KHI CHƯA ĐĂNG NHẬP ---
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Đăng nhập</Button>
+                </Link>
+                <Link to="/register">
+                  <Button size="sm">Đăng ký</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      {/* ─── NỘI DUNG CHÍNH (Thay đổi theo từng trang) ─── */}
+      {/* ─── MAIN CONTENT ─── */}
       <main className="flex-1">
         <Outlet />
       </main>
 
-      {/* ─── FOOTER (Dùng chung) ─── */}
+      {/* ─── FOOTER ─── */}
       <footer className="border-t bg-card py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -65,7 +116,7 @@ export default function PublicLayout() {
               <h4 className="font-semibold text-foreground">Sản phẩm</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li><Link to="/properties" className="hover:text-primary">Tìm phòng</Link></li>
-                <li><Link to="/features" className="hover:text-primary">Tính năng</Link></li>
+                <li><Link to="#" className="hover:text-primary">Tính năng</Link></li>
               </ul>
             </div>
             <div>

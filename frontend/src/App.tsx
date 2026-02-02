@@ -1,19 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { Toaster } from "sonner";
+import { useLocation } from "react-router-dom";
 
-// Import Layouts
-import MainLayout from './components/layout/MainLayout';
-import PublicLayout from './components/layout/PublicLayout'; // <-- Import mới
+import MainLayout from "./components/layout/MainLayout";
+import PublicLayout from "./components/layout/PublicLayout";
 
-// Import Pages
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ContactPage from './pages/ContactPage';
-import HelpCenter from './pages/HelpCenter';
-import FAQPage from './pages/FAQPage';
-import PrivacyPage from './pages/PrivacyPage';
-import TermsPage from './pages/TermsPage';
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ContactPage from "./pages/ContactPage";
+import HelpCenter from "./pages/HelpCenter";
+import FAQPage from "./pages/FAQPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -23,8 +23,18 @@ const ProtectedRoute = () => {
 
 const PublicRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
   if (isLoading) return null;
-  return isAuthenticated ? <Navigate to="/dashboard" /> : <Outlet />;
+
+  if (
+    isAuthenticated &&
+    (location.pathname === "/login" || location.pathname === "/register")
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
 };
 
 function App() {
@@ -32,8 +42,6 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          
-          {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/contact" element={<ContactPage />} />
@@ -43,24 +51,29 @@ function App() {
             <Route path="/terms" element={<TermsPage />} />
           </Route>
 
-          {/* ─── GROUP: AUTH PAGES (Login/Register) ─── */}
           <Route element={<PublicRoute />}>
-             {/* Auth pages thường không cần Header/Footer rườm rà, hoặc dùng layout riêng */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
 
-          {/* ─── GROUP: PROTECTED PAGES (Dashboard Admin) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              {/* Nếu PropertyList ở đây là bản quản lý (Admin), nó sẽ dùng Sidebar */}
-              {/* <Route path="/properties" element={<PropertyList />} /> */}
+              {/* <Route path="/dashboard" element={<Dashboard />} /> */}
             </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+
+      {/* 🔥 TOASTER DUY NHẤT */}
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={5000}
+        visibleToasts={5}
+      />
     </AuthProvider>
   );
 }
