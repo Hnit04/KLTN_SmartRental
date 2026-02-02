@@ -19,7 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-
+import org.springframework.http.HttpMethod;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -75,7 +75,10 @@ public class SecurityConfig {
 
                         //Cho phép trang lỗi
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
 
+                        // Nếu bạn muốn cho phép xem ảnh tĩnh (nếu có)
+                        .requestMatchers("/uploads/**").permitAll()
                         //API còn lại phải đăng nhập
                         .anyRequest().authenticated()
                 );

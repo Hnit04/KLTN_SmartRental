@@ -34,6 +34,16 @@ public class PropertyService {
     @Autowired
     private ModelMapper modelMapper;
 
+    // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public)
+    public List<PropertyResponse> getAllProperties() {
+        List<Property> properties = propertyRepository.findAll();
+
+        // Convert từng Entity sang Response (đã bao gồm tính toán giá)
+        return properties.stream()
+                .map(this::mapToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
     // TẠO KHU TRỌ MỚI
     @Transactional
     public PropertyResponse createProperty(Long landlordId, PropertyRequest request) {
@@ -86,10 +96,43 @@ public class PropertyService {
                 .collect(Collectors.toList());
     }
 
+    // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
         PropertyResponse res = modelMapper.map(p, PropertyResponse.class);
+
+        // Convert chuỗi JSON ảnh thành List
         res.setImages(JsonUtil.convertJsonToList(p.getImages()));
-        res.setLandlordName(p.getLandlord().getFullName());
+
+        if (p.getLandlord() != null) {
+            res.setLandlordName(p.getLandlord().getFullName());
+        }
+
+        // --- TÍNH TOÁN GIÁ VÀ PHÒNG TRỐNG ---
+        List<Room> rooms = p.getRooms();
+        if (rooms != null && !rooms.isEmpty()) {
+            // Tính giá thấp nhất
+            double min = rooms.stream().mapToDouble(Room::getPrice).min().orElse(0.0);
+
+            // Tính giá cao nhất
+            double max = rooms.stream().mapToDouble(Room::getPrice).max().orElse(0.0);
+
+            // Đếm phòng còn trống (AVAILABLE)
+            long available = rooms.stream()
+                    .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
+                    .count();
+
+            res.setMinPrice(min);
+            res.setMaxPrice(max);
+            res.setAvailableRooms((int) available);
+            res.setTotalRooms(rooms.size());
+        } else {
+            // Nếu nhà chưa có phòng nào
+            res.setMinPrice(0.0);
+            res.setMaxPrice(0.0);
+            res.setAvailableRooms(0);
+            res.setTotalRooms(0);
+        }
+
         return res;
     }
 
@@ -97,7 +140,9 @@ public class PropertyService {
         RoomResponse res = modelMapper.map(r, RoomResponse.class);
         res.setImages(JsonUtil.convertJsonToList(r.getImages()));
         res.setAmenities(JsonUtil.convertJsonToList(r.getAmenities()));
-        res.setPropertyName(r.getProperty().getName());
+        if (r.getProperty() != null) {
+            res.setPropertyName(r.getProperty().getName());
+        }
         return res;
     }
 }
