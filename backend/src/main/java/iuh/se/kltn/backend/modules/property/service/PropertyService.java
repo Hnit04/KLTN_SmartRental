@@ -145,4 +145,10 @@ public class PropertyService {
         }
         return res;
     }
+
+    public PropertyResponse getPropertyById(Long id) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trọ với ID: " + id));
+        return mapToPropertyResponse(property);
+    }
 }
