@@ -5,6 +5,7 @@ import iuh.se.kltn.backend.common.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -17,9 +18,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
-import org.springframework.http.HttpMethod;
+
+import java.util.Arrays;
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -48,38 +52,51 @@ public class SecurityConfig {
         return authProvider;
     }
 
+    /**
+     * 🔥 CẤU HÌNH CORS CHI TIẾT (FIX LỖI CHẶN PUT/DELETE)
+     * Thay vì dùng applyPermitDefaultValues() (chỉ cho GET/POST), ta cấu hình thủ công.
+     */
     @Bean
-    public CorsFilter corsFilter() {
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Cho phép mọi nguồn (Trong môi trường Dev). Product nên set cụ thể domain.
+        configuration.setAllowedOriginPatterns(List.of("*"));
+
+        // Cho phép đầy đủ các methods
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        // Cho phép các headers cần thiết
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+
+        // Cho phép credentials (nếu cần gửi cookie/auth header)
+        configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*");
-        config.addAllowedHeader("*");
-        config.addAllowedMethod("*");
-        source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(request -> new CorsConfiguration().applyPermitDefaultValues())) // Kích hoạt CORS
+                // ✅ Sử dụng bean corsConfigurationSource đã định nghĩa ở trên
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        //API Auth
+                        // API Auth (Đăng ký, Đăng nhập, Refresh Token)
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        //Swagger
+                        // Swagger UI
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        //Cho phép trang lỗi
+                        // Trang lỗi và API Public
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll() // Xem phòng không cần login
+                        .requestMatchers("/uploads/**").permitAll() // Xem ảnh
 
-                        // Nếu bạn muốn cho phép xem ảnh tĩnh (nếu có)
-                        .requestMatchers("/uploads/**").permitAll()
-                        //API còn lại phải đăng nhập
+                        // Các API còn lại bắt buộc phải có Token
                         .anyRequest().authenticated()
                 );
 

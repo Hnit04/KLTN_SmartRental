@@ -1,30 +1,19 @@
-import { Outlet, Link, useNavigate } from "react-router-dom";
+import { Outlet, Link } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { 
-  Home, 
-  Star, 
-  LogOut, 
-  LayoutDashboard, 
-  User as UserIcon 
-} from "lucide-react";
-// 1. Import hook useAuth
+import { Home, Star } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+// Import component UserNav mới (Giả sử bạn đã tạo ở Bước 1)
+import { UserNav } from "../shared/UserNav"; 
 
 export default function PublicLayout() {
-  // 2. Lấy thông tin user và hàm logout
-  const { isAuthenticated, user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
               <Home className="h-5 w-5 text-primary-foreground" />
@@ -32,6 +21,7 @@ export default function PublicLayout() {
             <span className="text-xl font-bold text-foreground">SmartRental</span>
           </Link>
 
+          {/* Menu Chính */}
           <nav className="hidden items-center gap-6 md:flex">
             <Link to="/" className="text-sm font-medium text-foreground hover:text-primary">
               Trang chủ
@@ -47,38 +37,13 @@ export default function PublicLayout() {
             </Link>
           </nav>
 
-          {/* 3. Phần hiển thị Động theo trạng thái đăng nhập */}
+          {/* Phần hiển thị User (Đã cập nhật) */}
           <div className="flex items-center gap-3">
-            {isAuthenticated && user ? (
-              // --- GIAO DIỆN KHI ĐÃ ĐĂNG NHẬP ---
-              <>
-                <div className="hidden md:flex flex-col items-end mr-2">
-                  <span className="text-sm font-medium leading-none">
-                    {user.fullName || user.username}
-                  </span>
-                  <span className="text-xs text-muted-foreground mt-1 uppercase">
-                    {user.role}
-                  </span>
-                </div>
-                
-                <Link to="/dashboard">
-                  <Button variant="default" size="sm" className="gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Button>
-                </Link>
-
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleLogout}
-                  title="Đăng xuất"
-                >
-                  <LogOut className="h-4 w-4 text-muted-foreground hover:text-red-500" />
-                </Button>
-              </>
+            {isAuthenticated ? (
+              // ✅ HIỂN THỊ USERNAV KHI ĐÃ ĐĂNG NHẬP
+              <UserNav />
             ) : (
-              // --- GIAO DIỆN KHI CHƯA ĐĂNG NHẬP ---
+              // HIỂN THỊ NÚT ĐĂNG NHẬP/ĐĂNG KÝ KHI CHƯA LOGIN
               <>
                 <Link to="/login">
                   <Button variant="ghost" size="sm">Đăng nhập</Button>

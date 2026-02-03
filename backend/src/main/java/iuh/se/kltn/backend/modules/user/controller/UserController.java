@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,15 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
         return ResponseEntity.ok(userProfile);
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<UserProfileResponse> updateProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestBody UpdateProfileRequest request) {
+
+        UserProfileResponse response = userService.updateUserProfile(currentUser.getId(), request);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/wallet")

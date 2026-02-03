@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, LoginResponse } from '../types/auth'; // Import đúng đường dẫn types
-import { authApi } from '../api/api/authApi'; // Import đúng đường dẫn api
+// 1. Import từ '../types' thay vì '../types/auth' để lấy đúng định nghĩa User mới
+import type { User, AuthResponse, RegisterRequest } from '../types'; 
+import { authApi } from '../api/api/authApi';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (data: any) => Promise<void>; // Chấp nhận data login linh hoạt
   logout: () => void;
+  // Thêm hàm update user để dùng khi cập nhật ví/profile mà không cần login lại
+  updateUser: (user: User) => void; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,41 +19,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Load user từ localStorage khi F5 trang
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('accessToken');
-    if (storedUser && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Lỗi parse user từ storage", e);
-        localStorage.removeItem('user');
+    const initAuth = () => {
+      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('accessToken');
+      
+      if (storedUser && token) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Lỗi parse user từ storage", e);
+          localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    initAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (credentials: any) => {
     try {
-      // Gọi API từ authApi
-      const data: LoginResponse = await authApi.login({ username, password });
+      // 2. Gọi API Login
+      // Lưu ý: authApi.login cần trả về kiểu AuthResponse (đã định nghĩa ở step trước)
+      // AuthResponse bao gồm: { accessToken, refreshToken, user: User }
+      const response = await authApi.login(credentials);
       
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      // Kiểm tra cấu trúc trả về để lấy data đúng chỗ
+      // Một số axios setup trả data trực tiếp, một số trả trong response.data
+      const data = (response as any).data || response; 
+
+      const { accessToken, refreshToken, user: userData } = data as AuthResponse;
+
+      // Lưu Token
+      localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       
-      // Map dữ liệu LoginResponse sang User
-      const userData: User = {
-        id: data.id,
-        username: data.username,
-        email: data.email,
-        role: data.role,
-        fullName: data.username,
-        kycStatus: 'NOT_VERIFIED',
-        reputationScore: 0,
+      // 3. Lưu User (QUAN TRỌNG: userData từ API phải khớp với interface User)
+      // Nếu API trả về thiếu trường (ví dụ thiếu createdAt), ta cần bổ sung để không lỗi TS
+      const safeUser: User = {
+        ...userData,
+        // Fallback giá trị nếu API login chưa trả về đủ (phòng hờ)
+        reputationScore: userData.reputationScore || 50,
+        kycStatus: userData.kycStatus || 'PENDING',
+        createdAt: userData.createdAt || new Date().toISOString(),
+        updatedAt: userData.updatedAt || new Date().toISOString(),
       };
 
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(safeUser));
+      setUser(safeUser);
+
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -62,10 +84,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
+    // Có thể thêm điều hướng về trang chủ hoặc login tại đây nếu cần
+    // window.location.href = '/login'; 
+  };
+
+  // Hàm cập nhật state user (ví dụ sau khi update ví thành công ở ProfilePage)
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

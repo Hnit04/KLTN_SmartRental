@@ -5,7 +5,7 @@ import type {
   RegisterRequest, 
   User,
   TokenRefreshResponse 
-} from '../../types/auth';
+} from '../../types';
 export const authApi = {
   // Đăng nhập
   login: async (data: LoginRequest): Promise<LoginResponse> => {

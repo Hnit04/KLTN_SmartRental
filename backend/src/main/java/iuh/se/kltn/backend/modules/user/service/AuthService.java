@@ -8,11 +8,13 @@ import iuh.se.kltn.backend.modules.user.dto.request.TokenRefreshRequest;
 import iuh.se.kltn.backend.modules.user.dto.request.UserRegisterRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.LoginResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.TokenRefreshResponse;
+import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse; // Import mới
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.RefreshToken;
 import iuh.se.kltn.backend.modules.user.entity.Tenant;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
+import org.modelmapper.ModelMapper; // Import mới
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -38,6 +40,9 @@ public class AuthService {
 
     @Autowired
     private RefreshTokenService refreshTokenService;
+
+    @Autowired
+    private ModelMapper modelMapper;
 
     // ĐĂNG KÝ
     public User register(UserRegisterRequest request) {
@@ -72,9 +77,8 @@ public class AuthService {
         return userRepository.save(newUser);
     }
 
-    // ĐĂNG NHẬP
+    // ĐĂNG NHẬP (ĐÃ SỬA)
     public LoginResponse login(LoginRequest request) {
-        // 1. Xác thực username/password
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
@@ -82,28 +86,25 @@ public class AuthService {
                 )
         );
 
-        // 2. Lưu vào Security Context
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 3. Tạo Access Token (JWT)
         String jwt = tokenProvider.generateToken(authentication);
-
-        // 4. Lấy thông tin UserPrincipal từ Authentication để lấy ID
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-
-        // 5. Tạo Refresh Token lưu xuống DB
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(userPrincipal.getId());
-
-        // 6. Trả về LoginResponse đầy đủ thông tin
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        UserProfileResponse userProfile = modelMapper.map(user, UserProfileResponse.class);
+        if (user instanceof Landlord) {
+            userProfile.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
+        }
         return new LoginResponse(
                 jwt,
                 refreshToken.getToken(),
-                userPrincipal.getId(),
-                userPrincipal.getUsername(),
-                userPrincipal.getEmail(),
-                userPrincipal.getAuthorities().iterator().next().getAuthority()
+                userProfile
         );
     }
+
+    // REFRESH TOKEN
     public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {
         String requestRefreshToken = request.getRefreshToken();
 
@@ -111,20 +112,13 @@ public class AuthService {
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {
-                    // 1. Tạo lại UserPrincipal từ user tìm được
                     UserPrincipal userPrincipal = UserPrincipal.create(user);
-
-                    // 2. Tạo Authentication object (cần thiết để sinh JWT)
                     Authentication authentication = new UsernamePasswordAuthenticationToken(
                             userPrincipal,
                             null,
                             userPrincipal.getAuthorities()
                     );
-
-                    // 3. Sinh Access Token mới
                     String newAccessToken = tokenProvider.generateToken(authentication);
-
-                    // 4. Trả về token mới + refresh token cũ
                     return new TokenRefreshResponse(newAccessToken, requestRefreshToken);
                 })
                 .orElseThrow(() -> new RuntimeException("Refresh token không tồn tại trong hệ thống!"));

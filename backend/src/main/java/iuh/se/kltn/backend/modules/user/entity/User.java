@@ -8,6 +8,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -31,7 +32,8 @@ public class User {
 
     @Column(unique = true)
     private String email;
-
+    private String currentAddress;
+    private LocalDate dateOfBirth;
     private String phoneNumber;
 
     private String zaloPhone;
