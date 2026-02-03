@@ -35,7 +35,7 @@ export default function LoginPage() {
 
       // ✅ Đăng nhập thành công
       toast.success("Đăng nhập thành công!", {
-        description: "Đang chuyển hướng đến Dashboard...",
+        description: "Đang chuyển hướng đến Trang chủ...",
         duration: 3000,
       });
 

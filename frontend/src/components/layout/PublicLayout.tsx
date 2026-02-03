@@ -1,76 +1,89 @@
-import { Outlet, Link, useNavigate } from "react-router-dom";
+import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { 
-  Home, 
-  Star, 
-  LogOut, 
-  LayoutDashboard, 
-  User as UserIcon 
+import {
+  Home,
+  Star,
+  LogOut,
+  LayoutDashboard,
 } from "lucide-react";
-// 1. Import hook useAuth
 import { useAuth } from "../../context/AuthContext";
 
 export default function PublicLayout() {
-  // 2. Lấy thông tin user và hàm logout
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  console.log(user);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
+  // Class dùng chung cho menu header
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `text-sm font-medium transition-colors ${
+      isActive
+        ? "text-primary font-semibold"
+        : "text-muted-foreground hover:text-primary"
+    }`;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
               <Home className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">SmartRental</span>
+            <span className="text-xl font-bold text-foreground">
+              SmartRental
+            </span>
           </Link>
 
+          {/* Menu */}
           <nav className="hidden items-center gap-6 md:flex">
-            <Link to="/" className="text-sm font-medium text-foreground hover:text-primary">
+            <NavLink to="/" end className={navLinkClass}>
               Trang chủ
-            </Link>
-            <Link to="/properties" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/properties" className={navLinkClass}>
               Tìm phòng
-            </Link>
-            <Link to="/contact" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/contact" className={navLinkClass}>
               Liên hệ
-            </Link>
-            <Link to="/help" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/help" className={navLinkClass}>
               Trợ giúp
-            </Link>
+            </NavLink>
           </nav>
 
-          {/* 3. Phần hiển thị Động theo trạng thái đăng nhập */}
+          {/* Auth Actions */}
           <div className="flex items-center gap-3">
             {isAuthenticated && user ? (
-              // --- GIAO DIỆN KHI ĐÃ ĐĂNG NHẬP ---
               <>
                 <div className="hidden md:flex flex-col items-end mr-2">
                   <span className="text-sm font-medium leading-none">
-                    {user.fullName || user.username}
+                     {user.fullName || user.username}
                   </span>
                   <span className="text-xs text-muted-foreground mt-1 uppercase">
                     {user.role}
                   </span>
                 </div>
-                
-                <Link to="/dashboard">
-                  <Button variant="default" size="sm" className="gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Button>
-                </Link>
 
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                {user?.role === "ROLE_LANDLORD" && (
+                  <Link to="/dashboard">
+                    <Button size="sm" className="gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                )}
+
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleLogout}
                   title="Đăng xuất"
                 >
@@ -78,10 +91,11 @@ export default function PublicLayout() {
                 </Button>
               </>
             ) : (
-              // --- GIAO DIỆN KHI CHƯA ĐĂNG NHẬP ---
               <>
                 <Link to="/login">
-                  <Button variant="ghost" size="sm">Đăng nhập</Button>
+                  <Button variant="ghost" size="sm">
+                    Đăng nhập
+                  </Button>
                 </Link>
                 <Link to="/register">
                   <Button size="sm">Đăng ký</Button>
@@ -92,7 +106,7 @@ export default function PublicLayout() {
         </div>
       </header>
 
-      {/* ─── MAIN CONTENT ─── */}
+      {/* ─── MAIN ─── */}
       <main className="flex-1">
         <Outlet />
       </main>
@@ -112,32 +126,64 @@ export default function PublicLayout() {
                 Nền tảng thuê phòng thông minh, kết nối chủ trọ và người thuê.
               </p>
             </div>
+
             <div>
-              <h4 className="font-semibold text-foreground">Sản phẩm</h4>
+              <h4 className="font-semibold">Sản phẩm</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/properties" className="hover:text-primary">Tìm phòng</Link></li>
-                <li><Link to="#" className="hover:text-primary">Tính năng</Link></li>
+                <li>
+                  <Link to="/properties" className="hover:text-primary">
+                    Tìm phòng
+                  </Link>
+                </li>
+                <li>
+                  <Link to="#" className="hover:text-primary">
+                    Tính năng
+                  </Link>
+                </li>
               </ul>
             </div>
+
             <div>
-              <h4 className="font-semibold text-foreground">Hỗ trợ</h4>
+              <h4 className="font-semibold">Hỗ trợ</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/help" className="hover:text-primary">Trung tâm trợ giúp</Link></li>
-                <li><Link to="/contact" className="hover:text-primary">Liên hệ</Link></li>
-                <li><Link to="/faq" className="hover:text-primary">FAQ</Link></li>
+                <li>
+                  <Link to="/help" className="hover:text-primary">
+                    Trung tâm trợ giúp
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className="hover:text-primary">
+                    Liên hệ
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/faq" className="hover:text-primary">
+                    FAQ
+                  </Link>
+                </li>
               </ul>
             </div>
+
             <div>
-              <h4 className="font-semibold text-foreground">Pháp lý</h4>
+              <h4 className="font-semibold">Pháp lý</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/privacy" className="hover:text-primary">Chính sách bảo mật</Link></li>
-                <li><Link to="/terms" className="hover:text-primary">Điều khoản sử dụng</Link></li>
+                <li>
+                  <Link to="/privacy" className="hover:text-primary">
+                    Chính sách bảo mật
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms" className="hover:text-primary">
+                    Điều khoản sử dụng
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
+
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 sm:flex-row">
             <p className="text-sm text-muted-foreground">
-              2024 SmartRental. All rights reserved.
+              © 2024 SmartRental. All rights reserved.
             </p>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Star className="h-4 w-4 fill-primary text-primary" />

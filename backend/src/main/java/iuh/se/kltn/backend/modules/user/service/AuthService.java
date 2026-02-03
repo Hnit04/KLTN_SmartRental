@@ -101,7 +101,9 @@ public class AuthService {
                 userPrincipal.getId(),
                 userPrincipal.getUsername(),
                 userPrincipal.getEmail(),
-                userPrincipal.getAuthorities().iterator().next().getAuthority()
+                userPrincipal.getAuthorities().iterator().next().getAuthority(),
+                userPrincipal.getFullName()
+
         );
     }
     public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {

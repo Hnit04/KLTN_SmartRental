@@ -78,6 +78,9 @@ export default function ContactPage() {
                       <a href="mailto:trancongtinh20042004@gmail.com" className="text-muted-foreground text-sm mt-1 block hover:text-primary transition-colors">
                         trancongtinh20042004@gmail.com
                       </a>
+                      <a href="mailto:tranngochung19112004@gmail.com" className="text-muted-foreground text-sm mt-1 block hover:text-primary transition-colors">
+                        tranngochung19112004@gmail.com
+                      </a>
                       <a href="mailto:business@smartrental.vn" className="text-muted-foreground text-sm block hover:text-primary transition-colors">
                         business@smartrental.vn
                       </a>
@@ -92,7 +95,7 @@ export default function ContactPage() {
                     <div>
                       <h3 className="font-semibold text-foreground">Hotline</h3>
                       <a href="tel:1900123456" className="text-muted-foreground text-sm mt-1 block hover:text-primary font-medium">
-                        1900 123 456
+                        1900 1234
                       </a>
                       <p className="text-xs text-muted-foreground">(Cước phí: 1.000đ/phút)</p>
                     </div>

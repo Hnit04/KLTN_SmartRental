@@ -57,13 +57,14 @@ function App() {
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
-          </Route>
-
-          {/* ─── GROUP: AUTH PAGES ─── */}
+            {/* ─── GROUP: AUTH PAGES ─── */}
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
+          </Route>
+
+          
 
           {/* ─── GROUP: PROTECTED PAGES (Dashboard) ─── */}
           <Route element={<ProtectedRoute />}>

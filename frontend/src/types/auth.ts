@@ -28,6 +28,7 @@ export interface LoginResponse {
   username: string;
   email: string;
   role: UserRole;
+  fullName: string;
 }
 
 // 4. Token Refresh Request

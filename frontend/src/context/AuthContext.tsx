@@ -37,14 +37,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
-      
+      console.log("Login response data:", data);
       // Map dữ liệu LoginResponse sang User
       const userData: User = {
         id: data.id,
         username: data.username,
         email: data.email,
         role: data.role,
-        fullName: data.username,
+        fullName: data.fullName, 
         kycStatus: 'NOT_VERIFIED',
         reputationScore: 0,
       };
