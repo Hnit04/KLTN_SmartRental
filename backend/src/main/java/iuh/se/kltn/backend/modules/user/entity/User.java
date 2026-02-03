@@ -9,6 +9,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -39,7 +40,8 @@ public class User {
     @NotBlank(message = "Email không được để trống")
     @Column(unique = true)
     private String email;
-
+    private String currentAddress;
+    private LocalDate dateOfBirth;
     @Pattern(regexp = "^(0|\\+84)[0-9]{9}$", message = "Số điện thoại không hợp lệ")
     private String phoneNumber;
 

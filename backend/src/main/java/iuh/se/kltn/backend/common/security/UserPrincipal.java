@@ -17,11 +17,12 @@ import java.util.List;
 public class UserPrincipal implements UserDetails {
     private Long id;
     private String username;
-
     private String email;
-    private String fullName;
     @JsonIgnore
     private String password;
+
+    private String fullName;
+    private String avatarUrl;
 
     private Collection<? extends GrantedAuthority> authorities;
 
@@ -36,9 +37,12 @@ public class UserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getFullName(),
                 user.getPassword(),
+                user.getFullName(),
+                user.getAvatarUrl(),
                 authorities
         );
     }
+
 
     @Override
     public boolean isAccountNonExpired() { return true; }

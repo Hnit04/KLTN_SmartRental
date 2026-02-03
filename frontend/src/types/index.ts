@@ -1,186 +1,184 @@
-// User types
+// ==========================================
+// 1. USER & AUTH TYPES
+// ==========================================
+
 export type UserRole = "TENANT" | "LANDLORD" | "ADMIN";
-export type KYCStatus = "PENDING" | "APPROVED" | "REJECTED";
-export type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED"; 
 
 export interface User {
-  id: string | number; // Chấp nhận cả number (do backend trả number) và string
+  id: number;
+  username: string;
   email: string;
-  username?: string;
-  fullName: string;    // Frontend sẽ dùng chuẩn này
-  phoneNumber?: string;
-  dateOfBirth?: string;
-  socialAddress?: string;
-  currentAddress?: string;
-  cccd?: string;
-  avatar?: string;
-  reputationScore?: number;
+  fullName: string;
   role: UserRole;
+  
+  // Optional fields
+  phoneNumber?: string;
+  avatarUrl?: string;      
+  walletAddress?: string;  
+  cccdNumber?: string;     
+  dateOfBirth?: string;    
+  currentAddress?: string;
+  
+  // ✅ Giữ nguyên zaloPhone (Backend có)
+  zaloPhone?: string;      
+  
+  // System fields
+  reputationScore: number; 
   kycStatus: KYCStatus;
-  createdAt?: string;  // [QUAN TRỌNG] Thêm ? vì API login có thể không trả về cái này
+  createdAt: string;       
+  updatedAt: string;       
 }
 
-export interface Landlord extends User {
-  businessLicenseUrl?: string;
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken?: string;
+  user: User; // Backend trả về UserProfileResponse lồng trong user -> Khớp
 }
 
-export interface Tenant extends User {
-  preference?: TenantPreference;
+// ✅ BỔ SUNG: Interface cho API Login (authApi.ts cần cái này)
+export interface LoginRequest {
+  username: string;
+  password: string;
 }
 
-export interface TenantPreference {
-  id: string;
-  targetPriceMin?: number;
-  targetPriceMax?: number;
-  preferredLocation?: string;
-  hasJob?: boolean;
-  amenitiesRef?: string;
+export interface RegisterRequest {
+  username: string;
+  password?: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  walletAddress?: string;
 }
 
-// Property types
-export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
+// ✅ Khớp hoàn toàn với UpdateProfileRequest.java
+export interface UpdateProfileRequest {
+  fullName?: string;
+  phoneNumber?: string;
+  zaloPhone?: string;     
+  dateOfBirth?: string;   
+  currentAddress?: string;
+  cccdNumber?: string;
+  avatarUrl?: string; 
+}
 
-// src/types/property.ts
+// ==========================================
+// 2. PROPERTY & ROOM TYPES
+// ==========================================
 
 export interface Property {
   id: number;
-  name: string;            // Map với Property.java: name
-  address: string;         // Map với Property.java: address
-  district: string;        // Map với Property.java: district
-  city: string;            // Map với Property.java: city
+  name: string;
+  address: string;
+  district: string;
+  city: string;
   description: string;
-  
-  // Giá dịch vụ (Map với Property.java)
-  elecPrice: number;       
+  elecPrice: number;
   waterPrice: number;
   internetPrice: number;
-  
-  images: string[];        // Map với Property.java: images (List<String>)
-  landlordName?: string;   
-  
-  // UI Fields (Backend chưa trả về, nhưng cần để hiển thị Card)
-  minPrice?: number;       // Giá phòng thấp nhất trong khu
-  maxPrice?: number;       // Giá phòng cao nhất trong khu
-  totalRooms?: number;     // Tổng số phòng
-  availableRooms?: number; // Số phòng còn trống
+  images: string[];
+  landlordId?: number;
+  landlordName?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  totalRooms?: number;
+  availableRooms?: number;
 }
+
+export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
 
 export interface Room {
   id: number;
   name: string;
   price: number;
   area: number;
-  status: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
+  status: RoomStatus;
   images: string[];
-  amenities: string[];
+  amenities: string[]; 
+  description?: string;
+  propertyId: number;
 }
 
-// Contract types
+// ==========================================
+// 3. CONTRACT TYPES
+// ==========================================
+
 export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY";
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED";
 
 export interface Contract {
-  id: string;
-  signDate?: string;
+  id: number; // Đã sửa thành number
+  code: string; 
+  
+  tenantId: number;
+  landlordId: number;
+  roomId: number;
+  
+  createdDate: string;
   startDate: string;
-  actualEndDate?: string;
+  endDate: string;
+  actualEndDate?: string; 
+  signDate?: string;      
+  
   depositAmount: number;
-  content?: string;
-  contractOwnerName: string;
-  contractOwnerAddress: string;
-  depositTrash?: string;
+  monthlyPrice: number;
   depositStatus: DepositStatus;
+  
   status: ContractStatus;
-  roomId: string;
-  members?: ContractMember[];
+  contentUrl?: string;    
 }
 
-export interface ContractMember {
-  id: string;
-  fullName: string;
-  cccdNumber: string;
-  phoneNumber?: string;
-  dateOfBirth?: string;
-  contractDate: string;
-  hometownPlace?: string;
-  status: RequestStatus;
-  leftDate?: string;
-}
+// ==========================================
+// 4. UTILITY TYPES (Bills, Notifications...)
+// ==========================================
 
-// Bill types
-export type BillStatus = "UNPAID" | "PAID" | "LATE";
+export type BillStatus = "UNPAID" | "PAID" | "OVERDUE";
 
 export interface Bill {
-  id: string;
+  id: number;
+  title: string;
+  // ✅ Sửa thành number để khớp với Contract.id (nếu dùng quan hệ DB)
+  contractId: number; 
   oldElecIndex: number;
   newElecIndex: number;
   oldWaterIndex: number;
   newWaterIndex: number;
   totalAmount: number;
-  extraChargeRate?: number;
-  paymentTrash?: string;
-  extraFee?: number;
+  serviceFee: number;
   status: BillStatus;
+  deadline: string;
   paidAt?: string;
-  contractId: string;
 }
 
-// Appointment types
-export type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
-
-export interface Appointment {
-  id: string;
-  name: string;
-  address?: string;
-  meetTime: string;
-  role?: string;
-  meetingLink?: string;
-  status: AppointmentStatus;
-  userId: string;
-  propertyId: string;
-}
-
-// Notification types
-export type NotificationType = "SYSTEM" | "PAYMENT_REMINDER" | "CONTRACT_UPDATE" | "NEW_REVIEW";
+export type NotificationType = "SYSTEM" | "PAYMENT" | "CONTRACT";
 
 export interface Notification {
-  id: string;
+  id: number;
   title: string;
   message: string;
   type: NotificationType;
-  referenceId?: string;
   isRead: boolean;
   createdAt: string;
 }
 
-// Review types
-export interface Review {
-  id: string;
-  rating: number;
-  content?: string;
-  createdAt: string;
-  userId: string;
-  propertyId: string;
-}
-
-// API Response types
 export interface ApiResponse<T> {
-  data: T;
-  message?: string;
   success: boolean;
+  message: string;
+  data: T;
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
+  content: T[];
   page: number;
-  limit: number;
+  size: number;
+  totalElements: number;
   totalPages: number;
+  last: boolean;
 }
+export type LoginResponse = AuthResponse;
 
-
-export interface AuthResponse {
+// Định nghĩa cho Response khi Refresh Token
+export interface TokenRefreshResponse {
   accessToken: string;
-  refreshToken?: string;          // optional nếu backend không luôn trả
-  user: User;
+  refreshToken: string;
 }

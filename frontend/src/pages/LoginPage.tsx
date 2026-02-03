@@ -31,7 +31,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(formData.username, formData.password);
+      await login(formData);
 
       // ✅ Đăng nhập thành công
       toast.success("Đăng nhập thành công!", {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authApi } from "../api/api/authApi"; // <-- Sửa đường dẫn import
-import type { RegisterRequest } from "../types/auth"; // <-- Sửa đường dẫn import
+import type { RegisterRequest } from "../types/index"; // <-- Sửa đường dẫn import
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";

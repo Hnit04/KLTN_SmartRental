@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.user.service;
 
 import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
+import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
@@ -27,16 +28,27 @@ public class UserService {
         }
         return response;
     }
+    public UserProfileResponse updateUserProfile(Long userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        if (request.getFullName() != null) user.setFullName(request.getFullName());
+        if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
+        if (request.getCccdNumber() != null) user.setCccdNumber(request.getCccdNumber());
+        if (request.getZaloPhone() != null) user.setZaloPhone(request.getZaloPhone());
+        if (request.getCurrentAddress() != null) user.setCurrentAddress(request.getCurrentAddress());
+        if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
 
-    // Cập nhật ví MetaMask
+        User updatedUser = userRepository.save(user);
+        return modelMapper.map(updatedUser, UserProfileResponse.class);
+    }
     public void updateWalletAddress(Long userId, String walletAddress) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-
-        // Kiểm tra xem ví này có ai dùng chưa
-        if (userRepository.existsByWalletAddress(walletAddress)) {
-            throw new RuntimeException("Ví này đã được liên kết với tài khoản khác!");
-        }
+        userRepository.findByWalletAddress(walletAddress).ifPresent(existingUser -> {
+            if (!existingUser.getId().equals(userId)) {
+                throw new RuntimeException("Ví này đã được liên kết với tài khoản khác!");
+            }
+        });
 
         user.setWalletAddress(walletAddress);
         userRepository.save(user);

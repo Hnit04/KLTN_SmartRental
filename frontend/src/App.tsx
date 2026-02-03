@@ -14,7 +14,7 @@ import HelpCenter from "./pages/HelpCenter";
 import FAQPage from "./pages/FAQPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
-
+import ProfilePage from "./pages/ProfilePage";
 // 1. IMPORT TRANG DANH SÁCH PHÒNG
 import PropertiesPage from "./pages/PropertiesPage";
 
@@ -69,6 +69,7 @@ function App() {
           {/* ─── GROUP: PROTECTED PAGES (Dashboard) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
               {/* <Route path="/dashboard" element={<Dashboard />} /> */}
             </Route>
           </Route>
