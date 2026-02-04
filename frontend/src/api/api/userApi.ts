@@ -10,5 +10,16 @@ export const userApi = {
   updateProfile: async (data: UpdateProfileRequest): Promise<User> => {
     const response = await axiosClient.put<User>('/users/profile', data);
     return response.data;
+  },
+  uploadAvatar: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file); 
+
+    const response = await axiosClient.post<string>('/users/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data; 
   }
 };

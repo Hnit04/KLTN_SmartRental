@@ -35,7 +35,10 @@ jwt:
   secret: "7u7KqQ4TQXtK5vXvKDGZ9h3jHfYZ8vWqLxP9xJv0C7z7Fj8xE1JvY7TqHkQzU2JmO2XxZs7NfUqR2BvV7hTzN2RwXqQwWmR8"
   expiration: 86400000        # 1 ngày
   refreshExpiration: 2592000000 # 30 ngày
-
+cloudinary:
+  cloud-name: "dvvlxnwuk"
+  api-key: "553714881642637"
+  api-secret: "sAL6KmfpT3N9kY0OePv6uVnt6Sg"  
 # File Storage
 file:
   upload-dir: "uploads/"

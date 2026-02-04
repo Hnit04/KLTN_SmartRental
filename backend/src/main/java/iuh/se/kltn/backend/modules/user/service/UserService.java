@@ -53,4 +53,11 @@ public class UserService {
         user.setWalletAddress(walletAddress);
         userRepository.save(user);
     }
+    public void updateAvatar(Long userId, String avatarUrl) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAvatarUrl(avatarUrl);
+        userRepository.save(user);
+    }
 }

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   User, Mail, Phone, ShieldCheck, Wallet, 
-  MapPin, Calendar, Edit3, CheckCircle2, X, Save, MessageCircle 
+  MapPin, Calendar, Edit3, CheckCircle2, X, Save, MessageCircle, Camera 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -24,9 +24,13 @@ const ProfilePage = () => {
   // State quản lý loading
   const [isUpdatingWallet, setIsUpdatingWallet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false); // Loading avatar
   
   // State quản lý Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Ref cho input file upload avatar
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // State Form dữ liệu
   const [formData, setFormData] = useState({
@@ -45,16 +49,59 @@ const ProfilePage = () => {
         fullName: user.fullName || '',
         phoneNumber: user.phoneNumber || '',
         zaloPhone: user.zaloPhone || '',
-        dateOfBirth: user.dateOfBirth || '',
+        dateOfBirth: user.dateOfBirth ? (Array.isArray(user.dateOfBirth) ? convertArrDateToString(user.dateOfBirth) : user.dateOfBirth) : '',
         currentAddress: user.currentAddress || '',
         cccdNumber: user.cccdNumber || '',
       });
     }
   }, [isEditModalOpen, user]);
 
-  // --- 🔥 1. ĐÃ SỬA: HÀM KẾT NỐI VÍ METAMASK ---
+  // Helper chuyển mảng ngày [yyyy, mm, dd] sang chuỗi "yyyy-mm-dd" cho input date
+  const convertArrDateToString = (dateArr: any) => {
+    if (!Array.isArray(dateArr)) return dateArr;
+    const [year, month, day] = dateArr;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  // --- 1. XỬ LÝ UPLOAD AVATAR ---
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click(); // Kích hoạt input file ẩn
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate size (ví dụ: giới hạn 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB.");
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      
+      // Gọi API Upload (Đã thêm trong userApi.ts)
+      const newAvatarUrl = await userApi.uploadAvatar(file);
+
+      // Cập nhật Context
+      updateUser({ ...user, avatarUrl: newAvatarUrl });
+      
+      toast.success("Đổi ảnh đại diện thành công!");
+    } catch (error) {
+      console.error("Lỗi upload avatar:", error);
+      toast.error("Không thể tải ảnh lên. Vui lòng thử lại.");
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset input để cho phép chọn lại cùng 1 file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // --- 2. XỬ LÝ KẾT NỐI VÍ METAMASK ---
   const handleConnectWallet = async () => {
-    // Kiểm tra cài đặt MetaMask
     if (!window.ethereum) {
       toast.error("Vui lòng cài đặt MetaMask để sử dụng tính năng này!");
       return;
@@ -63,7 +110,6 @@ const ProfilePage = () => {
     try {
       setIsUpdatingWallet(true);
       
-      // Yêu cầu quyền truy cập ví
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const address = accounts[0];
 
@@ -72,18 +118,16 @@ const ProfilePage = () => {
         return;
       }
 
-      // ✅ FIX: Dùng 'params' để axios tự encode URL chuẩn xác, tránh lỗi cú pháp
-      await axiosClient.put('users/wallet', null, {
+      // Gọi API update wallet (Dùng params để tránh lỗi URL)
+      await axiosClient.put('/users/wallet', null, {
         params: { address: address }
       });
       
-      // Cập nhật Context ngay lập tức
       if (user) updateUser({ ...user, walletAddress: address });
       
       toast.success("Kết nối ví thành công!");
     } catch (error: any) {
       console.error("Lỗi ví:", error);
-      // Hiển thị thông báo lỗi chi tiết từ Backend
       const message = error.response?.data || error.message || "Lỗi kết nối ví.";
       toast.error(typeof message === 'string' ? message : "Không thể liên kết ví này.");
     } finally {
@@ -91,7 +135,7 @@ const ProfilePage = () => {
     }
   };
 
-  // --- 2. XỬ LÝ CẬP NHẬT HỒ SƠ ---
+  // --- 3. XỬ LÝ CẬP NHẬT HỒ SƠ ---
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -103,7 +147,7 @@ const ProfilePage = () => {
         fullName: formData.fullName,
         phoneNumber: formData.phoneNumber,
         zaloPhone: formData.zaloPhone,
-        dateOfBirth: formData.dateOfBirth,
+        dateOfBirth: formData.dateOfBirth, // Gửi chuỗi yyyy-mm-dd
         currentAddress: formData.currentAddress,
         cccdNumber: formData.cccdNumber,
       });
@@ -129,17 +173,43 @@ const ProfilePage = () => {
         <div className="h-32 bg-gradient-to-r from-primary/20 to-primary/5" />
         <div className="px-8 pb-8">
           <div className="relative flex flex-col md:flex-row items-end gap-5 -mt-12">
-            {/* Avatar Box */}
-            <div className="h-24 w-24 rounded-2xl bg-white p-1 shadow-lg">
-              <div className="h-full w-full rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden border">
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-3xl font-bold text-primary">
-                    {user.fullName?.charAt(0).toUpperCase() || user.username.charAt(0).toUpperCase()}
-                  </span>
-                )}
+            
+            {/* AVATAR BOX (Clickable) */}
+            <div className="relative group">
+              <div 
+                className="h-24 w-24 rounded-2xl bg-white p-1 shadow-lg cursor-pointer transition-transform hover:scale-105"
+                onClick={handleAvatarClick}
+                title="Nhấn để đổi ảnh đại diện"
+              >
+                <div className="h-full w-full rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden border relative">
+                  {/* Hiển thị Avatar */}
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-bold text-primary">
+                      {user.fullName?.charAt(0).toUpperCase() || user.username.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+
+                  {/* Overlay khi hover hoặc loading */}
+                  <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isUploadingAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {isUploadingAvatar ? (
+                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Camera className="h-6 w-6 text-white" />
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Input File Ẩn */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleFileChange}
+              />
             </div>
             
             {/* User Basic Info */}
@@ -365,6 +435,8 @@ const ProfilePage = () => {
     </div>
   );
 };
+
+// --- Sub-components (UI nhỏ) ---
 
 const InfoItem = ({ label, value, icon }: any) => (
   <div className="space-y-1">
