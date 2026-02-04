@@ -1,3 +1,5 @@
+// src/types/index.ts
+
 // ==========================================
 // 1. USER & AUTH TYPES
 // ==========================================
@@ -23,6 +25,10 @@ export interface User {
   // ✅ Giữ nguyên zaloPhone (Backend có)
   zaloPhone?: string;      
   
+  // 🔥 BỔ SUNG 2 TRƯỜNG NÀY ĐỂ TRÁNH LỖI TS KHI UPDATE CONTEXT
+  cccdFrontUrl?: string;   
+  cccdBackUrl?: string;    
+  
   // System fields
   reputationScore: number; 
   kycStatus: KYCStatus;
@@ -33,10 +39,10 @@ export interface User {
 export interface AuthResponse {
   accessToken: string;
   refreshToken?: string;
-  user: User; // Backend trả về UserProfileResponse lồng trong user -> Khớp
+  user: User; 
 }
 
-// ✅ BỔ SUNG: Interface cho API Login (authApi.ts cần cái này)
+// Interface cho API Login
 export interface LoginRequest {
   username: string;
   password: string;
@@ -51,7 +57,7 @@ export interface RegisterRequest {
   walletAddress?: string;
 }
 
-// ✅ Khớp hoàn toàn với UpdateProfileRequest.java
+// Khớp với UpdateProfileRequest.java
 export interface UpdateProfileRequest {
   fullName?: string;
   phoneNumber?: string;
@@ -107,7 +113,7 @@ export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMI
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED";
 
 export interface Contract {
-  id: number; // Đã sửa thành number
+  id: number;
   code: string; 
   
   tenantId: number;
@@ -137,7 +143,6 @@ export type BillStatus = "UNPAID" | "PAID" | "OVERDUE";
 export interface Bill {
   id: number;
   title: string;
-  // ✅ Sửa thành number để khớp với Contract.id (nếu dùng quan hệ DB)
   contractId: number; 
   oldElecIndex: number;
   newElecIndex: number;
@@ -175,9 +180,9 @@ export interface PaginatedResponse<T> {
   totalPages: number;
   last: boolean;
 }
+
 export type LoginResponse = AuthResponse;
 
-// Định nghĩa cho Response khi Refresh Token
 export interface TokenRefreshResponse {
   accessToken: string;
   refreshToken: string;
