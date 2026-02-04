@@ -80,4 +80,9 @@ public class User {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column(name = "cccd_front_url")
+    private String cccdFrontUrl;
+
+    @Column(name = "cccd_back_url")
+    private String cccdBackUrl;
 }

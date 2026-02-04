@@ -31,4 +31,6 @@ public class UserProfileResponse {
     private String businessLicenseUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String cccdFrontUrl;
+    private String cccdBackUrl;
 }

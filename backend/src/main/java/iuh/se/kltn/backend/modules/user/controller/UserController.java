@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.service.UserService;
@@ -23,7 +24,8 @@ public class UserController {
 
     @Autowired
     private CloudinaryService cloudinaryService;
-
+    @Autowired
+    private OcrService ocrService;
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
@@ -56,17 +58,47 @@ public class UserController {
                 return ResponseEntity.badRequest().body("File không được để trống");
             }
 
-            // 1. Upload lên Cloudinary
             String avatarUrl = cloudinaryService.uploadImage(file);
 
-            // 2. Lưu URL vào Database (Bạn cần thêm hàm updateAvatar trong UserService)
             userService.updateAvatar(currentUser.getId(), avatarUrl);
 
-            // 3. Trả về URL cho Frontend hiển thị ngay
             return ResponseEntity.ok(avatarUrl);
 
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body("Lỗi upload ảnh: " + e.getMessage());
+        }
+    }
+    @PostMapping(value = "/kyc", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> submitKYC(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam("cccdNumber") String cccdNumber,
+            @RequestParam("frontImage") MultipartFile frontImage,
+            @RequestParam("backImage") MultipartFile backImage) {
+
+        try {
+            System.out.println("Đang gửi ảnh sang FPT.AI...");
+            String extractedId = ocrService.extractIdNumber(frontImage);
+            System.out.println("AI đọc được: " + extractedId);
+            System.out.println("User nhập: " + cccdNumber);
+
+            boolean isAutoVerified = false;
+            if (extractedId != null && extractedId.equals(cccdNumber)) {
+                isAutoVerified = true;
+            }
+
+            String frontUrl = cloudinaryService.uploadImage(frontImage);
+            String backUrl = cloudinaryService.uploadImage(backImage);
+
+            userService.submitKYC(currentUser.getId(), cccdNumber, frontUrl, backUrl, isAutoVerified);
+
+            if (isAutoVerified) {
+                return ResponseEntity.ok("Xác thực danh tính thành công! (Duyệt tự động)");
+            } else {
+                return ResponseEntity.ok("Hồ sơ đã gửi. Hệ thống đang chờ Admin duyệt thủ công (Do ảnh mờ hoặc không khớp).");
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Lỗi xử lý: " + e.getMessage());
         }
     }
 }
