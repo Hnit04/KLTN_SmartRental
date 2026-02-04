@@ -48,7 +48,7 @@ public class User {
     @Pattern(regexp = "^(0|\\+84)[0-9]{9}$", message = "Số điện thoại không hợp lệ")
     private String zaloPhone;
 
-    @Column(unique = true)
+
     private String walletAddress;
 
     private String avatarUrl;
