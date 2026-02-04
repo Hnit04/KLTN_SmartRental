@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,8 +12,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class UserPrincipal implements UserDetails {
     private Long id;
@@ -22,7 +25,9 @@ public class UserPrincipal implements UserDetails {
     private String password;
 
     private String fullName;
+    private String phoneNumber;
     private String avatarUrl;
+    private String walletAddress;
 
     private Collection<? extends GrantedAuthority> authorities;
 
@@ -37,11 +42,12 @@ public class UserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getPassword(),
                 user.getFullName(),
+                user.getPhoneNumber(),
                 user.getAvatarUrl(),
+                user.getWalletAddress(),
                 authorities
         );
     }
-
 
     @Override
     public boolean isAccountNonExpired() { return true; }
@@ -51,4 +57,17 @@ public class UserPrincipal implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
     @Override
     public boolean isEnabled() { return true; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserPrincipal that = (UserPrincipal) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
 }
