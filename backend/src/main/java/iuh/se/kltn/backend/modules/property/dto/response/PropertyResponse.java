@@ -20,8 +20,8 @@ public class PropertyResponse {
 
     private List<String> images;
     private String landlordName;
+    private String landlordPhone;
 
-    // --- CÁC TRƯỜNG MỚI (Dữ liệu tính toán) ---
     private Double minPrice;       // Giá thấp nhất
     private Double maxPrice;       // Giá cao nhất
     private Integer availableRooms; // Số phòng còn trống

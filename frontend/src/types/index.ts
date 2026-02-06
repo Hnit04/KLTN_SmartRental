@@ -85,6 +85,7 @@ export interface Property {
   images: string[];
   landlordId?: number;
   landlordName?: string;
+  landlordPhone?: string;
   minPrice?: number;
   maxPrice?: number;
   totalRooms?: number;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { authApi } from "../api/api/authApi";
-import type { RegisterRequest } from "../types/index";
+import { authApi } from "../../api/authApi";
+import type { RegisterRequest } from "../../types/index";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";

@@ -1,11 +1,11 @@
-import axiosClient from '../axiosClient'; // Import từ file axiosClient.ts bên ngoài
+import axiosClient from './axiosClient'; 
 import type { 
   LoginRequest, 
   LoginResponse, 
   RegisterRequest, 
   User,
   TokenRefreshResponse 
-} from '../../types';
+} from '../types';
 export const authApi = {
   // Đăng nhập
   login: async (data: LoginRequest): Promise<LoginResponse> => {

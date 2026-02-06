@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import axiosClient from '@/api/axiosClient';
-import { userApi } from '@/api/api/userApi'; 
+import { userApi } from '@/api/userApi'; 
 import { toast } from 'sonner';
 
 // Khai báo global interface cho MetaMask
@@ -24,21 +24,19 @@ const ProfilePage = () => {
   // State quản lý loading
   const [isUpdatingWallet, setIsUpdatingWallet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false); // Loading avatar
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   
   // State quản lý Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-  // --- STATE CHO KYC (MỚI) ---
   const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+
+  // State Form & KYC
   const [kycFiles, setKycFiles] = useState<{ front: File | null, back: File | null }>({ front: null, back: null });
   const [kycPreviews, setKycPreviews] = useState<{ front: string, back: string }>({ front: '', back: '' });
-  const [kycCCCD, setKycCCCD] = useState(''); // Số CCCD trong modal KYC
-
-  // Ref cho input file upload avatar
+  const [kycCCCD, setKycCCCD] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State Form dữ liệu
   const [formData, setFormData] = useState({
     fullName: '',
     phoneNumber: '',
@@ -48,7 +46,7 @@ const ProfilePage = () => {
     cccdNumber: '',
   });
 
-  // Load dữ liệu user vào form chỉnh sửa
+  // --- USE EFFECTS ---
   useEffect(() => {
     if (isEditModalOpen && user) {
       setFormData({
@@ -62,7 +60,6 @@ const ProfilePage = () => {
     }
   }, [isEditModalOpen, user]);
 
-  // Reset form KYC khi mở modal
   useEffect(() => {
     if (isKycModalOpen && user) {
       setKycCCCD(user.cccdNumber || '');
@@ -71,205 +68,129 @@ const ProfilePage = () => {
     }
   }, [isKycModalOpen, user]);
 
-  // Helper chuyển mảng ngày [yyyy, mm, dd] sang chuỗi "yyyy-mm-dd"
   const convertArrDateToString = (dateArr: any) => {
     if (!Array.isArray(dateArr)) return dateArr;
     const [year, month, day] = dateArr;
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
-  // --- 1. XỬ LÝ UPLOAD AVATAR ---
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+  // --- HANDLERS ---
+  const handleAvatarClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
-
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB.");
       return;
     }
-
     try {
       setIsUploadingAvatar(true);
       const newAvatarUrl = await userApi.uploadAvatar(file);
       updateUser({ ...user, avatarUrl: newAvatarUrl });
       toast.success("Đổi ảnh đại diện thành công!");
     } catch (error) {
-      console.error("Lỗi upload avatar:", error);
-      toast.error("Không thể tải ảnh lên. Vui lòng thử lại.");
+      toast.error("Không thể tải ảnh lên.");
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // --- 2. XỬ LÝ KẾT NỐI VÍ METAMASK ---
   const handleConnectWallet = async () => {
     if (!window.ethereum) {
-      toast.error("Vui lòng cài đặt MetaMask để sử dụng tính năng này!");
+      toast.error("Vui lòng cài đặt MetaMask!");
       return;
     }
-
     try {
       setIsUpdatingWallet(true);
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const address = accounts[0];
-
-      if (!address) {
-        toast.error("Không tìm thấy địa chỉ ví.");
-        return;
-      }
-
       await axiosClient.put('/users/wallet', null, { params: { address: address } });
       if (user) updateUser({ ...user, walletAddress: address });
-      
       toast.success("Kết nối ví thành công!");
-    } catch (error: any) {
-      console.error("Lỗi ví:", error);
-      toast.error("Không thể liên kết ví này.");
+    } catch (error) {
+      toast.error("Không thể liên kết ví.");
     } finally {
       setIsUpdatingWallet(false);
     }
   };
-  // --- HÀM KIỂM TRA DỮ LIỆU ĐẦU VÀO ---
+
   const validateForm = () => {
-    // 1. Kiểm tra Số điện thoại (10 số, bắt đầu bằng số 0)
-    const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
-    if (formData.phoneNumber && !phoneRegex.test(formData.phoneNumber)) {
-      toast.error("Số điện thoại không hợp lệ (Phải là 10 số, đầu 03, 09...)");
-      return false;
-    }
-
-    // 2. Kiểm tra Zalo (Nếu có nhập thì phải đúng định dạng)
-    if (formData.zaloPhone && !phoneRegex.test(formData.zaloPhone)) {
-      toast.error("Số Zalo không hợp lệ.");
-      return false;
-    }
-
-    // 3. Kiểm tra CCCD (Phải đủ 12 số)
-    if (formData.cccdNumber) {
-        if (!/^\d{12}$/.test(formData.cccdNumber)) {
-            toast.error("Số CCCD phải bao gồm đúng 12 chữ số.");
-            return false;
-        }
-    }
-
-    // 4. Kiểm tra Họ tên (Không được để trống)
     if (!formData.fullName.trim()) {
-        toast.error("Vui lòng nhập họ và tên.");
+        toast.error("Vui lòng nhập họ tên.");
         return false;
     }
-
-    return true; // Dữ liệu OK
+    return true;
   };
-  // --- 3. XỬ LÝ CẬP NHẬT HỒ SƠ ---
-  // --- 3. XỬ LÝ CẬP NHẬT HỒ SƠ ---
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-
-    // 🔥 BƯỚC MỚI: Gọi hàm validate trước
-    if (!validateForm()) {
-        return; // Dừng lại nếu dữ liệu sai, không gửi lên server
-    }
-
+    if (!user || !validateForm()) return;
     try {
       setIsSaving(true);
-      
-      const updatedUser = await userApi.updateProfile({
-        fullName: formData.fullName,
-        phoneNumber: formData.phoneNumber,
-        zaloPhone: formData.zaloPhone,
-        dateOfBirth: formData.dateOfBirth, 
-        currentAddress: formData.currentAddress,
-        cccdNumber: formData.cccdNumber,
-      });
-
+      const updatedUser = await userApi.updateProfile(formData);
       updateUser({ ...user, ...updatedUser });
-
-      toast.success("Cập nhật hồ sơ thành công!");
+      toast.success("Cập nhật thành công!");
       setIsEditModalOpen(false);
     } catch (error: any) {
-      console.error(error);
-      // Hiển thị lỗi từ Backend trả về (nếu lọt qua validation frontend)
-      const errorMsg = error.response?.data?.message || "Cập nhật thất bại.";
-      toast.error(errorMsg);
+      toast.error(error.response?.data?.message || "Cập nhật thất bại.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- 4. XỬ LÝ KYC (AUTO OCR) ---
   const handleKycFileChange = (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const previewUrl = URL.createObjectURL(file);
       setKycFiles(prev => ({ ...prev, [side]: file }));
-      setKycPreviews(prev => ({ ...prev, [side]: previewUrl }));
+      setKycPreviews(prev => ({ ...prev, [side]: URL.createObjectURL(file) }));
     }
   };
 
   const handleSubmitKYC = async () => {
-    if (!kycCCCD.trim()) {
-      toast.error("Vui lòng nhập số CCCD!");
+    if (!kycCCCD.trim() || !kycFiles.front || !kycFiles.back) {
+      toast.error("Vui lòng nhập đủ thông tin và ảnh!");
       return;
     }
-    if (!kycFiles.front || !kycFiles.back) {
-      toast.error("Vui lòng tải lên đầy đủ ảnh mặt trước và mặt sau!");
-      return;
-    }
-
     try {
       setIsSaving(true);
-      
-      // Gọi API (Server sẽ gọi OCR và trả về message)
       const message = await userApi.submitKYC(kycCCCD, kycFiles.front, kycFiles.back);
-      
-      // Logic kiểm tra kết quả trả về từ server
-      // Nếu message chứa từ "thành công" hoặc "tự động" -> Có nghĩa là AI duyệt OK
       const isAutoVerified = message.toLowerCase().includes("thành công");
-      
       if (user) {
         updateUser({ 
             ...user, 
             cccdNumber: kycCCCD,
             kycStatus: isAutoVerified ? 'VERIFIED' : 'PENDING',
-            cccdFrontUrl: kycPreviews.front, // Cập nhật tạm để hiện ảnh
+            cccdFrontUrl: kycPreviews.front, 
             cccdBackUrl: kycPreviews.back 
         });
       }
-
       toast.success(message);
       setIsKycModalOpen(false);
-
     } catch (error: any) {
-      console.error(error);
-      const errMessage = error.response?.data || "Lỗi gửi hồ sơ KYC.";
-      toast.error(typeof errMessage === 'string' ? errMessage : "Gửi thất bại.");
+      toast.error("Gửi thất bại.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!user) return <div className="p-10 text-center">Đang tải thông tin...</div>;
+  if (!user) return <div className="p-10 text-center">Đang tải...</div>;
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative pb-20">
+      
       {/* ─── BANNER & AVATAR ─── */}
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-primary/20 to-primary/5" />
         <div className="px-8 pb-8">
           <div className="relative flex flex-col md:flex-row items-end gap-5 -mt-12">
             
-            {/* AVATAR BOX */}
+            {/* Avatar Box */}
             <div className="relative group">
               <div 
                 className="h-24 w-24 rounded-2xl bg-white p-1 shadow-lg cursor-pointer transition-transform hover:scale-105"
                 onClick={handleAvatarClick}
-                title="Nhấn để đổi ảnh đại diện"
               >
                 <div className="h-full w-full rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden border relative">
                   {user.avatarUrl ? (
@@ -280,18 +201,14 @@ const ProfilePage = () => {
                     </span>
                   )}
                   <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isUploadingAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                    {isUploadingAvatar ? (
-                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Camera className="h-6 w-6 text-white" />
-                    )}
+                    <Camera className="h-6 w-6 text-white" />
                   </div>
                 </div>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
             </div>
             
-            {/* User Info */}
+            {/* User Name & Role */}
             <div className="flex-1 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">{user.fullName || user.username}</h1>
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -307,8 +224,10 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* ─── CỘT TRÁI: THÔNG TIN CHI TIẾT ─── */}
+      {/* ─── NỘI DUNG CHÍNH (KHÔNG CÒN TAB) ─── */}
+      <div className="grid lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* CỘT TRÁI: THÔNG TIN & VÍ */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
@@ -334,7 +253,7 @@ const ProfilePage = () => {
               <InfoItem label="Số CCCD" value={user.cccdNumber ? `xxxx-xxxx-${user.cccdNumber.slice(-4)}` : "Chưa cập nhật"} />
               <InfoItem label="Địa chỉ" value={user.currentAddress} icon={<MapPin className="h-4 w-4" />} />
 
-              {/* TRẠNG THÁI KYC & NÚT XÁC THỰC */}
+              {/* KYC Status */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái xác thực</p>
                 <div className="flex items-center gap-3">
@@ -345,14 +264,8 @@ const ProfilePage = () => {
                       {user.kycStatus === 'VERIFIED' && <CheckCircle2 className="h-3 w-3" />}
                       {user.kycStatus}
                     </div>
-                    {/* Nút xác thực (Chỉ hiện khi chưa xong) */}
                     {user.kycStatus !== 'VERIFIED' && user.kycStatus !== 'PENDING' && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-6 text-xs"
-                        onClick={() => setIsKycModalOpen(true)}
-                      >
+                      <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setIsKycModalOpen(true)}>
                         Xác thực ngay
                       </Button>
                     )}
@@ -387,7 +300,7 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* ─── CỘT PHẢI: STATS ─── */}
+        {/* CỘT PHẢI: STATS */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border shadow-sm p-6 text-center">
             <p className="text-sm text-muted-foreground mb-1">Điểm uy tín hệ thống</p>
@@ -409,7 +322,7 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* ─── MODAL CHỈNH SỬA PROFILE ─── */}
+      {/* ─── MODAL EDIT PROFILE ─── */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
@@ -455,12 +368,10 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* ─── 🔥 MODAL KYC (XÁC THỰC DANH TÍNH) ─── */}
+      {/* ─── MODAL KYC ─── */}
       {isKycModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            
-            {/* Header Modal KYC */}
             <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" /> Xác thực danh tính (eKYC)
@@ -470,7 +381,6 @@ const ProfilePage = () => {
               </button>
             </div>
 
-            {/* Body KYC */}
             <div className="p-6 space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="kycCCCD">Số CCCD / CMND <span className="text-red-500">*</span></Label>
@@ -484,7 +394,6 @@ const ProfilePage = () => {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Mặt trước */}
                 <div className="space-y-2">
                   <Label>Mặt trước thẻ <span className="text-red-500">*</span></Label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
@@ -500,7 +409,6 @@ const ProfilePage = () => {
                   </div>
                 </div>
 
-                {/* Mặt sau */}
                 <div className="space-y-2">
                   <Label>Mặt sau thẻ <span className="text-red-500">*</span></Label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
@@ -518,7 +426,6 @@ const ProfilePage = () => {
               </div>
             </div>
 
-            {/* Footer KYC */}
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setIsKycModalOpen(false)}>Hủy bỏ</Button>
               <Button onClick={handleSubmitKYC} isLoading={isSaving} className="bg-green-600 hover:bg-green-700">

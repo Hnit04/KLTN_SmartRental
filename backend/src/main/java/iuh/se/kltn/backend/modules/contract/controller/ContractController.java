@@ -27,4 +27,14 @@ public class ContractController {
     public ResponseEntity<?> getMyContracts(@AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(contractService.getMyContracts(currentUser.getId()));
     }
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getContractById(@PathVariable Long id) {
+        return ResponseEntity.ok(contractService.getContractById(id));
+    }
+
+    // ✅ THÊM ĐOẠN NÀY (Nếu chưa có): API Ký hợp đồng
+    @PutMapping("/{id}/sign")
+    public ResponseEntity<?> signContract(@PathVariable Long id) {
+        return ResponseEntity.ok(contractService.signContract(id));
+    }
 }

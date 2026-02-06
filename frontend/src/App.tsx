@@ -1,22 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-// Lưu ý: Nếu bạn đã tạo component custom ở bước trước thì dùng: import { Toaster } from "@/components/ui/sonner";
 import { Toaster } from "sonner"; 
 
 import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
-import PropertyDetailPage from "./pages/PropertyDetailPage";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ContactPage from "./pages/ContactPage";
-import HelpCenter from "./pages/HelpCenter";
-import FAQPage from "./pages/FAQPage";
-import PrivacyPage from "./pages/PrivacyPage";
-import TermsPage from "./pages/TermsPage";
-import ProfilePage from "./pages/ProfilePage";
-// 1. IMPORT TRANG DANH SÁCH PHÒNG
-import PropertiesPage from "./pages/PropertiesPage";
+import PropertyDetailPage from "./pages/property/PropertyDetailPage";
+import HomePage from "./pages/core/HomePage";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import ContactPage from "./pages/core/ContactPage";
+import HelpCenter from "./pages/core/HelpCenter";
+import FAQPage from "./pages/core/FAQPage";
+import PrivacyPage from "./pages/core/PrivacyPage";
+import TermsPage from "./pages/core/TermsPage";
+import ProfilePage from "./pages/user/ProfilePage";
+import ContractsPage from "./pages/contract/ContractsPage"; 
+import ContractDetailPage from "./pages/contract/ContractDetailPage";// 1. IMPORT TRANG DANH SÁCH PHÒNG
+import PropertiesPage from "./pages/property/PropertiesPage";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -69,8 +69,15 @@ function App() {
           {/* ─── GROUP: PROTECTED PAGES (Dashboard) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-            <Route path="/profile" element={<ProfilePage />} />
-              {/* <Route path="/dashboard" element={<Dashboard />} /> */}
+ 
+              <Route path="/profile" element={<ProfilePage />} />
+              
+              {/* 1. Route cho Sidebar (Danh sách) */}
+              <Route path="/contracts" element={<ContractsPage />} />
+              
+              {/* 2. Route cho Chi tiết (File bạn vừa gửi) */}
+              <Route path="/contracts/:id" element={<ContractDetailPage />} />
+              
             </Route>
           </Route>
 

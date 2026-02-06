@@ -1,4 +1,3 @@
-import { createContext, useContext, useState, useEffect } from "react";
 import {
   Building2,
   Shield,
@@ -11,17 +10,25 @@ import {
   Star
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../src/context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
+import React from "react";
 
+// 1. Định nghĩa Interface cho Button để fix lỗi "implicitly any"
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  children: React.ReactNode;
+  variant?: "primary" | "secondary" | "outline" | "ghost"; // Giới hạn các giá trị cho phép
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
 
-// Định nghĩa Interface cho Button Props để tránh lỗi implicitly 'any'
+// 2. Áp dụng Interface vào Component
 const Button = ({ 
   children, 
   variant = "primary", 
   size = "md", 
   className = "", 
   ...props 
-}) => {
+}: ButtonProps) => {
   const baseStyles = "inline-flex items-center justify-center rounded-full font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50";
   
   const variants = {
@@ -39,6 +46,7 @@ const Button = ({
 
   return (
     <button 
+      // TypeScript giờ đã biết variant và size chắc chắn nằm trong danh sách key của variants/sizes
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >

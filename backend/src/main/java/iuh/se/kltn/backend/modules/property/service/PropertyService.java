@@ -34,17 +34,14 @@ public class PropertyService {
     @Autowired
     private ModelMapper modelMapper;
 
-    // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public)
     public List<PropertyResponse> getAllProperties() {
         List<Property> properties = propertyRepository.findAll();
 
-        // Convert từng Entity sang Response (đã bao gồm tính toán giá)
         return properties.stream()
                 .map(this::mapToPropertyResponse)
                 .collect(Collectors.toList());
     }
 
-    // TẠO KHU TRỌ MỚI
     @Transactional
     public PropertyResponse createProperty(Long landlordId, PropertyRequest request) {
         User user = userRepository.findById(landlordId)
@@ -62,7 +59,6 @@ public class PropertyService {
         return mapToPropertyResponse(saved);
     }
 
-    // THÊM PHÒNG VÀO KHU TRỌ
     @Transactional
     public RoomResponse addRoom(Long landlordId, Long propertyId, RoomRequest request) {
         Property property = propertyRepository.findById(propertyId)
@@ -82,41 +78,35 @@ public class PropertyService {
         return mapToRoomResponse(savedRoom);
     }
 
-    // LẤY DANH SÁCH NHÀ CỦA CHU TRO
     public List<PropertyResponse> getMyProperties(Long landlordId) {
         return propertyRepository.findByLandlordId(landlordId).stream()
                 .map(this::mapToPropertyResponse)
                 .collect(Collectors.toList());
     }
 
-    // LẤY DANH SÁCH PHÒNG CỦA 1 KHU TRỌ
     public List<RoomResponse> getRoomsByProperty(Long propertyId) {
         return roomRepository.findByPropertyId(propertyId).stream()
                 .map(this::mapToRoomResponse)
                 .collect(Collectors.toList());
     }
 
-    // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
         PropertyResponse res = modelMapper.map(p, PropertyResponse.class);
 
-        // Convert chuỗi JSON ảnh thành List
         res.setImages(JsonUtil.convertJsonToList(p.getImages()));
 
         if (p.getLandlord() != null) {
             res.setLandlordName(p.getLandlord().getFullName());
+
+            res.setLandlordPhone(p.getLandlord().getPhoneNumber());
         }
 
-        // --- TÍNH TOÁN GIÁ VÀ PHÒNG TRỐNG ---
         List<Room> rooms = p.getRooms();
         if (rooms != null && !rooms.isEmpty()) {
-            // Tính giá thấp nhất
             double min = rooms.stream().mapToDouble(Room::getPrice).min().orElse(0.0);
 
-            // Tính giá cao nhất
             double max = rooms.stream().mapToDouble(Room::getPrice).max().orElse(0.0);
 
-            // Đếm phòng còn trống (AVAILABLE)
             long available = rooms.stream()
                     .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
                     .count();
@@ -126,7 +116,6 @@ public class PropertyService {
             res.setAvailableRooms((int) available);
             res.setTotalRooms(rooms.size());
         } else {
-            // Nếu nhà chưa có phòng nào
             res.setMinPrice(0.0);
             res.setMaxPrice(0.0);
             res.setAvailableRooms(0);

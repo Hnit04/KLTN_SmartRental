@@ -5,6 +5,7 @@ import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
+import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -106,5 +108,33 @@ public class ContractService {
         } catch (Exception e) {
             return "HASH_ERROR";
         }
+    }
+    public ContractResponse getContractById(Long id) {
+        Contract contract = contractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));
+
+        // Dùng hàm mapToResponse bạn đã viết sẵn ở dưới
+        return mapToResponse(contract);
+    }
+
+    // 2. Hàm ký hợp đồng (Để nút "Ký ngay" hoạt động)
+    @Transactional
+    public ContractResponse signContract(Long id) {
+        Contract contract = contractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (contract.getStatus() == ContractStatus.ACTIVE) {
+            throw new RuntimeException("Hợp đồng này đã được ký trước đó!");
+        }
+
+        // Cập nhật trạng thái
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setSignDate(LocalDateTime.now());
+        contract.setSignMethod(ContractSignMethod.BLOCKCHAIN);
+
+        // (Optional) Nếu muốn cập nhật trạng thái phòng thành "Đã thuê" luôn
+        // contract.getRoom().setStatus(RoomStatus.RENTED);
+
+        return mapToResponse(contractRepository.save(contract));
     }
 }
