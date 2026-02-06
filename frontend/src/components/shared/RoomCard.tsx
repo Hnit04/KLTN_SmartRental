@@ -64,7 +64,7 @@ export default function RoomCard({ data }: RoomCardProps) {
         variant={isAvailable ? "default" : "outline"}
         disabled={!isAvailable}
       >
-        {isAvailable ? "Liên hệ thuê ngay" : "Đã hết phòng"}
+        {isAvailable ? "Xem thông tin phòng" : "Đã cho thuê"}
       </Button>
     </div>
   );

@@ -187,3 +187,36 @@ export interface TokenRefreshResponse {
   accessToken: string;
   refreshToken: string;
 }
+
+// ==========================================
+// 5. APPOINTMENT TYPES (Lịch hẹn xem phòng)
+// ==========================================
+
+export type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+
+export interface Appointment {
+  id: number;
+  tenantId: number;
+  landlordId: number;
+  roomId: number;
+  roomName?: string;
+  landlordName?: string;
+  tenantName?: string;
+  meetTime: string;      
+  status: AppointmentStatus;
+  note?: string;
+  meetingLink?: string
+  
+  createdAt: string;
+}
+
+export interface CreateAppointmentRequest {
+  roomId: number;
+  meetTime: string;
+  meetingLink?: string;
+  note?: string;
+}
+
+export interface UpdateAppointmentStatusRequest {
+  status: AppointmentStatus;
+}

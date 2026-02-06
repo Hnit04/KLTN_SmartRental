@@ -37,13 +37,10 @@ export default function PublicLayout() {
             </Link>
           </nav>
 
-          {/* Phần hiển thị User (Đã cập nhật) */}
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              // ✅ HIỂN THỊ USERNAV KHI ĐÃ ĐĂNG NHẬP
               <UserNav />
             ) : (
-              // HIỂN THỊ NÚT ĐĂNG NHẬP/ĐĂNG KÝ KHI CHƯA LOGIN
               <>
                 <Link to="/login">
                   <Button variant="ghost" size="sm">Đăng nhập</Button>
