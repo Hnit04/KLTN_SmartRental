@@ -97,7 +97,13 @@ export default function PropertyDetailPage() {
         {rooms.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {rooms.map((room) => (
-              <RoomCard key={room.id} data={room} />
+              <Link 
+                to={`/rooms/${room.id}`} 
+                key={room.id} 
+                className="transition-transform hover:scale-[1.02] active:scale-95"
+              >
+                <RoomCard data={room} />
+              </Link>
             ))}
           </div>
         ) : (

@@ -17,6 +17,8 @@ import TermsPage from "./pages/TermsPage";
 import ProfilePage from "./pages/ProfilePage";
 // 1. IMPORT TRANG DANH SÁCH PHÒNG
 import PropertiesPage from "./pages/PropertiesPage";
+import RoomDetailPage from "./pages/RoomDetailPage";
+import RoomManager from "./pages/RoomManager";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,6 +59,9 @@ function App() {
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
+            <Route path="/rooms/:id" element={<RoomDetailPage />} />
+            <Route path="/dashboard/rooms" element={<RoomManager />} />
+
             {/* ─── GROUP: AUTH PAGES ─── */}
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
