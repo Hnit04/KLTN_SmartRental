@@ -1,4 +1,4 @@
-import axiosClient from "../axiosClient";
+import axiosClient from "./axiosClient";
 import type { Property, Room } from "@/types/index";
 
 export const propertyApi = {

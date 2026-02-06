@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 // 1. Import từ '../types' thay vì '../types/auth' để lấy đúng định nghĩa User mới
 import type { User, AuthResponse, RegisterRequest } from '../types'; 
-import { authApi } from '../api/api/authApi';
+import { authApi } from '../api/authApi';
 
 interface AuthContextType {
   user: User | null;

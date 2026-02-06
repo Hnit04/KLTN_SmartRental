@@ -1,5 +1,5 @@
-import axiosClient from '../axiosClient';
-import type { User, UpdateProfileRequest } from '../../types';
+import axiosClient from './axiosClient';
+import type { User, UpdateProfileRequest } from '../types';
 
 export const userApi = {
   // 1. Lấy thông tin người dùng hiện tại

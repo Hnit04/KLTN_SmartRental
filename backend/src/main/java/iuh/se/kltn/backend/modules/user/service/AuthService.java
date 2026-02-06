@@ -66,12 +66,16 @@ public class AuthService {
             newUser = new Tenant();
         }
 
-        //thông tin chung
         newUser.setUsername(request.getUsername());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setFullName(request.getFullName());
         newUser.setEmail(request.getEmail());
-        newUser.setWalletAddress(request.getWalletAddress());
+        if (request.getWalletAddress() != null && !request.getWalletAddress().trim().isEmpty()) {
+            newUser.setWalletAddress(request.getWalletAddress().trim());
+        } else {
+            newUser.setWalletAddress(null);
+        }
+
         newUser.setRole(request.getRole());
 
         return userRepository.save(newUser);
