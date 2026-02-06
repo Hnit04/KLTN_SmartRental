@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, User, LayoutDashboard, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from "../ui/DropdownMenu";
+import { Dropdown, DropdownItem, DropdownSeparator } from "../ui/DropdownMenu";
 
 export function UserNav() {
   const { user, logout } = useAuth();

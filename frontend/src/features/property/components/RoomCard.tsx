@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { 
-  CheckCircle, XCircle, Maximize, CreditCard, 
-  Image as ImageIcon, FileSignature, ArrowRight 
+  CheckCircle, XCircle, Maximize, 
+  Image as ImageIcon, ArrowRight 
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FileText, MapPin, Calendar, CheckCircle2, AlertCircle, Clock, XCircle } from "lucide-react";
+import { MapPin, Calendar, CheckCircle2, AlertCircle, Clock, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Contract } from "@/types";
 
