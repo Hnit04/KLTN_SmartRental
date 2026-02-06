@@ -220,3 +220,19 @@ export interface CreateAppointmentRequest {
 export interface UpdateAppointmentStatusRequest {
   status: AppointmentStatus;
 }
+
+export interface AppointmentResponse {
+  id: number;
+  roomId: number;
+  roomName: string;
+  landlordId: number;
+  landlordName: string;
+  tenantId: number;
+  tenantName: string;
+  tenantPhone: string;
+  meetTime: string; // ISO string
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+  note: string;
+  meetingLink?: string;
+  createdAt: string;
+}

@@ -14,6 +14,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class AppointmentService {
@@ -52,6 +55,29 @@ public class AppointmentService {
                 saved.getNote(),
                 saved.getMeetingLink(),
                 saved.getCreatedAt()
+        );
+    }
+
+    public List<AppointmentResponse> getPendingAppointmentsByLandlord(Long landlordId) {
+        List<Appointment> appointments = appointmentRepo.findByLandlordIdAndStatus(landlordId, AppointmentStatus.PENDING);
+
+        return appointments.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private AppointmentResponse mapToResponse(Appointment appointment) {
+        return new AppointmentResponse(
+                appointment.getId(),
+                appointment.getRoom().getId(),
+                appointment.getRoom().getName(),
+                appointment.getLandlord().getId(),
+                appointment.getLandlord().getFullName(),
+                appointment.getMeetTime(),
+                appointment.getStatus(),
+                appointment.getNote(),
+                appointment.getMeetingLink(),
+                appointment.getCreatedAt()
         );
     }
 }

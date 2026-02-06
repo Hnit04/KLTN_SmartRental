@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.interaction.repository;
 
 import iuh.se.kltn.backend.modules.interaction.entity.Appointment;
+import iuh.se.kltn.backend.modules.interaction.enums.AppointmentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +22,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByRoomId(Long roomId);
 
     // Truy vấn nâng cao: Tìm các lịch hẹn đang chờ xác nhận (PENDING) của một chủ trọ
-    @Query("SELECT a FROM Appointment a WHERE a.landlord.id = :landlordId AND a.status = 'PENDING'")
-    List<Appointment> findPendingAppointmentsByLandlord(@Param("landlordId") Long landlordId);
+//    @Query("SELECT a FROM Appointment a WHERE a.landlord.id = :landlordId AND a.status = 'PENDING'")
+    List<Appointment> findByLandlordIdAndStatus(Long landlordId, AppointmentStatus status);
 }

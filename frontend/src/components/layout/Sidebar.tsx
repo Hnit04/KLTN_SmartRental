@@ -23,7 +23,7 @@ const Sidebar = () => {
     },
     {
       title: 'Quản lý phòng',
-      path: '/properties',
+      path: '/dashboard/rooms',
       icon: Home,
     },
     {
