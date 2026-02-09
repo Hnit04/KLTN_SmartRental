@@ -46,3 +46,13 @@ fpt:
   ai:
     api-key: "7QwK7PAR4s6zTLfoG3lUbiK9HYNNgsMo"
     url: "https://api.fpt.ai/vision/idr/vnm"
+blockchain:
+  # Cổng kết nối vào mạng Sepolia (Public RPC)
+#  rpc-url: "https://rpc.sepolia.org"
+  rpc-url: "https://ethereum-sepolia-rpc.publicnode.com"
+  # Private Key ví Admin/Chủ hệ thống (Ví sẽ trả phí Gas để deploy hợp đồng)
+  # ⚠️ Thay dòng dưới bằng Private Key ví MetaMask của bạn (Không phải 12 từ khóa)
+  private-key: "130a2f782b80a9d736b8e667e0bbcbc235f12fcf93f81173be697e7f7995520d"
+
+  # Chain ID của Sepolia
+  chain-id: 11155111
