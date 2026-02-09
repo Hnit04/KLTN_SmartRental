@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.contract.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -15,26 +16,29 @@ public class ContractController {
     @Autowired
     private ContractService contractService;
 
-    // Khách thuê tạo hợp đồng
+    // 1. Tạo hợp đồng
     @PostMapping
     public ResponseEntity<?> createContract(@AuthenticationPrincipal UserPrincipal currentUser,
                                             @RequestBody ContractRequest request) {
         return ResponseEntity.ok(contractService.createContract(currentUser.getId(), request));
     }
 
-    // Xem danh sách hợp đồng của ban than
+    // 2. Lấy danh sách của tôi
     @GetMapping("/mine")
     public ResponseEntity<?> getMyContracts(@AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(contractService.getMyContracts(currentUser.getId()));
     }
+
+    // 3. Lấy chi tiết
     @GetMapping("/{id}")
     public ResponseEntity<?> getContractById(@PathVariable Long id) {
         return ResponseEntity.ok(contractService.getContractById(id));
     }
 
-    // ✅ THÊM ĐOẠN NÀY (Nếu chưa có): API Ký hợp đồng
+    // 4. Ký hợp đồng (Có gọi Blockchain nếu chọn phương thức Blockchain)
     @PutMapping("/{id}/sign")
-    public ResponseEntity<?> signContract(@PathVariable Long id) {
-        return ResponseEntity.ok(contractService.signContract(id));
+    public ResponseEntity<?> signContract(@PathVariable Long id,
+                                          @RequestBody SignContractRequest request) {
+        return ResponseEntity.ok(contractService.signContract(id, request));
     }
 }

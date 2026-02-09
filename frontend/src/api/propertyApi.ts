@@ -9,9 +9,8 @@ export const propertyApi = {
 
   // Lấy danh sách phòng của khu trọ đó
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
-
+  getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),
   getMyProperties: () => {
     return axiosClient.get<Property[]>("/properties/mine");
   },
-
 };

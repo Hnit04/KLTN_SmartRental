@@ -1,24 +1,28 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-// Lưu ý: Nếu bạn đã tạo component custom ở bước trước thì dùng: import { Toaster } from "@/components/ui/sonner";
 import { Toaster } from "sonner"; 
 
 import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
-import PropertyDetailPage from "./pages/PropertyDetailPage";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ContactPage from "./pages/ContactPage";
-import HelpCenter from "./pages/HelpCenter";
-import FAQPage from "./pages/FAQPage";
-import PrivacyPage from "./pages/PrivacyPage";
-import TermsPage from "./pages/TermsPage";
-import ProfilePage from "./pages/ProfilePage";
-// 1. IMPORT TRANG DANH SÁCH PHÒNG
-import PropertiesPage from "./pages/PropertiesPage";
-import RoomDetailPage from "./pages/RoomDetailPage";
-import RoomManager from "./pages/RoomManager";
+import HomePage from "./pages/core/HomePage";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import ContactPage from "./pages/core/ContactPage";
+import HelpCenter from "./pages/core/HelpCenter";
+import FAQPage from "./pages/core/FAQPage";
+import PrivacyPage from "./pages/core/PrivacyPage";
+import TermsPage from "./pages/core/TermsPage";
+import ProfilePage from "./pages/user/ProfilePage";
+
+// --- PROPERTY PAGES ---
+import PropertiesPage from "./pages/property/PropertiesPage";
+import PropertyDetailPage from "./pages/property/PropertyDetailPage";
+
+// --- CONTRACT PAGES ---
+import ContractsPage from "./pages/contract/ContractsPage"; 
+import ContractDetailPage from "./pages/contract/ContractDetailPage";
+// ✅ Import trang tạo hợp đồng
+import CreateContractPage from "./pages/contract/CreateContractPage"; 
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,7 +40,7 @@ const PublicRoute = () => {
     isAuthenticated &&
     (location.pathname === "/login" || location.pathname === "/register")
   ) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />; // Hoặc về /properties tùy bạn
   }
 
   return <Outlet />;
@@ -51,39 +55,49 @@ function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
             
-            {/* 2. THÊM ROUTE CHO TRANG PHÒNG */}
+            {/* PROPERTY ROUTES */}
             <Route path="/properties" element={<PropertiesPage />} />
             <Route path="/properties/:id" element={<PropertyDetailPage />} />
+            
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/help" element={<HelpCenter />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
-            <Route path="/rooms/:id" element={<RoomDetailPage />} />
-            <Route path="/dashboard/rooms" element={<RoomManager />} />
-
-            {/* ─── GROUP: AUTH PAGES ─── */}
-          <Route element={<PublicRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
-          </Route>
-
-          
-
-          {/* ─── GROUP: PROTECTED PAGES (Dashboard) ─── */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
-            <Route path="/profile" element={<ProfilePage />} />
-              {/* <Route path="/dashboard" element={<Dashboard />} /> */}
+            
+            {/* AUTH ROUTES (Chỉ dành cho khách chưa đăng nhập) */}
+            <Route element={<PublicRoute />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
             </Route>
           </Route>
 
+          {/* ─── GROUP: PROTECTED PAGES (Cần đăng nhập) ─── */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
+ 
+              <Route path="/profile" element={<ProfilePage />} />
+              
+              {/* === CONTRACT ROUTES (SỬA LẠI THỨ TỰ) === */}
+              
+              {/* 1. Route tĩnh (Cụ thể) phải đặt TRƯỚC */}
+              <Route path="/contracts/create" element={<CreateContractPage />} />
+              
+              {/* 2. Route động (Dynamic ID) đặt SAU */}
+              <Route path="/contracts/:id" element={<ContractDetailPage />} />
+              
+              {/* 3. Route danh sách */}
+              <Route path="/contracts" element={<ContractsPage />} />
+              
+            </Route>
+          </Route>
+
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
 
-      {/* 🔥 TOASTER DUY NHẤT */}
+      {/* 🔥 TOASTER CONFIG */}
       <Toaster
         position="top-right"
         richColors
