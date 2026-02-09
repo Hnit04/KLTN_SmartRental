@@ -22,10 +22,10 @@ export interface User {
   dateOfBirth?: string;    
   currentAddress?: string;
   
-  // ✅ Giữ nguyên zaloPhone (Backend có)
+  // Zalo Phone
   zaloPhone?: string;      
   
-  // 🔥 BỔ SUNG 2 TRƯỜNG NÀY ĐỂ TRÁNH LỖI TS KHI UPDATE CONTEXT
+  // KYC Images
   cccdFrontUrl?: string;   
   cccdBackUrl?: string;    
   
@@ -42,7 +42,6 @@ export interface AuthResponse {
   user: User; 
 }
 
-// Interface cho API Login
 export interface LoginRequest {
   username: string;
   password: string;
@@ -57,7 +56,6 @@ export interface RegisterRequest {
   walletAddress?: string;
 }
 
-// Khớp với UpdateProfileRequest.java
 export interface UpdateProfileRequest {
   fullName?: string;
   phoneNumber?: string;
@@ -104,6 +102,11 @@ export interface Room {
   amenities: string[]; 
   description?: string;
   propertyId: number;
+  
+  // Flattened fields from Backend (nếu có)
+  propertyName?: string;
+  address?: string;      
+  landlordName?: string; 
 }
 
 // ==========================================
@@ -112,6 +115,9 @@ export interface Room {
 
 export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY";
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED";
+
+// ✅ 1. Thêm Enum phương thức ký
+export type ContractSignMethod = "TRADITIONAL" | "BLOCKCHAIN";
 
 export interface Contract {
   id: number;
@@ -128,11 +134,37 @@ export interface Contract {
   signDate?: string;      
   
   depositAmount: number;
-  monthlyPrice: number;
-  depositStatus: DepositStatus;
+  monthlyPrice: number; // Trong response backend trả về 'price' hoặc 'monthlyPrice', kiểm tra kỹ DTO
+  price?: number;       // Thêm trường này đề phòng backend trả về tên khác
   
+  depositStatus: DepositStatus;
   status: ContractStatus;
   contentUrl?: string;    
+  
+  // ✅ 2. Các trường hiển thị (Flattened)
+  roomName?: string;
+  propertyAddress?: string;
+  tenantName?: string;
+  landlordName?: string;
+
+  // ✅ 3. Thông tin ký & Blockchain
+  signMethod?: ContractSignMethod;
+  smartContractAddress?: string;
+  deployTxHash?: string;
+  contractHash?: string;
+}
+
+// Payload để tạo hợp đồng
+export interface CreateContractPayload {
+  roomId: number | string;
+  startDate: string;
+  duration: number;
+}
+
+// ✅ 4. Payload để Ký hợp đồng
+export interface SignContractPayload {
+  signMethod: ContractSignMethod;
+  signatureImage?: string; // Optional (cho truyền thống nếu cần sau này)
 }
 
 // ==========================================

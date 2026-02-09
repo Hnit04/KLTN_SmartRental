@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
-  MapPin, Printer, ArrowLeft, MessageSquarePlus, X, ShieldCheck 
+  MapPin, Printer, ArrowLeft, MessageSquarePlus, X, ShieldCheck,
+  Smartphone, Blocks
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-// ✅ Sử dụng Textarea component xịn xò của bạn
 import { Textarea } from "@/components/ui/Textarea"; 
 import { contractApi } from "@/api/contractApi"; 
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { toast } from "sonner";
-import type { Contract } from "@/types";
+import type { Contract, ContractSignMethod } from "@/types"; // ✅ Import thêm Enum
 
 // Interface mở rộng để hứng dữ liệu chi tiết
 interface ContractDetail extends Contract {
@@ -32,6 +32,8 @@ export default function ContractDetailPage() {
   
   // State xử lý Ký
   const [isSigning, setIsSigning] = useState(false);
+  const [isSignModalOpen, setIsSignModalOpen] = useState(false); // ✅ Modal chọn phương thức
+  const [signMethod, setSignMethod] = useState<ContractSignMethod>("BLOCKCHAIN"); // ✅ Phương thức được chọn
 
   // State xử lý Yêu cầu chỉnh sửa
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -48,7 +50,8 @@ export default function ContractDetailPage() {
     try {
       setIsLoading(true);
       const res = await contractApi.getDetail(id!);
-      setContract((res as any).data || res); 
+      // @ts-ignore
+      setContract(res.data || res); 
     } catch (error) {
       console.error(error);
       toast.error("Không thể tải thông tin hợp đồng");
@@ -58,19 +61,24 @@ export default function ContractDetailPage() {
     }
   };
 
-  // --- HANDLER: KÝ HỢP ĐỒNG ---
+  // --- HANDLER: KÝ HỢP ĐỒNG (CẬP NHẬT) ---
   const handleSignContract = async () => {
     try {
       setIsSigning(true);
-      // Giả lập độ trễ Blockchain
-      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      await contractApi.signContract(id!);
+      // Gọi API với phương thức đã chọn (payload)
+      await contractApi.signContract(id!, {
+        signMethod: signMethod
+      });
       
       toast.success("Ký hợp đồng thành công!", {
-        description: "Hợp đồng đã có hiệu lực pháp lý.",
+        description: signMethod === "BLOCKCHAIN" 
+          ? "Hợp đồng đã được lưu trữ an toàn trên Blockchain." 
+          : "Hợp đồng đã có hiệu lực pháp lý.",
       });
-      fetchContract(); // Reload lại data
+
+      setIsSignModalOpen(false);
+      fetchContract(); // Reload lại data để thấy trạng thái mới
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Ký thất bại. Vui lòng thử lại.");
     } finally {
@@ -220,9 +228,12 @@ export default function ContractDetailPage() {
                         {isActive ? (
                              <div className="relative inline-block">
                                 <p className="font-signature text-2xl text-blue-800">{contract.tenantName}</p>
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-16 border-4 border-red-500 text-red-500 flex items-center justify-center rotate-[-15deg] font-black text-xs rounded opacity-80 uppercase tracking-widest">
-                                    Signed via<br/>Blockchain
-                                </div>
+                                {/* Tem đóng dấu nếu là Blockchain */}
+                                {contract.signMethod === "BLOCKCHAIN" && (
+                                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-16 border-4 border-red-500 text-red-500 flex items-center justify-center rotate-[-15deg] font-black text-xs rounded opacity-80 uppercase tracking-widest">
+                                      Signed via<br/>Blockchain
+                                  </div>
+                                )}
                              </div>
                         ) : (
                             <div className="h-16 flex items-center justify-center bg-gray-50 border border-dashed rounded text-gray-400 italic text-xs">
@@ -237,32 +248,32 @@ export default function ContractDetailPage() {
 
           {/* ─── CỘT PHẢI: ACTIONS & SUMMARY ─── */}
           <div className="space-y-6">
-             {/* Thông tin tóm tắt */}
-             <div className="bg-white rounded-xl shadow-sm border p-6">
-               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                 <ShieldCheck className="h-5 w-5 text-green-600" />
-                 Thông tin chính
-               </h3>
-               <div className="space-y-4">
-                 <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 mt-1"><MapPin className="h-4 w-4" /></div>
-                    <div className="text-sm">
-                        <p className="text-gray-500 text-xs">Địa chỉ phòng</p>
-                        <p className="font-medium line-clamp-2">{contract.propertyAddress}</p>
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded bg-orange-50 flex items-center justify-center text-orange-600 shrink-0"><Calendar className="h-4 w-4" /></div>
-                    <div className="text-sm">
-                        <p className="text-gray-500 text-xs">Thời hạn hợp đồng</p>
-                        <p className="font-medium">{formatDate(contract.startDate)} - {formatDate(contract.endDate)}</p>
-                    </div>
-                 </div>
-               </div>
-             </div>
+              {/* Thông tin tóm tắt */}
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  Thông tin chính
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                     <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 mt-1"><MapPin className="h-4 w-4" /></div>
+                     <div className="text-sm">
+                         <p className="text-gray-500 text-xs">Địa chỉ phòng</p>
+                         <p className="font-medium line-clamp-2">{contract.propertyAddress}</p>
+                     </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                     <div className="h-8 w-8 rounded bg-orange-50 flex items-center justify-center text-orange-600 shrink-0"><Calendar className="h-4 w-4" /></div>
+                     <div className="text-sm">
+                         <p className="text-gray-500 text-xs">Thời hạn hợp đồng</p>
+                         <p className="font-medium">{formatDate(contract.startDate)} - {formatDate(contract.endDate)}</p>
+                     </div>
+                  </div>
+                </div>
+              </div>
 
-             {/* KHU VỰC HÀNH ĐỘNG */}
-             {isPending && (
+              {/* KHU VỰC HÀNH ĐỘNG */}
+              {isPending && (
               <div className="bg-white rounded-xl border-2 border-primary/20 p-6 space-y-4 shadow-lg shadow-primary/5">
                 <div>
                     <h3 className="font-bold text-gray-900">Yêu cầu hành động</h3>
@@ -271,9 +282,9 @@ export default function ContractDetailPage() {
                     </p>
                 </div>
                 
+                {/* NÚT KÍCH HOẠT MODAL KÝ */}
                 <Button 
-                  onClick={handleSignContract} 
-                  isLoading={isSigning}
+                  onClick={() => setIsSignModalOpen(true)} // ✅ Mở Modal
                   className="w-full h-12 text-base shadow-md"
                 >
                   <PenTool className="h-5 w-5 mr-2" />
@@ -298,22 +309,49 @@ export default function ContractDetailPage() {
                   Đề xuất chỉnh sửa
                 </Button>
               </div>
-            )}
+              )}
 
-            {isActive && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                    <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <h4 className="font-bold text-green-800">Hợp đồng hợp lệ</h4>
-                    <p className="text-xs text-green-700 mt-1">
-                        Hợp đồng đã được ký kết thành công và lưu trữ trên hệ thống.
-                    </p>
+              {/* HIỂN THỊ TRẠNG THÁI SAU KHI KÝ */}
+              {isActive && (
+                <div className="space-y-4">
+                    {/* Nếu ký Blockchain -> Hiện thông tin Hash */}
+                    {contract.signMethod === "BLOCKCHAIN" ? (
+                        <div className="bg-gray-900 text-white rounded-xl p-4 shadow-lg">
+                             <h4 className="font-bold flex items-center gap-2 mb-3 text-green-400">
+                                 <Blocks className="h-4 w-4" /> Secured by Blockchain
+                             </h4>
+                             <div className="space-y-3 text-xs text-gray-400">
+                                 <div>
+                                     <span className="block font-bold text-gray-500 uppercase text-[10px]">Transaction Hash</span>
+                                     <div className="truncate font-mono bg-black/30 p-2 rounded mt-1 border border-white/10" title={contract.deployTxHash}>
+                                         {contract.deployTxHash || "Đang cập nhật..."}
+                                     </div>
+                                 </div>
+                                 <div>
+                                     <span className="block font-bold text-gray-500 uppercase text-[10px]">Smart Contract</span>
+                                     <div className="truncate font-mono bg-black/30 p-2 rounded mt-1 border border-white/10" title={contract.smartContractAddress}>
+                                         {contract.smartContractAddress || "Đang cập nhật..."}
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    ) : (
+                        // Nếu ký truyền thống
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                            <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                            <h4 className="font-bold text-green-800">Hợp đồng hợp lệ</h4>
+                            <p className="text-xs text-green-700 mt-1">
+                                Hợp đồng đã được ký xác nhận điện tử và lưu trữ trên hệ thống.
+                            </p>
+                        </div>
+                    )}
                 </div>
-            )}
+              )}
           </div>
         </div>
       </div>
 
-      {/* ─── MODAL ĐỀ XUẤT CHỈNH SỬA (Sử dụng Textarea Component) ─── */}
+      {/* ─── MODAL ĐỀ XUẤT CHỈNH SỬA ─── */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
@@ -328,7 +366,6 @@ export default function ContractDetailPage() {
             </div>
             
             <div className="space-y-4">
-              {/* ✅ COMPONENT TEXTAREA MỚI */}
               <Textarea 
                 label="Nội dung bạn muốn thay đổi"
                 placeholder="Ví dụ: Tôi muốn sửa lại ngày bắt đầu thuê thành 15/10 vì lý do..." 
@@ -337,13 +374,9 @@ export default function ContractDetailPage() {
                 onChange={(e) => setEditContent(e.target.value)}
                 autoFocus
               />
-              
-              <div className="flex flex-col gap-1">
-                 <p className="text-[11px] text-gray-500">
-                    Lưu ý: Quá trình ký hợp đồng sẽ tạm hoãn cho đến khi chủ nhà phản hồi yêu cầu này.
-                 </p>
-              </div>
-              
+              <p className="text-[11px] text-gray-500">
+                 Lưu ý: Quá trình ký hợp đồng sẽ tạm hoãn cho đến khi chủ nhà phản hồi yêu cầu này.
+              </p>
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
                 <Button onClick={handleRequestChange} isLoading={isSendingRequest}>Gửi đề xuất</Button>
@@ -352,6 +385,70 @@ export default function ContractDetailPage() {
           </div>
         </div>
        )}
+
+      {/* ─── ✅ MODAL LỰA CHỌN PHƯƠNG THỨC KÝ (MỚI) ─── */}
+      {isSignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
+              
+              <button onClick={() => setIsSignModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+
+              <h2 className="text-xl font-bold mb-2 text-center">Xác nhận ký hợp đồng</h2>
+              <p className="text-sm text-gray-500 mb-6 text-center">
+                Chọn hình thức xác thực mà bạn muốn sử dụng.
+              </p>
+              
+              <div className="space-y-3 mb-6">
+                  {/* Lựa chọn 1: BLOCKCHAIN */}
+                  <div 
+                    className={`border-2 p-4 rounded-xl cursor-pointer flex items-start gap-4 transition-all ${signMethod === 'BLOCKCHAIN' ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                    onClick={() => setSignMethod("BLOCKCHAIN")}
+                  >
+                      <div className={`mt-1 shrink-0 ${signMethod === 'BLOCKCHAIN' ? 'text-blue-600' : 'text-gray-300'}`}>
+                          {signMethod === 'BLOCKCHAIN' ? <CheckCircle className="h-6 w-6 fill-blue-100" /> : <div className="h-6 w-6 rounded-full border-2" />}
+                      </div>
+                      <div>
+                          <h4 className={`font-bold text-sm ${signMethod === 'BLOCKCHAIN' ? 'text-blue-700' : 'text-gray-900'}`}>Ký số Blockchain (Khuyên dùng)</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            An toàn tuyệt đối. Hợp đồng được mã hóa và lưu trữ vĩnh viễn trên chuỗi khối.
+                          </p>
+                      </div>
+                  </div>
+
+                  {/* Lựa chọn 2: TRUYỀN THỐNG */}
+                  <div 
+                    className={`border-2 p-4 rounded-xl cursor-pointer flex items-start gap-4 transition-all ${signMethod === 'TRADITIONAL' ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                    onClick={() => setSignMethod("TRADITIONAL")}
+                  >
+                      <div className={`mt-1 shrink-0 ${signMethod === 'TRADITIONAL' ? 'text-blue-600' : 'text-gray-300'}`}>
+                          {signMethod === 'TRADITIONAL' ? <CheckCircle className="h-6 w-6 fill-blue-100" /> : <div className="h-6 w-6 rounded-full border-2" />}
+                      </div>
+                      <div>
+                          <h4 className={`font-bold text-sm ${signMethod === 'TRADITIONAL' ? 'text-blue-700' : 'text-gray-900'}`}>Xác nhận điện tử (Nhanh)</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                             Kích hoạt ngay bằng cách xác nhận đồng ý điều khoản. Không lưu hash.
+                          </p>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="flex gap-3">
+                  <Button variant="ghost" className="flex-1" onClick={() => setIsSignModalOpen(false)}>
+                      Để sau
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+                    onClick={handleSignContract} 
+                    isLoading={isSigning}
+                  >
+                      {signMethod === 'BLOCKCHAIN' ? 'Ký Blockchain' : 'Xác nhận ngay'}
+                  </Button>
+              </div>
+           </div>
+        </div>
+      )}
 
     </div>
   );
