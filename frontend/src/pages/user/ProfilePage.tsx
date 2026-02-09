@@ -315,8 +315,12 @@ const ProfilePage = () => {
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h4 className="font-bold mb-4 text-sm uppercase">Hoạt động</h4>
             <div className="space-y-4">
-              <ActivityItem label="Ngày tham gia" value={new Date(user.createdAt).toLocaleDateString('vi-VN')} icon={<Calendar />} />
-              <ActivityItem label="Cập nhật cuối" value={new Date(user.updatedAt).toLocaleDateString('vi-VN')} icon={<Edit3 />} />
+          <ActivityItem 
+            label="Ngày tham gia" 
+            value={new Date(user.createdAt).toLocaleString('vi-VN')} 
+            icon={<Calendar />} 
+          />              
+          <ActivityItem label="Cập nhật cuối" value={new Date(user.updatedAt).toLocaleString('vi-VN')} icon={<Edit3 />} />
             </div>
           </div>
         </div>
