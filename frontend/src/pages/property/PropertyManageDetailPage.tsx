@@ -1,0 +1,341 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { 
+  MapPin, Plus, Edit, ArrowLeft, Loader2, 
+  Sparkles, ImagePlus, X, FileText, FileSignature 
+} from 'lucide-react';
+import { propertyApi } from '@/api/propertyApi';
+import { Button } from '@/components/ui/Button';
+import { toast } from 'sonner';
+import type { Property, Room } from '@/types/index';
+
+export default function PropertyManageDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  
+  const [property, setProperty] = useState<Property | null>(null);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // --- STATE CHO MODAL PHÒNG ---
+  const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
+  
+  const [formData, setFormData] = useState({
+    name: '', price: '', area: '', description: '',
+    amenitiesInput: '', 
+    amenities: [] as string[],
+    images: [] as string[]
+  });
+
+  // --- STATE UPLOAD ẢNH ---
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (id) fetchData();
+  }, [id]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [propRes, roomsRes] = await Promise.all([
+        propertyApi.getDetail(id!),
+        propertyApi.getRooms(id!)
+      ]);
+      setProperty((propRes as any).data || propRes);
+      setRooms((roomsRes as any).data || roomsRes);
+    } catch (error) {
+      toast.error('Không thể tải dữ liệu phòng');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- MỞ MODAL THÊM / SỬA ---
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setFormData({ name: '', price: '', area: '', description: '', amenitiesInput: '', amenities: [], images: [] });
+    setSelectedFiles([]); setPreviewUrls([]);
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (room: Room) => {
+    setEditingId(room.id);
+    setFormData({
+      name: room.name, 
+      price: room.price.toString(), 
+      area: room.area.toString(),
+      description: room.description || '', 
+      amenities: room.amenities || [],
+      amenitiesInput: room.amenities?.join(', ') || '',
+      images: room.images || []
+    });
+    setSelectedFiles([]); setPreviewUrls([]);
+    setShowModal(true);
+  };
+
+  // --- XỬ LÝ ẢNH ---
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files).filter(file => file.size <= 5 * 1024 * 1024);
+      setSelectedFiles(prev => [...prev, ...filesArray]);
+      setPreviewUrls(prev => [...prev, ...filesArray.map(f => URL.createObjectURL(f))]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+  const removeSelectedFile = (idx: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== idx));
+  };
+  const removeOldImage = (idx: number) => {
+    setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+  };
+
+  // --- TÍCH HỢP AI TẠO MÔ TẢ ---
+  const handleGenerateAI = async () => {
+    if (!formData.name || !formData.area || !formData.price) {
+      toast.warning('Vui lòng nhập Tên, Diện tích và Giá thuê để AI có dữ liệu viết bài!');
+      return;
+    }
+    try {
+      setIsGeneratingAI(true);
+      const keywords = `Phòng ${formData.name}, diện tích ${formData.area}m2, giá ${formData.price} VND/tháng. Tiện ích: ${formData.amenitiesInput}. Sạch sẽ, an ninh tốt.`;
+      
+      const res = await propertyApi.generateRoomDescription(keywords);
+      const generatedText = (res as any).data?.description || res; 
+      
+      setFormData(prev => ({ ...prev, description: generatedText }));
+      toast.success('AI đã tạo mô tả thành công!');
+    } catch (error) {
+      toast.error('Lỗi khi gọi AI. Tính năng đang bảo trì.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // --- LƯU PHÒNG ---
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.price || !formData.area) {
+      toast.warning('Vui lòng nhập đủ thông tin bắt buộc!');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // 1. Upload ảnh
+      let newUrls: string[] = [];
+      if (selectedFiles.length > 0) {
+        toast.info("Đang tải ảnh lên...");
+        const uploadRes = await propertyApi.uploadImages(selectedFiles);
+        newUrls = (uploadRes as any).data || uploadRes;
+      }
+
+      // 2. Tách tiện ích từ chuỗi input
+      const parsedAmenities = formData.amenitiesInput
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+
+      const payload = {
+        name: formData.name,
+        price: Number(formData.price),
+        area: Number(formData.area),
+        description: formData.description,
+        amenities: parsedAmenities,
+        images: [...formData.images, ...newUrls],
+      };
+
+      if (editingId) {
+        await propertyApi.updateRoom(editingId, payload);
+        toast.success('Cập nhật phòng thành công!');
+      } else {
+        await propertyApi.createRoom(id!, payload);
+        toast.success('Thêm phòng mới thành công!');
+      }
+      
+      setShowModal(false);
+      fetchData(); 
+    } catch (error) {
+      toast.error(editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (!property) return <div className="text-center py-20">Không tìm thấy khu trọ.</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* --- HEADER --- */}
+      <div>
+        <Link to="/properties/manage" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Về danh sách khu trọ
+        </Link>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
+            <p className="flex items-center text-gray-500 mt-1"><MapPin className="h-4 w-4 mr-1" /> {property.address}</p>
+          </div>
+          <Button onClick={handleOpenCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Thêm phòng mới</Button>
+        </div>
+      </div>
+
+      {/* --- DANH SÁCH PHÒNG --- */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+        {rooms.length === 0 ? (
+          <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
+            <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
+            <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
+          </div>
+        ) : (
+          rooms.map(room => (
+            <div key={room.id} className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col">
+              {/* Ảnh phòng */}
+              <div className="h-40 bg-gray-200 relative">
+                {room.images && room.images.length > 0 ? (
+                  <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
+                )}
+                <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
+                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                }`}>
+                  {room.status === 'AVAILABLE' ? 'Trống' : 'Đã thuê'}
+                </span>
+              </div>
+
+              {/* Thông tin phòng */}
+              <div className="p-4 flex-1 flex flex-col">
+                <h3 className="text-xl font-bold text-gray-900 mb-3">Phòng {room.name}</h3>
+                <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
+                  <p className="flex justify-between"><span>Giá thuê:</span> <strong className="text-primary">{room.price?.toLocaleString()}đ</strong></p>
+                  <p className="flex justify-between"><span>Diện tích:</span> <strong className="text-gray-900">{room.area} m²</strong></p>
+                  <p className="text-xs text-gray-500 mt-2 line-clamp-2" title={room.amenities?.join(', ')}>
+                    Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
+                  </p>
+                </div>
+                
+                {/* NÚT THAO TÁC THÔNG MINH */}
+                <div className="flex gap-2 border-t pt-4 mt-auto">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" 
+                    onClick={() => handleOpenEdit(room)}
+                  >
+                    <Edit className="h-4 w-4 mr-1.5" /> Sửa
+                  </Button>
+
+                  {room.status === 'AVAILABLE' ? (
+                    <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
+                        <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
+                        <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* --- MODAL THÊM/SỬA PHÒNG --- */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
+              <h2 className="text-xl font-bold">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
+                {/* Thông tin cơ bản */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên phòng (VD: 101) *</label>
+                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Diện tích (m²) *</label>
+                    <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá thuê (VND) *</label>
+                    <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  </div>
+                </div>
+
+                {/* Tiện ích */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tiện ích (Ngăn cách bằng dấu phẩy)</label>
+                  <input type="text" placeholder="VD: Máy lạnh, Tủ lạnh, Giường nệm, Ban công..." value={formData.amenitiesInput} onChange={e => setFormData({...formData, amenitiesInput: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                </div>
+
+                {/* Khối Tích hợp AI viết mô tả */}
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                  <div className="flex justify-between items-end mb-2">
+                    <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Mô tả phòng</label>
+                    <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white">
+                      {isGeneratingAI ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                      Tự động viết bằng AI
+                    </Button>
+                  </div>
+                  <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none" placeholder="Nhập mô tả hoặc nhấn nút bên trên để AI tự động tạo lời chào mời hấp dẫn..." />
+                </div>
+
+                {/* Upload Ảnh */}
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Phòng</label>
+                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
+                    <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
+                    <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
+                    <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                  </div>
+
+                  {(formData.images.length > 0 || previewUrls.length > 0) && (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 mt-4">
+                      {formData.images.map((url, idx) => (
+                        <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border">
+                          <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removeOldImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                      {previewUrls.map((url, idx) => (
+                        <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed">
+                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />
+                          <button type="button" onClick={() => removeSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={isSubmitting}>Hủy</Button>
+              <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px]">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? 'Lưu thay đổi' : 'Lưu phòng mới')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
