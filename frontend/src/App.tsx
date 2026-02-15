@@ -17,32 +17,47 @@ import ProfilePage from "./pages/user/ProfilePage";
 // --- PROPERTY PAGES ---
 import PropertiesPage from "./pages/property/PropertiesPage";
 import PropertyDetailPage from "./pages/property/PropertyDetailPage";
-
-// --- CONTRACT PAGES ---
+import PropertiesManagePage from "./pages/property/PropertiesManagePage";
+import PropertyManageDetailPage from "./pages/property/PropertyManageDetailPage";
+import BillManagePage from "./pages/finance/BillManagePage";
+// --- CONTRACT & DASHBOARD PAGES ---
 import ContractsPage from "./pages/contract/ContractsPage"; 
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
-// ✅ Import trang tạo hợp đồng
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
+import DashboardPage from "./pages/dashboard/DashboardPage";
 
+// 1. Bảo vệ các trang yêu cầu Đăng Nhập
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
+// 2. Chặn truy cập Login/Register khi ĐÃ Đăng Nhập
 const PublicRoute = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) return null;
 
-  if (
-    isAuthenticated &&
-    (location.pathname === "/login" || location.pathname === "/register")
-  ) {
-    return <Navigate to="/dashboard" replace />; // Hoặc về /properties tùy bạn
+  if (isAuthenticated && (location.pathname === "/login" || location.pathname === "/register")) {
+    // Điều hướng dựa theo Role
+    return <Navigate to={user?.role === 'LANDLORD' ? "/dashboard" : "/"} replace />; 
   }
 
+  return <Outlet />;
+};
+
+// 3. Phân quyền truy cập các trang chuyên biệt theo Role
+const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  
+  if (!allowedRoles.includes(user.role)) {
+    // Sai Role thì đá ra trang chủ hoặc dashboard
+    return <Navigate to={user.role === 'LANDLORD' ? "/dashboard" : "/"} replace />;
+  }
+  
   return <Outlet />;
 };
 
@@ -65,29 +80,38 @@ function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             
-            {/* AUTH ROUTES (Chỉ dành cho khách chưa đăng nhập) */}
+            {/* AUTH ROUTES */}
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
             </Route>
           </Route>
 
-          {/* ─── GROUP: PROTECTED PAGES (Cần đăng nhập) ─── */}
+          {/* ─── GROUP: PROTECTED PAGES (Cần đăng nhập - Dùng MainLayout) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
  
               <Route path="/profile" element={<ProfilePage />} />
               
-              {/* === CONTRACT ROUTES (SỬA LẠI THỨ TỰ) === */}
+              {/* === KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD) === */}
+              <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/properties/manage" element={<PropertiesManagePage />} />
+                <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
+                
+                {/* Giữ chỗ cho các chức năng sau */}
+                <Route path="/finance" element={<BillManagePage />} />
+                <Route path="/reports" element={<div>Báo cáo doanh thu (Đang xây dựng)</div>} />
+              </Route>
               
-              {/* 1. Route tĩnh (Cụ thể) phải đặt TRƯỚC */}
+              {/* === CONTRACT ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
+              {/* Lưu ý: Route tĩnh (Cụ thể) phải đặt TRƯỚC Route động (/:id) */}
               <Route path="/contracts/create" element={<CreateContractPage />} />
-              
-              {/* 2. Route động (Dynamic ID) đặt SAU */}
               <Route path="/contracts/:id" element={<ContractDetailPage />} />
-              
-              {/* 3. Route danh sách */}
               <Route path="/contracts" element={<ContractsPage />} />
+              
+              {/* Dùng chung Lịch hẹn */}
+              <Route path="/appointments" element={<div>Quản lý Lịch hẹn (Đang xây dựng)</div>} />
               
             </Route>
           </Route>
@@ -98,13 +122,7 @@ function App() {
       </BrowserRouter>
 
       {/* 🔥 TOASTER CONFIG */}
-      <Toaster
-        position="top-right"
-        richColors
-        closeButton
-        duration={5000}
-        visibleToasts={5}
-      />
+      <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
     </AuthProvider>
   );
 }

@@ -93,7 +93,8 @@ public class SecurityConfig {
 
                         // Trang lỗi và API Public
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll() // Xem phòng không cần login
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**", "api/rooms/**", "/api/appointments/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/appointments/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll() // Xem ảnh
 
                         // Các API còn lại bắt buộc phải có Token

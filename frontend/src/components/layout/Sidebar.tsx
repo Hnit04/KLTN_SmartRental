@@ -6,7 +6,10 @@ import {
   Calendar, 
   Settings, 
   LogOut,
-  UserCircle 
+  UserCircle,
+  Building,
+  Receipt,
+  PieChart
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -15,41 +18,51 @@ const Sidebar = () => {
   const location = useLocation();
   const { logout, user } = useAuth();
 
-  // 1. Menu dùng chung
-  const commonItems = [
+  // 1. Menu dành cho CHỦ TRỌ (Bám sát tài liệu thiết kế 1.4.2)
+  const landlordItems = [
     {
-      title: 'Tổng quan',
+      title: 'Tổng quan & Thống kê',
       path: '/dashboard',
       icon: LayoutDashboard,
     },
-  ];
-
-  // 2. Menu dành cho CHỦ TRỌ (Cần nhiều chức năng quản lý)
-  const landlordItems = [
     {
-      title: 'Quản lý phòng',
-      path: '/properties/manage', // Trang dành riêng cho chủ trọ (thêm/sửa/xóa)
-      icon: Home,
+      title: 'Khu trọ & Phòng trọ',
+      path: '/properties/manage',
+      icon: Building, // Icon tòa nhà hợp lý hơn cho khu trọ
     },
     {
-      title: 'Quản lý hợp đồng',
+      title: 'Quản lý Hợp đồng',
       path: '/contracts',
       icon: FileText,
     },
     {
-      title: 'Lịch hẹn khách xem',
+      title: 'Tài chính & Hóa đơn',
+      path: '/finance',
+      icon: Receipt, // Icon biên lai/hóa đơn
+    },
+    {
+      title: 'Quản lý Lịch hẹn',
       path: '/appointments',
       icon: Calendar,
     },
+    {
+      title: 'Báo cáo doanh thu',
+      path: '/reports',
+      icon: PieChart, // Icon biểu đồ cho chức năng Xuất báo cáo Excel/PDF
+    }
   ];
 
-  // 3. Menu dành cho NGƯỜI THUÊ (Chỉ giữ lại những gì cần quản lý)
+  // 2. Menu dành cho NGƯỜI THUÊ
   const tenantItems = [
-    // ❌ Đã bỏ mục "Tìm phòng" để tránh trùng với menu ngang
     {
       title: 'Hợp đồng của tôi',
       path: '/contracts',
       icon: FileText,
+    },
+    {
+      title: 'Hóa đơn & Thanh toán',
+      path: '/my-bills',
+      icon: Receipt,
     },
     {
       title: 'Lịch sử xem phòng',
@@ -58,7 +71,7 @@ const Sidebar = () => {
     },
   ];
 
-  // 4. Menu Cài đặt & Profile (Luôn hiển thị ở dưới)
+  // 3. Menu Cài đặt & Profile (Dùng chung dưới cùng)
   const bottomItems = [
     {
       title: 'Hồ sơ cá nhân',
@@ -72,19 +85,14 @@ const Sidebar = () => {
     },
   ];
 
-  // Logic chọn menu
-  let menuItems = commonItems;
-  if (user?.role === 'LANDLORD') {
-    menuItems = [...commonItems, ...landlordItems, ...bottomItems];
-  } else {
-    // Với Tenant, bỏ mục "Tổng quan" nếu dashboard không có biểu đồ gì đặc biệt
-    // Chỉ tập trung vào Hợp đồng và Hồ sơ
-    menuItems = [...tenantItems, ...bottomItems];
-  }
+  // Logic phân luồng Menu
+  const menuItems = user?.role === 'LANDLORD' 
+    ? [...landlordItems, ...bottomItems] 
+    : [...tenantItems, ...bottomItems];
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white text-gray-900 transition-transform hidden md:flex flex-col">
-      {/* Logo Area - Bấm vào đây để quay về trang chủ (Menu ngang) */}
+      {/* Logo Area */}
       <div className="flex h-16 items-center border-b px-6">
         <Link to="/" className="flex items-center gap-2 font-bold text-xl text-primary hover:opacity-80 transition-opacity" title="Về trang chủ">
           <Home className="h-6 w-6" />
@@ -95,7 +103,8 @@ const Sidebar = () => {
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          // Xử lý Active state chính xác hơn cho các route con
+          const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
             <Link
               key={item.path}
