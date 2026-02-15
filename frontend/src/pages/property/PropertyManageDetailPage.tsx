@@ -2,12 +2,20 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
-  Sparkles, ImagePlus, X, FileText, FileSignature 
+  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare 
 } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
+
+// Danh sách các tiện ích phổ biến
+const COMMON_AMENITIES = [
+  "Máy lạnh", "Tủ lạnh", "Máy giặt", "Nóng lạnh",
+  "Giường nệm", "Tủ quần áo", "Ban công", "Kệ bếp",
+  "Chỗ để xe", "Thang máy", "Wifi tốc độ cao", "An ninh 24/7",
+  "Máy hút mùi", "Sofa", "Smart TV", "Bàn ghế làm việc"
+];
 
 export default function PropertyManageDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,8 +32,8 @@ export default function PropertyManageDetailPage() {
   
   const [formData, setFormData] = useState({
     name: '', price: '', area: '', description: '',
-    amenitiesInput: '', 
-    amenities: [] as string[],
+    amenities: [] as string[], // Chứa các tiện ích chọn từ Checkbox
+    customAmenitiesInput: '', // Chứa các tiện ích nhập tay (không có trong list mặc định)
     images: [] as string[]
   });
 
@@ -57,24 +65,50 @@ export default function PropertyManageDetailPage() {
   // --- MỞ MODAL THÊM / SỬA ---
   const handleOpenCreate = () => {
     setEditingId(null);
-    setFormData({ name: '', price: '', area: '', description: '', amenitiesInput: '', amenities: [], images: [] });
+    setFormData({ name: '', price: '', area: '', description: '', amenities: [], customAmenitiesInput: '', images: [] });
     setSelectedFiles([]); setPreviewUrls([]);
     setShowModal(true);
   };
 
   const handleOpenEdit = (room: Room) => {
     setEditingId(room.id);
+    
+    // Phân loại tiện ích: Cái nào có trong COMMON_AMENITIES thì đưa vào checkbox, còn lại đưa vào text input
+    const standardAmenities: string[] = [];
+    const customAmenities: string[] = [];
+    
+    (room.amenities || []).forEach(item => {
+      if (COMMON_AMENITIES.includes(item)) {
+        standardAmenities.push(item);
+      } else {
+        customAmenities.push(item);
+      }
+    });
+
     setFormData({
       name: room.name, 
       price: room.price.toString(), 
       area: room.area.toString(),
       description: room.description || '', 
-      amenities: room.amenities || [],
-      amenitiesInput: room.amenities?.join(', ') || '',
+      amenities: standardAmenities,
+      customAmenitiesInput: customAmenities.join(', '), // Nối bằng dấu phẩy
       images: room.images || []
     });
     setSelectedFiles([]); setPreviewUrls([]);
     setShowModal(true);
+  };
+
+  // --- XỬ LÝ CHECKBOX TIỆN ÍCH ---
+  const handleToggleAmenity = (amenity: string) => {
+    setFormData(prev => {
+      const isSelected = prev.amenities.includes(amenity);
+      return {
+        ...prev,
+        amenities: isSelected 
+          ? prev.amenities.filter(item => item !== amenity) // Bỏ chọn
+          : [...prev.amenities, amenity] // Chọn thêm
+      };
+    });
   };
 
   // --- XỬ LÝ ẢNH ---
@@ -102,7 +136,9 @@ export default function PropertyManageDetailPage() {
     }
     try {
       setIsGeneratingAI(true);
-      const keywords = `Phòng ${formData.name}, diện tích ${formData.area}m2, giá ${formData.price} VND/tháng. Tiện ích: ${formData.amenitiesInput}. Sạch sẽ, an ninh tốt.`;
+      // Gộp tiện ích từ checkbox và nhập tay
+      const allAmenities = [...formData.amenities, formData.customAmenitiesInput].filter(Boolean).join(', ');
+      const keywords = `Phòng ${formData.name}, diện tích ${formData.area}m2, giá ${formData.price} VND/tháng. Tiện ích: ${allAmenities}. Sạch sẽ, an ninh tốt.`;
       
       const res = await propertyApi.generateRoomDescription(keywords);
       const generatedText = (res as any).data?.description || res; 
@@ -127,7 +163,6 @@ export default function PropertyManageDetailPage() {
     try {
       setIsSubmitting(true);
       
-      // 1. Upload ảnh
       let newUrls: string[] = [];
       if (selectedFiles.length > 0) {
         toast.info("Đang tải ảnh lên...");
@@ -135,18 +170,20 @@ export default function PropertyManageDetailPage() {
         newUrls = (uploadRes as any).data || uploadRes;
       }
 
-      // 2. Tách tiện ích từ chuỗi input
-      const parsedAmenities = formData.amenitiesInput
+      // Xử lý gộp tiện ích: Checkbox + Nhập tay (cắt dấu phẩy)
+      const parsedCustomAmenities = formData.customAmenitiesInput
         .split(',')
         .map(item => item.trim())
         .filter(item => item.length > 0);
+      
+      const finalAmenities = [...formData.amenities, ...parsedCustomAmenities];
 
       const payload = {
         name: formData.name,
         price: Number(formData.price),
         area: Number(formData.area),
         description: formData.description,
-        amenities: parsedAmenities,
+        amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
       };
 
@@ -224,12 +261,7 @@ export default function PropertyManageDetailPage() {
                 
                 {/* NÚT THAO TÁC THÔNG MINH */}
                 <div className="flex gap-2 border-t pt-4 mt-auto">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" 
-                    onClick={() => handleOpenEdit(room)}
-                  >
+                  <Button variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleOpenEdit(room)}>
                     <Edit className="h-4 w-4 mr-1.5" /> Sửa
                   </Button>
 
@@ -256,46 +288,75 @@ export default function PropertyManageDetailPage() {
       {/* --- MODAL THÊM/SỬA PHÒNG --- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
               <h2 className="text-xl font-bold">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">
-              <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
+              <form id="room-form" onSubmit={handleSubmit} className="space-y-6">
+                
                 {/* Thông tin cơ bản */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tên phòng (VD: 101) *</label>
-                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Diện tích (m²) *</label>
-                    <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Giá thuê (VND) *</label>
-                    <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                   </div>
                 </div>
 
-                {/* Tiện ích */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tiện ích (Ngăn cách bằng dấu phẩy)</label>
-                  <input type="text" placeholder="VD: Máy lạnh, Tủ lạnh, Giường nệm, Ban công..." value={formData.amenitiesInput} onChange={e => setFormData({...formData, amenitiesInput: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                {/* ✅ KHU VỰC TIỆN ÍCH (CHECKBOX GRID) */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
+                  </label>
+                  
+                  {/* Lưới Checkbox */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                    {COMMON_AMENITIES.map((amenity) => (
+                      <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                          checked={formData.amenities.includes(amenity)}
+                          onChange={() => handleToggleAmenity(amenity)}
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-primary transition-colors">{amenity}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Input nhập tiện ích khác */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Tiện ích khác (Ngăn cách bằng dấu phẩy)</label>
+                    <input 
+                      type="text" 
+                      placeholder="VD: Cửa sổ lớn, Máy nước nóng lạnh, Lò vi sóng..." 
+                      value={formData.customAmenitiesInput} 
+                      onChange={e => setFormData({...formData, customAmenitiesInput: e.target.value})} 
+                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-primary outline-none text-sm bg-white" 
+                    />
+                  </div>
                 </div>
 
                 {/* Khối Tích hợp AI viết mô tả */}
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                   <div className="flex justify-between items-end mb-2">
                     <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Mô tả phòng</label>
-                    <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
                       {isGeneratingAI ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
                       Tự động viết bằng AI
                     </Button>
                   </div>
-                  <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none" placeholder="Nhập mô tả hoặc nhấn nút bên trên để AI tự động tạo lời chào mời hấp dẫn..." />
+                  <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white" placeholder="Nhập mô tả hoặc nhấn nút bên trên để AI tự động tạo lời chào mời hấp dẫn..." />
                 </div>
 
                 {/* Upload Ảnh */}

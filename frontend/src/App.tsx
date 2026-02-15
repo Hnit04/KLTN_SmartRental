@@ -19,7 +19,7 @@ import PropertiesPage from "./pages/property/PropertiesPage";
 import PropertyDetailPage from "./pages/property/PropertyDetailPage";
 import PropertiesManagePage from "./pages/property/PropertiesManagePage";
 import PropertyManageDetailPage from "./pages/property/PropertyManageDetailPage";
-
+import BillManagePage from "./pages/finance/BillManagePage";
 // --- CONTRACT & DASHBOARD PAGES ---
 import ContractsPage from "./pages/contract/ContractsPage"; 
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
@@ -100,7 +100,7 @@ function App() {
                 <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
                 
                 {/* Giữ chỗ cho các chức năng sau */}
-                <Route path="/finance" element={<div>Quản lý Tài chính & Hóa đơn (Đang xây dựng)</div>} />
+                <Route path="/finance" element={<BillManagePage />} />
                 <Route path="/reports" element={<div>Báo cáo doanh thu (Đang xây dựng)</div>} />
               </Route>
               
