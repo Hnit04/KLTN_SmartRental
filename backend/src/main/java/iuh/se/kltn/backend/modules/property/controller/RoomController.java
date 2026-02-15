@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.property.controller;
 
+import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import iuh.se.kltn.backend.modules.property.service.RoomService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,5 +18,11 @@ public class RoomController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getRoomDetail(@PathVariable Long id) {
         return ResponseEntity.ok(roomService.getRoomById(id));
+    }
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateRoom(
+            @PathVariable Long id,
+            @RequestBody RoomRequest request) {
+        return ResponseEntity.ok(roomService.updateRoom(id, request));
     }
 }

@@ -25,7 +25,7 @@ import ContractsPage from "./pages/contract/ContractsPage";
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
 import DashboardPage from "./pages/dashboard/DashboardPage";
-
+import ReportsPage from "./pages/dashboard/ReportsPage";
 // 1. Bảo vệ các trang yêu cầu Đăng Nhập
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -101,7 +101,7 @@ function App() {
                 
                 {/* Giữ chỗ cho các chức năng sau */}
                 <Route path="/finance" element={<BillManagePage />} />
-                <Route path="/reports" element={<div>Báo cáo doanh thu (Đang xây dựng)</div>} />
+                <Route path="/reports" element={<ReportsPage />} />
               </Route>
               
               {/* === CONTRACT ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}

@@ -16,4 +16,5 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     Optional<Contract> findTopByRoomIdOrderByStartDateDesc(Long roomId);
 
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
+    List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
 }

@@ -153,4 +153,35 @@ public class PropertyService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trọ với ID: " + id));
         return mapToPropertyResponse(property);
     }
+    @Transactional
+    public PropertyResponse updateProperty(Long landlordId, Long propertyId, PropertyRequest request) {
+        // 1. Tìm khu trọ theo ID
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại với ID: " + propertyId));
+
+        // 2. Kiểm tra quyền sở hữu (Chỉ cho phép Chủ trọ sở hữu mới được sửa)
+        if (!property.getLandlord().getId().equals(landlordId)) {
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa khu trọ này!");
+        }
+
+        // 3. Cập nhật dữ liệu từ request
+        property.setName(request.getName());
+        property.setCity(request.getCity());
+        property.setDistrict(request.getDistrict());
+        property.setAddress(request.getAddress());
+        property.setDescription(request.getDescription());
+
+        property.setElecPrice(request.getElecPrice());
+        property.setWaterPrice(request.getWaterPrice());
+        property.setInternetPrice(request.getInternetPrice());
+
+        // Cập nhật list hình ảnh (nếu có gửi lên)
+        if (request.getImages() != null && !request.getImages().isEmpty()) {
+            property.setImages(JsonUtil.convertListToJson(request.getImages()));
+        }
+
+        // 4. Lưu vào Database và trả về
+        Property saved = propertyRepository.save(property);
+        return mapToPropertyResponse(saved);
+    }
 }

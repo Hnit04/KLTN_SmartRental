@@ -27,4 +27,13 @@ public class BillController {
     public ResponseEntity<?> getBillsByContract(@PathVariable Long contractId) {
         return ResponseEntity.ok(billService.getBillsByContract(contractId));
     }
+    @GetMapping("/billing-status")
+    public ResponseEntity<?> getBillingStatus(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam int month,
+            @RequestParam int year) {
+
+        // Truyền ID của Chủ trọ đang đăng nhập vào
+        return ResponseEntity.ok(billService.getBillingStatus(currentUser.getId(), month, year));
+    }
 }
