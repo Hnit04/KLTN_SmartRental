@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.contract.service;
 
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.BillingStatusResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Bill;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.enums.BillStatus;
@@ -80,7 +81,11 @@ public class BillService {
     public List<BillResponse> getBillsByContract(Long contractId) {
         return billRepository.findByContractId(contractId).stream()
                 .map(bill -> {
-                    return mapToResponse(bill, 0.0, 0.0, bill.getContract().getActualPrice());
+                    Property property = bill.getContract().getRoom().getProperty();
+                    double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
+                    double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+
+                    return mapToResponse(bill, elecCost, waterCost, bill.getContract().getActualPrice());
                 })
                 .collect(Collectors.toList());
     }
@@ -92,5 +97,62 @@ public class BillService {
         res.setWaterCost(water);
         res.setRoomCost(room);
         return res;
+    }
+    public List<BillingStatusResponse> getBillingStatus(Long landlordId, int month, int year) {
+        // 1. Lấy tất cả Hợp đồng đang ACTIVE của Chủ trọ này
+        List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
+
+        List<BillingStatusResponse> responses = new java.util.ArrayList<>();
+
+        for (Contract contract : activeContracts) {
+            BillingStatusResponse res = new BillingStatusResponse();
+            res.setId(contract.getId());
+            res.setRoomName(contract.getRoom().getName());
+            res.setTenantName(contract.getTenant().getFullName()); // Tùy thuộc Entity User/Tenant của bạn
+            res.setActualPrice(contract.getActualPrice());
+
+            Property property = contract.getRoom().getProperty();
+            res.setElecPrice(property.getElecPrice());
+            res.setWaterPrice(property.getWaterPrice());
+            res.setInternetPrice(property.getInternetPrice());
+
+            // 2. Kiểm tra xem Tháng này đã có Hóa đơn chưa
+            java.util.Optional<Bill> currentBillOpt = billRepository.findByContractIdAndMonthAndYear(contract.getId(), month, year);
+
+            if (currentBillOpt.isPresent()) {
+                // NẾU ĐÃ CHỐT SỔ -> Lấy dữ liệu của hóa đơn hiện tại
+                Bill currentBill = currentBillOpt.get();
+                res.setBillStatus(currentBill.getStatus().name()); // UNPAID, PAID, LATE
+                res.setOldElecIndex(currentBill.getOldElecIndex());
+                res.setOldWaterIndex(currentBill.getOldWaterIndex());
+                res.setTotalAmount(currentBill.getTotalAmount());
+                res.setDeadline(currentBill.getDeadline());
+
+                // Cờ nhận diện thanh toán Blockchain
+                if (currentBill.getPaymentTxHash() != null && !currentBill.getPaymentTxHash().isEmpty()) {
+                    res.setPaymentMethod("BLOCKCHAIN");
+                }
+            } else {
+                // NẾU CHƯA CHỐT SỔ (UNBILLED) -> Đi tìm số điện nước của tháng trước
+                res.setBillStatus("UNBILLED");
+
+                int prevMonth = (month == 1) ? 12 : month - 1;
+                int prevYear = (month == 1) ? year - 1 : year;
+
+                java.util.Optional<Bill> prevBillOpt = billRepository.findByContractIdAndMonthAndYear(contract.getId(), prevMonth, prevYear);
+
+                if (prevBillOpt.isPresent()) {
+                    // Lấy số mới của tháng trước làm số cũ của tháng này
+                    res.setOldElecIndex(prevBillOpt.get().getNewElecIndex());
+                    res.setOldWaterIndex(prevBillOpt.get().getNewWaterIndex());
+                } else {
+                    // Nếu là tháng đầu tiên khách mới vào ở, chưa có hóa đơn cũ -> Set là 0
+                    res.setOldElecIndex(0);
+                    res.setOldWaterIndex(0);
+                }
+            }
+            responses.add(res);
+        }
+        return responses;
     }
 }

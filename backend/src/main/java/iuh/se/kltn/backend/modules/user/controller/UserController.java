@@ -24,8 +24,10 @@ public class UserController {
 
     @Autowired
     private CloudinaryService cloudinaryService;
+
     @Autowired
     private OcrService ocrService;
+
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
@@ -58,7 +60,8 @@ public class UserController {
                 return ResponseEntity.badRequest().body("File không được để trống");
             }
 
-            String avatarUrl = cloudinaryService.uploadImage(file);
+            // ✅ SỬA LỖI TẠI ĐÂY: Dùng hàm uploadAvatar đã định nghĩa trong CloudinaryService
+            String avatarUrl = cloudinaryService.uploadAvatar(file);
 
             userService.updateAvatar(currentUser.getId(), avatarUrl);
 
@@ -68,6 +71,7 @@ public class UserController {
             return ResponseEntity.internalServerError().body("Lỗi upload ảnh: " + e.getMessage());
         }
     }
+
     @PostMapping(value = "/kyc", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitKYC(
             @AuthenticationPrincipal UserPrincipal currentUser,
@@ -86,8 +90,9 @@ public class UserController {
                 isAutoVerified = true;
             }
 
-            String frontUrl = cloudinaryService.uploadImage(frontImage);
-            String backUrl = cloudinaryService.uploadImage(backImage);
+            // ✅ SỬA LỖI TẠI ĐÂY: Truyền thêm tham số folderName ("smart-rental/kyc")
+            String frontUrl = cloudinaryService.uploadImage(frontImage, "smart-rental/kyc");
+            String backUrl = cloudinaryService.uploadImage(backImage, "smart-rental/kyc");
 
             userService.submitKYC(currentUser.getId(), cccdNumber, frontUrl, backUrl, isAutoVerified);
 

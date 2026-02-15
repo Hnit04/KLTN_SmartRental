@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BillRepository extends JpaRepository<Bill, Long> {
@@ -13,4 +14,5 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     // Tìm các hóa đơn chưa thanh toán của một hợp đồng
     List<Bill> findByContractIdAndStatus(Long contractId, BillStatus status);
+    Optional<Bill> findByContractIdAndMonthAndYear(Long contractId, Integer month, Integer year);
 }
