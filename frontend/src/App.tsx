@@ -26,6 +26,10 @@ import ContractDetailPage from "./pages/contract/ContractDetailPage";
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
+
+// ✅ 1. IMPORT TRANG QUẢN LÝ LỊCH HẸN VÀO ĐÂY
+import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
+
 // 1. Bảo vệ các trang yêu cầu Đăng Nhập
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -99,19 +103,17 @@ function App() {
                 <Route path="/properties/manage" element={<PropertiesManagePage />} />
                 <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
                 
-                {/* Giữ chỗ cho các chức năng sau */}
                 <Route path="/finance" element={<BillManagePage />} />
                 <Route path="/reports" element={<ReportsPage />} />
               </Route>
               
-              {/* === CONTRACT ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
-              {/* Lưu ý: Route tĩnh (Cụ thể) phải đặt TRƯỚC Route động (/:id) */}
+              {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
               <Route path="/contracts/create" element={<CreateContractPage />} />
               <Route path="/contracts/:id" element={<ContractDetailPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
               
-              {/* Dùng chung Lịch hẹn */}
-              <Route path="/appointments" element={<div>Quản lý Lịch hẹn (Đang xây dựng)</div>} />
+              {/* ✅ 2. THAY THẾ DIV GIỮ CHỖ BẰNG COMPONENT THẬT */}
+              <Route path="/appointments" element={<AppointmentManagePage />} />
               
             </Route>
           </Route>

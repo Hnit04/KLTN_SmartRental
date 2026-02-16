@@ -15,8 +15,14 @@ public class AppointmentResponse {
     private Long id;
     private Long roomId;
     private String roomName;
+
     private Long landlordId;
     private String landlordFullName;
+
+    private Long tenantId;
+    private String tenantFullName;
+    private String tenantPhone;
+
     private LocalDateTime meetTime;
     private AppointmentStatus status;
     private String note;

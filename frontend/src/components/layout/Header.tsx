@@ -1,8 +1,9 @@
-import { Bell, Search } from 'lucide-react';
-import { Button } from '@/components/ui/Button'; 
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
-// Import component UserNav để dùng chung
+
+// Import component UserNav và NotificationBell để dùng chung
 import { UserNav } from "../shared/UserNav"; 
+import NotificationBell from "../shared/NotificationBell";
 
 const Header = () => {
   return (
@@ -23,16 +24,14 @@ const Header = () => {
 
       {/* Bên Phải: Thông báo & User Profile */}
       <div className="flex items-center gap-4">
-        {/* Nút thông báo */}
-        <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-gray-700">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-        </Button>
+        
+        {/* ✅ TÍCH HỢP COMPONENT CHUÔNG THÔNG BÁO VÀO ĐÂY */}
+        <NotificationBell />
 
         {/* Đường kẻ dọc ngăn cách */}
         <div className="h-6 w-px bg-gray-200" />
 
-        {/* ✅ THAY THẾ TOÀN BỘ CODE CŨ BẰNG USERNAV */}
+        {/* ✅ USERNAV */}
         <UserNav />
       </div>
     </header>

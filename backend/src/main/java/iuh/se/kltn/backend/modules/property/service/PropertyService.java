@@ -18,7 +18,11 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -183,5 +187,21 @@ public class PropertyService {
         // 4. Lưu vào Database và trả về
         Property saved = propertyRepository.save(property);
         return mapToPropertyResponse(saved);
+    }
+    public String reverseGeocode(double lat, double lon) {
+        String url = String.format("https://nominatim.openstreetmap.org/reverse?format=json&lat=%s&lon=%s&addressdetails=1&accept-language=vi", lat, lon);
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        // Khai báo User-Agent (Tên đồ án) để OpenStreetMap không chặn
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "KLTN_SmartRental_App_Version_1.0");
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        // Bắn request lấy dữ liệu
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+        return response.getBody(); // Trả về chuỗi JSON chuẩn
     }
 }

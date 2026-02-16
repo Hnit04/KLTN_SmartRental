@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, MapPin, Plus, Loader2, Edit, X, Camera, ImagePlus } from 'lucide-react';
+import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,6 +15,7 @@ export default function PropertiesManagePage() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false); // State định vị
   
   const [formData, setFormData] = useState({
     name: '', city: '', district: '', address: '',
@@ -68,6 +69,73 @@ export default function PropertiesManagePage() {
     setShowModal(true);
   };
 
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Trình duyệt của bạn không hỗ trợ lấy vị trí.");
+      return;
+    }
+
+    setIsFetchingLocation(true);
+    const toastId = toast.loading("Đạng lấy định vị... Vui lòng chờ!");
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        // Có tọa độ -> Lập tức tắt theo dõi để tiết kiệm tài nguyên
+        navigator.geolocation.clearWatch(watchId);
+
+        try {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          // ✅ 1. GỌI VỀ BACKEND SPRING BOOT CỦA MÌNH
+          const response = await propertyApi.reverseGeocode(lat, lon);
+          
+          // ✅ 2. XỬ LÝ DỮ LIỆU JSON
+          // Tùy cấu hình Axios, dữ liệu có thể nằm ở response.data hoặc trực tiếp ở response
+          let data = (response as any).data || response;
+          // Vì Spring Boot trả về chuỗi String JSON nguyên xi, nên ta cần parse nó ra Object
+          if (typeof data === 'string') {
+            data = JSON.parse(data);
+          }
+
+          if (data && data.address) {
+            const addr = data.address;
+            
+            const city = addr.city || addr.province || addr.state || '';
+            const district = addr.county || addr.suburb || addr.city_district || addr.district || '';
+            const street = addr.road || addr.pedestrian || '';
+            const houseNumber = addr.house_number ? `${addr.house_number} ` : '';
+            
+            setFormData(prev => ({
+              ...prev,
+              city: city.replace('Thành phố ', '').replace('Tỉnh ', ''),
+              district: district.replace('Quận ', '').replace('Huyện ', ''),
+              address: `${houseNumber}${street}`.trim() || data.display_name.split(',')[0]
+            }));
+            
+            toast.success("Đã lấy được vị trí hiện tại!", { id: toastId });
+          }
+        } catch (error) {
+          toast.error("Không thể phân tích địa chỉ từ tọa độ.", { id: toastId });
+        } finally {
+          setIsFetchingLocation(false);
+        }
+      },
+      (error) => {
+        navigator.geolocation.clearWatch(watchId);
+        setIsFetchingLocation(false);
+        
+        let errorMsg = "Lỗi không xác định khi lấy vị trí.";
+        if (error.code === 1) errorMsg = "Bị từ chối! Hãy bật định vị trên thiết bị và cấp quyền.";
+        else if (error.code === 2) errorMsg = "Không thể xác định tọa độ GPS của thiết bị này.";
+        else if (error.code === 3) errorMsg = "Quá thời gian định vị. Vui lòng thử lại.";
+
+        toast.error(errorMsg, { id: toastId });
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
   // --- XỬ LÝ ẢNH TRƯỚC KHI UPLOAD ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -117,7 +185,6 @@ export default function PropertiesManagePage() {
       if (selectedFiles.length > 0) {
         toast.info("Đang tải ảnh lên hệ thống...");
         const uploadRes = await propertyApi.uploadImages(selectedFiles);
-        // axiosClient trả về data ở res.data hoặc trả thẳng res tùy cấu hình interceptor của bạn
         newlyUploadedUrls = (uploadRes as any).data || uploadRes; 
       }
 
@@ -155,7 +222,7 @@ export default function PropertiesManagePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header và List (Giữ nguyên như cũ) */}
+      {/* Header và List */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Khu trọ của tôi</h1>
@@ -192,7 +259,7 @@ export default function PropertiesManagePage() {
       </div>
 
       {/* ========================================= */}
-      {/* MODAL THÊM / SỬA KHU TRỌ (BỔ SUNG UPLOAD) */}
+      {/* MODAL THÊM / SỬA KHU TRỌ */}
       {/* ========================================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
@@ -204,25 +271,38 @@ export default function PropertiesManagePage() {
             
             <div className="p-6 overflow-y-auto flex-1">
               <form id="property-form" onSubmit={handleSubmit} className="space-y-4">
-                {/* ... Các trường nhập liệu (Tên, Địa chỉ, Giá) vẫn giữ nguyên ... */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tên khu trọ / Tòa nhà *</label>
                   <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                 </div>
+                
+                {/* --- KHU VỰC NHẬP ĐỊA CHỈ & LẤY VỊ TRÍ --- */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh / Thành phố *</label>
-                    <input required type="text" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    <input required type="text" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: Hồ Chí Minh" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quận / Huyện</label>
-                    <input type="text" value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    <input type="text" value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: Gò Vấp" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ chi tiết *</label>
-                  <input required type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Địa chỉ chi tiết *</label>
+                    <button 
+                      type="button" 
+                      onClick={handleGetLocation}
+                      disabled={isFetchingLocation}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded transition-colors"
+                    >
+                      {isFetchingLocation ? <Loader2 className="h-3 w-3 animate-spin" /> : <LocateFixed className="h-3 w-3" />}
+                      {isFetchingLocation ? "Đang định vị..." : "Lấy vị trí hiện tại"}
+                    </button>
+                  </div>
+                  <input required type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="Số nhà, tên đường..." />
                 </div>
+
                 <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg border">
                   <div><label className="text-sm font-medium">Giá điện (đ/kWh)</label><input type="number" value={formData.elecPrice} onChange={e => setFormData({...formData, elecPrice: e.target.value})} className="w-full border p-2 rounded-md outline-none" /></div>
                   <div><label className="text-sm font-medium">Giá nước (đ/m3)</label><input type="number" value={formData.waterPrice} onChange={e => setFormData({...formData, waterPrice: e.target.value})} className="w-full border p-2 rounded-md outline-none" /></div>
@@ -233,7 +313,7 @@ export default function PropertiesManagePage() {
                 <div className="mt-6 border-t pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Khu trọ</label>
                   
-                  {/* Nút chọn ảnh (ẩn input file đi cho đẹp) */}
+                  {/* Nút chọn ảnh */}
                   <div 
                     onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer"
@@ -251,7 +331,7 @@ export default function PropertiesManagePage() {
                   {(formData.images.length > 0 || previewUrls.length > 0) && (
                     <div className="grid grid-cols-4 gap-3 mt-4">
                       
-                      {/* Hiển thị ảnh cũ (đã có URL trên Cloudinary) */}
+                      {/* Hiển thị ảnh cũ */}
                       {formData.images.map((url, idx) => (
                         <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border bg-gray-100">
                           <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
@@ -264,7 +344,7 @@ export default function PropertiesManagePage() {
                         </div>
                       ))}
 
-                      {/* Hiển thị ảnh mới chọn (sắp upload) */}
+                      {/* Hiển thị ảnh mới chọn */}
                       {previewUrls.map((url, idx) => (
                         <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed bg-blue-50">
                           <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />

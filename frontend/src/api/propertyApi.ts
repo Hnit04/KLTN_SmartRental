@@ -33,4 +33,7 @@ export const propertyApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  reverseGeocode: (lat: number, lon: number) => {
+    return axiosClient.get(`/properties/reverse-geocode?lat=${lat}&lon=${lon}`);
+  },
 };
