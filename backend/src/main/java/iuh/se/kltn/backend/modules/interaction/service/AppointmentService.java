@@ -44,18 +44,7 @@ public class AppointmentService {
 
         Appointment saved = appointmentRepo.save(appointment);
 
-        return new AppointmentResponse(
-                saved.getId(),
-                saved.getRoom().getId(),
-                saved.getRoom().getName(),
-                saved.getLandlord().getId(),
-                saved.getLandlord().getFullName(),
-                saved.getMeetTime(),
-                saved.getStatus(),
-                saved.getNote(),
-                saved.getMeetingLink(),
-                saved.getCreatedAt()
-        );
+        return mapToResponse(saved); // Dùng chung hàm map cho gọn
     }
 
     public List<AppointmentResponse> getPendingAppointmentsByLandlord(Long landlordId) {
@@ -66,6 +55,22 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    // ✅ THÊM HÀM NÀY ĐỂ DUYỆT / TỪ CHỐI LỊCH HẸN
+    @Transactional
+    public void updateAppointmentStatus(Long id, AppointmentStatus status, String username) {
+        Appointment appointment = appointmentRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch hẹn"));
+
+        // Kiểm tra xem người đang thao tác có đúng là chủ trọ của lịch hẹn này không
+        if (!appointment.getLandlord().getUsername().equals(username)) {
+            throw new RuntimeException("Bạn không có quyền cập nhật lịch hẹn này");
+        }
+
+        appointment.setStatus(status);
+        appointmentRepo.save(appointment);
+    }
+
+    // ✅ SỬA HÀM NÀY ĐỂ TRẢ VỀ THÊM THÔNG TIN TENANT
     private AppointmentResponse mapToResponse(Appointment appointment) {
         return new AppointmentResponse(
                 appointment.getId(),
@@ -73,6 +78,9 @@ public class AppointmentService {
                 appointment.getRoom().getName(),
                 appointment.getLandlord().getId(),
                 appointment.getLandlord().getFullName(),
+                appointment.getTenant().getId(),             // Thêm Tenant ID
+                appointment.getTenant().getFullName(),       // Thêm Tenant Name
+                appointment.getTenant().getPhoneNumber(),    // Thêm Tenant Phone (Lấy từ class cha User)
                 appointment.getMeetTime(),
                 appointment.getStatus(),
                 appointment.getNote(),

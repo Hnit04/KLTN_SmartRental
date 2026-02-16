@@ -79,4 +79,14 @@ public class PropertyController {
             return ResponseEntity.internalServerError().body("Lỗi khi tải ảnh lên Cloudinary: " + e.getMessage());
         }
     }
+    @GetMapping("/reverse-geocode")
+    public ResponseEntity<?> reverseGeocode(@RequestParam double lat, @RequestParam double lon) {
+        try {
+            // Gọi sang Service để lấy chuỗi JSON địa chỉ
+            String result = propertyService.reverseGeocode(lat, lon);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi khi gọi API bản đồ: " + e.getMessage());
+        }
+    }
 }
