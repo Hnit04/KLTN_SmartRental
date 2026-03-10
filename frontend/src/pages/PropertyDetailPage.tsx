@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MapPin, ArrowLeft, Zap, Droplets, Wifi, ShieldCheck } from "lucide-react";
-import { propertyApi } from "@/api/api/propertyApi";
+import { propertyApi } from "@/api/propertyApi";
 import type { Property, Room } from "@/types/index";
-import RoomCard from "@/components/shared/RoomCard";
+import RoomCard from "@/features/property/components/RoomCard";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 

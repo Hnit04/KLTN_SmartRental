@@ -1,13 +1,30 @@
 import axiosClient from "./axiosClient";
 
+export interface CreateAppointmentPayload {
+  roomId: number;
+  meetTime: string; // Format: YYYY-MM-DDTHH:mm
+  note?: string;
+  meetingLink?: string;
+}
+
 export const appointmentApi = {
-  // Lấy danh sách lịch hẹn đang chờ duyệt của chủ trọ
-  getPendingByLandlord: (landlordId: number) => {
+  // 1. Khách thuê tạo lịch hẹn mới
+  createAppointment: (data: CreateAppointmentPayload) => {
+    return axiosClient.post("/appointments", data);
+  },
+
+  // 2. Khách thuê lấy danh sách lịch hẹn của mình (Chuẩn bị cho bước sau)
+  getMyAppointments: () => {
+    return axiosClient.get("/appointments/mine");
+  },
+  
+  // 3. Chủ nhà lấy danh sách lịch hẹn đang chờ duyệt
+  getPendingByLandlord: (landlordId: number | string) => {
     return axiosClient.get(`/appointments/landlord/${landlordId}/pending`);
   },
   
-  // API này bạn sẽ cần viết thêm ở Spring Boot nhé (để duyệt/từ chối)
-  updateStatus: (id: number, status: 'CONFIRMED' | 'REJECTED' | 'CANCELLED') => {
+  // 4. Cập nhật trạng thái lịch hẹn (Duyệt/Từ chối)
+  updateStatus: (id: number | string, status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED') => {
     return axiosClient.put(`/appointments/${id}/status`, { status });
   }
 };

@@ -2,19 +2,17 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
-  Eye, FileSignature, Image as ImageIcon 
+  Eye, FileSignature, Image as ImageIcon, CalendarClock 
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription 
-} from "@/components/ui/Dialog"; // Giả sử bạn có component Dialog (Modal)
 import type { Room } from "@/types/index";
 
 interface RoomCardProps {
   data: Room;
+  onBookAppointment?: () => void;
 }
 
-export default function RoomCard({ data }: RoomCardProps) {
+export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   const navigate = useNavigate();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -25,7 +23,7 @@ export default function RoomCard({ data }: RoomCardProps) {
   const formatPrice = (price: number) => 
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  // 3. Xử lý parse JSON ảnh và tiện ích (Vì DB lưu dạng String)
+  // 3. Xử lý parse JSON ảnh và tiện ích
   let images: string[] = [];
   let amenities: string[] = [];
 
@@ -33,14 +31,13 @@ export default function RoomCard({ data }: RoomCardProps) {
     images = data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : [];
     amenities = data.amenities ? (typeof data.amenities === 'string' ? JSON.parse(data.amenities) : data.amenities) : [];
   } catch (e) {
-    // Fallback nếu JSON lỗi
     images = []; 
     amenities = [];
   }
 
   const coverImage = images.length > 0 ? images[0] : null;
 
-  // --- HANDLER: THUÊ NGAY ---
+  // ✅ KHÔI PHỤC HÀM "THUÊ NGAY"
   const handleRentNow = () => {
     if (!isAvailable) return;
     // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
@@ -66,7 +63,6 @@ export default function RoomCard({ data }: RoomCardProps) {
             </div>
           )}
 
-          {/* Badge Trạng thái */}
           <div className="absolute top-3 right-3 shadow-sm">
             {isAvailable ? (
               <span className="bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
@@ -98,7 +94,6 @@ export default function RoomCard({ data }: RoomCardProps) {
             </div>
           </div>
 
-          {/* Tiện ích (Tag nhỏ) */}
           {amenities.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
               {amenities.slice(0, 3).map((item, index) => (
@@ -114,9 +109,8 @@ export default function RoomCard({ data }: RoomCardProps) {
             </div>
           )}
 
-          {/* --- NÚT HÀNH ĐỘNG (FOOTER) --- */}
+          {/* --- NÚT HÀNH ĐỘNG NGOÀI THẺ --- */}
           <div className="mt-auto grid grid-cols-2 gap-2 pt-3 border-t">
-              {/* Nút 1: Xem chi tiết (Mở Modal) */}
               <Button 
                   variant="outline" 
                   size="sm" 
@@ -126,15 +120,17 @@ export default function RoomCard({ data }: RoomCardProps) {
                   <Eye className="h-3.5 w-3.5 mr-1.5" /> Chi tiết
               </Button>
 
-              {/* Nút 2: Thuê ngay (Chuyển trang) */}
               <Button 
                   size="sm"
-                  className={`text-xs h-9 gap-1 ${!isAvailable ? 'cursor-not-allowed opacity-50' : ''}`}
+                  className={`text-xs h-9 gap-1 ${!isAvailable ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
                   disabled={!isAvailable}
-                  onClick={handleRentNow}
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      if (onBookAppointment) onBookAppointment();
+                  }}
               >
                   {isAvailable ? (
-                      <>Thuê ngay <ArrowRight className="h-3.5 w-3.5 ml-0.5" /></>
+                      <>Đặt lịch xem <CalendarClock className="h-3.5 w-3.5 ml-0.5" /></>
                   ) : (
                       "Đã hết"
                   )}
@@ -143,20 +139,19 @@ export default function RoomCard({ data }: RoomCardProps) {
         </div>
       </div>
 
-      {/* --- MODAL CHI TIẾT PHÒNG (Quick View) --- */}
-      {/* Nếu bạn chưa cài Dialog của shadcn/ui thì có thể bỏ phần này hoặc dùng thẻ div fixed đơn giản */}
+      {/* --- MODAL CHI TIẾT PHÒNG --- */}
       {isDetailOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-             <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative">
-                {/* Ảnh cover trong modal */}
-                <div className="h-56 bg-gray-100 relative">
+             <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
+                
+                <div className="h-56 bg-gray-100 relative shrink-0">
                     {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
                     <button onClick={() => setIsDetailOpen(false)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
                         <XCircle className="h-6 w-6" />
                     </button>
                 </div>
                 
-                <div className="p-6">
+                <div className="p-6 overflow-y-auto">
                     <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
                     <p className="text-2xl text-primary font-bold mb-4">{formatPrice(data.price)} <span className="text-sm font-normal text-gray-500">/tháng</span></p>
                     
@@ -184,11 +179,31 @@ export default function RoomCard({ data }: RoomCardProps) {
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setIsDetailOpen(false)}>Đóng</Button>
-                        <Button className="flex-1" disabled={!isAvailable} onClick={handleRentNow}>
-                            <FileSignature className="h-4 w-4 mr-2" /> Tiến hành thuê
-                        </Button>
+                    {/* ✅ CUNG CẤP CẢ 2 LỰA CHỌN TRONG MODAL CHI TIẾT */}
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t">
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsDetailOpen(false)}>Đóng</Button>
+                        
+                        <div className="flex flex-1 gap-3">
+                            <Button 
+                                variant="outline"
+                                className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50" 
+                                disabled={!isAvailable} 
+                                onClick={() => {
+                                    setIsDetailOpen(false); 
+                                    if (onBookAppointment) onBookAppointment(); 
+                                }}
+                            >
+                                <CalendarClock className="h-4 w-4 mr-2" /> Đặt lịch
+                            </Button>
+
+                            <Button 
+                                className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md" 
+                                disabled={!isAvailable} 
+                                onClick={handleRentNow}
+                            >
+                                <FileSignature className="h-4 w-4 mr-2" /> Thuê ngay
+                            </Button>
+                        </div>
                     </div>
                 </div>
              </div>

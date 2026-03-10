@@ -122,33 +122,27 @@ export type ContractSignMethod = "TRADITIONAL" | "BLOCKCHAIN";
 export interface Contract {
   id: number;
   code: string; 
-  
   tenantId: number;
   landlordId: number;
   roomId: number;
   
-  createdDate: string;
   startDate: string;
   endDate: string;
-  actualEndDate?: string; 
-  signDate?: string;      
+  signDate?: string;
   
+  actualPrice: number;   // Khớp với Backend Contract.java
   depositAmount: number;
-  monthlyPrice: number; // Trong response backend trả về 'price' hoặc 'monthlyPrice', kiểm tra kỹ DTO
-  price?: number;       // Thêm trường này đề phòng backend trả về tên khác
   
-  depositStatus: DepositStatus;
-  status: ContractStatus;
-  contentUrl?: string;    
+  status: "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  signMethod: "TRADITIONAL" | "BLOCKCHAIN";
   
-  // ✅ 2. Các trường hiển thị (Flattened)
+  // Các trường Flattened để hiển thị UI
   roomName?: string;
   propertyAddress?: string;
   tenantName?: string;
   landlordName?: string;
 
-  // ✅ 3. Thông tin ký & Blockchain
-  signMethod?: ContractSignMethod;
+  // Blockchain fields
   smartContractAddress?: string;
   deployTxHash?: string;
   contractHash?: string;
@@ -171,30 +165,13 @@ export interface SignContractPayload {
 // 4. UTILITY TYPES (Bills, Notifications...)
 // ==========================================
 
-export type BillStatus = "UNPAID" | "PAID" | "OVERDUE";
-
-export interface Bill {
-  id: number;
-  title: string;
-  contractId: number; 
-  oldElecIndex: number;
-  newElecIndex: number;
-  oldWaterIndex: number;
-  newWaterIndex: number;
-  totalAmount: number;
-  serviceFee: number;
-  status: BillStatus;
-  deadline: string;
-  paidAt?: string;
-}
-
-export type NotificationType = "SYSTEM" | "PAYMENT" | "CONTRACT";
-
+export type NotificationType = "SYSTEM" | "PAYMENT_REMINDER" | "CONTRACT_UPDATE" | "NEW_REVIEW";
 export interface Notification {
   id: number;
   title: string;
   message: string;
   type: NotificationType;
+  referenceId?: number;
   isRead: boolean;
   createdAt: string;
 }
@@ -259,13 +236,53 @@ export interface AppointmentResponse {
   roomId: number;
   roomName: string;
   landlordId: number;
-  landlordName: string;
+  landlordFullName: string; // ✅ Đổi từ landlordName thành landlordFullName
   tenantId: number;
-  tenantName: string;
+  tenantFullName: string;   // ✅ Đổi từ tenantName thành tenantFullName
   tenantPhone: string;
-  meetTime: string; // ISO string
-  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+  meetTime: string; 
+  status: 'PENDING' | 'CONFIRMED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'; // ✅ Thêm APPROVED
   note: string;
   meetingLink?: string;
   createdAt: string;
+}
+// ==========================================
+// 6. BILLING & FINANCE TYPES
+// ==========================================
+
+export type BillStatus = "UNBILLED" | "PENDING" | "PAID" | "LATE";
+
+export interface ContractBilling {
+  id: number;
+  roomName: string;
+  tenantName: string;
+  actualPrice: number;
+  elecPrice: number;
+  waterPrice: number;
+  internetPrice: number;
+  billStatus: BillStatus; 
+  oldElecIndex: number;
+  oldWaterIndex: number;
+  totalAmount?: number;
+  deadline?: string;
+  paymentMethod?: string;
+  newElecIndex?: number;
+  newWaterIndex?: number;
+  additionalFee?: number;
+  discountAmount?: number;
+  note?: string;
+}
+
+export interface Bill {
+  id: number;
+  roomName: string;
+  month: number;
+  year: number;
+  totalAmount: number;
+  elecCost: number;
+  waterCost: number;
+  roomCost: number;
+  status: BillStatus;
+  deadline: string;
+  paymentTxHash?: string;
 }

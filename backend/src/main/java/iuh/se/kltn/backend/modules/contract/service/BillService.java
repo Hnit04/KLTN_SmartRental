@@ -10,6 +10,8 @@ import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
 import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Property;
+import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
+import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,9 @@ public class BillService {
     @Autowired private BillRepository billRepository;
     @Autowired private ContractRepository contractRepository;
     @Autowired private ModelMapper modelMapper;
+
+    // Inject thêm NotificationService để tạo thông báo
+    @Autowired private NotificationService notificationService;
 
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
@@ -44,6 +49,7 @@ public class BillService {
                 request.getNewWaterIndex() < request.getOldWaterIndex()) {
             throw new RuntimeException("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
         }
+
         // Tính tiền
         Property property = contract.getRoom().getProperty();
 
@@ -56,6 +62,8 @@ public class BillService {
         double roomCost = contract.getActualPrice();
 
         double totalAmount = roomCost + elecCost + waterCost + internetCost;
+        double addFee = request.getAdditionalFee() != null ? request.getAdditionalFee() : 0.0;
+        double discount = request.getDiscountAmount() != null ? request.getDiscountAmount() : 0.0;
 
         // Lưu Hóa đơn
         Bill bill = new Bill();
@@ -70,11 +78,41 @@ public class BillService {
         bill.setTotalAmount(totalAmount);
         bill.setDeadline(request.getDeadline());
         bill.setStatus(BillStatus.UNPAID);
-
+        bill.setElecMeterImageUrl(request.getElecMeterImageUrl());
+        bill.setWaterMeterImageUrl(request.getWaterMeterImageUrl());
+        bill.setAdditionalFee(addFee);
+        bill.setDiscountAmount(discount);
+        bill.setNote(request.getNote());
         // Lưu tỷ giá ETH/VND tại thời điểm tạo
         bill.setExchangeRate(2500.0);
 
-        return mapToResponse(billRepository.save(bill), elecCost, waterCost, roomCost);
+        // Lưu vào DB
+        Bill savedBill = billRepository.save(bill);
+
+        // =========================================================
+        // TẠO THÔNG BÁO GỬI CHO KHÁCH THUÊ
+        // =========================================================
+        try {
+            String title = "Hóa đơn mới tháng " + savedBill.getMonth() + "/" + savedBill.getYear();
+            String message = String.format("Chủ nhà đã chốt điện nước phòng %s. Tổng số tiền cần thanh toán là %,.0f VNĐ. Hạn chót đóng tiền: %s",
+                    contract.getRoom().getName(),
+                    savedBill.getTotalAmount(),
+                    savedBill.getDeadline() != null ? savedBill.getDeadline().toLocalDate().toString() : "Chưa cập nhật");
+
+            // Gọi hàm từ NotificationService
+            notificationService.createNotification(
+                    contract.getTenant(), // Gửi cho Tenant (Người thuê)
+                    title,
+                    message,
+                    NotificationType.PAYMENT_REMINDER,
+                    contract.getId()
+            );
+        } catch (Exception e) {
+            // Log lỗi nếu không gửi được thông báo để không làm gián đoạn việc tạo hóa đơn
+            System.err.println("Lỗi khi tạo thông báo hóa đơn: " + e.getMessage());
+        }
+
+        return mapToResponse(savedBill, elecCost, waterCost, roomCost);
     }
 
     // Lấy danh sách hóa đơn của Hợp đồng
@@ -98,6 +136,7 @@ public class BillService {
         res.setRoomCost(room);
         return res;
     }
+
     public List<BillingStatusResponse> getBillingStatus(Long landlordId, int month, int year) {
         // 1. Lấy tất cả Hợp đồng đang ACTIVE của Chủ trọ này
         List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
@@ -127,7 +166,13 @@ public class BillService {
                 res.setOldWaterIndex(currentBill.getOldWaterIndex());
                 res.setTotalAmount(currentBill.getTotalAmount());
                 res.setDeadline(currentBill.getDeadline());
-
+                res.setNewElecIndex(currentBill.getNewElecIndex());
+                res.setNewWaterIndex(currentBill.getNewWaterIndex());
+                res.setAdditionalFee(currentBill.getAdditionalFee());
+                res.setDiscountAmount(currentBill.getDiscountAmount());
+                res.setNote(currentBill.getNote());
+                // ---------------------------
+                res.setTotalAmount(currentBill.getTotalAmount());
                 // Cờ nhận diện thanh toán Blockchain
                 if (currentBill.getPaymentTxHash() != null && !currentBill.getPaymentTxHash().isEmpty()) {
                     res.setPaymentMethod("BLOCKCHAIN");
