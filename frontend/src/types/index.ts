@@ -171,23 +171,6 @@ export interface SignContractPayload {
 // 4. UTILITY TYPES (Bills, Notifications...)
 // ==========================================
 
-export type BillStatus = "UNPAID" | "PAID" | "OVERDUE";
-
-export interface Bill {
-  id: number;
-  title: string;
-  contractId: number; 
-  oldElecIndex: number;
-  newElecIndex: number;
-  oldWaterIndex: number;
-  newWaterIndex: number;
-  totalAmount: number;
-  serviceFee: number;
-  status: BillStatus;
-  deadline: string;
-  paidAt?: string;
-}
-
 export type NotificationType = "SYSTEM" | "PAYMENT" | "CONTRACT";
 
 export interface Notification {
@@ -268,4 +251,44 @@ export interface AppointmentResponse {
   note: string;
   meetingLink?: string;
   createdAt: string;
+}
+// ==========================================
+// 6. BILLING & FINANCE TYPES
+// ==========================================
+
+export type BillStatus = "UNBILLED" | "PENDING" | "PAID" | "LATE";
+
+export interface ContractBilling {
+  id: number;
+  roomName: string;
+  tenantName: string;
+  actualPrice: number;
+  elecPrice: number;
+  waterPrice: number;
+  internetPrice: number;
+  billStatus: BillStatus; 
+  oldElecIndex: number;
+  oldWaterIndex: number;
+  totalAmount?: number;
+  deadline?: string;
+  paymentMethod?: string;
+  newElecIndex?: number;
+  newWaterIndex?: number;
+  additionalFee?: number;
+  discountAmount?: number;
+  note?: string;
+}
+
+export interface Bill {
+  id: number;
+  roomName: string;
+  month: number;
+  year: number;
+  totalAmount: number;
+  elecCost: number;
+  waterCost: number;
+  roomCost: number;
+  status: BillStatus;
+  deadline: string;
+  paymentTxHash?: string;
 }

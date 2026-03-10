@@ -2,7 +2,6 @@ import axiosClient from "./axiosClient";
 import type { Bill } from "@/types/index";
 
 export const billApi = {
-  // Tạo hóa đơn mới
   createBill: (data: {
     contractId: number;
     month: number;
@@ -12,6 +11,12 @@ export const billApi = {
     oldWaterIndex: number;
     newWaterIndex: number;
     deadline?: string;
+    // Thêm các trường mới
+    additionalFee?: number;
+    discountAmount?: number;
+    note?: string;
+    elecMeterImageUrl?: string;
+    waterMeterImageUrl?: string;
   }) => {
     return axiosClient.post("/bills", data);
   },

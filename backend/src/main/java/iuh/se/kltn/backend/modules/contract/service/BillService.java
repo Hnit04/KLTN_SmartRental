@@ -56,7 +56,8 @@ public class BillService {
         double roomCost = contract.getActualPrice();
 
         double totalAmount = roomCost + elecCost + waterCost + internetCost;
-
+        double addFee = request.getAdditionalFee() != null ? request.getAdditionalFee() : 0.0;
+        double discount = request.getDiscountAmount() != null ? request.getDiscountAmount() : 0.0;
         // Lưu Hóa đơn
         Bill bill = new Bill();
         bill.setContract(contract);
@@ -70,7 +71,11 @@ public class BillService {
         bill.setTotalAmount(totalAmount);
         bill.setDeadline(request.getDeadline());
         bill.setStatus(BillStatus.UNPAID);
-
+        bill.setElecMeterImageUrl(request.getElecMeterImageUrl());
+        bill.setWaterMeterImageUrl(request.getWaterMeterImageUrl());
+        bill.setAdditionalFee(addFee);
+        bill.setDiscountAmount(discount);
+        bill.setNote(request.getNote());
         // Lưu tỷ giá ETH/VND tại thời điểm tạo
         bill.setExchangeRate(2500.0);
 
@@ -127,7 +132,13 @@ public class BillService {
                 res.setOldWaterIndex(currentBill.getOldWaterIndex());
                 res.setTotalAmount(currentBill.getTotalAmount());
                 res.setDeadline(currentBill.getDeadline());
-
+                res.setNewElecIndex(currentBill.getNewElecIndex());
+                res.setNewWaterIndex(currentBill.getNewWaterIndex());
+                res.setAdditionalFee(currentBill.getAdditionalFee());
+                res.setDiscountAmount(currentBill.getDiscountAmount());
+                res.setNote(currentBill.getNote());
+                // ---------------------------
+                res.setTotalAmount(currentBill.getTotalAmount());
                 // Cờ nhận diện thanh toán Blockchain
                 if (currentBill.getPaymentTxHash() != null && !currentBill.getPaymentTxHash().isEmpty()) {
                     res.setPaymentMethod("BLOCKCHAIN");

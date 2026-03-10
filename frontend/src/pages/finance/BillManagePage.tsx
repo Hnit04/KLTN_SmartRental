@@ -1,401 +1,549 @@
 import { useState, useEffect } from 'react';
 import { 
   Receipt, Zap, Droplets, CheckCircle2, AlertCircle, 
-  Clock, Search, Plus, FileText, ChevronLeft, ChevronRight, 
-  Blocks, Loader2, X, Calendar, Printer
+  Clock, Search, FileText, ChevronLeft, ChevronRight, 
+  Blocks, Loader2, X, Calendar, Printer, Camera, Filter, ArrowUpDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { toast } from 'sonner';
 import { billApi } from '@/api/billApi';
+import type { ContractBilling } from '@/types/index';
 
-interface ContractBilling {
-  id: number;
-  roomName: string;
-  tenantName: string;
-  actualPrice: number;
-  elecPrice: number;
-  waterPrice: number;
-  internetPrice: number;
-  billStatus: string; 
-  oldElecIndex: number;
-  oldWaterIndex: number;
-  totalAmount?: number;
-  deadline?: string;
-  paymentMethod?: string;
-}
+const formatCurrency = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
+const formatDate = (dateString?: string) => {
+  if (!dateString) return 'Chưa cập nhật';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 export default function BillManagePage() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  
   const [contracts, setContracts] = useState<ContractBilling[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // State cho Tìm kiếm
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // State quản lý Modal Chốt điện nước (Tạo Hóa Đơn)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedContract, setSelectedContract] = useState<ContractBilling | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // State quản lý Modal Xem Chi tiết (Biên Lai)
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [viewingContract, setViewingContract] = useState<ContractBilling | null>(null);
+  // --- FILTER & SORT STATES ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [sortBy, setSortBy] = useState('ROOM_ASC');
 
-  const [formData, setFormData] = useState({
-    newElecIndex: '',
-    newWaterIndex: '',
-  });
+  // Modals state
+  const [selectedContract, setSelectedContract] = useState<ContractBilling | null>(null);
+  const [isChotSoModalOpen, setIsChotSoModalOpen] = useState(false);
+  
+  const [viewingContract, setViewingContract] = useState<ContractBilling | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+
+  // Form states cho Chốt sổ
+  const [newElec, setNewElec] = useState<string>('');
+  const [newWater, setNewWater] = useState<string>('');
+  const [additionalFee, setAdditionalFee] = useState<string>('');
+  const [discountAmount, setDiscountAmount] = useState<string>('');
+  const [note, setNote] = useState('');
+  const [deadlineDate, setDeadlineDate] = useState(''); 
+
+  // State quản lý ảnh
+  const [meterFiles, setMeterFiles] = useState<{ elec: File | null, water: File | null }>({ elec: null, water: null });
+  const [meterPreviews, setMeterPreviews] = useState<{ elec: string, water: string }>({ elec: '', water: '' });
+
+  // States tính toán Real-time
+  const [previewTotal, setPreviewTotal] = useState<number>(0);
 
   const fetchBillingStatus = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const res = await billApi.getBillingStatus(currentMonth, currentYear);
-      setContracts((res as any).data || res);
+      if (res.data) setContracts(res.data);
     } catch (error) {
-      toast.error("Không thể tải trạng thái hóa đơn của tháng này!");
+      toast.error('Không thể tải dữ liệu hóa đơn.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  useEffect(() => { fetchBillingStatus(); }, [currentMonth, currentYear]);
+
+  // Logic Tính Tiền Real-time
   useEffect(() => {
-    fetchBillingStatus();
-  }, [currentMonth, currentYear]);
+    if (!selectedContract) return;
+
+    const elecUsed = Math.max(0, Number(newElec) - selectedContract.oldElecIndex);
+    const waterUsed = Math.max(0, Number(newWater) - selectedContract.oldWaterIndex);
+    
+    const elecCost = elecUsed * selectedContract.elecPrice;
+    const waterCost = waterUsed * selectedContract.waterPrice;
+    const roomCost = selectedContract.actualPrice;
+    
+    const extra = Number(additionalFee) || 0;
+    const discount = Number(discountAmount) || 0;
+
+    const total = roomCost + elecCost + waterCost + extra - discount;
+    setPreviewTotal(Math.max(0, total)); 
+  }, [newElec, newWater, additionalFee, discountAmount, selectedContract]);
+
 
   const handlePrevMonth = () => {
-    if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(y => y - 1); } 
-    else { setCurrentMonth(m => m - 1); }
+    if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(prev => prev - 1); } 
+    else { setCurrentMonth(prev => prev - 1); }
   };
 
   const handleNextMonth = () => {
-    if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(y => y + 1); } 
-    else { setCurrentMonth(m => m + 1); }
+    if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(prev => prev + 1); } 
+    else { setCurrentMonth(prev => prev + 1); }
   };
 
-  const openBillingModal = (contract: ContractBilling) => {
+  const openChotSoModal = (contract: ContractBilling) => {
     setSelectedContract(contract);
-    setFormData({ newElecIndex: '', newWaterIndex: '' });
-    setIsModalOpen(true);
-  };
-
-  const openDetailModal = (contract: ContractBilling) => {
-    setViewingContract(contract);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleGenerateBill = async () => {
-    if (!selectedContract) return;
+    setNewElec(''); setNewWater('');
+    setAdditionalFee(''); setDiscountAmount(''); setNote('');
+    setMeterFiles({ elec: null, water: null });
+    setMeterPreviews({ elec: '', water: '' });
     
-    if (!formData.newElecIndex || !formData.newWaterIndex) {
-      toast.warning("Vui lòng nhập đầy đủ chỉ số điện và nước mới!");
-      return;
-    }
-    if (Number(formData.newElecIndex) < selectedContract.oldElecIndex || Number(formData.newWaterIndex) < selectedContract.oldWaterIndex) {
-      toast.error("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
-      return;
-    }
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    setDeadlineDate(`${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-05T23:59:59`);
+    
+    setIsChotSoModalOpen(true);
+  };
 
+  const openReceiptModal = (contract: ContractBilling) => {
+    setViewingContract(contract);
+    setIsReceiptModalOpen(true);
+  };
+
+  const handleMeterFileChange = (type: 'elec' | 'water', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setMeterFiles(prev => ({ ...prev, [type]: file }));
+      setMeterPreviews(prev => ({ ...prev, [type]: URL.createObjectURL(file) }));
+    }
+  };
+
+  const handleChotSo = async () => {
+    if (!selectedContract) return;
+    const nElec = Number(newElec);
+    const nWater = Number(newWater);
+
+    if (nElec < selectedContract.oldElecIndex) return toast.error('Số điện mới không được nhỏ hơn số cũ!');
+    if (nWater < selectedContract.oldWaterIndex) return toast.error('Số nước mới không được nhỏ hơn số cũ!');
+
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      
       await billApi.createBill({
         contractId: selectedContract.id,
         month: currentMonth,
         year: currentYear,
         oldElecIndex: selectedContract.oldElecIndex,
-        newElecIndex: Number(formData.newElecIndex),
+        newElecIndex: nElec,
         oldWaterIndex: selectedContract.oldWaterIndex,
-        newWaterIndex: Number(formData.newWaterIndex),
+        newWaterIndex: nWater,
+        deadline: deadlineDate || undefined,
+        additionalFee: Number(additionalFee) || 0,
+        discountAmount: Number(discountAmount) || 0,
+        note: note,
       });
 
-      toast.success(`Đã xuất hóa đơn phòng ${selectedContract.roomName} thành công!`);
-      setIsModalOpen(false);
+      toast.success('Chốt sổ thành công!');
+      setIsChotSoModalOpen(false);
       fetchBillingStatus();
-      
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Lỗi tạo hóa đơn. Vui lòng kiểm tra lại hệ thống!");
+    } catch (error) {
+      toast.error('Chốt sổ thất bại!');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Logic Tìm kiếm
-  const filteredContracts = contracts.filter(c => 
-    c.roomName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.tenantName.toLowerCase().includes(searchTerm.toLowerCase())
+  // --- XỬ LÝ LỌC & SẮP XẾP ---
+  let processedContracts = contracts.filter(c => 
+    (c.roomName.toLowerCase().includes(searchTerm.toLowerCase()) || c.tenantName.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (filterStatus === 'ALL' || c.billStatus === filterStatus)
   );
 
-  const paidAmount = contracts.filter(c => c.billStatus === 'PAID').reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-  const unpaidAmount = contracts.filter(c => c.billStatus === 'UNPAID').reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-  const lateAmount = contracts.filter(c => c.billStatus === 'LATE').reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-  const unbilledCount = contracts.filter(c => c.billStatus === 'UNBILLED').length;
+  processedContracts.sort((a, b) => {
+    if (sortBy === 'ROOM_ASC') return a.roomName.localeCompare(b.roomName);
+    if (sortBy === 'ROOM_DESC') return b.roomName.localeCompare(a.roomName);
+    
+    const getPrice = (contract: ContractBilling) => contract.totalAmount || contract.actualPrice;
+    if (sortBy === 'PRICE_DESC') return getPrice(b) - getPrice(a);
+    if (sortBy === 'PRICE_ASC') return getPrice(a) - getPrice(b);
+    return 0;
+  });
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Receipt className="h-6 w-6 text-primary" /> Quản lý thu chi
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Chốt chỉ số điện nước và quản lý thanh toán hàng tháng.</p>
-        </div>
-
-        <div className="flex items-center bg-gray-50 rounded-lg p-1 border">
-          <Button variant="ghost" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-5 w-5 text-gray-600" /></Button>
-          <div className="px-4 font-bold text-lg text-primary min-w-[120px] text-center">
-            Tháng {currentMonth}/{currentYear}
-          </div>
-          <Button variant="ghost" size="icon" onClick={handleNextMonth}><ChevronRight className="h-5 w-5 text-gray-600" /></Button>
-        </div>
-      </div>
-
-      {/* THỐNG KÊ */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Đã thu (PAID)" value={`${paidAmount.toLocaleString()}đ`} color="text-green-600" bg="bg-green-50" />
-        <StatCard title="Chờ đóng (UNPAID)" value={`${unpaidAmount.toLocaleString()}đ`} color="text-yellow-600" bg="bg-yellow-50" />
-        <StatCard title="Quá hạn (LATE)" value={`${lateAmount.toLocaleString()}đ`} color="text-red-600" bg="bg-red-50" />
-        <StatCard title="Chưa chốt sổ" value={`${unbilledCount} Phòng`} color="text-gray-600" bg="bg-gray-100" />
-      </div>
-
-      {/* DANH SÁCH */}
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-          <h3 className="font-bold text-gray-800">Tình trạng thanh toán tháng {currentMonth}</h3>
-          
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input 
-              className="pl-9 h-9 text-sm" 
-              placeholder="Tìm tên phòng, người thuê..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý Thu Tiền</h1>
+          <p className="text-gray-500 text-sm">Chốt điện nước và quản lý hóa đơn hàng tháng</p>
         </div>
         
-        <div className="overflow-x-auto min-h-[300px]">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredContracts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-500">
-                <Receipt className="h-8 w-8 mb-2 opacity-20" />
-                <p>{searchTerm ? "Không tìm thấy phòng phù hợp với từ khóa." : "Không có hợp đồng nào đang hiệu lực trong tháng này."}</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-500 uppercase bg-gray-100/50">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Phòng</th>
-                  <th className="px-6 py-4 font-semibold">Người thuê</th>
-                  <th className="px-6 py-4 font-semibold text-right">Tổng tiền (VNĐ)</th>
-                  <th className="px-6 py-4 font-semibold text-center">Trạng thái</th>
-                  <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredContracts.map((contract) => (
-                  <tr key={contract.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-900">{contract.roomName}</td>
-                    <td className="px-6 py-4 text-gray-600">{contract.tenantName}</td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-900">
-                      {contract.totalAmount ? contract.totalAmount.toLocaleString() + 'đ' : '---'}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {contract.billStatus === 'UNBILLED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600"><EditIcon /> Chưa chốt</span>}
-                      {contract.billStatus === 'UNPAID' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-yellow-100 text-yellow-700"><Clock className="h-3.5 w-3.5" /> Chờ thu</span>}
-                      {contract.billStatus === 'PAID' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700">
-                          {contract.paymentMethod === 'BLOCKCHAIN' ? <Blocks className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />} 
-                          Đã thanh toán
-                        </span>
-                      )}
-                      {contract.billStatus === 'LATE' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700"><AlertCircle className="h-3.5 w-3.5" /> Quá hạn</span>}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {contract.billStatus === 'UNBILLED' ? (
-                        <Button size="sm" onClick={() => openBillingModal(contract)} className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors">
-                          <Plus className="h-4 w-4 mr-1" /> Chốt sổ ngay
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" className="text-gray-600 hover:text-primary hover:bg-primary/5" onClick={() => openDetailModal(contract)}>
-                          <FileText className="h-4 w-4 mr-1" /> Chi tiết
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        {/* KHỐI CHỌN THÁNG/NĂM (ĐÃ NÂNG CẤP) */}
+        <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+          <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+          
+          <div className="relative flex items-center gap-2 font-semibold min-w-[130px] justify-center cursor-pointer hover:text-primary transition-colors group">
+            <Calendar className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+            <span>Tháng {currentMonth} / {currentYear}</span>
+            {/* Native Month Picker ẩn đè lên */}
+            <input 
+              type="month" 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              value={`${currentYear}-${String(currentMonth).padStart(2, '0')}`}
+              onChange={(e) => {
+                if(e.target.value) {
+                  const [y, m] = e.target.value.split('-');
+                  setCurrentYear(parseInt(y, 10));
+                  setCurrentMonth(parseInt(m, 10));
+                }
+              }}
+            />
+          </div>
+
+          <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      {/* --- MODAL CHỐT SỔ ĐIỆN NƯỚC (TẠO HÓA ĐƠN) --- */}
-      {isModalOpen && selectedContract && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-bold">Phòng {selectedContract.roomName} - {selectedContract.tenantName}</h2>
-                <p className="text-xs text-gray-500 mt-1">Kỳ hóa đơn: Tháng {currentMonth}/{currentYear}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Tiền phòng cố định</p>
-                <p className="font-bold text-blue-600">{selectedContract.actualPrice.toLocaleString()}đ</p>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100">
-                <div className="flex justify-between items-center mb-3 text-orange-600 font-bold">
-                  <span className="flex items-center gap-2"><Zap className="h-5 w-5" /> Chỉ số Điện</span>
-                  <span className="text-xs font-normal text-orange-800 bg-orange-100 px-2 py-1 rounded">{(selectedContract.elecPrice || 0).toLocaleString()}đ/kWh</span>
+      {/* --- THANH CÔNG CỤ (TOOLBAR): SEARCH, FILTER, SORT --- */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Input 
+            placeholder="Tìm theo tên phòng hoặc người thuê..." 
+            className="pl-10 h-11 rounded-xl bg-white border-gray-200 shadow-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <div className="flex flex-wrap sm:flex-nowrap gap-3">
+          <div className="relative w-full sm:w-48">
+             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+             <select
+                className="w-full h-11 pl-9 pr-8 appearance-none bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none cursor-pointer shadow-sm text-gray-700"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+             >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="UNBILLED">Chưa chốt sổ</option>
+                <option value="PENDING">Chờ thanh toán</option>
+                <option value="PAID">Đã thu tiền</option>
+                <option value="LATE">Trễ hạn</option>
+             </select>
+          </div>
+
+          <div className="relative w-full sm:w-56">
+             <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+             <select
+                className="w-full h-11 pl-9 pr-8 appearance-none bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none cursor-pointer shadow-sm text-gray-700"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+             >
+                <option value="ROOM_ASC">Sắp xếp: Phòng (A-Z)</option>
+                <option value="ROOM_DESC">Sắp xếp: Phòng (Z-A)</option>
+                <option value="PRICE_DESC">Sắp xếp: Tiền (Cao xuống Thấp)</option>
+                <option value="PRICE_ASC">Sắp xếp: Tiền (Thấp lên Cao)</option>
+             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* DANH SÁCH PHÒNG */}
+      {isLoading ? (
+         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
+      ) : processedContracts.length === 0 ? (
+         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
+            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">Không tìm thấy kết quả</h3>
+            <p className="text-gray-500 mt-1">Vui lòng thử đổi từ khóa tìm kiếm hoặc bộ lọc khác.</p>
+         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {processedContracts.map(contract => (
+            <div key={contract.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all flex flex-col">
+              <div className="p-5 border-b border-gray-100 flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Phòng {contract.roomName}</h3>
+                  <p className="text-sm text-gray-500">{contract.tenantName}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500">Số cũ</label>
-                    <Input disabled value={selectedContract.oldElecIndex || 0} className="bg-gray-100 font-mono mt-1 text-gray-500" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-900">Số mới *</label>
-                    <Input type="number" autoFocus className="border-orange-300 focus-visible:ring-orange-400 font-mono mt-1" value={formData.newElecIndex} onChange={e => setFormData({...formData, newElecIndex: e.target.value})} />
-                  </div>
-                </div>
+                {contract.billStatus === 'UNBILLED' && <Badge variant="destructive" icon={<AlertCircle />}>Chưa chốt</Badge>}
+                {contract.billStatus === 'PENDING' && <Badge variant="warning" icon={<Clock />}>Chờ đóng</Badge>}
+                {contract.billStatus === 'PAID' && <Badge variant="success" icon={<CheckCircle2 />}>Đã thu</Badge>}
+                {contract.billStatus === 'LATE' && <Badge variant="destructive" icon={<AlertCircle />}>Trễ hạn</Badge>}
               </div>
 
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                <div className="flex justify-between items-center mb-3 text-blue-600 font-bold">
-                  <span className="flex items-center gap-2"><Droplets className="h-5 w-5" /> Chỉ số Nước</span>
-                  <span className="text-xs font-normal text-blue-800 bg-blue-100 px-2 py-1 rounded">{(selectedContract.waterPrice || 0).toLocaleString()}đ/khối</span>
+              <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Giá thuê:</span>
+                    <span className="font-semibold">{formatCurrency(contract.actualPrice)}</span>
+                  </div>
+                  {contract.totalAmount && (
+                    <div className="flex justify-between text-sm pt-2 border-t border-dashed mt-2">
+                      <span className="text-gray-500">Tổng cộng:</span>
+                      <span className="font-bold text-primary text-base">{formatCurrency(contract.totalAmount)}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500">Số cũ</label>
-                    <Input disabled value={selectedContract.oldWaterIndex || 0} className="bg-gray-100 font-mono mt-1 text-gray-500" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-900">Số mới *</label>
-                    <Input type="number" className="border-blue-300 focus-visible:ring-blue-400 font-mono mt-1" value={formData.newWaterIndex} onChange={e => setFormData({...formData, newWaterIndex: e.target.value})} />
-                  </div>
+                
+                <div className="pt-4 flex gap-2 mt-auto">
+                  {contract.billStatus === 'UNBILLED' ? (
+                    <Button className="w-full bg-primary" onClick={() => openChotSoModal(contract)}>
+                      <Receipt className="h-4 w-4 mr-2" /> Chốt Sổ Ngay
+                    </Button>
+                  ) : (
+                    <Button className="w-full" variant="outline" onClick={() => openReceiptModal(contract)}>
+                      <FileText className="h-4 w-4 mr-2" /> Xem Biên Lai
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Hủy</Button>
-              <Button onClick={handleGenerateBill} isLoading={isSubmitting}>Phát hành Hóa đơn</Button>
+      {/* --- MODAL CHỐT SỔ --- */}
+      {isChotSoModalOpen && selectedContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8 animate-in zoom-in-95">
+            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-primary" />
+                Chốt Sổ Tháng {currentMonth} - Phòng {selectedContract.roomName}
+              </h2>
+              <button onClick={() => setIsChotSoModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row">
+                <div className="p-6 flex-1 space-y-5 border-r border-gray-100">
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Nhập điện */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center justify-between text-yellow-600">
+                                <span className="flex items-center gap-1"><Zap className="h-4 w-4" /> Điện</span>
+                                <span className="text-xs text-gray-500 font-normal">{formatCurrency(selectedContract.elecPrice)}/kWh</span>
+                            </label>
+                            <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                                <p className="text-xs text-gray-500 mb-2">Số cũ: <span className="font-bold text-gray-800">{selectedContract.oldElecIndex}</span></p>
+                                <Input type="number" placeholder="Số mới" value={newElec} onChange={(e) => setNewElec(e.target.value)} className="bg-white" />
+                                
+                                <div className="mt-3 border-2 border-dashed border-yellow-300 rounded-lg p-2 flex flex-col items-center justify-center h-24 bg-white hover:bg-yellow-50/50 transition-colors relative group overflow-hidden cursor-pointer">
+                                  {meterPreviews.elec ? (
+                                    <img src={meterPreviews.elec} alt="Điện" className="h-full w-full object-cover rounded" />
+                                  ) : (
+                                    <div className="text-center text-yellow-600/60">
+                                      <Camera className="h-5 w-5 mx-auto mb-1" />
+                                      <span className="text-[10px] font-medium">Chụp công tơ điện</span>
+                                    </div>
+                                  )}
+                                  <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMeterFileChange('elec', e)} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Nhập nước */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center justify-between text-blue-600">
+                                <span className="flex items-center gap-1"><Droplets className="h-4 w-4" /> Nước</span>
+                                <span className="text-xs text-gray-500 font-normal">{formatCurrency(selectedContract.waterPrice)}/m³</span>
+                            </label>
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-xs text-gray-500 mb-2">Số cũ: <span className="font-bold text-gray-800">{selectedContract.oldWaterIndex}</span></p>
+                                <Input type="number" placeholder="Số mới" value={newWater} onChange={(e) => setNewWater(e.target.value)} className="bg-white" />
+                                
+                                <div className="mt-3 border-2 border-dashed border-blue-300 rounded-lg p-2 flex flex-col items-center justify-center h-24 bg-white hover:bg-blue-50/50 transition-colors relative group overflow-hidden cursor-pointer">
+                                  {meterPreviews.water ? (
+                                    <img src={meterPreviews.water} alt="Nước" className="h-full w-full object-cover rounded" />
+                                  ) : (
+                                    <div className="text-center text-blue-600/60">
+                                      <Camera className="h-5 w-5 mx-auto mb-1" />
+                                      <span className="text-[10px] font-medium">Chụp công tơ nước</span>
+                                    </div>
+                                  )}
+                                  <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMeterFileChange('water', e)} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                        <div className="space-y-1">
+                            <label className="text-sm text-gray-600">Phụ phí phát sinh (VNĐ)</label>
+                            <Input type="number" placeholder="VD: 50000" value={additionalFee} onChange={(e) => setAdditionalFee(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm text-gray-600">Giảm trừ (VNĐ)</label>
+                            <Input type="number" placeholder="VD: 100000" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Ghi chú (Lý do phụ phí/giảm trừ)</label>
+                        <Input placeholder="VD: Tiền rác 50k, giảm 100k tiền nước do mất nước" value={note} onChange={(e) => setNote(e.target.value)} />
+                    </div>
+                </div>
+
+                <div className="p-6 md:w-72 bg-gray-50 flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-800 uppercase mb-4 border-b pb-2">Tạm tính</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Tiền phòng:</span>
+                                <span>{formatCurrency(selectedContract.actualPrice)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Tiền điện ({Math.max(0, Number(newElec) - selectedContract.oldElecIndex)} kí):</span>
+                                <span>{formatCurrency(Math.max(0, Number(newElec) - selectedContract.oldElecIndex) * selectedContract.elecPrice)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Tiền nước ({Math.max(0, Number(newWater) - selectedContract.oldWaterIndex)} khối):</span>
+                                <span>{formatCurrency(Math.max(0, Number(newWater) - selectedContract.oldWaterIndex) * selectedContract.waterPrice)}</span>
+                            </div>
+                            {Number(additionalFee) > 0 && (
+                                <div className="flex justify-between text-red-600">
+                                    <span>Phụ phí:</span>
+                                    <span>+{formatCurrency(Number(additionalFee))}</span>
+                                </div>
+                            )}
+                            {Number(discountAmount) > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                    <span>Giảm trừ:</span>
+                                    <span>-{formatCurrency(Number(discountAmount))}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-dashed border-gray-300">
+                        <p className="text-xs text-gray-500 mb-1">Tổng cộng dự kiến</p>
+                        <p className="text-3xl font-black text-primary">{formatCurrency(previewTotal)}</p>
+                        
+                        <Button 
+                            className="w-full mt-4" 
+                            onClick={handleChotSo} 
+                            disabled={!newElec || !newWater || isSubmitting}
+                        >
+                            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                            Phát Hành Hóa Đơn
+                        </Button>
+                    </div>
+                </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ MODAL CHI TIẾT HÓA ĐƠN (BIÊN LAI CHUYÊN NGHIỆP) */}
-      {isDetailModalOpen && viewingContract && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-           <div className="bg-white w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 relative" style={{ borderRadius: '12px', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' }}>
-              
-              {/* Nút Đóng */}
-              <button onClick={() => setIsDetailModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 bg-white/80 rounded-full p-1 z-10">
-                <X className="h-5 w-5" />
+      {/* --- MODAL BIÊN LAI --- */}
+      {isReceiptModalOpen && viewingContract && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+           <div className="bg-white w-full max-w-md overflow-hidden shadow-2xl relative my-8 animate-in zoom-in-95">
+              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 bg-white/50 rounded-full p-1">
+                 <X className="h-5 w-5" />
               </button>
-
-              {/* Phần Header Biên Lai */}
-              <div className="bg-gray-50 px-6 pt-8 pb-4 text-center border-b border-dashed border-gray-300">
-                 <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <Receipt className="h-6 w-6 text-primary" />
+              
+              <div className="p-8 pb-4 text-center bg-gray-50 border-b border-gray-200">
+                 <div className="w-14 h-14 bg-white border border-gray-200 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <Receipt className="h-7 w-7 text-primary" />
                  </div>
-                 <h2 className="text-xl font-bold text-gray-900 uppercase tracking-wide">Hóa Đơn Tiền Nhà</h2>
-                 <p className="text-sm font-medium text-gray-500 mt-1">Phòng {viewingContract.roomName} • Tháng {currentMonth}/{currentYear}</p>
+                 <h2 className="text-2xl font-black uppercase tracking-widest text-gray-900">Biên Lai Tiền Nhà</h2>
+                 <p className="text-gray-500 mt-1 font-medium">Tháng {currentMonth} / {currentYear}</p>
                  
-                 <div className="mt-3">
-                   {viewingContract.billStatus === 'UNPAID' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700"><Clock className="h-3.5 w-3.5" /> Chờ thanh toán</span>}
-                   {viewingContract.billStatus === 'PAID' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700"><CheckCircle2 className="h-3.5 w-3.5" /> Đã thanh toán</span>}
-                   {viewingContract.billStatus === 'LATE' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><AlertCircle className="h-3.5 w-3.5" /> Quá hạn thanh toán</span>}
+                 <div className="mt-4 inline-flex items-center justify-center">
+                   {viewingContract.billStatus === 'PAID' ? (
+                     <span className="px-4 py-1.5 bg-green-100 text-green-700 text-sm font-bold rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-4 h-4"/> ĐÃ THANH TOÁN</span>
+                   ) : viewingContract.billStatus === 'LATE' ? (
+                     <span className="px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-full border border-red-200 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> TRỄ HẠN</span>
+                   ) : (
+                     <span className="px-4 py-1.5 bg-orange-100 text-orange-700 text-sm font-bold rounded-full border border-orange-200 flex items-center gap-1"><Clock className="w-4 h-4"/> CHỜ THANH TOÁN</span>
+                   )}
                  </div>
               </div>
 
-              {/* Phần Chi tiết (Bóc tách từng khoản) */}
-              <div className="p-6 space-y-5 bg-white">
+              <div className="px-8 py-5 text-sm space-y-2 text-gray-700">
+                  <div className="flex justify-between"><span className="text-gray-500">Phòng:</span><span className="font-bold text-gray-900">{viewingContract.roomName}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Khách thuê:</span><span className="font-bold text-gray-900">{viewingContract.tenantName}</span></div>
+                  {viewingContract.deadline && (
+                      <div className="flex justify-between"><span className="text-gray-500">Hạn thanh toán:</span><span className={viewingContract.billStatus === 'LATE' ? 'font-bold text-red-600' : 'font-bold text-gray-900'}>{formatDate(viewingContract.deadline)}</span></div>
+                  )}
+              </div>
+
+              <div className="px-8 py-5 space-y-4 border-t border-dashed border-gray-300 bg-white">
+                 <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-800">Tiền phòng</span>
+                    <span className="font-semibold">{formatCurrency(viewingContract.actualPrice)}</span>
+                 </div>
                  
-                 {/* Thông tin người thuê */}
-                 <div className="flex justify-between items-end border-b pb-3">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-semibold">Khách hàng</p>
-                        <p className="font-bold text-gray-900 text-base">{viewingContract.tenantName}</p>
+                 <div className="flex justify-between text-sm">
+                    <div className="flex flex-col">
+                        <span className="font-medium text-gray-800">Tiền điện</span>
+                        <span className="text-xs text-gray-500">
+                          {viewingContract.oldElecIndex} ➔ {viewingContract.newElecIndex} 
+                          ({Math.max(0, (viewingContract.newElecIndex || 0) - viewingContract.oldElecIndex)} kWh x {formatCurrency(viewingContract.elecPrice).replace('đ','')})
+                        </span>
                     </div>
-                    {viewingContract.deadline && (
-                    <div className="text-right">
-                        <p className="text-xs text-gray-500 uppercase font-semibold">Hạn thanh toán</p>
-                        <p className="font-bold text-red-600 text-sm">{new Date(viewingContract.deadline).toLocaleDateString('vi-VN')}</p>
+                    <span className="font-semibold mt-1">
+                        {formatCurrency(Math.max(0, (viewingContract.newElecIndex || 0) - viewingContract.oldElecIndex) * viewingContract.elecPrice)}
+                    </span>
+                 </div>
+
+                 <div className="flex justify-between text-sm">
+                    <div className="flex flex-col">
+                        <span className="font-medium text-gray-800">Tiền nước</span>
+                        <span className="text-xs text-gray-500">
+                          {viewingContract.oldWaterIndex} ➔ {viewingContract.newWaterIndex} 
+                          ({Math.max(0, (viewingContract.newWaterIndex || 0) - viewingContract.oldWaterIndex)} m³ x {formatCurrency(viewingContract.waterPrice).replace('đ','')})
+                        </span>
                     </div>
+                    <span className="font-semibold mt-1">
+                        {formatCurrency(Math.max(0, (viewingContract.newWaterIndex || 0) - viewingContract.oldWaterIndex) * viewingContract.waterPrice)}
+                    </span>
+                 </div>
+
+                 {viewingContract.additionalFee ? (
+                    <div className="flex justify-between text-sm text-red-600">
+                        <span className="font-medium">Phụ phí phát sinh</span>
+                        <span className="font-semibold">+{formatCurrency(viewingContract.additionalFee)}</span>
+                    </div>
+                 ) : null}
+
+                 {viewingContract.discountAmount ? (
+                    <div className="flex justify-between text-sm text-green-600">
+                        <span className="font-medium">Giảm trừ</span>
+                        <span className="font-semibold">-{formatCurrency(viewingContract.discountAmount)}</span>
+                    </div>
+                 ) : null}
+
+                 {viewingContract.note && (
+                     <div className="p-3 bg-gray-50 rounded text-xs text-gray-600 border border-gray-100 italic">
+                         <span className="font-semibold not-italic">Ghi chú: </span>{viewingContract.note}
+                     </div>
+                 )}
+              </div>
+
+              <div className="px-8 py-6 bg-gray-900 text-white">
+                 <div className="flex flex-col items-center justify-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Tổng số tiền cần thanh toán</p>
+                    <span className="font-black text-4xl">{formatCurrency(viewingContract.totalAmount || viewingContract.actualPrice)}</span>
+                    
+                    {viewingContract.paymentMethod === 'BLOCKCHAIN' && (
+                       <p className="mt-3 text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-semibold flex items-center gap-1 border border-indigo-500/30">
+                           <Blocks className="w-3 h-3"/> Đã thanh toán qua Smart Contract
+                       </p>
                     )}
                  </div>
-
-                 {/* Các khoản phí */}
-                 <div className="space-y-3">
-                     {/* 1. Tiền phòng */}
-                     <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-gray-700">1. Tiền thuê phòng</span>
-                        <span className="font-semibold text-gray-900">{viewingContract.actualPrice?.toLocaleString()}đ</span>
-                     </div>
-
-                     {/* 2. Tiền điện */}
-                     <div className="flex justify-between items-start text-sm">
-                        <div>
-                            <span className="font-medium text-gray-700 block">2. Tiền điện</span>
-                            <span className="text-xs text-gray-400">Đơn giá: {viewingContract.elecPrice?.toLocaleString()}đ/kWh</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                            {viewingContract.totalAmount ? 'Theo đồng hồ' : '---'}
-                        </span>
-                     </div>
-
-                     {/* 3. Tiền nước */}
-                     <div className="flex justify-between items-start text-sm">
-                        <div>
-                            <span className="font-medium text-gray-700 block">3. Tiền nước</span>
-                            <span className="text-xs text-gray-400">Đơn giá: {viewingContract.waterPrice?.toLocaleString()}đ/khối</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                            {viewingContract.totalAmount ? 'Theo đồng hồ' : '---'}
-                        </span>
-                     </div>
-
-                     {/* 4. Internet / Dịch vụ */}
-                     <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-gray-700">4. Phí Dịch vụ (Internet, Rác...)</span>
-                        <span className="font-semibold text-gray-900">{viewingContract.internetPrice?.toLocaleString()}đ</span>
-                     </div>
-                 </div>
-                 
-                 {/* Divider răng cưa */}
-                 <div className="relative flex items-center py-2">
-                    <div className="flex-grow border-t-2 border-dashed border-gray-200"></div>
-                 </div>
-
-                 {/* Tổng tiền */}
-                 <div className="flex justify-between items-end">
-                    <div>
-                        <span className="font-bold text-gray-900 text-lg uppercase">Tổng cộng</span>
-                        {viewingContract.paymentMethod === 'BLOCKCHAIN' && (
-                            <p className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-1"><Blocks className="h-3 w-3" /> Paid via SmartContract</p>
-                        )}
-                    </div>
-                    <span className="font-black text-3xl text-primary">{(viewingContract.totalAmount || viewingContract.actualPrice).toLocaleString()}đ</span>
-                 </div>
               </div>
 
-              {/* Răng cưa đáy biên lai (CSS trick) */}
-              <div className="h-4 bg-white" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, transparent 12px, #f9fafb 13px)', backgroundSize: '20px 20px', backgroundPosition: 'bottom' }}></div>
-              <div className="bg-gray-50 p-4 text-center">
-                  <Button className="w-full" variant="outline" onClick={() => window.print()}>
-                      <Printer className="h-4 w-4 mr-2" /> In Biên Lai
+              <div className="bg-white p-4 flex gap-3">
+                  <Button className="w-full flex-1" variant="outline" onClick={() => setIsReceiptModalOpen(false)}>
+                      Đóng
+                  </Button>
+                  <Button className="w-full flex-1 bg-primary text-white" onClick={() => window.print()}>
+                      <Printer className="h-4 w-4 mr-2" /> In / Tải PDF
                   </Button>
               </div>
            </div>
@@ -405,16 +553,16 @@ export default function BillManagePage() {
   );
 }
 
-const StatCard = ({ title, value, color, bg }: any) => (
-  <div className={`${bg} rounded-xl p-4 border border-black/5`}>
-    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{title}</p>
-    <p className={`text-2xl font-black ${color}`}>{value}</p>
-  </div>
-);
-
-const EditIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9"/>
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-  </svg>
-);
+const Badge = ({ children, variant, icon }: any) => {
+  const styles = {
+    success: 'bg-green-100 text-green-700',
+    warning: 'bg-orange-100 text-orange-700',
+    destructive: 'bg-red-100 text-red-700',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant as keyof typeof styles]}`}>
+      {icon && <span className="[&>svg]:h-3 [&>svg]:w-3">{icon}</span>}
+      {children}
+    </span>
+  );
+};

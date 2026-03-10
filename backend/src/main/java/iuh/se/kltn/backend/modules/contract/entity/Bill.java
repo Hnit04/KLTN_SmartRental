@@ -42,4 +42,9 @@ public class Bill {
     private BillStatus status;
 
     private LocalDateTime paidAt;
+    private String elecMeterImageUrl; // Ảnh minh chứng đồng hồ điện
+    private String waterMeterImageUrl; // Ảnh minh chứng đồng hồ nước
+    private Double additionalFee; // Phụ phí (rác, gửi xe, vệ sinh...)
+    private Double discountAmount; // Giảm trừ
+    private String note; // Ghi chú cho các khoản phát sinh
 }

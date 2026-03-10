@@ -15,4 +15,9 @@ public class BillRequest {
     private Integer newWaterIndex;
 
     private LocalDateTime deadline;
+    private String elecMeterImageUrl;
+    private String waterMeterImageUrl;
+    private Double additionalFee;
+    private Double discountAmount;
+    private String note;
 }

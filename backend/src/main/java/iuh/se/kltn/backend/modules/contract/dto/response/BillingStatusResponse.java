@@ -21,4 +21,9 @@ public class BillingStatusResponse {
     private Double totalAmount;
     private LocalDateTime deadline;
     private String paymentMethod; // "BLOCKCHAIN" hoặc "TRADITIONAL"
+    private Integer newElecIndex;
+    private Integer newWaterIndex;
+    private Double additionalFee;
+    private Double discountAmount;
+    private String note;
 }
