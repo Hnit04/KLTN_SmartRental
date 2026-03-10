@@ -2,8 +2,9 @@ import { Outlet, Link } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Home, Star } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-// Import component UserNav mới (Giả sử bạn đã tạo ở Bước 1)
 import { UserNav } from "../shared/UserNav"; 
+// ✅ THÊM IMPORT CHUÔNG THÔNG BÁO Ở ĐÂY
+import NotificationBell from "../shared/NotificationBell"; 
 
 export default function PublicLayout() {
   const { isAuthenticated } = useAuth();
@@ -39,7 +40,12 @@ export default function PublicLayout() {
 
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <UserNav />
+              // ✅ ĐÃ SỬA ĐOẠN NÀY: HIỂN THỊ CẢ CHUÔNG VÀ AVATAR
+              <>
+                <NotificationBell />
+                <div className="h-6 w-px bg-gray-200 hidden sm:block" />
+                <UserNav />
+              </>
             ) : (
               <>
                 <Link to="/login">

@@ -1,6 +1,8 @@
-import { Link } from "react-router-dom";
-import { MapPin, Calendar, CheckCircle2, AlertCircle, Clock, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { useNavigate } from "react-router-dom";
+import { 
+  MapPin, Calendar, CheckCircle2, AlertCircle, 
+  Clock, XCircle, ChevronRight, FileText, Banknote
+} from "lucide-react";
 import type { Contract } from "@/types";
 
 interface ContractItemProps {
@@ -8,70 +10,84 @@ interface ContractItemProps {
 }
 
 export default function ContractItem({ data }: ContractItemProps) {
-  // Helper format tiền
+  const navigate = useNavigate();
+
   const formatPrice = (price: number) => 
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  // Helper format ngày
   const formatDate = (dateStr: string) => 
     dateStr ? new Date(dateStr).toLocaleDateString('vi-VN') : 'Chưa xác định';
 
-  // Helper hiển thị trạng thái (Badge)
   const renderStatus = (status: string) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1"><CheckCircle2 className="h-3 w-3"/> Đang hiệu lực</span>;
+        return <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-xs font-bold border border-green-200">Hiệu lực</span>;
       case 'PENDING_SIGNATURE':
-        return <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1"><AlertCircle className="h-3 w-3"/> Chờ ký tên</span>;
+        return <span className="bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-xs font-bold border border-orange-200">Chờ ký</span>;
       case 'EXPIRED':
-        return <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1"><Clock className="h-3 w-3"/> Đã hết hạn</span>;
-      case 'TERMINATED_EARLY':
-        return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1"><XCircle className="h-3 w-3"/> Đã hủy</span>;
+        return <span className="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200">Hết hạn</span>;
       default:
-        return <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-bold">{status}</span>;
+        return <span className="bg-red-100 text-red-700 px-4 py-1.5 rounded-full text-xs font-bold border border-red-200">Đã hủy</span>;
     }
   };
 
   return (
-    <div className="group bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200">
-      <div className="flex flex-col md:flex-row justify-between gap-4">
-        {/* Thông tin chính */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-             <span className="text-xs font-mono text-gray-400">#{data.code || data.id}</span>
-             {renderStatus(data.status)}
-          </div>
-          
-          {/* Vì API trả về contract, cần đảm bảo backend trả về roomName/address hoặc bạn phải join bảng. 
-              Giả sử backend trả về field roomName (nếu chưa có thì update backend hoặc mapping DTO) */}
-          <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary transition-colors">
-            {/* Nếu DTO chưa có roomName, tạm thời hardcode hoặc check lại Backend */}
-            {(data as any).roomName || "Phòng trọ #" + data.roomId} 
-          </h3>
-          
-          <div className="flex items-center text-sm text-gray-500">
-            <MapPin className="h-3.5 w-3.5 mr-1" />
-            <span className="line-clamp-1">{(data as any).propertyAddress || "Đang cập nhật địa chỉ..."}</span>
-          </div>
+    <div 
+      className="group bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-xl hover:border-primary/40 transition-all cursor-pointer relative overflow-hidden"
+      onClick={() => navigate(`/contracts/${data.id}`)}
+    >
+      {/* Hiệu ứng màu nền nhẹ khi hover */}
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-          <div className="flex items-center gap-4 text-xs text-gray-500 pt-2">
-             <div className="flex items-center gap-1">
-               <Calendar className="h-3 w-3"/> 
-               {formatDate(data.startDate)} - {formatDate(data.endDate)}
-             </div>
+      <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
+        {/* Khối 1: Icon & Thông tin định danh (Cao hơn) */}
+        <div className="flex items-center gap-5 md:w-1/4">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300 shadow-sm">
+            <FileText className="h-8 w-8" />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <h3 className="text-lg font-extrabold text-gray-900 truncate leading-tight group-hover:text-primary transition-colors">
+              {data.roomName || `Phòng #${data.roomId}`}
+            </h3>
+            <p className="text-[11px] text-gray-400 font-mono tracking-tighter bg-gray-100 w-fit px-2 py-0.5 rounded">
+              MÃ: {data.code || `#${data.id}`}
+            </p>
           </div>
         </div>
 
-        {/* Giá & Hành động */}
-        <div className="flex flex-col justify-between items-end gap-3 min-w-[120px]">
-           <div className="text-right">
-             <p className="text-sm font-medium text-gray-500">Giá thuê</p>
-             <p className="text-lg font-bold text-primary">{formatPrice(data.monthlyPrice)}</p>
-           </div>
-           
-           <Link to={`/contracts/${data.id}`}>
-             <Button size="sm" variant="outline" className="w-full">Xem chi tiết</Button>
-           </Link>
+        {/* Khối 2: Địa chỉ & Thời gian (Dãn dòng hơn) */}
+        <div className="flex flex-col gap-2.5 md:w-1/3 text-sm text-gray-600">
+          <div className="flex items-start gap-2.5">
+            <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <span className="line-clamp-2 leading-relaxed font-medium">
+              {data.propertyAddress || "Địa chỉ đang cập nhật..."}
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
+            <span className="font-medium italic text-gray-500">
+              {formatDate(data.startDate)} — {formatDate(data.endDate)}
+            </span>
+          </div>
+        </div>
+
+        {/* Khối 3: Giá thuê (To và rõ ràng) */}
+        <div className="md:w-1/6 flex flex-col justify-center">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+            <Banknote className="w-3 h-3" />
+            <span>Giá thuê tháng</span>
+          </div>
+          <p className="text-2xl font-black text-primary tracking-tight">
+            {formatPrice(data.actualPrice || 0)}
+          </p>
+        </div>
+
+        {/* Khối 4: Trạng thái & Action */}
+        <div className="flex items-center justify-between md:w-1/4 md:justify-end gap-6 border-t md:border-t-0 pt-4 md:pt-0">
+          {renderStatus(data.status)}
+          <div className="h-10 w-10 rounded-xl border border-gray-200 flex items-center justify-center group-hover:bg-primary group-hover:border-primary group-hover:text-white transition-all shadow-sm">
+            <ChevronRight className="h-5 w-5" />
+          </div>
         </div>
       </div>
     </div>
