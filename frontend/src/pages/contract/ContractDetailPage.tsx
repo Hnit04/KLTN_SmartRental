@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
   MapPin, Printer, ArrowLeft, Blocks, Receipt, Wallet, 
-  AlertCircle, Clock, CheckCircle2, Loader2
+  AlertCircle, Clock, CheckCircle2, Loader2, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { contractApi } from "@/api/contractApi"; 
@@ -12,6 +12,9 @@ import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { toast } from "sonner";
 import type { Contract, ContractSignMethod } from "@/types";
 import { useAuth } from "@/context/AuthContext"; 
+
+// Điều chỉnh lại import đường dẫn ReviewModal tùy theo cấu trúc thư mục của bạn
+import ReviewModal from "@/features/interaction/components/ReviewModal";
 
 // Interface mở rộng để hứng dữ liệu chi tiết
 interface ContractDetail extends Contract {
@@ -37,17 +40,19 @@ export default function ContractDetailPage() {
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
   const [signMethod, setSignMethod] = useState<ContractSignMethod>('TRADITIONAL');
 
-  // --- STATE MỚI (HƯỚNG 2) ---
+  // --- STATE MỚI ---
   const [activeTab, setActiveTab] = useState<'INFO' | 'BILLS'>('INFO');
   const [bills, setBills] = useState<any[]>([]);
   const [isLoadingBills, setIsLoadingBills] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
 
+  // ✅ STATE ĐIỀU KHIỂN MODAL ĐÁNH GIÁ
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+
   // 1. Lấy chi tiết hợp đồng
   useEffect(() => {
     const fetchContractDetail = async () => {
       try {
-        // Đã sửa từ getContractById thành getDetail theo API của bạn
         const res = await contractApi.getDetail(Number(id));
         setContract(res.data);
       } catch (error) {
@@ -91,7 +96,6 @@ export default function ContractDetailPage() {
         toast.info("Đang gọi Web3 Provider...");
       }
 
-      // Đã sửa cú pháp truyền dữ liệu theo API signContract
       await contractApi.signContract(Number(id), { signMethod });
       
       toast.success("Ký hợp đồng thành công!");
@@ -134,8 +138,6 @@ export default function ContractDetailPage() {
       });
 
       toast.success(`Giao dịch đã được gửi! Hash: ${txHash.substring(0, 10)}...`);
-      
-      // await billApi.payBillWeb3(bill.id, txHash);
       
       const res = await billApi.getBillsByContract(Number(id));
       setBills(res.data);
@@ -263,6 +265,16 @@ export default function ContractDetailPage() {
                   <PenTool className="h-4 w-4" /> Ký Hợp Đồng Ngay
                 </Button>
               )}
+
+              {/* ✅ NÚT VIẾT ĐÁNH GIÁ (Chỉ hiện khi hợp đồng ACTIVE và là KHÁCH THUÊ) */}
+              {contract.status === 'ACTIVE' && user?.role === 'TENANT' && (
+                <Button 
+                  className="w-full mt-6 gap-2 h-11 bg-yellow-500 hover:bg-yellow-600 text-white shadow-md shadow-yellow-200" 
+                  onClick={() => setIsReviewModalOpen(true)}
+                >
+                  <Star className="h-4 w-4 fill-white" /> Viết Đánh Giá
+                </Button>
+              )}
             </div>
             
             <Button variant="outline" className="w-full justify-start gap-3 h-12 bg-white">
@@ -325,7 +337,6 @@ export default function ContractDetailPage() {
                              <p className="text-xl font-black text-primary">{(bill.totalAmount).toLocaleString('vi-VN')}đ</p>
                           </div>
                           
-                          {/* Xử lý hiển thị Nút thanh toán theo Role */}
                           {bill.status === 'PAID' ? (
                             <Button variant="outline" className="gap-2">
                                <Printer className="w-4 h-4" /> Xem biên lai
@@ -413,6 +424,15 @@ export default function ContractDetailPage() {
            </div>
         </div>
       )}
+
+      {/* ✅ MODAL ĐÁNH GIÁ ĐƯỢC THÊM VÀO ĐÂY */}
+      <ReviewModal 
+        isOpen={isReviewModalOpen} 
+        onClose={() => setIsReviewModalOpen(false)} 
+        contractId={Number(id)} 
+        roomName={contract.roomName || ''} 
+      />
+
     </div>
   );
 }

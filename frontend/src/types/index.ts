@@ -286,3 +286,21 @@ export interface Bill {
   deadline: string;
   paymentTxHash?: string;
 }
+// --- REVIEW TYPES ---
+export interface ReviewResponse {
+  id: number;
+  contractId: number;
+  roomName: string;
+  reviewerId: number;
+  reviewerName: string;
+  reviewerAvatar: string | null;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ReviewRequest {
+  contractId: number;
+  rating: number;
+  comment: string;
+}

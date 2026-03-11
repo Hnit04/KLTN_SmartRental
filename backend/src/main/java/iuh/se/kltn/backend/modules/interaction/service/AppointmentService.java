@@ -68,7 +68,7 @@ public class AppointmentService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
-    
+
     @Transactional
     public void updateAppointmentStatus(Long id, AppointmentStatus status, String username) {
         Appointment appointment = appointmentRepo.findById(id)
