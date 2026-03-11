@@ -10,5 +10,8 @@ export const reviewApi = {
   // Lấy danh sách đánh giá của 1 chủ nhà
   getReviewsByLandlord: (landlordId: number | string) => {
     return axiosClient.get(`/reviews/landlord/${landlordId}`);
+  },
+  getReviewsByProperty: (propertyId: number | string) => {
+    return axiosClient.get(`/reviews/property/${propertyId}`);
   }
 };

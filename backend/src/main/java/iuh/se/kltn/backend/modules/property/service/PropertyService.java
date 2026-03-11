@@ -100,7 +100,7 @@ public class PropertyService {
                 .collect(Collectors.toList());
     }
 
-    
+
     // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
         PropertyResponse res = modelMapper.map(p, PropertyResponse.class);

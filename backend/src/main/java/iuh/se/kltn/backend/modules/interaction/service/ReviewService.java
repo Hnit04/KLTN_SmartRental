@@ -98,4 +98,10 @@ public class ReviewService {
                 review.getCreatedAt()
         );
     }
+    public List<ReviewResponse> getReviewsByProperty(Long propertyId) {
+        return reviewRepo.findByContract_Room_Property_IdOrderByCreatedAtDesc(propertyId)
+                .stream()
+                .map(this::mapToResponse) // Gọi lại hàm mapToResponse bạn đã có
+                .collect(Collectors.toList());
+    }
 }

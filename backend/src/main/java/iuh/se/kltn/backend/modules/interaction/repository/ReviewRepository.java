@@ -13,7 +13,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // Lấy danh sách review của một chủ nhà (Target = Landlord)
     List<Review> findByTargetIdOrderByCreatedAtDesc(Long targetId);
-
+    List<Review> findByContract_Room_Property_IdOrderByCreatedAtDesc(Long propertyId);
     // Kiểm tra xem user này đã review hợp đồng này chưa
     boolean existsByContractAndReviewer(Contract contract, User reviewer);
 }

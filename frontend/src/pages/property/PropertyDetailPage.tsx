@@ -34,6 +34,7 @@ export default function PropertyDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- FETCH DATA ---
+  // --- FETCH DATA ---
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -48,35 +49,25 @@ export default function PropertyDetailPage() {
         setProperty(propertyData);
         setRooms(roomRes.data as any);
 
-        // ✅ LOGIC TÌM ID CHỦ NHÀ MẠNH MẼ NHẤT
-        // Tìm ID chủ nhà từ nhiều ngóc ngách cấu trúc DTO có thể có
-        const targetLandlordId = 
-            propertyData?.landlordId || 
-            propertyData?.landlord?.id || 
-            propertyData?.userId || 
-            propertyData?.user?.id;
-
-        if (targetLandlordId) {
-          try {
-             const reviewRes = await reviewApi.getReviewsByLandlord(targetLandlordId);
+        // ✅ GỌI THẲNG API LẤY REVIEW THEO PROPERTY ID (KHU TRỌ)
+        try {
+            // Truyền thẳng biến id của khu trọ vào API mới
+            const reviewRes = await reviewApi.getReviewsByProperty(id);
              
-             // Bóc tách nhiều lớp bọc của Spring Boot & Axios
-             let finalReviewData = (reviewRes as any)?.data !== undefined ? (reviewRes as any).data : reviewRes;
+            // Bóc tách nhiều lớp bọc của Spring Boot & Axios
+            let finalReviewData = (reviewRes as any)?.data !== undefined ? (reviewRes as any).data : reviewRes;
              
-             if (finalReviewData?.data) finalReviewData = finalReviewData.data;
-             if (finalReviewData?.content) finalReviewData = finalReviewData.content; // Nếu dùng Pageable
+            if (finalReviewData?.data) finalReviewData = finalReviewData.data;
+            if (finalReviewData?.content) finalReviewData = finalReviewData.content; 
 
-             if (Array.isArray(finalReviewData)) {
-                 setReviews(finalReviewData);
-             } else {
-                 setReviews([]);
-             }
-          } catch (reviewErr) {
-             console.error("Lỗi khi tải Đánh giá:", reviewErr);
-             setReviews([]);
-          }
-        } else {
-          console.warn("⚠️ Không tìm thấy ID Chủ nhà trong Property Data. Đánh giá sẽ không hiển thị.");
+            if (Array.isArray(finalReviewData)) {
+                setReviews(finalReviewData);
+            } else {
+                setReviews([]);
+            }
+        } catch (reviewErr) {
+            console.error("Lỗi khi tải Đánh giá:", reviewErr);
+            setReviews([]);
         }
 
       } catch (error) {

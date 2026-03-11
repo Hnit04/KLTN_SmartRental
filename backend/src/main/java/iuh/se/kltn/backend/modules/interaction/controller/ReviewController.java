@@ -30,4 +30,8 @@ public class ReviewController {
     public ResponseEntity<?> getReviewsByLandlord(@PathVariable Long landlordId) {
         return ResponseEntity.ok(reviewService.getReviewsByLandlord(landlordId));
     }
+    @GetMapping("/property/{propertyId}")
+    public ResponseEntity<?> getReviewsByProperty(@PathVariable Long propertyId) {
+        return ResponseEntity.ok(reviewService.getReviewsByProperty(propertyId));
+    }
 }
