@@ -11,4 +11,6 @@ public class ContractRequest {
     private LocalDate endDate;
     private Double depositAmount;
     private ContractSignMethod signMethod;
+    private String tenantEmail;
+    private String additionalTerms;
 }

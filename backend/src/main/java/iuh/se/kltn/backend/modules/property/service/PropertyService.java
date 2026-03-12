@@ -101,16 +101,15 @@ public class PropertyService {
     }
 
 
-
     // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
         PropertyResponse res = modelMapper.map(p, PropertyResponse.class);
-
-        // Convert chuỗi JSON ảnh thành List
         res.setImages(JsonUtil.convertJsonToList(p.getImages()));
 
         if (p.getLandlord() != null) {
+            res.setLandlordId(p.getLandlord().getId());
             res.setLandlordName(p.getLandlord().getFullName());
+            res.setLandlordPhone(p.getLandlord().getPhoneNumber());
         }
 
         // --- TÍNH TOÁN GIÁ VÀ PHÒNG TRỐNG ---

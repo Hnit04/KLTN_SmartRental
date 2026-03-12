@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { 
   MapPin, ArrowLeft, Zap, Droplets, Wifi, ShieldCheck, 
-  User, Phone, MessageSquare, CalendarClock, X, Loader2
+  User, Phone, MessageSquare, CalendarClock, X, Loader2, Star
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
+import { reviewApi } from '@/api/reviewApi'; 
 import { useAuth } from "@/context/AuthContext";
-import type { Property, Room } from "@/types/index";
+import type { Property, Room, ReviewResponse } from "@/types/index"; 
 import RoomCard from "@/features/property/components/RoomCard";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +22,7 @@ export default function PropertyDetailPage() {
   
   const [property, setProperty] = useState<Property | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [reviews, setReviews] = useState<ReviewResponse[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
 
   // --- STATE CHO MODAL ĐẶT LỊCH ---
@@ -32,6 +34,7 @@ export default function PropertyDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- FETCH DATA ---
+  // --- FETCH DATA ---
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -41,8 +44,32 @@ export default function PropertyDetailPage() {
           propertyApi.getDetail(id),
           propertyApi.getRooms(id)
         ]);
-        setProperty(propRes.data as any);
+        
+        const propertyData = propRes.data as any;
+        setProperty(propertyData);
         setRooms(roomRes.data as any);
+
+        // ✅ GỌI THẲNG API LẤY REVIEW THEO PROPERTY ID (KHU TRỌ)
+        try {
+            // Truyền thẳng biến id của khu trọ vào API mới
+            const reviewRes = await reviewApi.getReviewsByProperty(id);
+             
+            // Bóc tách nhiều lớp bọc của Spring Boot & Axios
+            let finalReviewData = (reviewRes as any)?.data !== undefined ? (reviewRes as any).data : reviewRes;
+             
+            if (finalReviewData?.data) finalReviewData = finalReviewData.data;
+            if (finalReviewData?.content) finalReviewData = finalReviewData.content; 
+
+            if (Array.isArray(finalReviewData)) {
+                setReviews(finalReviewData);
+            } else {
+                setReviews([]);
+            }
+        } catch (reviewErr) {
+            console.error("Lỗi khi tải Đánh giá:", reviewErr);
+            setReviews([]);
+        }
+
       } catch (error) {
         toast.error("Không thể tải thông tin khu trọ.");
       } finally {
@@ -65,7 +92,6 @@ export default function PropertyDetailPage() {
     window.open(`https://zalo.me/${phone}`, '_blank');
   };
 
-  // Mở modal đặt lịch
   const handleOpenBookingModal = (room: Room) => {
     if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để đặt lịch xem phòng!");
@@ -84,7 +110,6 @@ export default function PropertyDetailPage() {
     setIsBookingModalOpen(true);
   };
 
-  // Gửi API đặt lịch
   const handleSubmitBooking = async () => {
     if (!selectedRoom || !meetDate || !meetTime) {
       toast.error("Vui lòng chọn đầy đủ ngày và giờ hẹn!");
@@ -93,9 +118,7 @@ export default function PropertyDetailPage() {
 
     setIsSubmitting(true);
     try {
-      // Nối chuỗi ngày giờ theo chuẩn Backend yêu cầu: "yyyy-MM-dd'T'HH:mm"
       const dateTimeString = `${meetDate}T${meetTime}`;
-
       await appointmentApi.createAppointment({
         roomId: selectedRoom.id,
         meetTime: dateTimeString,
@@ -126,7 +149,6 @@ export default function PropertyDetailPage() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Quay lại tìm kiếm
           </Link>
 
-          {/* GALLERY GRID LAYOUT */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 h-[300px] md:h-[400px] rounded-2xl overflow-hidden mb-8 shadow-sm">
             <div className="md:col-span-2 md:row-span-2 relative group cursor-pointer">
               <img src={displayImages[0]} alt="Main" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -149,7 +171,6 @@ export default function PropertyDetailPage() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* CỘT TRÁI */}
             <div className="flex-1 space-y-8">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.name}</h1>
@@ -176,7 +197,6 @@ export default function PropertyDetailPage() {
               </div>
             </div>
 
-            {/* CỘT PHẢI */}
             <div className="lg:w-80 shrink-0">
               <div className="sticky top-24 space-y-4">
                 <div className="bg-white rounded-xl shadow-lg shadow-gray-100 border p-5">
@@ -225,7 +245,6 @@ export default function PropertyDetailPage() {
         {rooms.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {rooms.map((room) => (
-              // TRUYỀN HÀM XỬ LÝ XUỐNG ROOMCARD
               <RoomCard 
                 key={room.id} 
                 data={room} 
@@ -242,6 +261,56 @@ export default function PropertyDetailPage() {
              <p className="text-gray-500 text-sm mt-1">Hiện tại khu trọ này chưa có phòng nào được đăng tải.</p>
           </div>
         )}
+
+        {/* --- 4. KHỐI ĐÁNH GIÁ (REVIEWS) --- */}
+        <div className="mt-12 bg-white rounded-2xl border p-6 md:p-8 shadow-sm">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Star className="h-6 w-6 text-yellow-500 fill-yellow-500" />
+            Đánh giá từ người thuê ({reviews.length})
+          </h2>
+
+          {reviews.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-dashed">
+              Chưa có đánh giá nào cho chủ nhà này.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {reviews.map((review) => (
+                <div key={review.id} className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold shrink-0">
+                        {review.reviewerName ? review.reviewerName.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm">{review.reviewerName || 'Người dùng ẩn danh'}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(review.createdAt).toLocaleDateString('vi-VN', { 
+                             year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5 shrink-0">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          className={`h-4 w-4 ${star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-200'}`} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-gray-700 text-sm leading-relaxed mt-2 italic">
+                    "{review.comment}"
+                  </p>
+                  <div className="mt-4 inline-block bg-white text-[11px] font-medium text-gray-500 px-2.5 py-1.5 rounded border">
+                    Đã thuê: Phòng {review.roomName}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 3. MODAL ĐẶT LỊCH XEM PHÒNG */}
@@ -273,7 +342,7 @@ export default function PropertyDetailPage() {
                       type="date" 
                       value={meetDate} 
                       onChange={(e) => setMeetDate(e.target.value)} 
-                      min={new Date().toISOString().split("T")[0]} // Không cho chọn ngày quá khứ
+                      min={new Date().toISOString().split("T")[0]} 
                     />
                   </div>
                   <div className="space-y-1.5">

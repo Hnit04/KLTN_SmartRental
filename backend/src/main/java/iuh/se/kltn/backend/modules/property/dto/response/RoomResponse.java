@@ -14,4 +14,5 @@ public class RoomResponse {
     private List<String> amenities;
     private List<String> images;
     private String propertyName;
+    private String defaultTerms;
 }

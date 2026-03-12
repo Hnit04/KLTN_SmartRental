@@ -1,4 +1,3 @@
-// File: PropertyResponse.java
 package iuh.se.kltn.backend.modules.property.dto.response;
 
 import lombok.Data;
@@ -19,11 +18,14 @@ public class PropertyResponse {
     private Double internetPrice;
 
     private List<String> images;
+
+    private Long landlordId;
+
     private String landlordName;
     private String landlordPhone;
 
-    private Double minPrice;       // Giá thấp nhất
-    private Double maxPrice;       // Giá cao nhất
-    private Integer availableRooms; // Số phòng còn trống
-    private Integer totalRooms;     // Tổng số phòng
+    private Double minPrice;
+    private Double maxPrice;
+    private Integer availableRooms;
+    private Integer totalRooms;
 }

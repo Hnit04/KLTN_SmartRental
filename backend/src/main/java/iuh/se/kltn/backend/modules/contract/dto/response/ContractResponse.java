@@ -17,13 +17,13 @@ public class ContractResponse {
 
     private LocalDate startDate;
     private LocalDate endDate;
-    private Double price;
+    private Double actualPrice;
     private Double depositAmount;
 
     private ContractStatus status;
     private DepositStatus depositStatus;
     private ContractSignMethod signMethod;
-
+    private String additionalTerms;
     // Thông tin nội dung
     private String contentUrl;
     private String contractHash;

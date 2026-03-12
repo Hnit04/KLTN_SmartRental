@@ -3,19 +3,21 @@ package iuh.se.kltn.backend.modules.contract.controller;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
+import iuh.se.kltn.backend.modules.contract.service.ContractChangeService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
+import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
 @RestController
 @RequestMapping("/api/contracts")
 public class ContractController {
 
     @Autowired
     private ContractService contractService;
-
+    @Autowired
+    private ContractChangeService contractChangeService;
     // 1. Tạo hợp đồng
     @PostMapping
     public ResponseEntity<?> createContract(@AuthenticationPrincipal UserPrincipal currentUser,
@@ -41,4 +43,30 @@ public class ContractController {
                                           @RequestBody SignContractRequest request) {
         return ResponseEntity.ok(contractService.signContract(id, request));
     }
+    @PostMapping("/{id}/change-requests")
+    public ResponseEntity<?> requestChange(@AuthenticationPrincipal UserPrincipal currentUser,
+                                           @PathVariable Long id,
+                                           @RequestBody ChangeRequestDTO requestDTO) {
+
+        return ResponseEntity.ok(contractChangeService.createChangeRequest(id, requestDTO, currentUser.getId()));
+    }
+
+    // 2. Lấy danh sách yêu cầu của một hợp đồng
+    @GetMapping("/{id}/change-requests")
+    public ResponseEntity<?> getChangeRequests(@PathVariable Long id) {
+        return ResponseEntity.ok(contractChangeService.getRequestsByContract(id));
+    }
+
+    // 3. Chủ trọ chấp nhận yêu cầu
+    @PutMapping("/change-requests/{requestId}/approve")
+    public ResponseEntity<?> approveChangeRequest(@PathVariable Long requestId) {
+        return ResponseEntity.ok(contractChangeService.approveRequest(requestId));
+    }
+
+    // 4. Chủ trọ từ chối yêu cầu
+    @PutMapping("/change-requests/{requestId}/reject")
+    public ResponseEntity<?> rejectChangeRequest(@PathVariable Long requestId) {
+        return ResponseEntity.ok(contractChangeService.rejectRequest(requestId));
+    }
+
 }

@@ -29,7 +29,8 @@ public class Room {
 
     @Column(columnDefinition = "TEXT")
     private String amenities; // JSON tiện ích
-
+    @Column(columnDefinition = "TEXT")
+    private String defaultTerms;
     @Column(columnDefinition = "TEXT")
     private String images; // JSON ảnh phòng
 

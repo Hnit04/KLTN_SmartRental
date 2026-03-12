@@ -59,6 +59,10 @@ public class RoomService {
             room.setImages(JsonUtil.convertListToJson(request.getImages()));
         }
 
+        if (request.getDefaultTerms() != null) {
+            room.setDefaultTerms(request.getDefaultTerms());
+        }
+
         Room savedRoom = roomRepository.save(room);
         return mapToRoomResponse(savedRoom);
     }
