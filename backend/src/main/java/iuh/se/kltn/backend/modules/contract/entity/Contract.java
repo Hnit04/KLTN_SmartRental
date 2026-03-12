@@ -50,7 +50,9 @@ public class Contract {
 
     @Enumerated(EnumType.STRING)
     private DepositStatus depositStatus;
-
+    @Column(columnDefinition = "TEXT")
+    private String additionalTerms;
     @OneToMany(mappedBy = "contract")
     private List<Bill> bills;
+
 }

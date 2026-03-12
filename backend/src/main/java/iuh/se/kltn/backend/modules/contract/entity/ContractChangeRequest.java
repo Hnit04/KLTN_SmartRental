@@ -1,5 +1,7 @@
 package iuh.se.kltn.backend.modules.contract.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestType;
 import jakarta.persistence.*;
@@ -20,7 +22,8 @@ public class ContractChangeRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id", nullable = false)
     private Contract contract;
 
@@ -30,10 +33,14 @@ public class ContractChangeRequest {
     private String oldValue;
     private String newValue;
     private String reason;
-
+    private String requestedByRole;
     @Enumerated(EnumType.STRING)
     private RequestStatus status;
 
     @CreationTimestamp
     private LocalDateTime requestDate;
+    @JsonProperty("contractId")
+    public Long retrieveContractId() {
+        return contract != null ? contract.getId() : null;
+    }
 }

@@ -10,4 +10,5 @@ public class RoomRequest {
     private Float area;
     private List<String> amenities;
     private List<String> images;
+    private String defaultTerms;
 }

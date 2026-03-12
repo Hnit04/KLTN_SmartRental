@@ -102,7 +102,7 @@ export interface Room {
   amenities: string[]; 
   description?: string;
   propertyId: number;
-  
+  defaultTerms?: string;
   // Flattened fields from Backend (nếu có)
   propertyName?: string;
   address?: string;      
@@ -132,7 +132,7 @@ export interface Contract {
   
   actualPrice: number;   // Khớp với Backend Contract.java
   depositAmount: number;
-  
+  additionalTerms?: string;
   status: "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "CANCELLED";
   signMethod: "TRADITIONAL" | "BLOCKCHAIN";
   
@@ -152,7 +152,11 @@ export interface Contract {
 export interface CreateContractPayload {
   roomId: number | string;
   startDate: string;
-  duration: number;
+  endDate: string;           // Dùng endDate thay cho duration
+  depositAmount?: number;    // Thêm tiền cọc
+  additionalTerms?: string;  // Thêm điều khoản
+  tenantEmail?: string;      // Thêm email khách
+  signMethod?: string;       // Thêm phương thức ký
 }
 
 // ✅ 4. Payload để Ký hợp đồng
@@ -303,4 +307,25 @@ export interface ReviewRequest {
   contractId: number;
   rating: number;
   comment: string;
+}
+// Thêm vào dưới type ContractStatus...
+export type RequestType = "RENT_INCREASE" | "EXTENSION" | "TERMINATION" | "CHANGE_TERMS";
+export type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+
+export interface ContractChangeRequest {
+  id: number;
+  contractId: number;
+  type: RequestType;
+  oldValue: string;
+  newValue: string;
+  reason: string;
+  status: RequestStatus;
+  requestDate: string;
+  requestedByRole?: string;
+}
+
+export interface ChangeRequestDTO {
+  type: RequestType;
+  newValue: string;
+  reason: string;
 }

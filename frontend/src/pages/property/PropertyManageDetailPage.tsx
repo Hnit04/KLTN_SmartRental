@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
-  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare 
+  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText
 } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +15,15 @@ const COMMON_AMENITIES = [
   "Giường nệm", "Tủ quần áo", "Ban công", "Kệ bếp",
   "Chỗ để xe", "Thang máy", "Wifi tốc độ cao", "An ninh 24/7",
   "Máy hút mùi", "Sofa", "Smart TV", "Bàn ghế làm việc"
+];
+
+// ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN DÀNH CHO CHỦ TRỌ
+const LANDLORD_SUGGESTED_TERMS = [
+  "Không nuôi thú cưng (chó, mèo...).",
+  "Giữ yên tĩnh chung sau 22h00 đêm.",
+  "Báo trước 30 ngày trước khi trả phòng.",
+  "Bồi thường 100% nếu làm hỏng tài sản phòng.",
+  "Chậm tiền nhà quá 5 ngày phạt 5%."
 ];
 
 export default function PropertyManageDetailPage() {
@@ -32,9 +41,10 @@ export default function PropertyManageDetailPage() {
   
   const [formData, setFormData] = useState({
     name: '', price: '', area: '', description: '',
-    amenities: [] as string[], // Chứa các tiện ích chọn từ Checkbox
-    customAmenitiesInput: '', // Chứa các tiện ích nhập tay (không có trong list mặc định)
-    images: [] as string[]
+    amenities: [] as string[], 
+    customAmenitiesInput: '', 
+    images: [] as string[],
+    defaultTerms: '' // ✅ TRƯỜNG ĐIỀU KHOẢN MẪU
   });
 
   // --- STATE UPLOAD ẢNH ---
@@ -65,19 +75,23 @@ export default function PropertyManageDetailPage() {
   // --- MỞ MODAL THÊM / SỬA ---
   const handleOpenCreate = () => {
     setEditingId(null);
-    setFormData({ name: '', price: '', area: '', description: '', amenities: [], customAmenitiesInput: '', images: [] });
+    setFormData({ 
+      name: '', price: '', area: '', description: '', 
+      amenities: [], customAmenitiesInput: '', images: [],
+      defaultTerms: '' 
+    });
     setSelectedFiles([]); setPreviewUrls([]);
     setShowModal(true);
   };
 
-  const handleOpenEdit = (room: Room) => {
+  const handleOpenEdit = (room: any) => { 
     setEditingId(room.id);
     
-    // Phân loại tiện ích: Cái nào có trong COMMON_AMENITIES thì đưa vào checkbox, còn lại đưa vào text input
+    // Phân loại tiện ích
     const standardAmenities: string[] = [];
     const customAmenities: string[] = [];
     
-    (room.amenities || []).forEach(item => {
+    (room.amenities || []).forEach((item: string) => {
       if (COMMON_AMENITIES.includes(item)) {
         standardAmenities.push(item);
       } else {
@@ -91,8 +105,9 @@ export default function PropertyManageDetailPage() {
       area: room.area.toString(),
       description: room.description || '', 
       amenities: standardAmenities,
-      customAmenitiesInput: customAmenities.join(', '), // Nối bằng dấu phẩy
-      images: room.images || []
+      customAmenitiesInput: customAmenities.join(', '), 
+      images: room.images || [],
+      defaultTerms: room.defaultTerms || '' 
     });
     setSelectedFiles([]); setPreviewUrls([]);
     setShowModal(true);
@@ -105,10 +120,24 @@ export default function PropertyManageDetailPage() {
       return {
         ...prev,
         amenities: isSelected 
-          ? prev.amenities.filter(item => item !== amenity) // Bỏ chọn
-          : [...prev.amenities, amenity] // Chọn thêm
+          ? prev.amenities.filter(item => item !== amenity) 
+          : [...prev.amenities, amenity] 
       };
     });
+  };
+
+  // ✅ HÀM XỬ LÝ CLICK GỢI Ý ĐIỀU KHOẢN
+  const handleAddTerm = (term: string) => {
+    if (formData.defaultTerms.includes(term)) {
+      toast.info("Điều khoản này đã được thêm rồi!");
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      defaultTerms: prev.defaultTerms 
+        ? `${prev.defaultTerms}\n- ${term}` 
+        : `- ${term}`
+    }));
   };
 
   // --- XỬ LÝ ẢNH ---
@@ -136,7 +165,6 @@ export default function PropertyManageDetailPage() {
     }
     try {
       setIsGeneratingAI(true);
-      // Gộp tiện ích từ checkbox và nhập tay
       const allAmenities = [...formData.amenities, formData.customAmenitiesInput].filter(Boolean).join(', ');
       const keywords = `Phòng ${formData.name}, diện tích ${formData.area}m2, giá ${formData.price} VND/tháng. Tiện ích: ${allAmenities}. Sạch sẽ, an ninh tốt.`;
       
@@ -170,7 +198,6 @@ export default function PropertyManageDetailPage() {
         newUrls = (uploadRes as any).data || uploadRes;
       }
 
-      // Xử lý gộp tiện ích: Checkbox + Nhập tay (cắt dấu phẩy)
       const parsedCustomAmenities = formData.customAmenitiesInput
         .split(',')
         .map(item => item.trim())
@@ -185,6 +212,7 @@ export default function PropertyManageDetailPage() {
         description: formData.description,
         amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
+        defaultTerms: formData.defaultTerms 
       };
 
       if (editingId) {
@@ -259,7 +287,7 @@ export default function PropertyManageDetailPage() {
                   </p>
                 </div>
                 
-                {/* NÚT THAO TÁC THÔNG MINH */}
+                {/* NÚT THAO TÁC */}
                 <div className="flex gap-2 border-t pt-4 mt-auto">
                   <Button variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleOpenEdit(room)}>
                     <Edit className="h-4 w-4 mr-1.5" /> Sửa
@@ -313,13 +341,12 @@ export default function PropertyManageDetailPage() {
                   </div>
                 </div>
 
-                {/* ✅ KHU VỰC TIỆN ÍCH (CHECKBOX GRID) */}
+                {/* TIỆN ÍCH */}
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
                   </label>
                   
-                  {/* Lưới Checkbox */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
                     {COMMON_AMENITIES.map((amenity) => (
                       <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
@@ -334,7 +361,6 @@ export default function PropertyManageDetailPage() {
                     ))}
                   </div>
 
-                  {/* Input nhập tiện ích khác */}
                   <div className="pt-3 border-t border-gray-200">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Tiện ích khác (Ngăn cách bằng dấu phẩy)</label>
                     <input 
@@ -347,16 +373,59 @@ export default function PropertyManageDetailPage() {
                   </div>
                 </div>
 
-                {/* Khối Tích hợp AI viết mô tả */}
-                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                  <div className="flex justify-between items-end mb-2">
-                    <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Mô tả phòng</label>
-                    <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
-                      {isGeneratingAI ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                      Tự động viết bằng AI
-                    </Button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* AI Mô tả */}
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col">
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Mô tả phòng</label>
+                      <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm h-8 px-2 text-xs">
+                        {isGeneratingAI ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                        Tạo bằng AI
+                      </Button>
+                    </div>
+                    <textarea rows={6} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none" placeholder="Nhập mô tả..." />
                   </div>
-                  <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white" placeholder="Nhập mô tả hoặc nhấn nút bên trên để AI tự động tạo lời chào mời hấp dẫn..." />
+
+                  {/* ✅ KHU VỰC CẤU HÌNH ĐIỀU KHOẢN MẪU CÓ GIAO DIỆN CHIPS */}
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="block text-sm font-bold text-blue-900 flex items-center gap-1">
+                        <ScrollText className="h-4 w-4" /> Điều khoản & Nội quy mẫu
+                      </label>
+                    </div>
+                    
+                    {/* Tags gợi ý click là thêm */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
+                            const isAdded = formData.defaultTerms.includes(term);
+                            return (
+                                <span
+                                    key={idx}
+                                    onClick={() => !isAdded && handleAddTerm(term)}
+                                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
+                                        isAdded 
+                                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                            : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
+                                    }`}
+                                >
+                                    <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
+                                        {isAdded ? '✓' : '+'}
+                                    </span> 
+                                    {term.substring(0, 30)}...
+                                </span>
+                            );
+                        })}
+                    </div>
+
+                    <textarea 
+                      rows={6} 
+                      value={formData.defaultTerms} 
+                      onChange={e => setFormData({...formData, defaultTerms: e.target.value})} 
+                      className="w-full flex-1 border-blue-200 p-3 rounded-md focus:ring-2 focus:ring-blue-400 outline-none bg-white resize-none text-sm leading-relaxed" 
+                      placeholder="VD: Không nuôi chó mèo. Thanh toán tiền mùng 5 hàng tháng. Giữ vệ sinh chung..." 
+                    />
+                    <p className="text-[11px] text-blue-600 mt-2 italic">Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê phòng này.</p>
+                  </div>
                 </div>
 
                 {/* Upload Ảnh */}
