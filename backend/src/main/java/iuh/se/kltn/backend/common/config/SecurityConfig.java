@@ -90,7 +90,7 @@ public class SecurityConfig {
 
                         // Swagger UI
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-
+                        .requestMatchers("/api/ai/**").permitAll()
                         // Trang lỗi và API Public
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/properties/**", "api/rooms/**", "/api/appointments/**").permitAll()
