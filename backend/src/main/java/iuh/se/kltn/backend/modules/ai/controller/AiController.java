@@ -22,11 +22,11 @@ public class AiController {
     @PostMapping("/chat")
     public ResponseEntity<?> chatWithAi(@RequestBody Map<String, String> request) {
         String message = request.get("message");
-
-        String response = smartRentalAi.chat(message);
-
+        String sessionId = request.getOrDefault("sessionId", "default-user");
+        String response = smartRentalAi.chat(sessionId, message);
         return ResponseEntity.ok(Map.of(
                 "status", "success",
+                "sessionId", sessionId,
                 "reply", response
         ));
     }
