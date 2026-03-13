@@ -102,11 +102,14 @@ export interface Room {
   amenities: string[]; 
   description?: string;
   propertyId: number;
-  defaultTerms?: string;
-  // Flattened fields from Backend (nếu có)
   propertyName?: string;
   address?: string;      
+  propertyAddress?: string;
   landlordName?: string; 
+  elecPrice?: number;
+  waterPrice?: number;
+  internetPrice?: number;
+  defaultTerms?: string;
 }
 
 // ==========================================

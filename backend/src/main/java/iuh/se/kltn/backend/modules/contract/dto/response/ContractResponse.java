@@ -27,7 +27,9 @@ public class ContractResponse {
     // Thông tin nội dung
     private String contentUrl;
     private String contractHash;
-
+    private Double elecPrice;
+    private Double waterPrice;
+    private Double internetPrice;
 
     private String smartContractAddress;
     private String deployTxHash;

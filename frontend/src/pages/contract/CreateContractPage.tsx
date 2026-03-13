@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail } from "lucide-react";
+import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -9,7 +9,7 @@ import { propertyApi } from "@/api/propertyApi";
 import { contractApi } from "@/api/contractApi";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useAuth } from "@/context/AuthContext";
-import type { CreateContractPayload } from "@/types"; // Import interface chuẩn
+import type { CreateContractPayload } from "@/types"; 
 
 export default function CreateContractPage() {
   const { user } = useAuth(); 
@@ -20,7 +20,9 @@ export default function CreateContractPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [room, setRoom] = useState<any>(null);
 
-  // Form data
+  // --- THÊM STATE CHO MODAL PREVIEW ---
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     startDate: new Date().toISOString().split('T')[0], 
     duration: 6, 
@@ -28,7 +30,6 @@ export default function CreateContractPage() {
     additionalTerms: "" 
   });
 
-  // ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN (Click để nối thêm vào)
   const LANDLORD_SUGGESTED_TERMS = [
     "Không nuôi thú cưng (chó, mèo...).",
     "Giữ yên tĩnh chung sau 22h00 đêm.",
@@ -58,7 +59,6 @@ export default function CreateContractPage() {
     }));
   };
 
-  // 1. TẢI THÔNG TIN PHÒNG VÀ AUTO-FILL ĐIỀU KHOẢN MẪU
   useEffect(() => {
     if (!roomId) {
       toast.error("Không tìm thấy phòng!");
@@ -72,16 +72,19 @@ export default function CreateContractPage() {
             const roomData = (res as any).data || res;
             setRoom(roomData);
 
-            // ✅ NẾU LÀ CHỦ TRỌ: LẤY ĐIỀU KHOẢN MẪU CỦA PHÒNG ĐIỀN VÀO LUÔN
-            if (user?.role === 'LANDLORD') {
-               // Mẫu dự phòng nếu DB chưa có defaultTerms
-               const systemTemplate = `I. NỘI QUY CHUNG:\n- Giữ gìn vệ sinh chung, đổ rác đúng nơi quy định.\n- Không gây ồn ào sau 22h00.\n- Không chứa chấp người lạ qua đêm khi chưa báo cáo Chủ nhà.\n\nII. TRÁCH NHIỆM TÀI SẢN:\n- Bồi thường 100% giá trị nếu làm hư hỏng tài sản có sẵn trong phòng.\n- Trả phòng phải báo trước ít nhất 30 ngày, nếu không sẽ mất cọc.\n\nIII. THANH TOÁN:\n- Thanh toán tiền nhà và dịch vụ từ ngày 01 đến ngày 05 hàng tháng. Chậm trễ phạt 5%.`;
-               
-               setFormData(prev => ({
-                 ...prev,
-                 additionalTerms: roomData.defaultTerms || systemTemplate
-               }));
-            }
+            const systemTemplate = `I. NỘI QUY CHUNG:\n- Giữ gìn vệ sinh chung, đổ rác đúng nơi quy định.\n- Không gây ồn ào sau 22h00.\n- Không chứa chấp người lạ qua đêm khi chưa báo cáo Chủ nhà.\n\nII. TRÁCH NHIỆM TÀI SẢN:\n- Bồi thường 100% giá trị nếu làm hư hỏng tài sản có sẵn trong phòng.\n- Trả phòng phải báo trước ít nhất 30 ngày, nếu không sẽ mất cọc.\n\nIII. THANH TOÁN:\n- Thanh toán tiền nhà và dịch vụ từ ngày 01 đến ngày 05 hàng tháng. Chậm trễ phạt 5%.`;
+            
+            const defaultText = roomData.defaultTerms || systemTemplate;
+
+            const formattedTerms = user?.role === 'TENANT' 
+                ? `--- NỘI QUY MẪU TỪ CHỦ TRỌ ---\n${defaultText}\n\n--- YÊU CẦU THÊM CỦA KHÁCH THUÊ ---\n`
+                : defaultText;
+
+            setFormData(prev => ({
+                ...prev,
+                additionalTerms: formattedTerms
+            }));
+
         } catch (error) {
             toast.error("Lỗi tải thông tin phòng");
         }
@@ -89,7 +92,13 @@ export default function CreateContractPage() {
     fetchRoomInfo();
   }, [roomId, navigate, user?.role]);
 
-  // 2. GỬI YÊU CẦU TẠO HỢP ĐỒNG (ĐÃ FIX LỖI TYPESCRIPT)
+  // HÀM TÍNH NGÀY KẾT THÚC (Dùng chung cho Submit và Preview)
+  const calculateEndDate = () => {
+    const start = new Date(formData.startDate);
+    const end = new Date(start.setMonth(start.getMonth() + Number(formData.duration)));
+    return end.toISOString().split('T')[0];
+  };
+
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
@@ -99,12 +108,8 @@ export default function CreateContractPage() {
         return;
       }
 
-      // ✅ TÍNH TOÁN NGÀY KẾT THÚC DỰA VÀO SỐ THÁNG
-      const start = new Date(formData.startDate);
-      const end = new Date(start.setMonth(start.getMonth() + Number(formData.duration)));
-      const endDateStr = end.toISOString().split('T')[0];
+      const endDateStr = calculateEndDate();
 
-      // ✅ PAYLOAD ĐẦY ĐỦ KHỚP VỚI INTERFACE MỚI NHẤT
       const payload: CreateContractPayload = {
           roomId: Number(roomId),
           startDate: formData.startDate,
@@ -115,7 +120,7 @@ export default function CreateContractPage() {
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
 
-      const res = await contractApi.createContract(payload);
+      const res = await contractApi.createContract(payload as any);
       
       toast.success(user?.role === 'LANDLORD' ? "Đã tạo hợp đồng nháp thành công!" : "Đã gửi yêu cầu thuê thành công!");
       
@@ -136,7 +141,6 @@ export default function CreateContractPage() {
       <div className="container mx-auto max-w-3xl">
         <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
           
-          {/* Header */}
           <div className="bg-primary/5 p-6 border-b border-primary/10">
             <h1 className="text-2xl font-bold text-gray-900">
                 {user?.role === 'LANDLORD' ? 'Tạo hợp đồng thuê mới' : 'Xác nhận thuê phòng'}
@@ -148,7 +152,6 @@ export default function CreateContractPage() {
 
           <div className="p-8 grid md:grid-cols-2 gap-8">
             
-            {/* CỘT TRÁI: THÔNG TIN PHÒNG (READ-ONLY) */}
             <div className="space-y-6">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-green-600" /> 
@@ -190,7 +193,6 @@ export default function CreateContractPage() {
                 </div>
             </div>
 
-            {/* CỘT PHẢI: INPUT FORM */}
             <div className="space-y-6">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                     <User className="h-5 w-5 text-blue-600" /> 
@@ -199,7 +201,6 @@ export default function CreateContractPage() {
 
                 <div className="space-y-4">
                     
-                    {/* KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (Nhập email khách) */}
                     {user?.role === 'LANDLORD' && (
                        <div className="space-y-2 p-4 bg-purple-50 rounded-lg border border-purple-100">
                           <Label className="text-purple-800">Email Khách Thuê (Bắt buộc)</Label>
@@ -248,11 +249,25 @@ export default function CreateContractPage() {
                         </div>
                     </div>
 
-                    {/* KHU VỰC ĐIỀU KHOẢN BỔ SUNG */}
                     <div className="space-y-3 pt-4 border-t mt-4">
-                        <div className="flex justify-between items-center">
-                            <Label className="text-gray-900 font-bold">Điều khoản & Nội quy</Label>
-                            <span className="text-xs text-gray-400">Có thể chỉnh sửa</span>
+                        <div className="flex flex-col gap-2 mb-1">
+                            <Label className="text-gray-900 font-bold text-base">
+                                {user?.role === 'LANDLORD' ? 'Điều khoản & Nội quy hợp đồng' : 'Nội quy Chủ nhà & Yêu cầu của bạn'}
+                            </Label>
+                            
+                            {user?.role === 'TENANT' && (
+                                <div className="bg-blue-50/80 text-blue-700 text-xs p-3 rounded-lg border border-blue-100 flex gap-2 items-start leading-relaxed">
+                                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+                                    <p>
+                                        Đoạn văn bản bên dưới là <strong>Nội quy mẫu do Chủ trọ thiết lập</strong>. Bạn có thể đọc, giữ nguyên hoặc gõ thêm các đề xuất của riêng mình vào phần dưới cùng.
+                                    </p>
+                                </div>
+                            )}
+                            {user?.role === 'LANDLORD' && (
+                                <p className="text-xs text-gray-500">
+                                    Dưới đây là Nội quy mẫu của phòng. Bạn có thể chỉnh sửa cho phù hợp với khách này.
+                                </p>
+                            )}
                         </div>
                         
                         <div className="flex flex-wrap gap-2 mb-2">
@@ -279,7 +294,6 @@ export default function CreateContractPage() {
                             })}
                         </div>
 
-                        {/* Ô nhập liệu dài cho điều khoản */}
                         <textarea 
                             className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[220px] resize-y placeholder:text-gray-400"
                             placeholder={user?.role === 'LANDLORD' ? "Đang tải điều khoản mẫu..." : "Nhập các yêu cầu riêng với chủ nhà..."}
@@ -297,11 +311,21 @@ export default function CreateContractPage() {
                     <p className="text-xs text-blue-600 mt-1">(Bao gồm 1 tháng cọc + 1 tháng tiền nhà)</p>
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-4 space-y-3">
+                    {/* ✅ NÚT XEM TRƯỚC HỢP ĐỒNG */}
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full h-11 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100"
+                        onClick={() => setIsPreviewOpen(true)}
+                    >
+                        <Eye className="w-4 h-4 mr-2" /> Xem trước bản hợp đồng
+                    </Button>
+
                     <Button onClick={handleSubmit} isLoading={isLoading} className="w-full h-12 text-base shadow-lg shadow-primary/20">
                         {user?.role === 'LANDLORD' ? 'Tạo Hợp Đồng Nháp' : 'Gửi yêu cầu & Xem hợp đồng'}
                     </Button>
-                    <Button variant="ghost" onClick={() => navigate(-1)} className="w-full mt-2">
+                    <Button variant="ghost" onClick={() => navigate(-1)} className="w-full h-11">
                         Hủy bỏ
                     </Button>
                 </div>
@@ -310,6 +334,107 @@ export default function CreateContractPage() {
           </div>
         </div>
       </div>
+
+      {/* ======================================================== */}
+      {/* MODAL XEM TRƯỚC BẢN HỢP ĐỒNG */}
+      {/* ======================================================== */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-white max-w-4xl w-full rounded-xl shadow-2xl relative flex flex-col max-h-[90vh]">
+            
+            {/* Header Modal */}
+            <div className="flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-xl shrink-0">
+                <h3 className="font-bold flex items-center gap-2 text-gray-800">
+                    <FileSignature className="w-5 h-5 text-indigo-600" /> Bản xem trước Hợp đồng
+                </h3>
+                <button onClick={() => setIsPreviewOpen(false)} className="text-gray-400 hover:text-red-500 bg-gray-200 hover:bg-red-100 p-1.5 rounded-full transition-all">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            {/* Khung văn bản A4 giả lập */}
+            <div className="p-6 sm:p-10 overflow-y-auto bg-gray-100/50 custom-scrollbar">
+                <div className="bg-white border shadow-sm max-w-3xl mx-auto p-8 sm:p-12 min-h-[800px]">
+                    
+                    <div className="text-center mb-8">
+                        <h2 className="font-bold text-lg uppercase leading-relaxed">Cộng hòa Xã hội Chủ nghĩa Việt Nam</h2>
+                        <h3 className="font-bold text-base underline underline-offset-4 decoration-2">Độc lập - Tự do - Hạnh phúc</h3>
+                    </div>
+
+                    <h1 className="text-center font-bold text-2xl uppercase mb-8">Hợp đồng thuê phòng trọ</h1>
+
+                    <div className="space-y-4 text-sm leading-relaxed text-justify">
+                        <p>Hôm nay, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}, chúng tôi gồm có:</p>
+                        
+                        <div className="pl-4 space-y-1">
+                            <p className="font-bold uppercase">BÊN CHO THUÊ (BÊN A):</p>
+                            <p>- Ông/Bà: <strong>{room?.landlordName || room?.property?.landlordName || '...........................................'}</strong></p>
+                            <p>- Địa chỉ khu trọ: {room?.propertyAddress || '...........................................'}</p>
+                        </div>
+
+                        <div className="pl-4 space-y-1">
+                            <p className="font-bold uppercase">BÊN THUÊ (BÊN B):</p>
+                            <p>- Ông/Bà: <strong>{user?.role === 'TENANT' ? user.fullName : (formData.tenantEmail || '...........................................')}</strong></p>
+                        </div>
+
+                        <p className="font-bold mt-6 mb-2">Hai bên thống nhất thỏa thuận các điều khoản sau:</p>
+
+                        <div className="space-y-2">
+                            <p><strong>Điều 1: Thông tin phòng thuê và Giá cả</strong></p>
+                            <ul className="list-disc pl-8 space-y-1">
+                                <li>Bên A đồng ý cho Bên B thuê phòng số: <strong>{room?.name}</strong>.</li>
+                                <li>Giá thuê phòng: <strong>{new Intl.NumberFormat('vi-VN').format(room?.price || 0)} VNĐ/tháng</strong>.</li>
+                                <li>Tiền đặt cọc: <strong>{new Intl.NumberFormat('vi-VN').format(room?.price || 0)} VNĐ</strong>.</li>
+                                <li>Giá điện: <strong>{room?.elecPrice ? `${new Intl.NumberFormat('vi-VN').format(room.elecPrice)} VNĐ/kWh` : 'Theo giá nhà nước'}</strong>.</li>
+                                <li>Giá nước: <strong>{room?.waterPrice ? `${new Intl.NumberFormat('vi-VN').format(room.waterPrice)} VNĐ/m³` : 'Theo giá nhà nước'}</strong>.</li>
+                                <li>Internet & Dịch vụ: <strong>{room?.internetPrice ? `${new Intl.NumberFormat('vi-VN').format(room.internetPrice)} VNĐ/tháng` : 'Miễn phí'}</strong>.</li>
+                            </ul>
+                        </div>
+
+                        <div className="space-y-2">
+                            <p><strong>Điều 2: Thời hạn hợp đồng</strong></p>
+                            <ul className="list-disc pl-8 space-y-1">
+                                <li>Thời gian thuê: <strong>{formData.duration} tháng</strong>.</li>
+                                <li>Từ ngày <strong>{new Date(formData.startDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{new Date(calculateEndDate()).toLocaleDateString('vi-VN')}</strong>.</li>
+                            </ul>
+                        </div>
+
+                        <div className="space-y-2">
+                            <p><strong>Điều 3: Các thỏa thuận bổ sung / Nội quy phòng trọ</strong></p>
+                            <div className="bg-gray-50 border p-4 rounded-md whitespace-pre-wrap italic">
+                                {formData.additionalTerms || "Không có thỏa thuận bổ sung nào khác."}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 mt-6">
+                            <p><strong>Điều 4: Cam kết chung</strong></p>
+                            <p>Hai bên cam kết thực hiện đúng các điều khoản đã ghi trong hợp đồng. Hợp đồng này được lập thành văn bản điện tử và có giá trị pháp lý tương đương bản cứng sau khi hai bên ký xác nhận.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 mt-12 text-center">
+                        <div>
+                            <p className="font-bold uppercase mb-16">BÊN A (CHO THUÊ)</p>
+                            <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                        </div>
+                        <div>
+                            <p className="font-bold uppercase mb-16">BÊN B (NGƯỜI THUÊ)</p>
+                            <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Footer Modal */}
+            <div className="p-4 border-t bg-white shrink-0 flex justify-end">
+                <Button onClick={() => setIsPreviewOpen(false)} className="px-8">
+                    Đã hiểu & Đóng lại
+                </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

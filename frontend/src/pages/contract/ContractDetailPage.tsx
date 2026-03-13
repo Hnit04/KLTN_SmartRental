@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState,  } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
-  MapPin, Printer, ArrowLeft, Blocks, Receipt, Wallet, 
+  MapPin,  ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star,
   MessageSquare, XCircle, Check
 } from "lucide-react";
@@ -21,6 +21,7 @@ import type {
 } from "@/types";
 import { useAuth } from "@/context/AuthContext"; 
 import ReviewModal from "@/features/interaction/components/ReviewModal";
+import html2pdf from "html2pdf.js"; // ✅ THÊM IMPORT NÀY
 
 interface ContractDetail extends Contract {
   roomName?: string;
@@ -30,6 +31,10 @@ interface ContractDetail extends Contract {
   tenantPhone?: string;
   tenantCccd?: string;
   additionalTerms?: string; 
+  // Các giá dịch vụ (nếu backend có trả về)
+  elecPrice?: number;
+  waterPrice?: number;
+  internetPrice?: number;
 }
 
 export default function ContractDetailPage() {
@@ -48,6 +53,7 @@ export default function ContractDetailPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [isLoadingBills, setIsLoadingBills] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // Trạng thái tải PDF
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
@@ -60,7 +66,6 @@ export default function ContractDetailPage() {
     reason: ''
   });
 
-  // ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN THEO ROLE (Copy từ CreateContractPage)
   const LANDLORD_SUGGESTED_TERMS = [
     "Không nuôi thú cưng (chó, mèo...).",
     "Giữ yên tĩnh chung sau 22h00 đêm.",
@@ -77,7 +82,6 @@ export default function ContractDetailPage() {
     "Xin phép nuôi thú cưng nhỏ (mèo/chuột hamster)."
   ];
 
-  // ✅ HÀM XỬ LÝ CLICK GỢI Ý
   const handleAddTerm = (term: string) => {
     if (changeForm.newValue.includes(term)) {
       toast.info("Điều khoản này đã được thêm rồi!");
@@ -131,6 +135,33 @@ export default function ContractDetailPage() {
       fetchBills();
     }
   }, [activeTab, id, bills.length]);
+
+  // ✅ HÀM TẢI PDF
+  // ✅ HÀM TẢI PDF ĐÃ FIX LỖI TYPESCRIPT
+  const handleDownloadPDF = () => {
+    const element = document.getElementById('contract-pdf-content');
+    if (!element) return;
+
+    setIsDownloading(true);
+    toast.info("Đang tạo file PDF, vui lòng đợi...");
+
+    // THÊM CHỮ ": any" VÀO ĐÂY LÀ HẾT LỖI
+    const opt: any = {
+      margin:       15,
+      filename:     `HopDong_Phong_${contract?.roomName}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+      setIsDownloading(false);
+      toast.success("Tải bản PDF thành công!");
+    }).catch(() => {
+      setIsDownloading(false);
+      toast.error("Lỗi khi xuất PDF.");
+    });
+  };
 
   const handleSignContract = async () => {
     setIsSigning(true);
@@ -245,6 +276,13 @@ export default function ContractDetailPage() {
   if (!contract) return <div className="text-center py-20">Không tìm thấy hợp đồng.</div>;
 
   const pendingRequest = changeRequests.find(req => req.status === 'PENDING');
+
+  // Tính toán thời gian (số tháng) cho bản in PDF
+  const startDateObj = new Date(contract.startDate);
+  const endDateObj = contract.endDate ? new Date(contract.endDate) : null;
+  const durationMonths = endDateObj 
+    ? (endDateObj.getFullYear() - startDateObj.getFullYear()) * 12 + (endDateObj.getMonth() - startDateObj.getMonth())
+    : '...';
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-6">
@@ -469,13 +507,22 @@ export default function ContractDetailPage() {
               )}
             </div>
             
-            <Button variant="outline" className="w-full justify-start gap-3 h-12 bg-white">
+            {/* ✅ GẮN HÀM XUẤT PDF VÀO NÚT NÀY */}
+            <Button 
+                variant="outline" 
+                className="w-full justify-start gap-3 h-12 bg-white"
+                onClick={handleDownloadPDF}
+                isLoading={isDownloading}
+            >
               <Download className="w-4 h-4 text-gray-500" /> Tải bản PDF
             </Button>
           </div>
         </div>
       )}
 
+      {/* CÁC MODAL KHÁC GIỮ NGUYÊN BÊN DƯỚI ... */}
+      {/* ... (Modal hóa đơn, Modal gửi đề xuất, Modal ký hợp đồng) ... */}
+      
       {activeTab === 'BILLS' && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -515,7 +562,6 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {/* ==================== MODAL: GỬI ĐỀ XUẤT ==================== */}
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
@@ -555,7 +601,6 @@ export default function ContractDetailPage() {
                     onChange={(e) => setChangeForm({...changeForm, newValue: e.target.value})}
                   />
                 ) : (
-                  // ✅ GIAO DIỆN MỚI CÓ TAGS CHỌN ĐIỀU KHOẢN
                   <div className="space-y-3 mt-1">
                     <div className="flex flex-wrap gap-2">
                       {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
@@ -615,7 +660,6 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {/* ==================== MODAL: KÝ HỢP ĐỒNG ==================== */}
       {isSignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
@@ -677,6 +721,103 @@ export default function ContractDetailPage() {
         contractId={Number(id)} 
         roomName={contract.roomName || ''} 
       />
+
+      {/* ======================================================== */}
+      {/* 📜 KHUNG ẨN CHỨA NỘI DUNG PDF ĐỂ XUẤT FILE */}
+      {/* ======================================================== */}
+      <div className="hidden">
+        <div id="contract-pdf-content" className="p-12 text-black bg-white" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+            <div className="text-center mb-8">
+                <h2 className="font-bold text-lg uppercase leading-relaxed">Cộng hòa Xã hội Chủ nghĩa Việt Nam</h2>
+                <h3 className="font-bold text-base underline underline-offset-4 decoration-2">Độc lập - Tự do - Hạnh phúc</h3>
+            </div>
+
+            <h1 className="text-center font-bold text-2xl uppercase mb-8">Hợp đồng thuê phòng trọ</h1>
+
+            <div className="space-y-4 text-sm leading-relaxed text-justify">
+                <p>Hôm nay, ngày {contract.signDate ? new Date(contract.signDate).getDate() : new Date().getDate()} tháng {contract.signDate ? new Date(contract.signDate).getMonth() + 1 : new Date().getMonth() + 1} năm {contract.signDate ? new Date(contract.signDate).getFullYear() : new Date().getFullYear()}, chúng tôi gồm có:</p>
+                
+                <div className="pl-4 space-y-1">
+                    <p className="font-bold uppercase">BÊN CHO THUÊ (BÊN A):</p>
+                    <p>- Ông/Bà: <strong>{contract.landlordName || '...........................................'}</strong></p>
+                    <p>- Địa chỉ khu trọ: {contract.propertyAddress || '...........................................'}</p>
+                </div>
+
+                <div className="pl-4 space-y-1">
+                    <p className="font-bold uppercase">BÊN THUÊ (BÊN B):</p>
+                    <p>- Ông/Bà: <strong>{contract.tenantName || '...........................................'}</strong></p>
+                </div>
+
+                <p className="font-bold mt-6 mb-2">Hai bên thống nhất thỏa thuận các điều khoản sau:</p>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 1: Thông tin phòng thuê và Giá cả</strong></p>
+                    <ul className="list-disc pl-8 space-y-1">
+                        <li>Bên A đồng ý cho Bên B thuê phòng số: <strong>{contract.roomName}</strong>.</li>
+                        <li>Giá thuê phòng: <strong>{new Intl.NumberFormat('vi-VN').format(contract.actualPrice || 0)} VNĐ/tháng</strong>.</li>
+                        <li>Tiền đặt cọc: <strong>{new Intl.NumberFormat('vi-VN').format(contract.depositAmount || 0)} VNĐ</strong>.</li>
+                        
+                        {/* Hiển thị giá dịch vụ nếu Backend có gửi về */}
+                        {contract.elecPrice && <li>Giá điện: <strong>{new Intl.NumberFormat('vi-VN').format(contract.elecPrice)} VNĐ/kWh</strong>.</li>}
+                        {contract.waterPrice && <li>Giá nước: <strong>{new Intl.NumberFormat('vi-VN').format(contract.waterPrice)} VNĐ/m³</strong>.</li>}
+                        {contract.internetPrice !== undefined && <li>Internet & Dịch vụ: <strong>{contract.internetPrice === 0 ? 'Miễn phí' : `${new Intl.NumberFormat('vi-VN').format(contract.internetPrice)} VNĐ/tháng`}</strong>.</li>}
+                    </ul>
+                </div>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 2: Thời hạn hợp đồng</strong></p>
+                    <ul className="list-disc pl-8 space-y-1">
+                        <li>Thời gian thuê: <strong>{durationMonths} tháng</strong>.</li>
+                        <li>Từ ngày <strong>{new Date(contract.startDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{contract.endDate ? new Date(contract.endDate).toLocaleDateString('vi-VN') : '...'}</strong>.</li>
+                    </ul>
+                </div>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 3: Các thỏa thuận bổ sung / Nội quy phòng trọ</strong></p>
+                    <div className="bg-gray-50 border border-gray-200 p-4 rounded-md whitespace-pre-wrap italic">
+                        {contract.additionalTerms || "Không có thỏa thuận bổ sung nào khác."}
+                    </div>
+                </div>
+
+                <div className="space-y-2 mt-6">
+                    <p><strong>Điều 4: Cam kết chung</strong></p>
+                    <p>Hai bên cam kết thực hiện đúng các điều khoản đã ghi trong hợp đồng. Hợp đồng này được lập thành văn bản điện tử trên hệ thống SmartRental và có giá trị pháp lý sau khi hai bên xác nhận.</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 mt-16 text-center">
+                <div>
+                    <p className="font-bold uppercase mb-4">BÊN A (CHO THUÊ)</p>
+                    {contract.status === 'ACTIVE' ? (
+                      <div className="text-green-600 font-bold italic border-2 border-green-500 rounded-lg p-2 w-max mx-auto rotate-[-5deg]">
+                        Đã ký điện tử
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                    )}
+                </div>
+                <div>
+                    <p className="font-bold uppercase mb-4">BÊN B (NGƯỜI THUÊ)</p>
+                    {contract.status === 'ACTIVE' ? (
+                      <div className="text-green-600 font-bold italic border-2 border-green-500 rounded-lg p-2 w-max mx-auto rotate-[-5deg]">
+                        Đã ký điện tử
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                    )}
+                </div>
+            </div>
+            {/* Stamp Blockchain nếu có */}
+            {contract.status === 'ACTIVE' && contract.signMethod === 'BLOCKCHAIN' && (
+              <div className="mt-12 p-4 border border-indigo-200 bg-indigo-50 rounded-lg text-[10px] text-indigo-800 text-center break-all">
+                <p className="font-bold uppercase mb-1">🔐 Chứng nhận Blockchain Smart Contract</p>
+                <p>Contract Address: {contract.smartContractAddress}</p>
+                <p>Tx Hash: {contract.deployTxHash}</p>
+              </div>
+            )}
+        </div>
+      </div>
+
     </div>
   );
 }
