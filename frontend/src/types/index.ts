@@ -102,11 +102,14 @@ export interface Room {
   amenities: string[]; 
   description?: string;
   propertyId: number;
-  defaultTerms?: string;
-  // Flattened fields from Backend (nếu có)
   propertyName?: string;
   address?: string;      
+  propertyAddress?: string;
   landlordName?: string; 
+  elecPrice?: number;
+  waterPrice?: number;
+  internetPrice?: number;
+  defaultTerms?: string;
 }
 
 // ==========================================
@@ -141,7 +144,8 @@ export interface Contract {
   propertyAddress?: string;
   tenantName?: string;
   landlordName?: string;
-
+  isTenantSigned?: boolean;
+  isLandlordSigned?: boolean;
   // Blockchain fields
   smartContractAddress?: string;
   deployTxHash?: string;
@@ -308,8 +312,7 @@ export interface ReviewRequest {
   rating: number;
   comment: string;
 }
-// Thêm vào dưới type ContractStatus...
-export type RequestType = "RENT_INCREASE" | "EXTENSION" | "TERMINATION" | "CHANGE_TERMS";
+export type RequestType = "RENT_INCREASE" | "EXTENSION" | "TERMINATION" | "CHANGE_TERMS" | "CHANGE_SIGN_METHOD";
 export type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
 export interface ContractChangeRequest {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
-  MapPin, Printer, ArrowLeft, Blocks, Receipt, Wallet, 
+  MapPin,  ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star,
   MessageSquare, XCircle, Check
 } from "lucide-react";
@@ -21,6 +21,7 @@ import type {
 } from "@/types";
 import { useAuth } from "@/context/AuthContext"; 
 import ReviewModal from "@/features/interaction/components/ReviewModal";
+import html2pdf from "html2pdf.js";
 
 interface ContractDetail extends Contract {
   roomName?: string;
@@ -30,6 +31,9 @@ interface ContractDetail extends Contract {
   tenantPhone?: string;
   tenantCccd?: string;
   additionalTerms?: string; 
+  elecPrice?: number;
+  waterPrice?: number;
+  internetPrice?: number;
 }
 
 export default function ContractDetailPage() {
@@ -48,6 +52,7 @@ export default function ContractDetailPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [isLoadingBills, setIsLoadingBills] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
@@ -60,7 +65,6 @@ export default function ContractDetailPage() {
     reason: ''
   });
 
-  // ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN THEO ROLE (Copy từ CreateContractPage)
   const LANDLORD_SUGGESTED_TERMS = [
     "Không nuôi thú cưng (chó, mèo...).",
     "Giữ yên tĩnh chung sau 22h00 đêm.",
@@ -77,7 +81,6 @@ export default function ContractDetailPage() {
     "Xin phép nuôi thú cưng nhỏ (mèo/chuột hamster)."
   ];
 
-  // ✅ HÀM XỬ LÝ CLICK GỢI Ý
   const handleAddTerm = (term: string) => {
     if (changeForm.newValue.includes(term)) {
       toast.info("Điều khoản này đã được thêm rồi!");
@@ -132,19 +135,44 @@ export default function ContractDetailPage() {
     }
   }, [activeTab, id, bills.length]);
 
+  const handleDownloadPDF = () => {
+    const element = document.getElementById('contract-pdf-content');
+    if (!element) return;
+
+    setIsDownloading(true);
+    toast.info("Đang tạo file PDF, vui lòng đợi...");
+
+    const opt: any = {
+      margin:       15,
+      filename:     `HopDong_Phong_${contract?.roomName}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+      setIsDownloading(false);
+      toast.success("Tải bản PDF thành công!");
+    }).catch(() => {
+      setIsDownloading(false);
+      toast.error("Lỗi khi xuất PDF.");
+    });
+  };
+
   const handleSignContract = async () => {
     setIsSigning(true);
     try {
-      if (signMethod === 'BLOCKCHAIN') {
+      if (contract?.signMethod === 'BLOCKCHAIN') {
         if (!window.ethereum) {
           toast.error("Vui lòng cài đặt ví MetaMask để ký Smart Contract!");
+          setIsSigning(false);
           return;
         }
         await window.ethereum.request({ method: 'eth_requestAccounts' });
         toast.info("Đang gọi Web3 Provider...");
       }
 
-      await contractApi.signContract(Number(id), { signMethod });
+      await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
       toast.success("Ký hợp đồng thành công!");
       setIsSignModalOpen(false);
       fetchContractData(); 
@@ -227,14 +255,12 @@ export default function ContractDetailPage() {
   const handleCounterPropose = async (req: ContractChangeRequest) => {
     try {
       await contractApi.rejectChangeRequest(req.id);
-      
       setChangeForm({
         type: req.type,
         newValue: req.newValue, 
         reason: "Tôi đồng ý một phần, xin đề xuất lại như sau..."
       });
       setIsRequestModalOpen(true);
-      
       fetchContractData();
     } catch (error) {
       toast.error("Lỗi khi tạo thương lượng mới.");
@@ -245,6 +271,14 @@ export default function ContractDetailPage() {
   if (!contract) return <div className="text-center py-20">Không tìm thấy hợp đồng.</div>;
 
   const pendingRequest = changeRequests.find(req => req.status === 'PENDING');
+  
+  // ✅ KIỂM TRA TRẠNG THÁI KÝ
+  const isMeSigned = user?.role === 'TENANT' ? contract.isTenantSigned : contract.isLandlordSigned;
+  const isPartnerSigned = user?.role === 'TENANT' ? contract.isLandlordSigned : contract.isTenantSigned;
+
+  const durationMonths = contract.endDate 
+    ? (new Date(contract.endDate).getFullYear() - new Date(contract.startDate).getFullYear()) * 12 + (new Date(contract.endDate).getMonth() - new Date(contract.startDate).getMonth())
+    : '...';
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-6">
@@ -303,11 +337,9 @@ export default function ContractDetailPage() {
                         <Button size="sm" onClick={() => handleApproveRequest(pendingRequest.id)} className="bg-green-600 hover:bg-green-700">
                           <Check className="w-4 h-4 mr-2" /> Chấp nhận
                         </Button>
-                        
                         <Button size="sm" variant="outline" onClick={() => handleCounterPropose(pendingRequest)} className="text-blue-600 border-blue-200 hover:bg-blue-50">
                           <PenTool className="w-4 h-4 mr-2" /> Thương lượng lại
                         </Button>
-
                         <Button size="sm" variant="outline" onClick={() => handleRejectRequest(pendingRequest.id)} className="text-red-600 border-red-200 hover:bg-red-50">
                           <XCircle className="w-4 h-4 mr-2" /> Từ chối
                         </Button>
@@ -439,15 +471,35 @@ export default function ContractDetailPage() {
               
               {contract.status !== 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  <Button 
-                    className="w-full gap-2 h-11" 
-                    onClick={() => setIsSignModalOpen(true)}
-                    disabled={!!pendingRequest}
-                  >
-                    <PenTool className="h-4 w-4" /> Ký Hợp Đồng Ngay
-                  </Button>
+                  <div className="flex flex-col gap-2 text-sm text-left bg-gray-50/50 p-4 rounded-xl border border-gray-100 mb-4">
+                    <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
+                    <div className="flex items-center justify-between">
+                        <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
+                        {contract.isLandlordSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className={contract.isTenantSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>2. Khách thuê</span>
+                        {contract.isTenantSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                    </div>
+                  </div>
+
+                  {!isMeSigned ? (
+                    <Button 
+                      className="w-full gap-2 h-11 shadow-md shadow-blue-500/20" 
+                      onClick={() => setIsSignModalOpen(true)}
+                      disabled={!!pendingRequest}
+                    >
+                      <PenTool className="h-4 w-4" /> Ký xác nhận
+                    </Button>
+                  ) : (
+                    !isPartnerSigned && (
+                      <div className="flex items-center justify-center gap-2 p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold rounded-lg">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Đang chờ đối tác ký...
+                      </div>
+                    )
+                  )}
                   
-                  {!pendingRequest && (
+                  {!pendingRequest && !isMeSigned && (
                     <Button 
                       variant="outline" 
                       className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
@@ -469,13 +521,18 @@ export default function ContractDetailPage() {
               )}
             </div>
             
-            <Button variant="outline" className="w-full justify-start gap-3 h-12 bg-white">
+            <Button 
+                variant="outline" 
+                className="w-full justify-start gap-3 h-12 bg-white"
+                onClick={handleDownloadPDF}
+                isLoading={isDownloading}
+            >
               <Download className="w-4 h-4 text-gray-500" /> Tải bản PDF
             </Button>
           </div>
         </div>
       )}
-
+      
       {activeTab === 'BILLS' && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -515,7 +572,6 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {/* ==================== MODAL: GỬI ĐỀ XUẤT ==================== */}
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
@@ -534,12 +590,24 @@ export default function ContractDetailPage() {
                   <option value="RENT_INCREASE">Điều chỉnh Giá thuê (VNĐ)</option>
                   <option value="EXTENSION">Gia hạn / Đổi ngày kết thúc</option>
                   <option value="CHANGE_TERMS">Thay đổi điều khoản khác</option>
+                  <option value="CHANGE_SIGN_METHOD">Thay đổi Phương thức ký hợp đồng</option> 
                 </select>
               </div>
 
               <div>
                 <Label>Giá trị mới đề xuất</Label>
-                {changeForm.type === 'RENT_INCREASE' ? (
+                
+                {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                    value={changeForm.newValue}
+                    onChange={(e) => setChangeForm({...changeForm, newValue: e.target.value})}
+                  >
+                    <option value="" disabled>-- Chọn phương thức bạn muốn --</option>
+                    <option value="BLOCKCHAIN">Ký bằng Smart Contract (Web3)</option>
+                    <option value="TRADITIONAL">Xác nhận điện tử (Nhanh)</option>
+                  </select>
+                ) : changeForm.type === 'RENT_INCREASE' ? (
                   <Input 
                     type="number" 
                     placeholder="VD: 4500000" 
@@ -555,7 +623,6 @@ export default function ContractDetailPage() {
                     onChange={(e) => setChangeForm({...changeForm, newValue: e.target.value})}
                   />
                 ) : (
-                  // ✅ GIAO DIỆN MỚI CÓ TAGS CHỌN ĐIỀU KHOẢN
                   <div className="space-y-3 mt-1">
                     <div className="flex flex-wrap gap-2">
                       {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
@@ -615,7 +682,7 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {/* ==================== MODAL: KÝ HỢP ĐỒNG ==================== */}
+      {/* ✅ GIAO DIỆN KHÓA CỨNG PHƯƠNG THỨC KÝ TRONG MODAL */}
       {isSignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
@@ -624,35 +691,39 @@ export default function ContractDetailPage() {
               <p className="text-sm text-gray-500 mb-6">Bạn đang ký hợp đồng cho phòng <span className="font-bold text-gray-800">{contract.roomName}</span>.</p>
 
               <div className="space-y-3 mb-8">
-                  <div 
-                      className={`flex gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${signMethod === 'BLOCKCHAIN' ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-200'}`}
-                      onClick={() => setSignMethod("BLOCKCHAIN")}
-                  >
-                      <div className={`mt-1 shrink-0 ${signMethod === 'BLOCKCHAIN' ? 'text-indigo-600' : 'text-gray-300'}`}>
-                          {signMethod === 'BLOCKCHAIN' ? <CheckCircle className="h-6 w-6 fill-indigo-100" /> : <div className="h-6 w-6 rounded-full border-2" />}
+                  {contract.signMethod === 'BLOCKCHAIN' ? (
+                      <div className="flex gap-4 p-4 rounded-xl border-2 border-indigo-500 bg-indigo-50/50">
+                          <div className="mt-1 shrink-0 text-indigo-600">
+                              <CheckCircle className="h-6 w-6 fill-indigo-100" />
+                          </div>
+                          <div>
+                              <h4 className="font-bold text-sm flex items-center gap-2 text-indigo-900">
+                                  Ký bằng Smart Contract <Blocks className="h-4 w-4 text-indigo-500"/>
+                                  <span className="text-[10px] bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full ml-1">Đã chốt</span>
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1 leading-relaxed">Sử dụng MetaMask để xác nhận giao dịch và lưu trên mạng lưới Sepolia.</p>
+                          </div>
                       </div>
-                      <div>
-                          <h4 className={`font-bold text-sm flex items-center gap-2 ${signMethod === 'BLOCKCHAIN' ? 'text-indigo-900' : 'text-gray-900'}`}>
-                             Ký bằng Smart Contract <Blocks className="h-4 w-4 text-indigo-500"/>
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-1 leading-relaxed">Sử dụng MetaMask.</p>
+                  ) : (
+                      <div className="flex gap-4 p-4 rounded-xl border-2 border-blue-500 bg-blue-50/50">
+                          <div className="mt-1 shrink-0 text-blue-600">
+                              <CheckCircle className="h-6 w-6 fill-blue-100" />
+                          </div>
+                          <div>
+                              <h4 className="font-bold text-sm flex items-center gap-2 text-blue-700">
+                                  Xác nhận điện tử (Nhanh)
+                                  <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full ml-2">Đã chốt</span>
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">
+                                  Kích hoạt ngay bằng cách xác nhận đồng ý các điều khoản trên hệ thống. Không dùng Web3.
+                              </p>
+                          </div>
                       </div>
-                  </div>
-
-                  <div 
-                      className={`flex gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${signMethod === 'TRADITIONAL' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200'}`}
-                      onClick={() => setSignMethod("TRADITIONAL")}
-                  >
-                      <div className={`mt-1 shrink-0 ${signMethod === 'TRADITIONAL' ? 'text-blue-600' : 'text-gray-300'}`}>
-                          {signMethod === 'TRADITIONAL' ? <CheckCircle className="h-6 w-6 fill-blue-100" /> : <div className="h-6 w-6 rounded-full border-2" />}
-                      </div>
-                      <div>
-                          <h4 className={`font-bold text-sm ${signMethod === 'TRADITIONAL' ? 'text-blue-700' : 'text-gray-900'}`}>Xác nhận điện tử (Nhanh)</h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                             Kích hoạt ngay bằng cách xác nhận đồng ý điều khoản. Không lưu hash.
-                          </p>
-                      </div>
-                  </div>
+                  )}
+                  
+                  <p className="text-[11px] text-gray-400 text-center italic mt-3">
+                      * Phương thức ký đã được chốt. Nếu muốn thay đổi, vui lòng đóng hộp thoại này và sử dụng tính năng "Đề xuất chỉnh sửa".
+                  </p>
               </div>
 
               <div className="flex gap-3">
@@ -664,7 +735,7 @@ export default function ContractDetailPage() {
                     onClick={handleSignContract} 
                     isLoading={isSigning}
                   >
-                      {signMethod === 'BLOCKCHAIN' ? 'Ký Web3 ngay' : 'Xác nhận ngay'}
+                      {contract.signMethod === 'BLOCKCHAIN' ? 'Ký Web3 ngay' : 'Xác nhận ngay'}
                   </Button>
               </div>
            </div>
@@ -677,6 +748,96 @@ export default function ContractDetailPage() {
         contractId={Number(id)} 
         roomName={contract.roomName || ''} 
       />
+
+      <div className="hidden">
+        <div id="contract-pdf-content" className="p-12 text-black bg-white" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+            <div className="text-center mb-8">
+                <h2 className="font-bold text-lg uppercase leading-relaxed">Cộng hòa Xã hội Chủ nghĩa Việt Nam</h2>
+                <h3 className="font-bold text-base underline underline-offset-4 decoration-2">Độc lập - Tự do - Hạnh phúc</h3>
+            </div>
+
+            <h1 className="text-center font-bold text-2xl uppercase mb-8">Hợp đồng thuê phòng trọ</h1>
+
+            <div className="space-y-4 text-sm leading-relaxed text-justify">
+                <p>Hôm nay, ngày {contract.signDate ? new Date(contract.signDate).getDate() : new Date().getDate()} tháng {contract.signDate ? new Date(contract.signDate).getMonth() + 1 : new Date().getMonth() + 1} năm {contract.signDate ? new Date(contract.signDate).getFullYear() : new Date().getFullYear()}, chúng tôi gồm có:</p>
+                
+                <div className="pl-4 space-y-1">
+                    <p className="font-bold uppercase">BÊN CHO THUÊ (BÊN A):</p>
+                    <p>- Ông/Bà: <strong>{contract.landlordName || '...........................................'}</strong></p>
+                    <p>- Địa chỉ khu trọ: {contract.propertyAddress || '...........................................'}</p>
+                </div>
+
+                <div className="pl-4 space-y-1">
+                    <p className="font-bold uppercase">BÊN THUÊ (BÊN B):</p>
+                    <p>- Ông/Bà: <strong>{contract.tenantName || '...........................................'}</strong></p>
+                </div>
+
+                <p className="font-bold mt-6 mb-2">Hai bên thống nhất thỏa thuận các điều khoản sau:</p>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 1: Thông tin phòng thuê và Giá cả</strong></p>
+                    <ul className="list-disc pl-8 space-y-1">
+                        <li>Bên A đồng ý cho Bên B thuê phòng số: <strong>{contract.roomName}</strong>.</li>
+                        <li>Giá thuê phòng: <strong>{new Intl.NumberFormat('vi-VN').format(contract.actualPrice || 0)} VNĐ/tháng</strong>.</li>
+                        <li>Tiền đặt cọc: <strong>{new Intl.NumberFormat('vi-VN').format(contract.depositAmount || 0)} VNĐ</strong>.</li>
+                        {contract.elecPrice && <li>Giá điện: <strong>{new Intl.NumberFormat('vi-VN').format(contract.elecPrice)} VNĐ/kWh</strong>.</li>}
+                        {contract.waterPrice && <li>Giá nước: <strong>{new Intl.NumberFormat('vi-VN').format(contract.waterPrice)} VNĐ/m³</strong>.</li>}
+                        {contract.internetPrice !== undefined && <li>Internet & Dịch vụ: <strong>{contract.internetPrice === 0 ? 'Miễn phí' : `${new Intl.NumberFormat('vi-VN').format(contract.internetPrice)} VNĐ/tháng`}</strong>.</li>}
+                    </ul>
+                </div>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 2: Thời hạn hợp đồng</strong></p>
+                    <ul className="list-disc pl-8 space-y-1">
+                        <li>Thời gian thuê: <strong>{durationMonths} tháng</strong>.</li>
+                        <li>Từ ngày <strong>{new Date(contract.startDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{contract.endDate ? new Date(contract.endDate).toLocaleDateString('vi-VN') : '...'}</strong>.</li>
+                    </ul>
+                </div>
+
+                <div className="space-y-2">
+                    <p><strong>Điều 3: Các thỏa thuận bổ sung / Nội quy phòng trọ</strong></p>
+                    <div className="bg-gray-50 border border-gray-200 p-4 rounded-md whitespace-pre-wrap italic">
+                        {contract.additionalTerms || "Không có thỏa thuận bổ sung nào khác."}
+                    </div>
+                </div>
+
+                <div className="space-y-2 mt-6">
+                    <p><strong>Điều 4: Cam kết chung</strong></p>
+                    <p>Hai bên cam kết thực hiện đúng các điều khoản đã ghi trong hợp đồng. Hợp đồng này được lập thành văn bản điện tử trên hệ thống SmartRental và có giá trị pháp lý sau khi hai bên xác nhận.</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 mt-16 text-center">
+                <div>
+                    <p className="font-bold uppercase mb-4">BÊN A (CHO THUÊ)</p>
+                    {contract.status === 'ACTIVE' ? (
+                      <div className="text-green-600 font-bold italic border-2 border-green-500 rounded-lg p-2 w-max mx-auto rotate-[-5deg]">
+                        Đã ký điện tử
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                    )}
+                </div>
+                <div>
+                    <p className="font-bold uppercase mb-4">BÊN B (NGƯỜI THUÊ)</p>
+                    {contract.status === 'ACTIVE' ? (
+                      <div className="text-green-600 font-bold italic border-2 border-green-500 rounded-lg p-2 w-max mx-auto rotate-[-5deg]">
+                        Đã ký điện tử
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 italic">(Ký, ghi rõ họ tên)</p>
+                    )}
+                </div>
+            </div>
+            {contract.status === 'ACTIVE' && contract.signMethod === 'BLOCKCHAIN' && (
+              <div className="mt-12 p-4 border border-indigo-200 bg-indigo-50 rounded-lg text-[10px] text-indigo-800 text-center break-all">
+                <p className="font-bold uppercase mb-1">🔐 Chứng nhận Blockchain Smart Contract</p>
+                <p>Contract Address: {contract.smartContractAddress}</p>
+                <p>Tx Hash: {contract.deployTxHash}</p>
+              </div>
+            )}
+        </div>
+      </div>
     </div>
   );
 }

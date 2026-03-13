@@ -13,6 +13,12 @@ public class RoomResponse {
     private RoomStatus status;
     private List<String> amenities;
     private List<String> images;
+
     private String propertyName;
+    private String propertyAddress;
+    private String landlordName;
+    private Double elecPrice;
+    private Double waterPrice;
+    private Double internetPrice;
     private String defaultTerms;
 }

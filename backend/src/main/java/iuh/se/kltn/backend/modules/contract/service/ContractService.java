@@ -5,11 +5,13 @@ import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
+import iuh.se.kltn.backend.modules.contract.entity.ContractChangeRequest; // ✅ BỔ SUNG IMPORT
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
 import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
-import iuh.se.kltn.backend.modules.contract.enums.RequestStatus; // THÊM IMPORT NÀY
-import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository; // THÊM IMPORT NÀY
+import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
+import iuh.se.kltn.backend.modules.contract.enums.RequestType; // ✅ BỔ SUNG IMPORT
+import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
@@ -38,8 +40,6 @@ public class ContractService {
     @Autowired private UserRepository userRepository;
     @Autowired private ModelMapper modelMapper;
     @Autowired private BlockchainService blockchainService;
-
-    // ✅ BỔ SUNG REPO ĐỂ KIỂM TRA YÊU CẦU CHỈNH SỬA
     @Autowired private ContractChangeRequestRepository changeRequestRepository;
 
     // --- 1. Tạo Hợp đồng mới ---
@@ -55,10 +55,10 @@ public class ContractService {
             throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
         }
 
-        // ✅ SỬA LOGIC: Hỗ trợ cả Chủ nhà và Khách thuê tạo hợp đồng
         Tenant tenant;
+        boolean isTenantCreating = false;
+
         if (currentUser.getRole() == Role.LANDLORD) {
-            // Nếu người tạo là Chủ trọ, phải tìm Khách thuê qua email (hoặc username) gửi lên từ request
             if (request.getTenantEmail() == null || request.getTenantEmail().isEmpty()) {
                 throw new RuntimeException("Chủ nhà phải cung cấp email của khách thuê!");
             }
@@ -69,8 +69,8 @@ public class ContractService {
             }
             tenant = (Tenant) foundTenant;
         } else if (currentUser.getRole() == Role.TENANT) {
-            // Nếu người tạo là Khách thuê
             tenant = (Tenant) currentUser;
+            isTenantCreating = true;
         } else {
             throw new RuntimeException("Bạn không có quyền tạo hợp đồng!");
         }
@@ -83,46 +83,58 @@ public class ContractService {
         contract.setActualPrice(room.getPrice());
         contract.setDepositAmount(request.getDepositAmount());
         contract.setSignMethod(request.getSignMethod());
-
-        // 👇 THÊM DÒNG NÀY: Lưu các điều khoản bổ sung
-        contract.setAdditionalTerms(request.getAdditionalTerms());
-
         contract.setStatus(ContractStatus.PENDING_SIGNATURE);
         contract.setDepositStatus(DepositStatus.UNPAID);
 
-        // 👇 SỬA DÒNG NÀY: Nối thêm additionalTerms vào chuỗi băm để chống sửa đổi trái phép
-        String termsForHash = (request.getAdditionalTerms() != null) ? request.getAdditionalTerms() : "";
-        String rawData = "CONTRACT-" + room.getId() + "-" + tenant.getId() + "-" + termsForHash + "-" + UUID.randomUUID();
+        // ✅ LOGIC MỚI XỬ LÝ ĐIỀU KHOẢN
+        String defaultTerms = room.getDefaultTerms() != null ? room.getDefaultTerms() : "";
+        if (isTenantCreating) {
+            // Nếu Khách thuê tạo: Hợp đồng gốc tạm thời chỉ giữ nội quy của Chủ trọ
+            contract.setAdditionalTerms(defaultTerms);
+        } else {
+            // Nếu Chủ trọ tạo: Lấy thẳng nội dung từ form (vì chủ trọ có quyền quyết định cuối)
+            contract.setAdditionalTerms(request.getAdditionalTerms());
+        }
 
+        String termsForHash = contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "";
+        String rawData = "CONTRACT-" + room.getId() + "-" + tenant.getId() + "-" + termsForHash + "-" + UUID.randomUUID();
         contract.setContractHash(calculateSHA256(rawData));
         contract.setContentUrl("https://smart-rental-storage.com/contracts/sample.pdf");
 
         Contract saved = contractRepository.save(contract);
+
+        // ✅ TỰ ĐỘNG TẠO ĐỀ XUẤT CHỈNH SỬA NẾU LÀ KHÁCH THUÊ TẠO HỢP ĐỒNG
+        if (isTenantCreating) {
+            String proposedTerms = request.getAdditionalTerms() != null ? request.getAdditionalTerms() : "";
+            // Nếu văn bản khách gửi lên khác với nội quy gốc
+            if (!proposedTerms.trim().equals(defaultTerms.trim())) {
+                ContractChangeRequest changeReq = new ContractChangeRequest();
+                changeReq.setContract(saved);
+                changeReq.setType(RequestType.CHANGE_TERMS);
+                changeReq.setOldValue(defaultTerms);
+                changeReq.setNewValue(proposedTerms);
+                changeReq.setReason("Khách thuê đề xuất các thỏa thuận riêng khi đăng ký thuê phòng.");
+                changeReq.setStatus(RequestStatus.PENDING);
+                changeReq.setRequestedByRole("TENANT");
+                changeRequestRepository.save(changeReq);
+            }
+        }
+
         return mapToResponse(saved);
     }
 
-    // --- 2. Lấy danh sách (Bạn có thể cần thêm hàm getContractsByLandlord sau này) ---
     // --- 2. Lấy danh sách ---
     public List<ContractResponse> getMyContracts(Long userId) {
-        // Lấy thông tin user hiện tại
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
         List<Contract> contracts;
-
-        // Phân nhánh logic dựa trên Role
         if (user.getRole() == Role.LANDLORD) {
-            // Nếu là chủ trọ: Lấy các hợp đồng thuộc các phòng/nhà của họ
             contracts = contractRepository.findContractsByLandlordId(userId);
         } else {
-            // Nếu là khách thuê: Lấy các hợp đồng họ đang thuê
             contracts = contractRepository.findByTenantId(userId);
         }
-
-        // Map sang DTO và trả về
-        return contracts.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return contracts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public ContractResponse getContractById(Long id) {
@@ -133,71 +145,76 @@ public class ContractService {
 
     // --- 3. Hàm ký hợp đồng ---
     @Transactional
-    public ContractResponse signContract(Long id, SignContractRequest request) {
+    public ContractResponse signContract(Long id, SignContractRequest request, Long currentUserId) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
         if (contract.getStatus() == ContractStatus.ACTIVE) {
-            throw new RuntimeException("Hợp đồng này đã được ký trước đó!");
+            throw new RuntimeException("Hợp đồng này đã được ký hoàn tất!");
         }
 
-        // ✅ CHẶN KÝ NẾU ĐANG CÓ YÊU CẦU ĐỀ XUẤT CHƯA ĐƯỢC DUYỆT
         boolean hasPendingRequest = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.PENDING);
         if (hasPendingRequest) {
-            throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận từ phía đối tác.");
+            throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
         }
 
-        // Cập nhật thông tin cơ bản
-        contract.setSignDate(LocalDateTime.now());
-        contract.setStatus(ContractStatus.ACTIVE);
+        // Lấy thông tin user đang thao tác
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        // 1. Cập nhật trạng thái ký của từng người
+        if (currentUser.getRole() == Role.TENANT) {
+            contract.setIsTenantSigned(true);
+        } else if (currentUser.getRole() == Role.LANDLORD) {
+            contract.setIsLandlordSigned(true);
+        }
+
+        // Lưu tạm phương thức ký của người thao tác cuối cùng
         contract.setSignMethod(request.getSignMethod());
 
-        // 🔥 XỬ LÝ THEO PHƯƠNG THỨC KÝ 🔥
-        if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
-            try {
-                String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
+        // 2. NẾU CẢ 2 BÊN ĐÃ KÝ -> KÍCH HOẠT HỢP ĐỒNG & DEPLOY BLOCKCHAIN
+        if (Boolean.TRUE.equals(contract.getIsTenantSigned()) && Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
+            contract.setSignDate(LocalDateTime.now());
+            contract.setStatus(ContractStatus.ACTIVE);
 
-                String tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2";
-                String landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4";
+            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+                try {
+                    String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
+                    String tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2";
+                    String landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4";
 
-                long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
-                long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
+                    long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
+                    long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
 
-                BigInteger rentWei = BigInteger.valueOf(priceVal);
-                BigInteger depositWei = BigInteger.valueOf(depositVal);
+                    BigInteger rentWei = BigInteger.valueOf(priceVal);
+                    BigInteger depositWei = BigInteger.valueOf(depositVal);
 
-                String deployedAddress = blockchainService.deployRentalContract(
-                        landlordWallet,
-                        tenantWallet,
-                        "Phong " + (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
-                        contractHashData,
-                        rentWei,
-                        depositWei
-                );
+                    String deployedAddress = blockchainService.deployRentalContract(
+                            landlordWallet, tenantWallet, "Phong " + (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
+                            contractHashData, rentWei, depositWei
+                    );
 
-                contract.setSmartContractAddress(deployedAddress);
-                contract.setContractHash(contractHashData);
-                contract.setDeployTxHash("Deployed on Sepolia via Backend");
+                    contract.setSmartContractAddress(deployedAddress);
+                    contract.setContractHash(contractHashData);
+                    contract.setDeployTxHash("Deployed on Sepolia via Backend");
 
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RuntimeException("Lỗi Deploy Blockchain: " + e.getMessage());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException("Lỗi Deploy Blockchain: " + e.getMessage());
+                }
             }
-        } else {
-            contract.setSmartContractAddress(null);
-            contract.setDeployTxHash(null);
-        }
 
-        if (contract.getRoom() != null) {
-            contract.getRoom().setStatus(RoomStatus.RENTED);
-            roomRepository.save(contract.getRoom());
+            if (contract.getRoom() != null) {
+                contract.getRoom().setStatus(RoomStatus.RENTED);
+                roomRepository.save(contract.getRoom());
+            }
         }
 
         Contract savedContract = contractRepository.save(contract);
         return mapToResponse(savedContract);
     }
 
-    // --- Helper Functions (Không đổi) ---
+    // --- Helper Functions ---
     private ContractResponse mapToResponse(Contract contract) {
         ContractResponse res = modelMapper.map(contract, ContractResponse.class);
         if (contract.getRoom() != null) {
@@ -207,6 +224,9 @@ public class ContractService {
                 if (contract.getRoom().getProperty().getLandlord() != null) {
                     res.setLandlordName(contract.getRoom().getProperty().getLandlord().getFullName());
                 }
+                res.setElecPrice(contract.getRoom().getProperty().getElecPrice());
+                res.setWaterPrice(contract.getRoom().getProperty().getWaterPrice());
+                res.setInternetPrice(contract.getRoom().getProperty().getInternetPrice());
             }
         }
         if (contract.getTenant() != null) {

@@ -30,15 +30,23 @@ public class ContractChangeRequest {
     @Enumerated(EnumType.STRING)
     private RequestType type;
 
+    @Column(columnDefinition = "TEXT")
     private String oldValue;
+
+    @Column(columnDefinition = "TEXT")
     private String newValue;
+
+    @Column(columnDefinition = "TEXT")
     private String reason;
-    private String requestedByRole;
+
     @Enumerated(EnumType.STRING)
     private RequestStatus status;
 
     @CreationTimestamp
     private LocalDateTime requestDate;
+
+    private String requestedByRole;
+
     @JsonProperty("contractId")
     public Long retrieveContractId() {
         return contract != null ? contract.getId() : null;

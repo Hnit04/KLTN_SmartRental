@@ -56,3 +56,6 @@ blockchain:
 
   # Chain ID của Sepolia
   chain-id: 11155111
+gemini:
+  api:
+    key: "AIzaSyDO3xhNcIUb0zgH7lPtPjPryZtfVU8DiBU"

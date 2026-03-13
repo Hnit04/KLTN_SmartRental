@@ -3,6 +3,7 @@ package iuh.se.kltn.backend.modules.contract.service;
 import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.entity.ContractChangeRequest;
+import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository;
@@ -69,6 +70,9 @@ public class ContractChangeService {
             case CHANGE_TERMS:
                 req.setOldValue(contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "");
                 break;
+            case CHANGE_SIGN_METHOD:
+                req.setOldValue(contract.getSignMethod().name());
+                break;
             default:
                 req.setOldValue("");
         }
@@ -106,6 +110,11 @@ public class ContractChangeService {
                     if (contract.getStatus() == ContractStatus.ACTIVE) {
                         contract.setStatus(ContractStatus.TERMINATED_EARLY);
                     }
+                    break;
+                case CHANGE_SIGN_METHOD: // ✅ THÊM ĐOẠN NÀY
+                    contract.setSignMethod(ContractSignMethod.valueOf(req.getNewValue()));
+                    contract.setIsTenantSigned(false);
+                    contract.setIsLandlordSigned(false);
                     break;
                 case CHANGE_TERMS:
                     contract.setAdditionalTerms(req.getNewValue());
