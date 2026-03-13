@@ -47,7 +47,8 @@ public class Contract {
 
     @Enumerated(EnumType.STRING)
     private ContractStatus status;
-
+    private Boolean isTenantSigned = false;
+    private Boolean isLandlordSigned = false;
     @Enumerated(EnumType.STRING)
     private DepositStatus depositStatus;
     @Column(columnDefinition = "TEXT")

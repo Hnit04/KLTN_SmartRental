@@ -30,7 +30,8 @@ public class ContractResponse {
     private Double elecPrice;
     private Double waterPrice;
     private Double internetPrice;
-
+    private Boolean isTenantSigned;
+    private Boolean isLandlordSigned;
     private String smartContractAddress;
     private String deployTxHash;
     private LocalDateTime signDate;

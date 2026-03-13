@@ -11,8 +11,8 @@ export const contractApi = {
   getDetail: (id: number | string) => {
     return axiosClient.get<Contract>(`/contracts/${id}`);
   },
-  signContract: (id: number | string, data: SignContractPayload) => {
-    return axiosClient.put<Contract>(`/contracts/${id}/sign`, data);
+  signContract: (id: number, data: SignContractPayload) => {
+    return axiosClient.post(`/contracts/${id}/sign`, data); 
   },
   
   // --- CÁC API CHO ĐỀ XUẤT CHỈNH SỬA (NEGOTIATION) ---

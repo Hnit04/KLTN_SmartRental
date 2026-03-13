@@ -145,56 +145,69 @@ public class ContractService {
 
     // --- 3. Hàm ký hợp đồng ---
     @Transactional
-    public ContractResponse signContract(Long id, SignContractRequest request) {
+    public ContractResponse signContract(Long id, SignContractRequest request, Long currentUserId) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
         if (contract.getStatus() == ContractStatus.ACTIVE) {
-            throw new RuntimeException("Hợp đồng này đã được ký trước đó!");
+            throw new RuntimeException("Hợp đồng này đã được ký hoàn tất!");
         }
 
         boolean hasPendingRequest = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.PENDING);
         if (hasPendingRequest) {
-            throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận từ phía đối tác.");
+            throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
         }
 
-        contract.setSignDate(LocalDateTime.now());
-        contract.setStatus(ContractStatus.ACTIVE);
+        // Lấy thông tin user đang thao tác
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        // 1. Cập nhật trạng thái ký của từng người
+        if (currentUser.getRole() == Role.TENANT) {
+            contract.setIsTenantSigned(true);
+        } else if (currentUser.getRole() == Role.LANDLORD) {
+            contract.setIsLandlordSigned(true);
+        }
+
+        // Lưu tạm phương thức ký của người thao tác cuối cùng
         contract.setSignMethod(request.getSignMethod());
 
-        if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
-            try {
-                String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
-                String tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2";
-                String landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4";
+        // 2. NẾU CẢ 2 BÊN ĐÃ KÝ -> KÍCH HOẠT HỢP ĐỒNG & DEPLOY BLOCKCHAIN
+        if (Boolean.TRUE.equals(contract.getIsTenantSigned()) && Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
+            contract.setSignDate(LocalDateTime.now());
+            contract.setStatus(ContractStatus.ACTIVE);
 
-                long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
-                long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
+            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+                try {
+                    String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
+                    String tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2";
+                    String landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4";
 
-                BigInteger rentWei = BigInteger.valueOf(priceVal);
-                BigInteger depositWei = BigInteger.valueOf(depositVal);
+                    long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
+                    long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
 
-                String deployedAddress = blockchainService.deployRentalContract(
-                        landlordWallet, tenantWallet, "Phong " + (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
-                        contractHashData, rentWei, depositWei
-                );
+                    BigInteger rentWei = BigInteger.valueOf(priceVal);
+                    BigInteger depositWei = BigInteger.valueOf(depositVal);
 
-                contract.setSmartContractAddress(deployedAddress);
-                contract.setContractHash(contractHashData);
-                contract.setDeployTxHash("Deployed on Sepolia via Backend");
+                    String deployedAddress = blockchainService.deployRentalContract(
+                            landlordWallet, tenantWallet, "Phong " + (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
+                            contractHashData, rentWei, depositWei
+                    );
 
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RuntimeException("Lỗi Deploy Blockchain: " + e.getMessage());
+                    contract.setSmartContractAddress(deployedAddress);
+                    contract.setContractHash(contractHashData);
+                    contract.setDeployTxHash("Deployed on Sepolia via Backend");
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException("Lỗi Deploy Blockchain: " + e.getMessage());
+                }
             }
-        } else {
-            contract.setSmartContractAddress(null);
-            contract.setDeployTxHash(null);
-        }
 
-        if (contract.getRoom() != null) {
-            contract.getRoom().setStatus(RoomStatus.RENTED);
-            roomRepository.save(contract.getRoom());
+            if (contract.getRoom() != null) {
+                contract.getRoom().setStatus(RoomStatus.RENTED);
+                roomRepository.save(contract.getRoom());
+            }
         }
 
         Contract savedContract = contractRepository.save(contract);
