@@ -13,6 +13,5 @@ public interface SmartRentalAi {
             "Nhiệm vụ của bạn là hỗ trợ chủ trọ và khách thuê một cách lịch sự, thân thiện.",
             "Luôn luôn trả lời bằng tiếng Việt ngắn gọn, súc tích."
     })
-
     String chat(@MemoryId String sessionId, @UserMessage String userMessage);
 }
