@@ -1,14 +1,22 @@
 package iuh.se.kltn.backend.modules.ai.service;
 
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
+import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-
+import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class AiOrchestratorService {
@@ -21,22 +29,66 @@ public class AiOrchestratorService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
     @Autowired
     private DataPresenterAi dataPresenterAi;
-    public Object processDataQuery(String question) {
-        String normalizedQuestion = question.trim().toLowerCase();
-        String sqlToExecute;
 
-        // 1. Tìm trong "Kho tri thức"
-        Optional<AiSqlCache> cachedItem = cacheRepository.findByQuestion(normalizedQuestion);
+    @Autowired
+    private EmbeddingModel embeddingModel;
 
-        if (cachedItem.isPresent() && cachedItem.get().isValid()) {
-            sqlToExecute = cachedItem.get().getGeneratedSql();
-            System.out.println("⚡ [CACHE HIT] Lấy SQL từ DB: " + sqlToExecute);
+    @Autowired
+    private EmbeddingStore<TextSegment> embeddingStore;
+
+    /**
+     * Tự động chạy khi Spring Boot khởi động.
+     * Đọc toàn bộ SQL từ MariaDB, biến thành Vector và đưa lên RAM.
+     */
+    @PostConstruct
+    public void initVectorCache() {
+        System.out.println("🔄 Đang nạp Kho tri thức SQL vào Vector Store trên RAM...");
+        List<AiSqlCache> allCaches = cacheRepository.findAll();
+        for (AiSqlCache cache : allCaches) {
+            if (cache.isValid()) {
+                addQuestionToVectorStore(cache.getQuestion(), cache.getGeneratedSql());
+            }
+        }
+        System.out.println("✅ Đã nạp xong " + allCaches.size() + " câu SQL vào Vector Store!");
+    }
+
+    private void addQuestionToVectorStore(String question, String sql) {
+        Embedding embedding = embeddingModel.embed(question).content();
+        Metadata metadata = Metadata.from("type", "sql").put("sql", sql);
+        TextSegment segment = TextSegment.from(question, metadata);
+        embeddingStore.add(embedding, segment);
+    }
+
+    // 1. Thêm 2 tham số role và userId vào hàm
+    public Object processDataQuery(String question, String role, Long userId) {
+        String sqlToExecute = null;
+
+        Embedding queryEmbedding = embeddingModel.embed(question).content();
+
+        // TÌM KIẾM NGỮ NGHĨA
+        EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                .queryEmbedding(queryEmbedding)
+                .maxResults(1)
+                .minScore(0.85)
+                .filter(metadataKey("type").isEqualTo("sql"))
+                .build();
+
+        EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);
+        List<EmbeddingMatch<TextSegment>> matches = searchResult.matches();
+
+        if (!matches.isEmpty()) {
+            EmbeddingMatch<TextSegment> bestMatch = matches.get(0);
+            sqlToExecute = bestMatch.embedded().metadata().getString("sql");
+            System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + bestMatch.score());
+            System.out.println("⚡ Câu hỏi gốc trong DB: " + bestMatch.embedded().text());
+            System.out.println("⚡ Lấy SQL từ RAM: " + sqlToExecute);
         } else {
-            // 2. Nếu chưa có, nhờ Gemini sinh ra
-            System.out.println("🐌 [CACHE MISS] Gọi Gemini để sinh SQL...");
-            sqlToExecute = sqlGeneratorAi.generateSql(question);
+            System.out.println("🐌 [CACHE MISS] Câu hỏi mới, gọi Gemini sinh SQL...");
+            // 2. Truyền role và userId xuống cho Kỹ sư Data
+            sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId);
 
             sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
 
@@ -44,30 +96,69 @@ public class AiOrchestratorService {
             if (selectIndex >= 0) {
                 sqlToExecute = sqlToExecute.substring(selectIndex);
             }
-
             System.out.println("🤖 Gemini trả về (Đã làm sạch): " + sqlToExecute);
         }
 
-        // 3. Thực thi câu lệnh SQL TRƯỚC
+        // ====================================================================
+        // 🛡️ LỚP BẢO VỆ 3: JAVA VALIDATOR (CHỐT CHẶN TRƯỚC KHI CHẠY DATABASE)
+        // ====================================================================
+
+        // Chặn 1: Nếu AI phát hiện Khách thuê hỏi sai quyền hạn và trả về chữ UNAUTHORIZED
+        if (sqlToExecute.trim().equalsIgnoreCase("UNAUTHORIZED")) {
+            return "Dạ, em chỉ là trợ lý ảo nên không có quyền cung cấp thông tin bảo mật này cho khách thuê ạ.";
+        }
+
+        // Chặn 2: Ngăn chặn Chủ trọ B lấy nhầm Cache của Chủ trọ A
+        // Ví dụ: Chủ trọ A (ID=1) hỏi "Có bao nhiêu phòng trống?", Cache lưu: WHERE landlord_id = 1
+        // Chủ trọ B (ID=2) hỏi y hệt -> Dính Cache. Nếu chạy luôn thì B sẽ xem được phòng của A!
+        if (role.equalsIgnoreCase("LANDLORD") && !matches.isEmpty()) {
+            if (!sqlToExecute.contains(userId.toString())) {
+                System.out.println("🚨 [SECURITY WARNING] SQL lấy từ Cache không khớp ID Chủ trọ! Đang ép sinh lại...");
+
+                // Ép AI sinh lại SQL mới cho đúng ID của Chủ trọ hiện tại
+                sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId);
+                sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
+                int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
+                if (selectIndex >= 0) {
+                    sqlToExecute = sqlToExecute.substring(selectIndex);
+                }
+
+                // Đánh dấu là Cache Miss để tí nữa hệ thống lưu câu mới này vào Database/RAM
+                matches.clear();
+            }
+        }
+
+        // Chặn 3: Đề phòng AI lỡ "ảo giác" quên chèn luật cho Tenant
+        if (role.equalsIgnoreCase("TENANT")) {
+            String upperSql = sqlToExecute.toUpperCase();
+            // Nếu khách hỏi mà SQL có chữ SUM (tổng tiền) hoặc không bị khóa theo tenant_id -> Chặn!
+            if (upperSql.contains("SUM(") || upperSql.contains("REVENUE")) {
+                return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
+            }
+        }
+        // ====================================================================
+
+
+        // 3. THỰC THI SQL
         try {
             List<Map<String, Object>> results = jdbcTemplate.queryForList(sqlToExecute);
 
-            if (cachedItem.isEmpty()) {
+            if (matches.isEmpty()) {
                 AiSqlCache newCache = AiSqlCache.builder()
-                        .question(normalizedQuestion)
+                        .question(question)
                         .generatedSql(sqlToExecute)
                         .isValid(true)
                         .build();
                 cacheRepository.save(newCache);
-                System.out.println("💾 Đã lưu SQL mới vào Kho tri thức thành công!");
+
+                addQuestionToVectorStore(question, sqlToExecute);
+                System.out.println("💾 Đã lưu tri thức mới vào DB và nạp lên Vector Store!");
             }
 
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
             System.out.println("Dữ liệu thô: " + rawDataStr);
 
-            String naturalResponse = dataPresenterAi.generateNaturalResponse(question, rawDataStr);
-
-            return naturalResponse;
+            return dataPresenterAi.generateNaturalResponse(question, rawDataStr);
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
