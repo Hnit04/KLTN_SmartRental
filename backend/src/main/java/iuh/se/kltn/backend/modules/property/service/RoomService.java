@@ -9,6 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class RoomService {
 
@@ -74,5 +78,20 @@ public class RoomService {
 
         Room savedRoom = roomRepository.save(room);
         return mapToRoomResponse(savedRoom);
+    }
+
+    // Trong RoomService.java (hoặc tạo file mới LandlordStatsService.java)
+
+
+    public Map<String, Long> getRoomStatsForLandlord(Long landlordId) {
+        Long totalRooms = roomRepository.countTotalRoomsByLandlord(landlordId);
+        Long rentedRooms = roomRepository.countRentedRoomsByLandlord(landlordId);
+        Long totalTenants  = roomRepository.sumCurrentOccupantsByLandlord(landlordId);
+
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("totalRooms", totalRooms != null ? totalRooms : 0L);
+        stats.put("rentedRooms", rentedRooms != null ? rentedRooms : 0L);
+        stats.put("totalTenants",  totalTenants  != null ? totalTenants  : 0L);
+        return stats;
     }
 }

@@ -1,5 +1,5 @@
 import axiosClient from "./axiosClient";
-import type { Bill } from "@/types/index";
+import type { Bill, RevenueChartData } from "@/types/index";
 
 export const billApi = {
   createBill: (data: {
@@ -27,5 +27,15 @@ export const billApi = {
   },
   getBillingStatus: (month: number, year: number) => {
     return axiosClient.get(`/bills/billing-status?month=${month}&year=${year}`);
-  }
+  },
+  getRevenueThisAndLastMonth: () => {
+    return axiosClient.get("/bills/revenue/compare");
+  },
+  getOverdueStats: () => {
+  return axiosClient.get("/bills/overdue/stats");
+  },
+  getRevenueLast6Months: () => {
+  return axiosClient.get<RevenueChartData[]>("/bills/revenue/last-6-months");
+    },
+
 };

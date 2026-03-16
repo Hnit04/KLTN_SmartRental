@@ -23,7 +23,8 @@ public class Room {
     private String name; // Số phòng
     private Double price;
     private Float area;
-
+    private Integer maxOccupants;
+    private Integer currentOccupants;
     @Enumerated(EnumType.STRING)
     private RoomStatus status = RoomStatus.AVAILABLE;
 

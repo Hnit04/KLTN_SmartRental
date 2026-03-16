@@ -1,8 +1,10 @@
 package iuh.se.kltn.backend.modules.contract.service;
 
+import iuh.se.kltn.backend.modules.contract.dto.MonthlyRevenueResponse;
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillResponse;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillingStatusResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.RevenueChartResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Bill;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.enums.BillStatus;
@@ -17,18 +19,26 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class BillService {
 
-    @Autowired private BillRepository billRepository;
-    @Autowired private ContractRepository contractRepository;
-    @Autowired private ModelMapper modelMapper;
+    @Autowired
+    private BillRepository billRepository;
+    @Autowired
+    private ContractRepository contractRepository;
+    @Autowired
+    private ModelMapper modelMapper;
 
     // Inject thêm NotificationService để tạo thông báo
-    @Autowired private NotificationService notificationService;
+    @Autowired
+    private NotificationService notificationService;
 
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
@@ -199,5 +209,114 @@ public class BillService {
             responses.add(res);
         }
         return responses;
+    }
+
+    // Trong BillService.java
+
+    public Map<String, Object> getRevenueThisMonthAndLastMonth(Long landlordId) {
+        // Tháng hiện tại: 3/2026 (theo ngày hệ thống 16/03/2026)
+        LocalDate now = LocalDate.now();
+        int thisMonth = now.getMonthValue();
+        int thisYear = now.getYear();
+
+        int lastMonth = now.minusMonths(1).getMonthValue();
+        int lastYear = now.minusMonths(1).getYear();
+
+        // Doanh thu tháng này
+        Double thisMonthRevenue = billRepository.calculateTotalRevenueForMonthAndLandlord(
+                landlordId, thisMonth, thisYear, BillStatus.PAID);
+
+        // Doanh thu tháng trước
+        Double lastMonthRevenue = billRepository.calculateTotalRevenueForMonthAndLandlord(
+                landlordId, lastMonth, lastYear, BillStatus.PAID);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("thisMonth", Map.of(
+                "month", thisMonth,
+                "year", thisYear,
+                "totalRevenue", thisMonthRevenue != null ? thisMonthRevenue : 0.0
+        ));
+        result.put("lastMonth", Map.of(
+                "month", lastMonth,
+                "year", lastYear,
+                "totalRevenue", lastMonthRevenue != null ? lastMonthRevenue : 0.0
+        ));
+        result.put("currency", "VND");
+
+        return result;
+    }
+
+    public Map<String, Object> getOverdueStats(Long landlordId) {
+        Double overdueAmount = billRepository.sumOverdueAmountByLandlord(landlordId);
+        Long overdueCount = billRepository.countOverdueBillsByLandlord(landlordId);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("overdueBillCount", overdueCount != null ? overdueCount : 0L);
+        stats.put("overdueAmount", overdueAmount != null ? overdueAmount : 0.0);
+
+        return stats;
+    }
+    public List<MonthlyRevenueResponse> getRevenueLast6Months(Long landlordId) {
+        LocalDate now = LocalDate.now(); // hoặc dùng Clock nếu test
+        int currentYear  = now.getYear();
+        int currentMonth = now.getMonthValue();
+
+        int prevYear = currentYear;
+        int startMonthLastYear = currentMonth + 1;
+
+        if (currentMonth <= 6) {
+            prevYear--;
+            startMonthLastYear = 12 - (6 - currentMonth) + 1;
+        } else {
+            startMonthLastYear = currentMonth - 5;
+        }
+
+        return billRepository.findRevenueLast6Months(
+                landlordId, currentYear, currentMonth, prevYear, startMonthLastYear
+        );
+    }
+
+    public List<RevenueChartResponse> getRevenueLast6MonthsForChart(Long landlordId) {
+        LocalDate now = LocalDate.now();
+        List<RevenueChartResponse> chartData = new ArrayList<>();
+
+        // 1. Tính toán khoảng thời gian để lấy dữ liệu từ DB
+        int currentYear = now.getYear();
+        int currentMonth = now.getMonthValue();
+
+        // Tính toán tháng bắt đầu của 6 tháng trước
+        LocalDate startDate = now.minusMonths(5);
+        int prevYear = startDate.getYear();
+        int startMonthLastYear = startDate.getMonthValue();
+
+        // Lấy dữ liệu thô từ database
+        List<MonthlyRevenueResponse> rawData = billRepository.findRevenueLast6Months(
+                landlordId, currentYear, currentMonth, prevYear, startMonthLastYear
+        );
+
+        // Chuyển rawData thành Map để tra cứu nhanh: "Tháng-Năm" -> Doanh thu
+        Map<String, Double> dataMap = rawData.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getMonth() + "-" + item.getYear(),
+                        MonthlyRevenueResponse::getRevenue,
+                        (v1, v2) -> v1
+                ));
+
+        // 2. TẠO CHÍNH XÁC 6 THÁNG (Đây là bước quan trọng nhất)
+        for (int i = 5; i >= 0; i--) {
+            LocalDate date = now.minusMonths(i);
+            int m = date.getMonthValue();
+            int y = date.getYear();
+
+            String key = m + "-" + y;
+            String label = String.format("T%02d/%d", m, y % 100);
+
+            // Nếu database không có (null), mặc định lấy 0.0
+            Double total = dataMap.getOrDefault(key, 0.0);
+
+            chartData.add(new RevenueChartResponse(label, total));
+        }
+
+        return chartData;
     }
 }
