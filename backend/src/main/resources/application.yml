@@ -59,3 +59,23 @@ blockchain:
 gemini:
   api:
     key: "AIzaSyDO3xhNcIUb0zgH7lPtPjPryZtfVU8DiBU"
+jpa:
+  hibernate:
+    ddl-auto: update
+  show-sql: true
+  properties:
+    hibernate:
+      dialect: org.hibernate.dialect.MariaDBDialect
+      format_sql: true
+      # --- CẤU HÌNH HIBERNATE ENVERS (THÊM VÀO ĐÂY) ---
+      envers:
+        # Hậu tố cho bảng audit (VD: users_aud)
+        audit_table_suffix: _aud
+        # Tên cột lưu ID phiên bản
+        revision_field_name: rev
+        # Tên cột lưu loại thay đổi (0: ADD, 1: MOD, 2: DEL)
+        revision_type_field_name: revtype
+        # Luôn lưu dữ liệu kể cả khi xóa
+        store_data_at_delete: true
+        # Bắt buộc ghi log ngay cả khi các trường không thay đổi giá trị (giúp audit chặt chẽ hơn)
+        audit_strategy: org.hibernate.envers.strategy.DefaultAuditStrategy

@@ -1,5 +1,5 @@
 import axiosClient from './axiosClient';
-import type { User, UpdateProfileRequest } from '../types';
+import type { User, UpdateProfileRequest,UserHistory } from '../types';
 
 export const userApi = {
   // 1. Lấy thông tin người dùng hiện tại
@@ -42,10 +42,40 @@ export const userApi = {
     });
     return response.data; // Trả về thông báo (VD: "Xác thực thành công!")
   },
+  // 5. Lấy danh sách user theo role (dành cho Admin)
   getUsersByRole: async (role: 'ADMIN' | 'LANDLORD' | 'TENANT' | string): Promise<User[]> => {
     const response = await axiosClient.get<User[]>('/users/by-role', {
       params: { role },  
     });
+    return response.data;
+  },
+  // 6. Khóa tài khoản tạm thời (chỉ Admin)
+  lockUser: async (userId: number, durationDays: number, reason: string[]): Promise<string> => {
+  const response = await axiosClient.post<string>(
+    `/users/${userId}/lock`,
+    null,
+    {
+      params: {
+        durationDays,
+        reason,
+      },
+      paramsSerializer: {
+        indexes: null 
+      }
+    }
+  );
+  return response.data; 
+},
+
+  // 7. Mở khóa tài khoản thủ công (chỉ Admin)
+  unlockUser: async (userId: number): Promise<string> => {
+    const response = await axiosClient.post<string>(`/users/${userId}/unlock`);
+    return response.data; // Ví dụ: "Đã mở khóa tài khoản ID 123"
+  },
+
+  // 8. Xem lịch sử thay đổi của một user (audit trail - chỉ Admin)
+  getUserHistory: async (userId: number): Promise<UserHistory[]> => {
+    const response = await axiosClient.get<UserHistory[]>(`/users/${userId}/history`);
     return response.data;
   },
 };

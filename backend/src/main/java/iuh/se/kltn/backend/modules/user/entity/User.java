@@ -2,15 +2,20 @@ package iuh.se.kltn.backend.modules.user.entity;
 
 
 import iuh.se.kltn.backend.common.enums.Role;
+import iuh.se.kltn.backend.common.utils.LockReasonConverter;
 import iuh.se.kltn.backend.modules.user.enums.KYCStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -18,6 +23,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Audited
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,6 +37,7 @@ public class User {
     @NotBlank(message = "Mật khẩu không được để trống")
     @Size(min = 6, message = "Mật khẩu phải có ít nhất 6 ký tự")
     @Column(nullable = false)
+    @NotAudited
     private String password;
 
     @NotBlank(message = "Họ tên không được để trống")
@@ -86,9 +93,16 @@ public class User {
     @Column(name = "cccd_back_url")
     private String cccdBackUrl;
 
+    @Column(name = "is_locked")
+    private boolean isLocked = false;
+
     @Column(name = "locked_at")
     private LocalDateTime lockedAt;
 
-    @Column(name = "lock_reason")
-    private String lockReason;
+    @Column(name = "lock_until")
+    private LocalDateTime lockUntil;
+
+    @Column(name = "lock_reason", columnDefinition = "TEXT")
+    @Convert(converter = LockReasonConverter.class)
+    private List<String> lockReason = new ArrayList<>();
 }
