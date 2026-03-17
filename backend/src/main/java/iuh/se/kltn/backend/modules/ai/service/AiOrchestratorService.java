@@ -165,7 +165,7 @@ public class AiOrchestratorService {
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
             System.out.println("Dữ liệu thô: " + rawDataStr);
 
-            return dataPresenterAi.generateNaturalResponse(question, rawDataStr);
+            return dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());

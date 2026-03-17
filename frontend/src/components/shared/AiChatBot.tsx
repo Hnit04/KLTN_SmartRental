@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Bot, User, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, ReactNode } from "react";
+import { MessageCircle, X, Send, Bot, User, Loader2, Home, DollarSign, ExternalLink } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { aiApi } from "../../api/aiApi";
@@ -25,6 +25,63 @@ export default function AiChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated } = useAuth();
+
+  // --- HÀM RENDER TIN NHẮN CHỨA CARD UI ---
+  const renderMessageWithCards = (text: string): ReactNode => {
+    // Regex tìm chuỗi [ROOM_CARD: id | name | price]
+    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      // 1. Đưa phần text bình thường trước cái match vào (nếu có)
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+
+      // 2. Parse thông tin từ match
+      const [_, roomId, roomName, priceStr] = match;
+      
+      // 3. Render Card Giao diện
+      parts.push(
+        <div key={match.index} className="w-full bg-background border border-border/60 rounded-xl shadow-sm mt-3 mb-2 overflow-hidden hover:shadow-md transition-shadow">
+          <div className="p-3 bg-primary/10 flex items-center justify-between border-b border-border/40">
+            <div className="flex items-center gap-2 font-semibold text-primary">
+              <Home className="w-4 h-4" />
+              <span>{roomName.trim()}</span>
+            </div>
+          </div>
+          <div className="p-3 text-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-muted-foreground">Giá thuê:</span>
+              <span className="font-bold text-destructive flex items-center gap-1">
+                {priceStr.trim()} <DollarSign className="w-3 h-3" />
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full flex items-center gap-2 text-xs h-8 mt-2"
+              onClick={() => window.open(`/rooms/${roomId.trim()}`, '_blank')}
+            >
+              <ExternalLink className="w-3 h-3" /> Xem chi tiết phòng
+            </Button>
+          </div>
+        </div>
+      );
+
+      lastIndex = regex.lastIndex;
+    }
+
+    // 4. Còn thừa text nào phía sau cuối cùng thì push nốt vào
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    // Trả về mảng các element (text và component đan xen)
+    return parts.length > 0 ? parts : text;
+  };
 
   // Tự động cuộn xuống cuối khi có tin nhắn mới
   const scrollToBottom = () => {
@@ -156,7 +213,7 @@ export default function AiChatBot() {
                   }`}
                   style={{ whiteSpace: "pre-line" }}
                 >
-                  {msg.text}
+                  {msg.sender === "user" ? msg.text : renderMessageWithCards(msg.text)}
                 </div>
               </div>
             ))}
