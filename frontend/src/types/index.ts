@@ -66,6 +66,16 @@ export interface UpdateProfileRequest {
   avatarUrl?: string; 
 }
 
+export interface TenantPreference {
+  id: number;
+  tenantId: number;
+  targetPriceMin?: number;
+  targetPriceMax?: number;
+  preferredLocation?: string;
+  hasPet?: boolean;
+  amenitiesRef?: string;
+}
+
 // ==========================================
 // 2. PROPERTY & ROOM TYPES
 // ==========================================
