@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.user.service;
 
+import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
@@ -10,6 +11,8 @@ import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class UserService {
@@ -97,5 +100,12 @@ public class UserService {
             user.setKycStatus(KYCStatus.PENDING);
         }
         userRepository.save(user);
+    }
+
+    public List<UserProfileResponse> getAllByRole(Role role) {
+        List<User> users = userRepository.findAllByRole(role);
+        return users.stream()
+                .map(user -> modelMapper.map(user, UserProfileResponse.class))
+                .toList();
     }
 }

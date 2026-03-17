@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
+import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
@@ -8,12 +9,14 @@ import iuh.se.kltn.backend.modules.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import iuh.se.kltn.backend.common.service.CloudinaryService;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -105,5 +108,14 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Lỗi xử lý: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/by-role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserProfileResponse>> getUsersByRole(
+            @RequestParam Role role,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<UserProfileResponse> users = userService.getAllByRole(role);
+        return ResponseEntity.ok(users);
     }
 }

@@ -41,5 +41,11 @@ export const userApi = {
       },
     });
     return response.data; // Trả về thông báo (VD: "Xác thực thành công!")
-  }
+  },
+  getUsersByRole: async (role: 'ADMIN' | 'LANDLORD' | 'TENANT' | string): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users/by-role', {
+      params: { role },  
+    });
+    return response.data;
+  },
 };

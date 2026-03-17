@@ -85,4 +85,10 @@ public class User {
 
     @Column(name = "cccd_back_url")
     private String cccdBackUrl;
+
+    @Column(name = "locked_at")
+    private LocalDateTime lockedAt;
+
+    @Column(name = "lock_reason")
+    private String lockReason;
 }
