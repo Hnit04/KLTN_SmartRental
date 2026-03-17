@@ -9,7 +9,9 @@ import {
   UserCircle,
   Building,
   Receipt,
-  PieChart
+  PieChart,
+  Users,          // Thêm icon cho Quản lý người dùng
+  Database,       // Thêm icon phù hợp cho Logs Blockchain
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -18,7 +20,7 @@ const Sidebar = () => {
   const location = useLocation();
   const { logout, user } = useAuth();
 
-  // 1. Menu dành cho CHỦ TRỌ (Bám sát tài liệu thiết kế 1.4.2)
+  // 1. Menu dành cho CHỦ TRỌ (LANDLORD)
   const landlordItems = [
     {
       title: 'Tổng quan & Thống kê',
@@ -28,7 +30,7 @@ const Sidebar = () => {
     {
       title: 'Khu trọ & Phòng trọ',
       path: '/properties/manage',
-      icon: Building, // Icon tòa nhà hợp lý hơn cho khu trọ
+      icon: Building,
     },
     {
       title: 'Quản lý Hợp đồng',
@@ -38,7 +40,7 @@ const Sidebar = () => {
     {
       title: 'Tài chính & Hóa đơn',
       path: '/finance',
-      icon: Receipt, // Icon biên lai/hóa đơn
+      icon: Receipt,
     },
     {
       title: 'Quản lý Lịch hẹn',
@@ -48,11 +50,11 @@ const Sidebar = () => {
     {
       title: 'Báo cáo doanh thu',
       path: '/reports',
-      icon: PieChart, // Icon biểu đồ cho chức năng Xuất báo cáo Excel/PDF
-    }
+      icon: PieChart,
+    },
   ];
 
-  // 2. Menu dành cho NGƯỜI THUÊ
+  // 2. Menu dành cho NGƯỜI THUÊ (TENANT / USER mặc định)
   const tenantItems = [
     {
       title: 'Hợp đồng của tôi',
@@ -71,7 +73,26 @@ const Sidebar = () => {
     },
   ];
 
-  // 3. Menu Cài đặt & Profile (Dùng chung dưới cùng)
+  // 3. Menu dành cho ADMIN (mới thêm)
+  const adminItems = [
+    {
+      title: 'Tổng quan & Thống kê',
+      path: '/admin/dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      title: 'Quản lý người dùng',
+      path: '/admin/users',
+      icon: Users,
+    },
+    {
+      title: 'Kiểm tra Logs Blockchain',
+      path: '/admin/blockchain-logs',
+      icon: Database,
+    },
+  ];
+
+  // 4. Menu Cài đặt & Profile (dùng chung dưới cùng)
   const bottomItems = [
     {
       title: 'Hồ sơ cá nhân',
@@ -85,10 +106,17 @@ const Sidebar = () => {
     },
   ];
 
-  // Logic phân luồng Menu
-  const menuItems = user?.role === 'LANDLORD' 
-    ? [...landlordItems, ...bottomItems] 
-    : [...tenantItems, ...bottomItems];
+  // Logic chọn menu theo role
+  let menuItems: typeof landlordItems = [...bottomItems];
+
+  if (user?.role === 'ADMIN') {
+    menuItems = [...adminItems, ...bottomItems];
+  } else if (user?.role === 'LANDLORD') {
+    menuItems = [...landlordItems, ...bottomItems];
+  } else {
+    // tenant / user mặc định hoặc role khác
+    menuItems = [...tenantItems, ...bottomItems];
+  }
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white text-gray-900 transition-transform hidden md:flex flex-col">
@@ -103,7 +131,6 @@ const Sidebar = () => {
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
         {menuItems.map((item) => {
-          // Xử lý Active state chính xác hơn cho các route con
           const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
             <Link

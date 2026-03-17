@@ -1,9 +1,3 @@
-// src/types/index.ts
-
-// ==========================================
-// 1. USER & AUTH TYPES
-// ==========================================
-
 export type UserRole = "TENANT" | "LANDLORD" | "ADMIN";
 export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED"; 
 
@@ -33,7 +27,26 @@ export interface User {
   reputationScore: number; 
   kycStatus: KYCStatus;
   createdAt: string;       
-  updatedAt: string;       
+  updatedAt: string; 
+  
+  locked?: boolean;
+  lockedAt?: string | null;
+  lockUntil?: string | null;
+  lockReason?: string | null;
+}
+
+export interface UserHistory {
+  id: number;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  isLocked: boolean;
+  lockUntil: string | null;     
+  lockReason: string | null;
+  modifiedBy: string;
+  modifiedAt: string;    
+  modifiedByFullName: string;       
+  auditRemark: string | null;
 }
 
 export interface AuthResponse {

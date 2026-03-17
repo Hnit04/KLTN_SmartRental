@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+// App.tsx
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext"; // KHÔNG cần import AuthProvider nữa
 import { Toaster } from "sonner"; 
 
 import MainLayout from "./components/layout/MainLayout";
@@ -27,17 +28,20 @@ import CreateContractPage from "./pages/contract/CreateContractPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
 
-// ✅ 1. IMPORT TRANG QUẢN LÝ LỊCH HẸN VÀO ĐÂY
+// --- ADMIN PAGES ---
+import AdminDashboardPage from "./pages/admin/AdminPage";
+import UserManagementPage from "./pages/admin/UserManagementPage";
+import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 
-// 1. Bảo vệ các trang yêu cầu Đăng Nhập
+// 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
-// 2. Chặn truy cập Login/Register khi ĐÃ Đăng Nhập
+// 2. PublicRoute (chặn login/register khi đã đăng nhập)
 const PublicRoute = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
@@ -45,21 +49,29 @@ const PublicRoute = () => {
   if (isLoading) return null;
 
   if (isAuthenticated && (location.pathname === "/login" || location.pathname === "/register")) {
-    // Điều hướng dựa theo Role
-    return <Navigate to={user?.role === 'LANDLORD' ? "/dashboard" : "/"} replace />; 
+    if (user?.role === 'ADMIN') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    
+    if (user?.role === 'LANDLORD') {
+      return <Navigate to="/dashboard" replace />;
+    }
+    
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;
 };
 
-// 3. Phân quyền truy cập các trang chuyên biệt theo Role
+// 3. RoleRoute (phân quyền theo role)
 const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" />;
   
-  if (!allowedRoles.includes(user.role)) {
-    // Sai Role thì đá ra trang chủ hoặc dashboard
-    return <Navigate to={user.role === 'LANDLORD' ? "/dashboard" : "/"} replace />;
+  if (!allowedRoles.includes(user.role ?? '')) {
+    if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+    if (user?.role === 'LANDLORD') return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
   
   return <Outlet />;
@@ -67,65 +79,62 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
-            
-            {/* PROPERTY ROUTES */}
-            <Route path="/properties" element={<PropertiesPage />} />
-            <Route path="/properties/:id" element={<PropertyDetailPage />} />
-            
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/help" element={<HelpCenter />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-            
-            {/* AUTH ROUTES */}
-            <Route element={<PublicRoute />}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-            </Route>
+    <>
+      <Routes>
+        {/* ─── GROUP: PUBLIC PAGES ─── */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<HomePage />} />
+          
+          <Route path="/properties" element={<PropertiesPage />} />
+          <Route path="/properties/:id" element={<PropertyDetailPage />} />
+          
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/help" element={<HelpCenter />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          
+          <Route element={<PublicRoute />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
           </Route>
+        </Route>
 
-          {/* ─── GROUP: PROTECTED PAGES (Cần đăng nhập - Dùng MainLayout) ─── */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
- 
-              <Route path="/profile" element={<ProfilePage />} />
-              
-              {/* === KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD) === */}
-              <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/properties/manage" element={<PropertiesManagePage />} />
-                <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
-                
-                <Route path="/finance" element={<BillManagePage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-              </Route>
-              
-              {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
-              <Route path="/contracts/create" element={<CreateContractPage />} />
-              <Route path="/contracts/:id" element={<ContractDetailPage />} />
-              <Route path="/contracts" element={<ContractsPage />} />
-              
-              {/* ✅ 2. THAY THẾ DIV GIỮ CHỖ BẰNG COMPONENT THẬT */}
-              <Route path="/appointments" element={<AppointmentManagePage />} />
-              
+        {/* ─── GROUP: PROTECTED PAGES ─── */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
+            
+            {/* LANDLORD ONLY */}
+            <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/properties/manage" element={<PropertiesManagePage />} />
+              <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
+              <Route path="/finance" element={<BillManagePage />} />
+              <Route path="/reports" element={<ReportsPage />} />
             </Route>
+
+            {/* ADMIN ONLY */}
+            <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
+            </Route>
+            
+            {/* SHARED: CONTRACT & APPOINTMENT */}
+            <Route path="/contracts/create" element={<CreateContractPage />} />
+            <Route path="/contracts/:id" element={<ContractDetailPage />} />
+            <Route path="/contracts" element={<ContractsPage />} />
+            <Route path="/appointments" element={<AppointmentManagePage />} />
           </Route>
+        </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </BrowserRouter>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
 
-      {/* 🔥 TOASTER CONFIG */}
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-    </AuthProvider>
+    </>
   );
 }
 
