@@ -29,6 +29,7 @@ import ReportsPage from "./pages/dashboard/ReportsPage";
 
 // ✅ 1. IMPORT TRANG QUẢN LÝ LỊCH HẸN VÀO ĐÂY
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
+import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 
 // 1. Bảo vệ các trang yêu cầu Đăng Nhập
 const ProtectedRoute = () => {
@@ -125,6 +126,9 @@ function App() {
 
       {/* 🔥 TOASTER CONFIG */}
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
+      
+      {/* 🤖 GLOBAL AI CHATBOT */}
+      <AiChatBot />
     </AuthProvider>
   );
 }

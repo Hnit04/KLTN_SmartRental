@@ -294,7 +294,7 @@ export interface Bill {
   deadline: string;
   paymentTxHash?: string;
 }
-interface RevenueChartData {
+export interface RevenueChartData {
     name: string; 
     total: number; 
 }
