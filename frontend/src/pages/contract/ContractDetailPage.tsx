@@ -4,7 +4,7 @@ import {
   FileText, Download, PenTool, CheckCircle, Calendar, 
   MapPin,  ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star,
-  MessageSquare, XCircle, Check
+  MessageSquare, XCircle, Check, Sparkles, Home, User
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +13,7 @@ import { contractApi } from "@/api/contractApi";
 import { billApi } from "@/api/billApi"; 
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { toast } from "sonner";
+import { Bot } from "lucide-react";
 import type { 
   Contract, 
   ContractSignMethod, 
@@ -59,6 +60,17 @@ export default function ContractDetailPage() {
   const [changeRequests, setChangeRequests] = useState<ContractChangeRequest[]>([]);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+
+  // AI Legal Advisor State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [isAnalyzingRequest, setIsAnalyzingRequest] = useState(false);
+  const [requestAnalysisResult, setRequestAnalysisResult] = useState<string | null>(null);
+  // Tự chỉnh sửa Điều khoản State
+  const [isEditTermsModalOpen, setIsEditTermsModalOpen] = useState(false);
+  const [editTermsContent, setEditTermsContent] = useState("");
+  const [isUpdatingTerms, setIsUpdatingTerms] = useState(false);
+
   const [changeForm, setChangeForm] = useState<{type: RequestType, newValue: string, reason: string}>({
     type: 'RENT_INCREASE',
     newValue: '',
@@ -267,6 +279,54 @@ export default function ContractDetailPage() {
     }
   };
 
+  const handleAnalyzeTerms = async () => {
+    if (!contract?.additionalTerms) {
+      toast.error("Không có điều khoản bổ sung để phân tích.");
+      return;
+    }
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      // Vì controller sẽ báo lỗi 429 nếu hết quota, ta bọc ở đây hoặc API Axios đã xử lý toast.error
+      const res = await contractApi.analyzeTerms(Number(id), { terms: contract.additionalTerms });
+      setAnalysisResult(res.data.result);
+      toast.success("AI đã phân tích xong hợp đồng.");
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        toast.error("AI đang hết lượt phản hồi hoặc quá tải, vui lòng quay lại sau ít phút!");
+      } else {
+        toast.error("AI không thể phân tích lúc này.");
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAnalyzeChangeRequest = async (req: ContractChangeRequest) => {
+    setIsAnalyzingRequest(true);
+    setRequestAnalysisResult(null);
+    try {
+      const prompt = `So sánh và đánh giá rủi ro của đề xuất từ đối tác:\n\n- NỘI DUNG GỐC: \n${req.oldValue || 'Trống'}\n\n- NỘI DUNG ĐỀ XUẤT MỚI: \n${req.newValue}\n\n- LÝ DO ĐỀ XUẤT: ${req.reason}\n\nĐề xuất này thay đổi thế nào? Có gài rủi ro bất lợi nào cho người tiếp nhận so với bản gốc không? Đừng nhận xét chung chung, hãy đi thẳng vào sự thay đổi. Trả lời dưới 150 chữ.`;
+      const res = await contractApi.analyzeTerms(Number(id), { terms: prompt });
+      setRequestAnalysisResult(res.data.result);
+      toast.success("AI đã đánh giá xong đề xuất.");
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        toast.error("AI đang quá tải (Rate limit), vui lòng chờ chút xíu!");
+      } else {
+        toast.error("Lỗi khi kết nối tới trợ lý AI.");
+      }
+    } finally {
+      setIsAnalyzingRequest(false);
+    }
+  };
+
+  const renderMarkdown = (text: string) => {
+    let html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/\n/g, '<br/>');
+    return { __html: html };
+  };
+
   if (isLoading) return <div className="py-20 flex justify-center"><LoadingSpinner /></div>;
   if (!contract) return <div className="text-center py-20">Không tìm thấy hợp đồng.</div>;
 
@@ -317,18 +377,54 @@ export default function ContractDetailPage() {
                 <div className="flex gap-3">
                   <AlertCircle className="w-6 h-6 text-orange-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="font-bold text-orange-800 text-lg">Đang có yêu cầu chỉnh sửa</h4>
-                    <p className="text-sm text-orange-700 mt-1 mb-3">
-                      Lý do: <span className="italic">"{pendingRequest.reason}"</span>
-                    </p>
-                    <div className="flex items-center gap-6 text-sm bg-white p-3 rounded-lg border border-orange-100 w-fit">
+                    <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-gray-500 text-xs uppercase font-bold">Loại yêu cầu</p>
-                        <p className="font-semibold text-gray-900">{pendingRequest.type}</p>
+                        <h4 className="font-bold text-orange-800 text-lg">Đang có yêu cầu chỉnh sửa ({pendingRequest.type})</h4>
+                        <p className="text-sm text-orange-700 mt-1 mb-3">
+                          Lý do: <span className="italic font-semibold">"{pendingRequest.reason}"</span>
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-gray-500 text-xs uppercase font-bold">Giá trị mới đề xuất</p>
-                        <p className="font-bold text-primary whitespace-pre-wrap">{pendingRequest.newValue}</p>
+                      {user?.role !== pendingRequest.requestedByRole && (
+                        <Button 
+                          size="sm" 
+                          className="bg-purple-600 hover:bg-purple-700 text-white shadow shadow-purple-200"
+                          onClick={() => handleAnalyzeChangeRequest(pendingRequest)}
+                          isLoading={isAnalyzingRequest}
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" /> AI Soi Lỗi Đề Xuất
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {requestAnalysisResult && (
+                      <div className="mb-4 p-4 bg-white border-2 border-purple-200 rounded-xl shadow-inner animate-in fade-in zoom-in-95">
+                        <h4 className="font-bold text-purple-800 mb-2 flex items-center gap-2 text-sm uppercase tracking-wider">
+                          <Bot className="h-4 w-4" /> AI Cảnh báo rủi ro:
+                        </h4>
+                        <div 
+                          className="text-sm text-purple-950 leading-relaxed font-medium"
+                          dangerouslySetInnerHTML={renderMarkdown(requestAnalysisResult)} 
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                      <div className="bg-red-50/50 p-3 rounded-lg border border-red-200">
+                        <p className="text-red-500 text-xs uppercase font-bold mb-1 flex items-center gap-1">
+                          <XCircle className="w-3 h-3" /> Bản gốc (Hủy bỏ)
+                        </p>
+                        <p className="text-gray-600 whitespace-pre-wrap line-through opacity-70">
+                          {pendingRequest.oldValue || <span className="italic">Không có nội dung cũ</span>}
+                        </p>
+                      </div>
+                      <div className="bg-green-50/50 p-3 rounded-lg border border-green-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-8 h-8 bg-green-200 rounded-bl-full opacity-30"></div>
+                        <p className="text-green-600 text-xs uppercase font-bold mb-1 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Đề xuất mới
+                        </p>
+                        <p className="font-bold text-green-900 whitespace-pre-wrap">
+                          {pendingRequest.newValue}
+                        </p>
                       </div>
                     </div>
                     
@@ -391,36 +487,117 @@ export default function ContractDetailPage() {
               </div>
             </div>
 
-            {contract.additionalTerms && (
-              <div className="bg-yellow-50/80 rounded-2xl border border-yellow-200 shadow-sm p-6">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-yellow-800">
-                  <AlertCircle className="h-5 w-5 text-yellow-600" /> Điều khoản thỏa thuận thêm
-                </h3>
-                <div className="text-sm text-yellow-900 whitespace-pre-wrap leading-relaxed bg-white/60 p-4 rounded-xl border border-yellow-100/50">
-                  {contract.additionalTerms}
+            {contract.additionalTerms && (() => {
+              const terms = contract.additionalTerms;
+              const hasSplit = terms.includes("--- NỘI QUY MẪU TỪ CHỦ TRỌ ---") && terms.includes("--- YÊU CẦU THÊM CỦA KHÁCH THUÊ ---");
+              
+              let landlordTerms = terms;
+              let tenantRequests = "";
+              
+              if (hasSplit) {
+                const parts = terms.split("--- YÊU CẦU THÊM CỦA KHÁCH THUÊ ---");
+                landlordTerms = parts[0].replace("--- NỘI QUY MẪU TỪ CHỦ TRỌ ---", "").trim();
+                tenantRequests = (parts[1] || "").trim();
+              }
+
+              return (
+                <div className="bg-white rounded-2xl border shadow-sm relative overflow-hidden">
+                  {/* Tieude va Nut AI */}
+                  <div className="flex justify-between items-center bg-gray-50 px-6 py-4 border-b">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+                      <AlertCircle className="h-5 w-5 text-gray-500" /> Điều khoản thỏa thuận thêm
+                    </h3>
+                    <Button 
+                      size="sm" 
+                      className="bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/30"
+                      onClick={handleAnalyzeTerms}
+                      isLoading={isAnalyzing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" /> AI Phân tích Rủi ro
+                    </Button>
+                  </div>
+
+                  <div className="p-6">
+                    {hasSplit ? (
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="bg-blue-50/50 rounded-xl p-5 border border-blue-100">
+                          <h4 className="font-bold text-blue-800 flex items-center gap-2 mb-3">
+                            <Home className="w-4 h-4" /> Nội quy từ Chủ Trọ
+                          </h4>
+                          <div className="text-sm text-blue-950 leading-relaxed whitespace-pre-wrap">
+                            {landlordTerms || "Không có nội quy đặc biệt."}
+                          </div>
+                        </div>
+                        <div className="bg-orange-50/50 rounded-xl p-5 border border-orange-100">
+                          <h4 className="font-bold text-orange-800 flex items-center gap-2 mb-3">
+                            <User className="w-4 h-4" /> Yêu cầu từ Khách Thuê
+                          </h4>
+                          <div className="text-sm text-orange-950 leading-relaxed whitespace-pre-wrap">
+                            {tenantRequests || "Không có yêu cầu thêm."}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed bg-gray-50/50 p-5 rounded-xl border border-gray-100">
+                        {contract.additionalTerms}
+                      </div>
+                    )}
+
+                    {/* KHUNG HIỂN THỊ KẾT QUẢ CỦA AI */}
+                    {analysisResult && (
+                      <div className="mt-6 p-5 bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl shadow-inner animate-in fade-in zoom-in-95">
+                        <h4 className="font-bold text-purple-900 mb-3 flex items-center gap-2">
+                          <Bot className="h-5 w-5 text-purple-600" /> Luật sư AI Đánh giá:
+                        </h4>
+                        <div 
+                          className="text-sm text-purple-950 leading-relaxed"
+                          dangerouslySetInnerHTML={renderMarkdown(analysisResult)} 
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {changeRequests.length > 0 && (
               <div className="bg-white rounded-2xl border shadow-sm p-6">
                 <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-gray-800">
                   <Clock className="h-4 w-4 text-gray-500" /> Lịch sử Đề xuất chỉnh sửa
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {changeRequests.map((req) => (
-                    <div key={req.id} className="flex justify-between items-center text-sm border-b pb-2 last:border-0">
-                      <div>
-                        <span className="font-medium">{req.type}</span> 
-                        <span className="text-gray-500 ml-2">({new Date(req.requestDate).toLocaleDateString()})</span>
-                        <span className="text-xs ml-2 px-2 py-0.5 bg-gray-100 rounded text-gray-600 border border-gray-200">
-                          Gửi bởi: {req.requestedByRole === 'LANDLORD' ? 'Chủ nhà' : 'Khách thuê'}
-                        </span>
+                    <div key={req.id} className="flex flex-col text-sm border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="font-bold text-gray-800">{req.type}</span> 
+                          <span className="text-gray-500 ml-2">({new Date(req.requestDate).toLocaleDateString()})</span>
+                          <span className="text-xs ml-2 px-2 py-0.5 bg-gray-100 rounded text-gray-600 border border-gray-200">
+                            Gửi bởi: {req.requestedByRole === 'LANDLORD' ? 'Chủ nhà' : 'Khách thuê'}
+                          </span>
+                        </div>
+                        <div>
+                          {req.status === 'ACCEPTED' && <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4"/> Đã duyệt</span>}
+                          {req.status === 'REJECTED' && <span className="text-red-500 font-bold flex items-center gap-1"><XCircle className="w-4 h-4"/> Đã từ chối</span>}
+                          {req.status === 'PENDING' && <span className="text-orange-500 font-bold">Đang chờ</span>}
+                        </div>
                       </div>
-                      <div>
-                        {req.status === 'ACCEPTED' && <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4"/> Đã duyệt</span>}
-                        {req.status === 'REJECTED' && <span className="text-red-600 font-bold flex items-center gap-1"><XCircle className="w-4 h-4"/> Đã từ chối</span>}
-                        {req.status === 'PENDING' && <span className="text-orange-600 font-bold">Đang chờ</span>}
+                      
+                      <p className="text-gray-500 text-xs mb-2 italic">Lý do: "{req.reason}"</p>
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-1 opacity-75 hover:opacity-100 transition-opacity">
+                        <div className="bg-red-50/30 p-2.5 rounded-lg border border-red-100/50">
+                          <p className="text-red-400 text-[10px] uppercase font-bold mb-1">Bản gốc</p>
+                          <p className="text-gray-500 whitespace-pre-wrap line-through text-xs">
+                            {req.oldValue || 'Không có'}
+                          </p>
+                        </div>
+                        <div className="bg-green-50/30 p-2.5 rounded-lg border border-green-100/50">
+                          <p className="text-green-500 text-[10px] uppercase font-bold mb-1">Đề xuất ({req.status === 'ACCEPTED' ? 'Đã áp dụng' : 'Bị từ chối'})</p>
+                          <p className="font-medium text-gray-700 whitespace-pre-wrap text-xs">
+                            {req.newValue}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -72,4 +72,63 @@ public class ContractController {
     public ResponseEntity<?> rejectChangeRequest(@PathVariable Long requestId) {
         return ResponseEntity.ok(contractChangeService.rejectRequest(requestId));
     }
+
+    // 9. Phân tích pháp lý điều khoản hợp đồng bằng AI
+    @Autowired
+    private iuh.se.kltn.backend.modules.ai.service.LegalAdvisorAi legalAdvisorAi;
+
+    @PostMapping("/{id}/analyze-terms")
+    public ResponseEntity<?> analyzeTerms(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> request) {
+        
+        iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse contract = contractService.getContractById(id);
+        
+        StringBuilder context = new StringBuilder();
+        String reqTerms = (request != null && request.containsKey("terms")) ? request.get("terms") : null;
+        
+        if (reqTerms != null && !reqTerms.trim().isEmpty() && !reqTerms.equals(contract.getAdditionalTerms())) {
+             context.append(reqTerms); 
+        } else {
+            context.append("--- THÔNG TIN CƠ BẢN ---\n")
+                   .append("- Phòng / Tòa nhà: ").append(contract.getRoomName()).append("\n")
+                   .append("- Thời hạn thuê: ").append(contract.getStartDate()).append(" đến ").append(contract.getEndDate()).append("\n")
+                   .append("- Giá thuê (VNĐ/tháng): ").append(contract.getActualPrice()).append("\n")
+                   .append("- Tiền cọc (VNĐ): ").append(contract.getDepositAmount()).append("\n")
+                   .append("- Giá điện, nước, internet: Điện_").append(contract.getElecPrice()).append(", Nước_").append(contract.getWaterPrice()).append("\n")
+                   .append("--- ĐIỀU KHOẢN BỔ SUNG KHÁC ---\n")
+                   .append(contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "Không có luật gì thêm.");
+        }
+        
+        String roleStr = currentUser.getAuthorities().stream().findFirst().get().getAuthority().replace("ROLE_", "");
+        
+        try {
+            String analysisResult = legalAdvisorAi.processContract(context.toString(), roleStr, "ANALYZE");
+            return ResponseEntity.ok(java.util.Collections.singletonMap("result", analysisResult));
+        } catch (Exception e) {
+            return handleAiException(e);
+        }
+    }
+
+    @PutMapping("/{id}/terms")
+    public ResponseEntity<?> updateContractTerms(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        
+        String newTerms = (request != null && request.containsKey("terms")) ? request.get("terms") : "";
+        try {
+            return ResponseEntity.ok(contractService.updateContractTerms(id, newTerms, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    private ResponseEntity<?> handleAiException(Exception e) {
+        if (e.getMessage() != null && e.getMessage().contains("429")) {
+            return ResponseEntity.status(429).body(java.util.Collections.singletonMap("message", "AI đang quá tải (Rate Limit). Vui lòng thử lại sau ít phút!"));
+        }
+        return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", "Lỗi AI: " + e.getMessage()));
+    }
 }

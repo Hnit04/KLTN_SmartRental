@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, ReactNode } from "react";
+import { useState, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
 import { MessageCircle, X, Send, Bot, User, Loader2, Home, DollarSign, ExternalLink } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
