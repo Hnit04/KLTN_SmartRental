@@ -121,15 +121,6 @@ public class UserService {
                 .toList();
     }
 
-    public List<User> getUpdateHistory(Long userId) {
-        AuditReader auditReader = AuditReaderFactory.get(entityManager);
-
-        // Lấy tất cả các phiên bản cũ của User có ID này
-        return auditReader.createQuery()
-                .forRevisionsOfEntity(User.class, true, true)
-                .add(AuditEntity.id().eq(userId))
-                .getResultList();
-    }
     @Transactional
     public void unlockUser(Long userId) {
         User user = userRepository.findById(userId)
@@ -150,4 +141,5 @@ public class UserService {
         user.setLockReason(reason);
         userRepository.saveAndFlush(user);
     }
+
 }
