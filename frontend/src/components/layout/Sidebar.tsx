@@ -4,12 +4,11 @@ import {
   FileText, 
   Home, 
   Calendar, 
-  Settings, 
   LogOut,
   UserCircle,
   Building,
-  Receipt,
-  PieChart
+  PieChart,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -38,7 +37,7 @@ const Sidebar = () => {
     {
       title: 'Tài chính & Hóa đơn',
       path: '/finance',
-      icon: Receipt, // Icon biên lai/hóa đơn
+      icon: Wallet,
     },
     {
       title: 'Quản lý Lịch hẹn',
@@ -76,17 +75,12 @@ const Sidebar = () => {
     },
   ];
 
-  // 3. Menu Cài đặt & Profile (Dùng chung dưới cùng)
+  // 3. Menu Profile (Dùng chung dưới cùng) — chỉ giữ những route thực sự có
   const bottomItems = [
     {
       title: 'Hồ sơ cá nhân',
       path: '/profile',
       icon: UserCircle,
-    },
-    {
-      title: 'Cài đặt tài khoản',
-      path: '/settings',
-      icon: Settings,
     },
   ];
 

@@ -10,4 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  // Fix: sockjs-client dùng biến Node.js 'global' không có trong browser
+  define: {
+    global: 'globalThis',
+  },
 })
+

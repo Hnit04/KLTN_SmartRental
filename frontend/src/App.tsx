@@ -61,8 +61,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   if (!user) return <Navigate to="/login" />;
   
   if (!allowedRoles.includes(user.role)) {
-    // Sai Role thì đá ra trang chủ hoặc dashboard
-    return <Navigate to={user.role === 'LANDLORD' ? "/dashboard" : "/"} replace />;
+    // Redirect đúng theo role: Landlord → dashboard, Tenant → tenant-dashboard
+    return <Navigate to={user.role === 'LANDLORD' ? '/dashboard' : '/tenant-dashboard'} replace />;
   }
   
   return <Outlet />;

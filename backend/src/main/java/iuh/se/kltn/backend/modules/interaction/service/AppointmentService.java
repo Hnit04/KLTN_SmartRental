@@ -54,8 +54,8 @@ public class AppointmentService {
                 room.getProperty().getLandlord(),
                 "Yêu cầu xem phòng mới",
                 "Khách hàng " + tenant.getFullName() + " vừa đặt lịch xem phòng " + room.getName(),
-                NotificationType.SYSTEM,
-                room.getProperty().getId() // Dẫn về trang chi tiết khu trọ
+                NotificationType.APPOINTMENT_UPDATE,
+                room.getProperty().getId()
         );
 
         return mapToResponse(saved);
@@ -125,7 +125,7 @@ public class AppointmentService {
                     appointment.getTenant(), // Gửi cho Khách thuê
                     title,
                     message,
-                    NotificationType.SYSTEM, // Loại thông báo hệ thống
+                    NotificationType.APPOINTMENT_UPDATE, // ✅ Dùng APPOINTMENT_UPDATE để FE navigate đúng
                     appointment.getRoom().getProperty().getId() // Dẫn Khách về lại trang chi tiết khu trọ
             );
         }
