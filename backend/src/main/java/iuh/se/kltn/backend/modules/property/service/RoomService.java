@@ -33,9 +33,9 @@ public class RoomService {
     }
 
     /**
-     * Hàm convert Entity -> DTO (Copy logic từ PropertyService sang để tái sử dụng)
+     * Hàm convert Entity -> DTO
      */
-    private RoomResponse mapToRoomResponse(Room r) {
+    public RoomResponse mapToRoomResponse(Room r) {
         RoomResponse res = modelMapper.map(r, RoomResponse.class);
 
         // Convert chuỗi JSON trong DB thành List Java

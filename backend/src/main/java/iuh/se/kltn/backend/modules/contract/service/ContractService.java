@@ -142,6 +142,34 @@ public class ContractService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));
         return mapToResponse(contract);
     }
+    
+    @Transactional
+    public ContractResponse updateContractTerms(Long contractId, String newTerms, Long userId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+                
+        // Chỉ cho phép sửa khi hợp đồng CHƯA CÓ HIỆU LỰC
+        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa điều khoản khi hợp đồng chưa được ký kết hoàn tất.");
+        }
+
+        contract.setAdditionalTerms(newTerms);
+        
+        // CỰC KỲ QUAN TRỌNG: Khi hợp đồng bị sửa nội dung, phải xóa bỏ toàn bộ chữ ký cũ
+        contract.setIsTenantSigned(false);
+        contract.setIsLandlordSigned(false);
+
+        // Tính toán lại Hash của hợp đồng
+        String termsForHash = contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "";
+        String rawData = "CONTRACT-" + contract.getRoom().getId() + "-" + contract.getTenant().getId() + "-" + termsForHash + "-" + UUID.randomUUID();
+        contract.setContractHash(calculateSHA256(rawData));
+        
+        Contract saved = contractRepository.save(contract);
+        return mapToResponse(saved);
+    }
 
     // --- 3. Hàm ký hợp đồng ---
     @Transactional

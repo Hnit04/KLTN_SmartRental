@@ -35,6 +35,7 @@ import AdminDashboardPage from "./pages/admin/AdminPage";
 import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
+import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
@@ -138,7 +139,10 @@ function App() {
       </BrowserRouter>
 
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-      </AuthProvider>
+      
+      {/* 🤖 GLOBAL AI CHATBOT */}
+      <AiChatBot />
+    </AuthProvider>
   );
 }
 

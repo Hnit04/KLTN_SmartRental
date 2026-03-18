@@ -7,8 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Collection;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
@@ -21,10 +23,24 @@ public class AiController {
 
 
     @PostMapping("/chat")
-    public ResponseEntity<?> chatWithAi(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> chatWithAi(
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
         String message = request.get("message");
         String sessionId = request.getOrDefault("sessionId", "default-user");
-        String response = smartRentalAi.chat(sessionId, message);
+        
+        String roleStr = "GUEST (Khách vãng lai chưa đăng nhập)";
+        String userName = "Khách hàng";
+        
+        if (currentUser != null) {
+            String roleRaw = currentUser.getAuthorities().iterator().next().getAuthority();
+            roleStr = roleRaw.replace("ROLE_", ""); // TENANT hoặc LANDLORD hoặc ADMIN
+            userName = currentUser.getUsername(); // Hoặc fullname
+        }
+
+        String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
+        
         return ResponseEntity.ok(Map.of(
                 "status", "success",
                 "sessionId", sessionId,

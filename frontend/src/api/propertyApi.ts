@@ -8,6 +8,7 @@ export const propertyApi = {
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
   getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),
   getMyProperties: () => axiosClient.get<Property[]>("/properties/mine"),
+  getRecommendedRooms: () => axiosClient.get<Room[]>("/recommendations/rooms"),
 
   // --- CÁC HÀM QUẢN LÝ KHU TRỌ (MỚI) ---
   createProperty: (data: Partial<Property>) => axiosClient.post<Property>("/properties", data),

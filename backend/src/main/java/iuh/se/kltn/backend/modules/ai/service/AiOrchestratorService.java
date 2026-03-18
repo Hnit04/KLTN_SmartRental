@@ -136,6 +136,13 @@ public class AiOrchestratorService {
                 return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
             }
         }
+        
+        // Chặn 4: Cấm tuyệt đối SQL Injection phá hoại CSDL
+        String upperCaseSql = sqlToExecute.toUpperCase();
+        if (upperCaseSql.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE)\\b.*")) {
+            System.err.println("🚨 [SECURITY ALERT] Phát hiện lệnh cấm mạo danh AI: " + sqlToExecute);
+            return "Dạ, yêu cầu của bạn chứa truy vấn không an toàn. Hệ thống đã huỷ bỏ yêu cầu này để bảo mật dữ liệu.";
+        }
         // ====================================================================
 
 
@@ -158,7 +165,7 @@ public class AiOrchestratorService {
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
             System.out.println("Dữ liệu thô: " + rawDataStr);
 
-            return dataPresenterAi.generateNaturalResponse(question, rawDataStr);
+            return dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());

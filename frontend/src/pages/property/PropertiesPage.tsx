@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { Search, MapPin, Frown, Filter } from "lucide-react";
+import { Search, MapPin, Frown, Filter, Sparkles, Zap } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import PropertyCard from "@/features/property/components/PropertyCard";
+import RoomCard from "@/features/property/components/RoomCard";
 import { propertyApi } from "@/api/propertyApi";
-import type { Property } from "@/types/index";
+import type { Property, Room } from "@/types/index";
 import { toast } from "sonner";
 
 export default function PropertiesPage() {
   // --- STATE ---
   const [properties, setProperties] = useState<Property[]>([]);
+  const [recommendedRooms, setRecommendedRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter States
@@ -19,20 +21,34 @@ export default function PropertiesPage() {
 
   // --- FETCH DATA ---
   useEffect(() => {
-    const fetchProperties = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await propertyApi.getAll();
-        setProperties(response.data as any); 
+        // Chạy song song cả hai API
+        const [propsRes, recRoomsRes] = await Promise.allSettled([
+          propertyApi.getAll(),
+          propertyApi.getRecommendedRooms()
+        ]);
+
+        if (propsRes.status === "fulfilled") {
+            setProperties(propsRes.value.data as any); 
+        }
+
+        // Chỗ này cần log lại lỗi nếu có, nhưng không làm crash trang.
+        // Chỉ hiện kết quả recRoomsRes nều gọi API thành công và trả ra mảng.
+        if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data)) {
+            setRecommendedRooms(recRoomsRes.value.data as any);
+        }
+
       } catch (error) {
-        console.error("Failed to fetch properties:", error);
-        toast.error("Không thể tải danh sách phòng.");
+        console.error("Failed to fetch properties or recommendations:", error);
+        toast.error("Không thể tải toàn bộ dữ liệu. Đã có lỗi xảy ra.");
       } finally {
         // Giả lập delay một chút để thấy hiệu ứng Skeleton (có thể bỏ khi chạy thật)
         setTimeout(() => setIsLoading(false), 500);
       }
     };
-    fetchProperties();
+    fetchData();
   }, []);
 
   // --- FILTER LOGIC ---
@@ -124,8 +140,41 @@ export default function PropertiesPage() {
         </div>
       </div>
 
+      {/* --- DANH SÁCH GỢI Ý CỦA AI (NẾU CÓ) --- */}
+      {recommendedRooms.length > 0 && (
+        <div className="container mx-auto max-w-7xl px-4 py-8">
+          <div className="flex items-center gap-3 border-b pb-4 mb-6">
+            <div className="p-2 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-lg text-amber-600">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+                Phòng Gợi Ý Từ AI
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Dựa trên sở thích bạn đã cài đặt, AI tìm thấy {recommendedRooms.length} phòng phù hợp nhất.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-6 snap-x">
+            {recommendedRooms.map((room) => (
+              <div key={room.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] snap-start shrink-0">
+                 {/* Bọc RoomCard trong 1 relative div để thêm badge "% Phù hợp" nếu có từ API, hiện tại tạm ẩn */}
+                <div className="relative h-full">
+                   <div className="absolute -top-3 -right-3 z-10 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border-2 border-white flex items-center gap-1">
+                      <Zap className="h-3 w-3" /> Phù hợp nhất
+                   </div>
+                   <RoomCard data={room} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* --- LIST CONTENT --- */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
+        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">Khám Phá Khu Trọ Toàn Quốc</h2>
         {isLoading ? (
           // SKELETON LOADING (Thay cho Spinner xoay)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
