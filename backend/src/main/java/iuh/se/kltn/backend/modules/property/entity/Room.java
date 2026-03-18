@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.property.entity;
 
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
+import iuh.se.kltn.backend.modules.property.enums.RoomType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -25,6 +26,14 @@ public class Room {
     private Float area;
     private Integer maxOccupants;
     private Integer currentOccupants;
+    
+    @Enumerated(EnumType.STRING)
+    private RoomType type = RoomType.STUDIO;
+    
+    // Không gian
+    private Boolean hasMezzanine = false;
+    private Boolean hasBalcony = false;
+
     @Enumerated(EnumType.STRING)
     private RoomStatus status = RoomStatus.AVAILABLE;
 

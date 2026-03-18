@@ -89,14 +89,13 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+    <>
+      <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
             
-            {/* PROPERTY ROUTES */}
+            {/* PROPERTY ROUTES (public) */}
             <Route path="/properties" element={<PropertiesPage />} />
             <Route path="/properties/:id" element={<PropertyDetailPage />} />
             <Route path="/rooms/:id" element={<RoomDetailPage />} />
@@ -107,16 +106,14 @@ function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
 
-            
-            {/* LANDLORD ONLY */}
-            <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/properties/manage" element={<PropertiesManagePage />} />
-              <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
-              <Route path="/finance" element={<BillManagePage />} />
-              <Route path="/reports" element={<ReportsPage />} />
+            {/* AUTH ROUTES (chặn nếu đã đăng nhập) */}
+            <Route element={<PublicRoute />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
             </Route>
+          </Route>
 
+          {/* ─── GROUP: PROTECTED PAGES (Yêu cầu đăng nhập, có Sidebar) ─── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
  
@@ -142,24 +139,16 @@ function App() {
               <Route path="/contracts/:id" element={<ContractDetailPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
               
-              {/* ✅ 2. THAY THẾ DIV GIỮ CHỖ BẰNG COMPONENT THẬT */}
               <Route path="/appointments" element={<AppointmentManagePage />} />
             </Route> 
 
+            {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
             <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
-
             </Route>
-            
-            {/* SHARED: CONTRACT & APPOINTMENT */}
-            <Route path="/contracts/create" element={<CreateContractPage />} />
-            <Route path="/contracts/:id" element={<ContractDetailPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/appointments" element={<AppointmentManagePage />} />
           </Route>
-        </Route>
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" />} />
@@ -168,7 +157,7 @@ function App() {
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
       {/* 🤖 GLOBAL AI CHATBOT */}
       <AiChatBot />
-    </AuthProvider>
+    </>
 
   );
 }

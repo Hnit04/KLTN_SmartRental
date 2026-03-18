@@ -94,7 +94,15 @@ public class User {
     private String cccdBackUrl;
 
     @Column(name = "is_locked")
-    private boolean isLocked = false;
+    private Boolean isLocked = false;
+
+    public boolean isLocked() {
+        return Boolean.TRUE.equals(this.isLocked);
+    }
+
+    public void setLocked(boolean locked) {
+        this.isLocked = locked;
+    }
 
     @Column(name = "locked_at")
     private LocalDateTime lockedAt;

@@ -56,4 +56,9 @@ public class Contract {
     @OneToMany(mappedBy = "contract")
     private List<Bill> bills;
 
+    @org.hibernate.annotations.CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @org.hibernate.annotations.UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

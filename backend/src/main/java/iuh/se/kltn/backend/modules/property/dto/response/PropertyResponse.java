@@ -12,6 +12,10 @@ public class PropertyResponse {
     private String city;
     private String description;
 
+    // Tọa độ
+    private Double latitude;
+    private Double longitude;
+
     // Giá dịch vụ
     private Double elecPrice;
     private Double waterPrice;
