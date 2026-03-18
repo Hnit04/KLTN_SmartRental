@@ -1,9 +1,17 @@
 import axiosClient from "./axiosClient";
 import type { Property, Room } from "@/types/index";
 
+export interface PaginatedResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+}
+
 export const propertyApi = {
   // --- CÁC HÀM GET (Giữ nguyên của bạn) ---
-  getAll: () => axiosClient.get<Property[]>("/properties"),
+  getAll: (page: number = 0, size: number = 12) => axiosClient.get<PaginatedResponse<Property>>(`/properties?page=${page}&size=${size}`),
   getDetail: (id: number | string) => axiosClient.get<Property>(`/properties/${id}`),
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
   getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),

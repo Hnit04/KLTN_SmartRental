@@ -337,7 +337,7 @@ export default function PropertyDetailPage() {
                    </div>
                 </div>
 
-                {/* BẢN ĐỒ LEAFLET qua OpenStreetMap iframe */}
+                {/* BẢN ĐỒ VỊ TRÍ (Google Maps iframe) */}
                 <div className="rounded-xl overflow-hidden border shadow-sm h-48">
                   <iframe
                     title="Bản đồ vị trí khu trọ"
@@ -345,7 +345,7 @@ export default function PropertyDetailPage() {
                     height="100%"
                     style={{ border: 0 }}
                     loading="lazy"
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=&layer=mapnik&marker=&query=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
                     onError={(e) => {
                       const iframe = e.currentTarget;
                       iframe.style.display = 'none';
@@ -353,7 +353,7 @@ export default function PropertyDetailPage() {
                   />
                 </div>
                 <a
-                  href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
+                  href={`https://maps.google.com/maps?q=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"

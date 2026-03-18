@@ -23,6 +23,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,13 +41,11 @@ public class PropertyService {
     private ModelMapper modelMapper;
 
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public)
-    public List<PropertyResponse> getAllProperties() {
-        List<Property> properties = propertyRepository.findAll();
+    public Page<PropertyResponse> getAllProperties(Pageable pageable) {
+        Page<Property> properties = propertyRepository.findAll(pageable);
 
         // Convert từng Entity sang Response (đã bao gồm tính toán giá)
-        return properties.stream()
-                .map(this::mapToPropertyResponse)
-                .collect(Collectors.toList());
+        return properties.map(this::mapToPropertyResponse);
     }
 
     // TẠO KHU TRỌ MỚI

@@ -89,9 +89,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+    <>
+      <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
@@ -168,7 +167,7 @@ function App() {
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
       {/* 🤖 GLOBAL AI CHATBOT */}
       <AiChatBot />
-    </AuthProvider>
+    </>
 
   );
 }

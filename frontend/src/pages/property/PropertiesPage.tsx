@@ -12,6 +12,8 @@ import { toast } from "sonner";
 export default function PropertiesPage() {
   // --- STATE ---
   const [properties, setProperties] = useState<Property[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [recommendedRooms, setRecommendedRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -29,20 +31,26 @@ export default function PropertiesPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true);
+        if (page === 0) setIsLoading(true);
         // Chạy song song cả hai API
         const [propsRes, recRoomsRes] = await Promise.allSettled([
-          propertyApi.getAll(),
-          propertyApi.getRecommendedRooms()
+          propertyApi.getAll(page, 12),
+          page === 0 ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
 
         if (propsRes.status === "fulfilled") {
-            setProperties(propsRes.value.data as any); 
+            const pageData = propsRes.value.data as any;
+            if (page === 0) {
+                 setProperties(pageData.content || pageData); 
+            } else {
+                 setProperties(prev => [...prev, ...(pageData.content || [])]);
+            }
+            setTotalPages(pageData.totalPages || 1);
         }
 
         // Chỗ này cần log lại lỗi nếu có, nhưng không làm crash trang.
         // Chỉ hiện kết quả recRoomsRes nều gọi API thành công và trả ra mảng.
-        if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data)) {
+        if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data) && recRoomsRes.value.data.length > 0) {
             // Đảm bảo luôn có matchScore để giao diện RoomCard hiện thị được Badge % Phù hợp
             const enrichedRooms = recRoomsRes.value.data.map((room: any) => ({
                 ...room,
@@ -61,7 +69,7 @@ export default function PropertiesPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [page]);
 
   // --- FILTER LOGIC ---
   const filteredProperties = useMemo(() => {
@@ -325,11 +333,21 @@ export default function PropertiesPage() {
             ))}
           </div>
         ) : filteredProperties.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {filteredProperties.map((property) => (
-              <PropertyCard key={property.id} data={property} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {filteredProperties.map((property) => (
+                <PropertyCard key={property.id} data={property} />
+              ))}
+            </div>
+            
+            {page < totalPages - 1 && (
+              <div className="flex justify-center mt-10">
+                <Button variant="outline" onClick={() => setPage(p => p + 1)} className="px-8 bg-white border-primary text-primary hover:bg-primary/5">
+                  Xem thêm khu trọ
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in zoom-in duration-300">
             <div className="bg-gray-100 p-6 rounded-full mb-4">
