@@ -18,6 +18,7 @@ import ProfilePage from "./pages/user/ProfilePage";
 // --- PROPERTY PAGES ---
 import PropertiesPage from "./pages/property/PropertiesPage";
 import PropertyDetailPage from "./pages/property/PropertyDetailPage";
+import RoomDetailPage from "./pages/property/RoomDetailPage";
 import PropertiesManagePage from "./pages/property/PropertiesManagePage";
 import PropertyManageDetailPage from "./pages/property/PropertyManageDetailPage";
 import BillManagePage from "./pages/finance/BillManagePage";
@@ -26,6 +27,7 @@ import ContractsPage from "./pages/contract/ContractsPage";
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
 import DashboardPage from "./pages/dashboard/DashboardPage";
+import TenantDashboardPage from "./pages/dashboard/TenantDashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
 
 // --- ADMIN PAGES ---
@@ -33,6 +35,7 @@ import AdminDashboardPage from "./pages/admin/AdminPage";
 import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
+import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
@@ -57,7 +60,12 @@ const PublicRoute = () => {
       return <Navigate to="/dashboard" replace />;
     }
     
+    if (user?.role === 'TENANT') {
+      return <Navigate to="/tenant-dashboard" replace />;
+    }
+    
     return <Navigate to="/" replace />;
+
   }
 
   return <Outlet />;
@@ -71,7 +79,9 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   if (!allowedRoles.includes(user.role ?? '')) {
     if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
     if (user?.role === 'LANDLORD') return <Navigate to="/dashboard" replace />;
+     if (user?.role === 'TENANT') return <Navigate to="/tenant-dashboard" replace />;
     return <Navigate to="/" replace />;
+
   }
   
   return <Outlet />;
@@ -79,31 +89,24 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <>
-      <Routes>
-        {/* ─── GROUP: PUBLIC PAGES ─── */}
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<HomePage />} />
-          
-          <Route path="/properties" element={<PropertiesPage />} />
-          <Route path="/properties/:id" element={<PropertyDetailPage />} />
-          
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/help" element={<HelpCenter />} />
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          
-          <Route element={<PublicRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
-        </Route>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
+            
+            {/* PROPERTY ROUTES */}
+            <Route path="/properties" element={<PropertiesPage />} />
+            <Route path="/properties/:id" element={<PropertyDetailPage />} />
+            <Route path="/rooms/:id" element={<RoomDetailPage />} />
+            
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/help" element={<HelpCenter />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
 
-        {/* ─── GROUP: PROTECTED PAGES ─── */}
-        <Route element={<ProtectedRoute />}>
-          <Route element={<MainLayout />}>
-            <Route path="/profile" element={<ProfilePage />} />
             
             {/* LANDLORD ONLY */}
             <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
@@ -114,11 +117,40 @@ function App() {
               <Route path="/reports" element={<ReportsPage />} />
             </Route>
 
-            {/* ADMIN ONLY */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
+ 
+              <Route path="/profile" element={<ProfilePage />} />
+              
+              {/* === KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD) === */}
+              <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/properties/manage" element={<PropertiesManagePage />} />
+                <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
+                
+                <Route path="/finance" element={<BillManagePage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+              </Route>
+
+              {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}
+              <Route element={<RoleRoute allowedRoles={['TENANT']} />}>
+                <Route path="/tenant-dashboard" element={<TenantDashboardPage />} />
+              </Route>
+              
+              {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
+              <Route path="/contracts/create" element={<CreateContractPage />} />
+              <Route path="/contracts/:id" element={<ContractDetailPage />} />
+              <Route path="/contracts" element={<ContractsPage />} />
+              
+              {/* ✅ 2. THAY THẾ DIV GIỮ CHỖ BẰNG COMPONENT THẬT */}
+              <Route path="/appointments" element={<AppointmentManagePage />} />
+            </Route> 
+
             <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
+
             </Route>
             
             {/* SHARED: CONTRACT & APPOINTMENT */}
@@ -134,7 +166,10 @@ function App() {
       </Routes>
 
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-    </>
+      {/* 🤖 GLOBAL AI CHATBOT */}
+      <AiChatBot />
+    </AuthProvider>
+
   );
 }
 

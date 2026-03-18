@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
-  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText
+  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
+  Trash2, AlertTriangle
 } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +39,10 @@ export default function PropertyManageDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
+
+  // --- STATE XÓA PHÒNG ---
+  const [deleteRoomConfirm, setDeleteRoomConfirm] = useState<Room | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '', price: '', area: '', description: '',
@@ -69,6 +74,22 @@ export default function PropertyManageDetailPage() {
       toast.error('Không thể tải dữ liệu phòng');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Hàm xóa phòng sau khi xác nhận
+  const handleDeleteRoom = async () => {
+    if (!deleteRoomConfirm) return;
+    setIsDeleting(true);
+    try {
+      await propertyApi.deleteRoom(deleteRoomConfirm.id);
+      toast.success(`Đã xóa phòng “${deleteRoomConfirm.name}”!`);
+      setDeleteRoomConfirm(null);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Xóa phòng thất bại.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -288,7 +309,7 @@ export default function PropertyManageDetailPage() {
                 </div>
                 
                 {/* NÚT THAO TÁC */}
-                <div className="flex gap-2 border-t pt-4 mt-auto">
+                <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap">
                   <Button variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleOpenEdit(room)}>
                     <Edit className="h-4 w-4 mr-1.5" /> Sửa
                   </Button>
@@ -306,6 +327,16 @@ export default function PropertyManageDetailPage() {
                       </Button>
                     </Link>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-500 border-red-200 hover:bg-red-50 px-2"
+                    onClick={() => setDeleteRoomConfirm(room)}
+                    title="Xóa phòng này"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -461,6 +492,32 @@ export default function PropertyManageDetailPage() {
               <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={isSubmitting}>Hủy</Button>
               <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px]">
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? 'Lưu thay đổi' : 'Lưu phòng mới')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIALOG XÁC NHẬN XÓA PHÒNG */}
+      {deleteRoomConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-red-50 rounded-full mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Xóa phòng?</h3>
+              <p className="text-sm text-gray-500 mb-1">Bạn có chắc muốn xóa phòng</p>
+              <p className="font-semibold text-gray-900 mb-3">“{deleteRoomConfirm.name}”?</p>
+              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                ⚠️ Hành động này không thể hoàn tác. Phòng đang có hợp đồng sẽ không thể xóa.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteRoomConfirm(null)} disabled={isDeleting}>Hủy</Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteRoom} disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Xóa phòng
               </Button>
             </div>
           </div>

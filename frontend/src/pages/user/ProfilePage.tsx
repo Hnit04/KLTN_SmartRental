@@ -439,9 +439,134 @@ const ProfilePage = () => {
           </div>
         </div>
       )}
+
+      {/* ─── SỞ THÍCH THUÊ PHÒNG (Tenant Only) ─── */}
+      {user.role === 'TENANT' && (
+        <TenantPreferenceSection />
+      )}
     </div>
   );
 };
+
+// Component con xử lý Sở thích
+import { tenantPreferenceApi } from '@/api/tenantPreferenceApi';
+import type { TenantPreference } from '@/types/index';
+import { Home, Lightbulb } from 'lucide-react';
+
+const TenantPreferenceSection = () => {
+  const [pref, setPref] = useState<Partial<TenantPreference>>({});
+  const [isSavingPref, setIsSavingPref] = useState(false);
+  const [isChanged, setIsChanged] = useState(false);
+
+  useEffect(() => {
+    const fetchPref = async () => {
+      try {
+        const res = await tenantPreferenceApi.getPreference();
+        if (res.data) setPref(res.data);
+      } catch (err) {
+        // Có thể user chưa có preference
+      }
+    };
+    fetchPref();
+  }, []);
+
+  const handleChange = (field: keyof TenantPreference, value: any) => {
+    setPref(prev => ({ ...prev, [field]: value }));
+    setIsChanged(true);
+  };
+
+  const handleSavePref = async () => {
+    try {
+      setIsSavingPref(true);
+      const res = await tenantPreferenceApi.updatePreference(pref);
+      if (res.data) setPref(res.data);
+      toast.success("Đã cập nhật sở thích thành công!");
+      setIsChanged(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Lỗi cập nhật sở thích.");
+    } finally {
+      setIsSavingPref(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border shadow-sm p-6 mt-6">
+      <div className="flex justify-between items-center border-b pb-4 mb-5">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-yellow-500" /> Cài đặt sở thích thuê phòng
+        </h3>
+        {isChanged && (
+          <Button size="sm" onClick={handleSavePref} isLoading={isSavingPref} className="gap-2">
+            <Save className="h-4 w-4" /> Lưu sở thích
+          </Button>
+        )}
+      </div>
+
+      <p className="text-sm text-muted-foreground mb-6">
+        Hệ thống AI sẽ dùng thông tin dưới đây để gợi ý những phòng trọ phù hợp nhất cho bạn ở trang chủ!
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Khu vực ưu tiên</Label>
+            <Input 
+              placeholder="Gò Vấp, Quận 12..." 
+              value={pref.preferredLocation || ''}
+              onChange={(e) => handleChange('preferredLocation', e.target.value)} 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Có nuôi thú cưng không?</Label>
+            <select 
+              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={pref.hasPet === true ? 'true' : pref.hasPet === false ? 'false' : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleChange('hasPet', val === 'true' ? true : val === 'false' ? false : undefined);
+              }}
+            >
+              <option value="">-- Chưa chọn --</option>
+              <option value="true">Có nuôi</option>
+              <option value="false">Không nuôi</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="space-y-4 border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6">
+          <div className="space-y-2">
+            <Label>Khoảng giá mong muốn (VNĐ)</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Input 
+                type="number" 
+                placeholder="Giá nhỏ nhất (Vd: 2000000)" 
+                min={0}
+                value={pref.targetPriceMin || ''}
+                onChange={(e) => handleChange('targetPriceMin', e.target.value ? Number(e.target.value) : undefined)} 
+              />
+              <Input 
+                type="number" 
+                placeholder="Giá cao nhất (Vd: 4000000)" 
+                min={0}
+                value={pref.targetPriceMax || ''}
+                onChange={(e) => handleChange('targetPriceMax', e.target.value ? Number(e.target.value) : undefined)} 
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Các tiện ích yêu cầu</Label>
+            <Input 
+              placeholder="Máy lạnh, máy giặt, gác lửng..." 
+              value={pref.amenitiesRef || ''}
+              onChange={(e) => handleChange('amenitiesRef', e.target.value)} 
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // UI Components nhỏ
 const InfoItem = ({ label, value, icon }: any) => (

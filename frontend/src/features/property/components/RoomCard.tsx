@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
-  Eye, FileSignature, Image as ImageIcon, CalendarClock 
+  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";
@@ -63,7 +63,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             </div>
           )}
 
-          <div className="absolute top-3 right-3 shadow-sm">
+          <div className="absolute top-3 right-3 shadow-sm z-10">
             {isAvailable ? (
               <span className="bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
                 <CheckCircle className="h-3 w-3" /> Còn trống
@@ -74,6 +74,19 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               </span>
             )}
           </div>
+
+          {data.matchScore && data.matchScore > 0 ? (
+            <div className="absolute top-3 left-3 flex flex-col items-start gap-1 z-10">
+              <span className="bg-primary/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
+                <Sparkles className="h-3 w-3" /> Phù hợp {Math.round(data.matchScore)}%
+              </span>
+              {data.matchReason && (
+                <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded shadow-sm max-w-[150px] line-clamp-1 italic">
+                  {data.matchReason}
+                </span>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {/* --- THÔNG TIN --- */}

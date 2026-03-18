@@ -27,5 +27,15 @@ export const contractApi = {
   },
   rejectChangeRequest: (requestId: number | string) => {
     return axiosClient.put(`/contracts/change-requests/${requestId}/reject`);
+  },
+  
+  // --- AI LEGAL ADVISOR ---
+  analyzeTerms: (id: number | string, data: { terms: string }) => {
+    return axiosClient.post<{ result: string }>(`/contracts/${id}/analyze-terms`, data, { timeout: 120000 });
+  },
+
+  // --- CẬP NHẬT ĐIỀU KHOẢN TRỰC TIẾP ---
+  updateTerms: (id: number | string, data: { terms: string }) => {
+    return axiosClient.put(`/contracts/${id}/terms`, data);
   }
 };

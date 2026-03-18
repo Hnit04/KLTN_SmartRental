@@ -21,4 +21,6 @@ public class RoomResponse {
     private Double waterPrice;
     private Double internetPrice;
     private String defaultTerms;
+    private Double matchScore; // Thêm điểm phù hợp AI
+    private String matchReason; // Lý do phù hợp (Vd: "Giá tốt, có gác lửng")
 }

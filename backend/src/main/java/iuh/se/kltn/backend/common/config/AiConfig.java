@@ -27,6 +27,7 @@ public class AiConfig {
                 .apiKey(apiKey)
                 .modelName("gemini-2.5-flash")
                 .temperature(0.7)
+                .timeout(java.time.Duration.ofSeconds(120)) // Cực kỳ quan trọng để ko bị timeout khi phân tích văn bản dài
                 .build();
     }
 

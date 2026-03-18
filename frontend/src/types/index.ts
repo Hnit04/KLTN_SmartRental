@@ -1,3 +1,10 @@
+
+// src/types/index.ts
+
+// ==========================================
+// 1. USER & AUTH TYPES
+// ==========================================
+
 export type UserRole = "TENANT" | "LANDLORD" | "ADMIN";
 export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED"; 
 
@@ -27,26 +34,7 @@ export interface User {
   reputationScore: number; 
   kycStatus: KYCStatus;
   createdAt: string;       
-  updatedAt: string; 
-  
-  locked?: boolean;
-  lockedAt?: string | null;
-  lockUntil?: string | null;
-  lockReason?: string | null;
-}
-
-export interface UserHistory {
-  id: number;
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  isLocked: boolean;
-  lockUntil: string | null;     
-  lockReason: string | null;
-  modifiedBy: string;
-  modifiedAt: string;    
-  modifiedByFullName: string;       
-  auditRemark: string | null;
+  updatedAt: string;       
 }
 
 export interface AuthResponse {
@@ -77,6 +65,16 @@ export interface UpdateProfileRequest {
   currentAddress?: string;
   cccdNumber?: string;
   avatarUrl?: string; 
+}
+
+export interface TenantPreference {
+  id: number;
+  tenantId: number;
+  targetPriceMin?: number;
+  targetPriceMax?: number;
+  preferredLocation?: string;
+  hasPet?: boolean;
+  amenitiesRef?: string;
 }
 
 // ==========================================
@@ -123,6 +121,8 @@ export interface Room {
   waterPrice?: number;
   internetPrice?: number;
   defaultTerms?: string;
+  matchScore?: number; // AI match score
+  matchReason?: string; // Reason for AI match
 }
 
 // ==========================================
@@ -307,7 +307,7 @@ export interface Bill {
   deadline: string;
   paymentTxHash?: string;
 }
-interface RevenueChartData {
+export interface RevenueChartData {
     name: string; 
     total: number; 
 }
@@ -349,3 +349,4 @@ export interface ChangeRequestDTO {
   newValue: string;
   reason: string;
 }
+

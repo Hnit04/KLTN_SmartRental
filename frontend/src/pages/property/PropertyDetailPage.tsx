@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { 
   MapPin, ArrowLeft, Zap, Droplets, Wifi, ShieldCheck, 
-  User, Phone, MessageSquare, CalendarClock, X, Loader2, Star
+  User, Phone, MessageSquare, CalendarClock, X, Loader2, Star, Bot,
+  ChevronLeft, ChevronRight, ZoomIn, SlidersHorizontal
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -24,6 +25,15 @@ export default function PropertyDetailPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reviews, setReviews] = useState<ReviewResponse[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- STATE LIGHTBOX ---
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // --- STATE FILTER PHÒNG ---
+  const [roomSortBy, setRoomSortBy] = useState<"default" | "price_asc" | "price_desc" | "area_asc">("default");
+  const [roomStatusFilter, setRoomStatusFilter] = useState<"ALL" | "AVAILABLE" | "RENTED">("ALL");
+  const [showRoomFilter, setShowRoomFilter] = useState(false);
 
   // --- STATE CHO MODAL ĐẶT LỊCH ---
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -92,6 +102,12 @@ export default function PropertyDetailPage() {
     window.open(`https://zalo.me/${phone}`, '_blank');
   };
 
+  const handleAskAI = () => {
+    if (!property) return;
+    const question = `Nhờ AI tư vấn thêm về ưu nhược điểm của khu trọ "${property.name}" (Địa chỉ: ${property.address}, ${property.district}, ${property.city}).`;
+    window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question } }));
+  };
+
   const handleOpenBookingModal = (room: Room) => {
     if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để đặt lịch xem phòng!");
@@ -134,14 +150,83 @@ export default function PropertyDetailPage() {
     }
   };
 
+  // --- COMPUTED: FILTER & SORT PHÒNG ---
+  const filteredRooms = useMemo(() => {
+    let result = [...rooms];
+    if (roomStatusFilter !== "ALL") {
+      result = result.filter(r => r.status === roomStatusFilter);
+    }
+    switch (roomSortBy) {
+      case "price_asc":  result.sort((a, b) => a.price - b.price); break;
+      case "price_desc": result.sort((a, b) => b.price - a.price); break;
+      case "area_asc":   result.sort((a, b) => a.area - b.area);  break;
+    }
+    return result;
+  }, [rooms, roomSortBy, roomStatusFilter]);
+
+  // --- COMPUTED: RATING TỔNG HỢP ---
+  const avgRating = reviews.length > 0
+    ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
+    : 0;
+  const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: reviews.filter(r => r.rating === star).length,
+    pct: reviews.length > 0 ? (reviews.filter(r => r.rating === star).length / reviews.length) * 100 : 0,
+  }));
+
   if (isLoading) return <LoadingSpinner />;
   if (!property) return <div className="text-center py-20 text-gray-500">Không tìm thấy khu trọ này.</div>;
 
+  // FIX: Không lặp ảnh nữa — chỉ dùng ảnh thật
   const images = property.images && property.images.length > 0 ? property.images : ["https://placehold.co/800x600?text=No+Image"];
-  const displayImages = images.length < 3 ? [...images, ...images, ...images].slice(0, 5) : images.slice(0, 5);
+  const displayImages = images.slice(0, 5); // max 5, không duplicate
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+
+      {/* ============ LIGHTBOX ============ */}
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <button
+            className="absolute left-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + images.length) % images.length); }}
+          >
+            <ChevronLeft className="h-7 w-7" />
+          </button>
+          <img
+            src={images[lightboxIndex]}
+            alt={`Ảnh ${lightboxIndex + 1}`}
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            className="absolute right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % images.length); }}
+          >
+            <ChevronRight className="h-7 w-7" />
+          </button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
+                className={`w-2 h-2 rounded-full transition ${i === lightboxIndex ? 'bg-white scale-125' : 'bg-white/40'}`}
+              />
+            ))}
+          </div>
+          <span className="absolute bottom-4 right-4 text-white/60 text-sm">{lightboxIndex + 1} / {images.length}</span>
+        </div>
+      )}
+
       {/* 1. HEADER & GALLERY */}
       <div className="bg-white border-b pb-6">
         <div className="container mx-auto max-w-7xl px-4 pt-6">
@@ -149,25 +234,52 @@ export default function PropertyDetailPage() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Quay lại tìm kiếm
           </Link>
 
+          {/* GALLERY — không lặp ảnh, có lightbox */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 h-[300px] md:h-[400px] rounded-2xl overflow-hidden mb-8 shadow-sm">
-            <div className="md:col-span-2 md:row-span-2 relative group cursor-pointer">
+            {/* Ảnh chính lớn */}
+            <div
+              className="md:col-span-2 md:row-span-2 relative group cursor-pointer"
+              onClick={() => { setLightboxIndex(0); setLightboxOpen(true); }}
+            >
               <img src={displayImages[0]} alt="Main" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
-            <div className="hidden md:block relative group cursor-pointer">
-               <img src={displayImages[1]} alt="Sub 1" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            </div>
-            <div className="hidden md:block relative group cursor-pointer">
-               <img src={displayImages[2]} alt="Sub 2" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            </div>
-            <div className="hidden md:block relative group cursor-pointer">
-               <img src={displayImages[1]} alt="Sub 3" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            </div>
-            <div className="hidden md:block relative group cursor-pointer">
-               <img src={displayImages[2]} alt="Sub 4" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-white font-bold text-sm bg-black/50 px-3 py-1 rounded-full border border-white/30">Xem tất cả ảnh</span>
-               </div>
-            </div>
+            {/* Ảnh phụ — chỉ hiện nếu có ảnh thật */}
+            {[1, 2, 3, 4].map((slot) => (
+              <div
+                key={slot}
+                className={`hidden md:block relative group cursor-pointer ${
+                  !displayImages[slot] ? 'bg-gray-100' : ''
+                }`}
+                onClick={() => { if (displayImages[slot]) { setLightboxIndex(slot); setLightboxOpen(true); } }}
+              >
+                {displayImages[slot] ? (
+                  <>
+                    <img
+                      src={displayImages[slot]}
+                      alt={`Sub ${slot}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {slot === 4 && images.length > 5 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">+{images.length - 5} ảnh</span>
+                      </div>
+                    )}
+                    {slot !== 4 && (
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-300 flex items-center justify-center">
+                        <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-100">
+                    <span className="text-xs">—</span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8">
@@ -219,14 +331,35 @@ export default function PropertyDetailPage() {
                      <Button variant="outline" className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 h-11" onClick={handleZalo}>
                         <MessageSquare className="h-4 w-4" /> Chat qua Zalo
                      </Button>
+                     <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50 h-11 shadow-sm" onClick={handleAskAI}>
+                        <Bot className="h-4 w-4" /> Nhờ AI tư vấn thêm về khu trọ này
+                     </Button>
                    </div>
                 </div>
 
-                <div className="bg-gray-100 rounded-xl h-48 flex flex-col items-center justify-center text-gray-400 border border-dashed relative overflow-hidden group">
-                   <div className="absolute inset-0 bg-[url('https://maps.gstatic.com/mapfiles/api-3/images/map_error_1.png')] bg-cover opacity-10 grayscale"></div>
-                   <MapPin className="h-8 w-8 mb-2 z-10 text-gray-300" />
-                   <span className="text-sm font-medium z-10">Bản đồ đang cập nhật</span>
+                {/* BẢN ĐỒ LEAFLET qua OpenStreetMap iframe */}
+                <div className="rounded-xl overflow-hidden border shadow-sm h-48">
+                  <iframe
+                    title="Bản đồ vị trí khu trọ"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=&layer=mapnik&marker=&query=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
+                    onError={(e) => {
+                      const iframe = e.currentTarget;
+                      iframe.style.display = 'none';
+                    }}
+                  />
                 </div>
+                <a
+                  href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                >
+                  <MapPin className="h-3 w-3" /> Xem bản đồ lớn hơn
+                </a>
               </div>
             </div>
           </div>
@@ -235,34 +368,113 @@ export default function PropertyDetailPage() {
 
       {/* 2. DANH SÁCH PHÒNG */}
       <div className="container mx-auto max-w-7xl px-4 py-10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">Danh sách phòng trống ({rooms.length})</h2>
-          <div className="inline-flex items-center gap-2 text-sm text-green-700 font-medium bg-green-50 px-4 py-1.5 rounded-full border border-green-200 shadow-sm">
-             <ShieldCheck className="h-4 w-4" /> Tin đăng đã được xác thực
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Danh sách phòng
+            <span className="ml-2 text-base font-normal text-gray-500">({filteredRooms.length}/{rooms.length})</span>
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex items-center gap-2 text-sm text-green-700 font-medium bg-green-50 px-4 py-1.5 rounded-full border border-green-200 shadow-sm">
+               <ShieldCheck className="h-4 w-4" /> Tin đăng đã xác thực
+            </div>
+            <button
+              onClick={() => setShowRoomFilter(!showRoomFilter)}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition ${
+                showRoomFilter ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" /> Lọc phòng
+            </button>
           </div>
         </div>
 
-        {rooms.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {rooms.map((room) => (
-              <RoomCard 
-                key={room.id} 
-                data={room} 
-                onBookAppointment={() => handleOpenBookingModal(room)} 
-              />
+        {/* PANEL LỌC PHÒNG */}
+        {showRoomFilter && (
+          <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-6 items-end animate-in slide-in-from-top-2 duration-200">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</label>
+              <div className="flex gap-2">
+                {(["ALL", "AVAILABLE", "RENTED"] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setRoomStatusFilter(s)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition ${
+                      roomStatusFilter === s
+                        ? 'bg-primary text-white border-primary'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {s === "ALL" ? "Tất cả" : s === "AVAILABLE" ? "Còn trống" : "Đã thuê"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-600 uppercase">Sắp xếp</label>
+              <select
+                className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+                value={roomSortBy}
+                onChange={e => setRoomSortBy(e.target.value as any)}
+              >
+                <option value="default">Mặc định</option>
+                <option value="price_asc">Giá: Thấp → Cao</option>
+                <option value="price_desc">Giá: Cao → Thấp</option>
+                <option value="area_asc">Diện tích: Nhỏ → Lớn</option>
+              </select>
+            </div>
+            <button
+              onClick={() => { setRoomSortBy("default"); setRoomStatusFilter("ALL"); }}
+              className="text-xs text-gray-500 hover:text-red-500 underline"
+            >
+              Đặt lại
+            </button>
+          </div>
+        )}
+
+        {filteredRooms.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {filteredRooms.map((room) => (
+              <div key={room.id} className="group relative">
+                <Link to={`/rooms/${room.id}`} className="block transition-transform hover:scale-[1.01] active:scale-[0.99]">
+                  <RoomCard 
+                    data={room} 
+                    onBookAppointment={() => handleOpenBookingModal(room)} 
+                  />
+                </Link>
+                {/* Nút đặt lịch nhanh — ngăn event nổi lên Link */}
+                <button
+                  onClick={e => { e.stopPropagation(); e.preventDefault(); handleOpenBookingModal(room); }}
+                  className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg hover:bg-primary/90"
+                >
+                  Đặt lịch
+                </button>
+              </div>
             ))}
           </div>
+
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-dashed">
              <div className="bg-gray-50 p-4 rounded-full mb-3">
                <ShieldCheck className="h-8 w-8 text-gray-300" />
              </div>
-             <h3 className="text-gray-900 font-medium">Chưa có phòng trống</h3>
-             <p className="text-gray-500 text-sm mt-1">Hiện tại khu trọ này chưa có phòng nào được đăng tải.</p>
+             <h3 className="text-gray-900 font-medium">
+               {rooms.length === 0 ? 'Chưa có phòng' : 'Không có phòng khớp bộ lọc'}
+             </h3>
+             <p className="text-gray-500 text-sm mt-1">
+               {rooms.length === 0
+                 ? 'Hiện tại khu trọ này chưa có phòng nào được đăng tải.'
+                 : 'Thử thay đổi bộ lọc để tìm phòng phù hợp.'}
+             </p>
+             {rooms.length > 0 && (
+               <button
+                 onClick={() => { setRoomSortBy('default'); setRoomStatusFilter('ALL'); }}
+                 className="mt-3 text-sm text-primary underline"
+               >Xóa bộ lọc</button>
+             )}
           </div>
         )}
 
-        {/* --- 4. KHỐI ĐÁNH GIÁ (REVIEWS) --- */}
+        {/* --- 4. KHỐI ĐÁNH GIÁ (REVIEWS) với Rating Tổng Hợp --- */}
         <div className="mt-12 bg-white rounded-2xl border p-6 md:p-8 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Star className="h-6 w-6 text-yellow-500 fill-yellow-500" />
@@ -271,44 +483,78 @@ export default function PropertyDetailPage() {
 
           {reviews.length === 0 ? (
             <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-dashed">
-              Chưa có đánh giá nào cho chủ nhà này.
+              Chưa có đánh giá nào cho khu trọ này.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {reviews.map((review) => (
-                <div key={review.id} className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold shrink-0">
-                        {review.reviewerName ? review.reviewerName.charAt(0).toUpperCase() : 'U'}
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm">{review.reviewerName || 'Người dùng ẩn danh'}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(review.createdAt).toLocaleDateString('vi-VN', { 
-                             year: 'numeric', month: 'long', day: 'numeric' 
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-0.5 shrink-0">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          className={`h-4 w-4 ${star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-200'}`} 
-                        />
-                      ))}
-                    </div>
+            <>
+              {/* RATING TỔNG HỢP */}
+              <div className="flex flex-col sm:flex-row gap-6 mb-8 p-5 bg-amber-50 rounded-2xl border border-amber-100">
+                {/* Điểm trung bình */}
+                <div className="flex flex-col items-center justify-center shrink-0 text-center">
+                  <span className="text-5xl font-extrabold text-amber-500">{avgRating.toFixed(1)}</span>
+                  <div className="flex gap-0.5 mt-1">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className={`h-5 w-5 ${
+                        s <= Math.round(avgRating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-200'
+                      }`} />
+                    ))}
                   </div>
-                  <p className="text-gray-700 text-sm leading-relaxed mt-2 italic">
-                    "{review.comment}"
-                  </p>
-                  <div className="mt-4 inline-block bg-white text-[11px] font-medium text-gray-500 px-2.5 py-1.5 rounded border">
-                    Đã thuê: Phòng {review.roomName}
-                  </div>
+                  <span className="text-xs text-gray-500 mt-1">{reviews.length} đánh giá</span>
                 </div>
-              ))}
-            </div>
+                {/* Phân phối sao */}
+                <div className="flex-1 space-y-1.5">
+                  {ratingDistribution.map(({ star, count, pct }) => (
+                    <div key={star} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-6 text-right shrink-0">{star}★</span>
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-400 w-4 shrink-0">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* DANH SÁCH REVIEW */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {reviews.map((review) => (
+                  <div key={review.id} className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold shrink-0">
+                          {review.reviewerName ? review.reviewerName.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">{review.reviewerName || 'Người dùng ẩn danh'}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(review.createdAt).toLocaleDateString('vi-VN', { 
+                               year: 'numeric', month: 'long', day: 'numeric' 
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5 shrink-0">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star 
+                            key={star} 
+                            className={`h-4 w-4 ${star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-200'}`} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-gray-700 text-sm leading-relaxed mt-2 italic">
+                      "{review.comment}"
+                    </p>
+                    <div className="mt-4 inline-block bg-white text-[11px] font-medium text-gray-500 px-2.5 py-1.5 rounded border">
+                      Đã thuê: Phòng {review.roomName}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

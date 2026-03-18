@@ -14,9 +14,20 @@ import java.util.Map;
 public class NotificationController {
     private final NotificationService notificationService;
 
+    // Lấy danh sách thông báo (có phân trang tuỳ chọn)
     @GetMapping("/mine")
-    public ResponseEntity<?> getMyNotifications(Principal principal) {
-        return ResponseEntity.ok(notificationService.getMyNotifications(principal.getName()));
+    public ResponseEntity<?> getMyNotifications(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal) {
+        return ResponseEntity.ok(notificationService.getMyNotifications(principal.getName(), page, size));
+    }
+
+    // Đếm thông báo chưa đọc — nhẹ, dùng cho badge polling
+    @GetMapping("/unread-count")
+    public ResponseEntity<?> getUnreadCount(Principal principal) {
+        long count = notificationService.countUnread(principal.getName());
+        return ResponseEntity.ok(Map.of("count", count));
     }
 
     @PutMapping("/{id}/read")
@@ -30,4 +41,11 @@ public class NotificationController {
         notificationService.markAllAsRead(principal.getName());
         return ResponseEntity.ok(Map.of("message", "Đã đánh dấu đọc tất cả"));
     }
-}
+
+    // Xoá 1 thông báo
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteNotification(@PathVariable Long id, Principal principal) {
+        notificationService.deleteNotification(id, principal.getName());
+        return ResponseEntity.ok(Map.of("message", "Đã xoá thông báo"));
+    }
+}

@@ -114,19 +114,19 @@ export default function App() {
                 Đơn giản hóa mọi thủ tục giấy tờ, thanh toán minh bạch và an toàn tuyệt đối.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                {!isAuthenticated && (
+                {!isAuthenticated ? (
                   <Link to="/register">
                     <Button size="lg" className="w-full sm:w-auto gap-2 group">
                       Bắt đầu ngay
                       <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </Link>
-                )}
+                ) : null}
                 <Link to="/properties">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  Khám phá phòng trọ
-                </Button> 
-              </Link>
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                    Khám phá phòng trọ
+                  </Button> 
+                </Link>
               </div>
             </div>
 
@@ -223,10 +223,12 @@ export default function App() {
                 Gia nhập cộng đồng hơn 5,000 chủ trọ thông thái. Đăng tin hoàn toàn miễn phí và bắt đầu quản lý chuyên nghiệp ngay hôm nay.
               </p>
               <div className="mt-10 flex flex-col items-center justify-center gap-6">
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto gap-3 py-6 px-10">
-                  <Users className="h-5 w-5" />
-                  Đăng ký làm chủ trọ
-                </Button>
+                <Link to="/register">
+                  <Button variant="secondary" size="lg" className="w-full sm:w-auto gap-3 py-6 px-10">
+                    <Users className="h-5 w-5" />
+                    Đăng ký làm chủ trọ
+                  </Button>
+                </Link>
                 
                 <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#DBC1AC]/60">
                   <span className="flex items-center gap-2">

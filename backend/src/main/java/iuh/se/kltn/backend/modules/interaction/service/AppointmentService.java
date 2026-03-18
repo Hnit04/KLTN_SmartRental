@@ -54,8 +54,8 @@ public class AppointmentService {
                 room.getProperty().getLandlord(),
                 "Yêu cầu xem phòng mới",
                 "Khách hàng " + tenant.getFullName() + " vừa đặt lịch xem phòng " + room.getName(),
-                NotificationType.SYSTEM,
-                room.getProperty().getId() // Dẫn về trang chi tiết khu trọ
+                NotificationType.APPOINTMENT_UPDATE,
+                room.getProperty().getId()
         );
 
         return mapToResponse(saved);
@@ -63,7 +63,26 @@ public class AppointmentService {
 
     public List<AppointmentResponse> getPendingAppointmentsByLandlord(Long landlordId) {
         List<Appointment> appointments = appointmentRepo.findByLandlordIdAndStatus(landlordId, AppointmentStatus.PENDING);
+        return appointments.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
+    // Lấy tất cả lịch hẹn của Tenant đang đăng nhập
+    public List<AppointmentResponse> getMyAppointments(String username) {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+        List<Appointment> appointments = appointmentRepo.findByTenantId(user.getId());
+        return appointments.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Lấy tất cả lịch hẹn của Chủ trọ đang đăng nhập (tất cả trạng thái)
+    public List<AppointmentResponse> getAllByLandlord(String username) {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+        List<Appointment> appointments = appointmentRepo.findByLandlordId(user.getId());
         return appointments.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -106,7 +125,7 @@ public class AppointmentService {
                     appointment.getTenant(), // Gửi cho Khách thuê
                     title,
                     message,
-                    NotificationType.SYSTEM, // Loại thông báo hệ thống
+                    NotificationType.APPOINTMENT_UPDATE, // ✅ Dùng APPOINTMENT_UPDATE để FE navigate đúng
                     appointment.getRoom().getProperty().getId() // Dẫn Khách về lại trang chi tiết khu trọ
             );
         }

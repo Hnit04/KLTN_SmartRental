@@ -1,6 +1,6 @@
 package iuh.se.kltn.backend.modules.contract.repository;
 
-import iuh.se.kltn.backend.modules.contract.dto.MonthlyRevenueResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.MonthlyRevenueResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Bill;
 import iuh.se.kltn.backend.modules.contract.enums.BillStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -57,7 +57,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     Long countOverdueBillsByLandlord(@Param("landlordId") Long landlordId);
 
     @Query("""
-    SELECT new iuh.se.kltn.backend.modules.contract.dto.MonthlyRevenueResponse(
+    SELECT new iuh.se.kltn.backend.modules.contract.dto.response.MonthlyRevenueResponse(
         b.year, 
         b.month, 
         COALESCE(SUM(b.totalAmount-b.discountAmount), 0)

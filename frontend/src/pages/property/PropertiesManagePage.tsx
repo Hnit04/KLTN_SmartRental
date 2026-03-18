@@ -1,11 +1,28 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed } from 'lucide-react';
+import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed, Trash2, AlertTriangle, Home, CheckCircle } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { toast } from 'sonner';
 import type { Property } from '@/types/index';
+
+// Danh sách 63 tỉnh/thành phố Việt Nam
+const VIETNAM_CITIES = [
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
+  "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
+  "Bình Thuận", "Cà Mau", "Cần Thơ", "Cao Bằng", "Đắk Lắk",
+  "Đắk Nông", "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai",
+  "Hà Giang", "Hà Nam", "Hà Nội", "Hà Tĩnh", "Hải Dương",
+  "Hải Phòng", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Khánh Hòa",
+  "Kiên Giang", "Kon Tum", "Lai Châu", "Lâm Đồng", "Lạng Sơn",
+  "Lào Cai", "Long An", "Nam Định", "Nghệ An", "Ninh Bình",
+  "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam",
+  "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La",
+  "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên - Huế",
+  "Tiền Giang", "Tp. Hồ Chí Minh", "Trà Vinh", "Tuyên Quang", "Vĩnh Long",
+  "Vĩnh Phúc", "Yên Bái", "Đà Nẵng"
+];
 
 export default function PropertiesManagePage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -16,6 +33,10 @@ export default function PropertiesManagePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false); // State định vị
+  
+  // --- STATE XOÁ KHU TRỌ ---
+  const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '', city: '', district: '', address: '',
@@ -62,11 +83,27 @@ export default function PropertiesManagePage() {
       name: property.name || '', city: property.city || '', district: property.district || '', address: property.address || '',
       elecPrice: property.elecPrice?.toString() || '', waterPrice: property.waterPrice?.toString() || '',
       internetPrice: property.internetPrice?.toString() || '', description: property.description || '',
-      images: property.images || [] // Load ảnh cũ từ DB
+      images: property.images || []
     });
     setSelectedFiles([]);
-    setPreviewUrls([]); // Clear file preview chưa upload
+    setPreviewUrls([]);
     setShowModal(true);
+  };
+
+  // Xác nhận và thực hiện xóa khu trọ
+  const handleDeleteConfirmed = async () => {
+    if (!deleteConfirm) return;
+    setIsDeleting(true);
+    try {
+      await propertyApi.deleteProperty(deleteConfirm.id);
+      toast.success(`Đã xóa khu trọ “${deleteConfirm.name}”!`);
+      setDeleteConfirm(null);
+      fetchProperties();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Xóa thất bại. Khu trọ có thể đang có phòng và hợp đồng. ');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleGetLocation = () => {
@@ -231,12 +268,23 @@ export default function PropertiesManagePage() {
         <Button onClick={handleOpenCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Thêm Khu trọ</Button>
       </div>
 
+      {/* DANH SÁCH KHU TRỌ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties.map((property) => (
           <Card key={property.id} className="overflow-hidden hover:shadow-md transition-shadow group relative flex flex-col">
-            <button onClick={() => handleOpenEdit(property)} className="absolute top-2 right-2 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-blue-50 text-blue-600">
+            {/* Nút sửa */}
+            <button onClick={() => handleOpenEdit(property)} className="absolute top-2 right-10 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-blue-50 text-blue-600">
               <Edit className="h-4 w-4" />
             </button>
+            {/* Nút xóa */}
+            <button
+              onClick={() => setDeleteConfirm(property)}
+              className="absolute top-2 right-2 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-red-50 text-red-500"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+
+            {/* Ảnh bìa */}
             <div className="h-40 bg-gray-200 relative">
               {property.images && property.images.length > 0 ? (
                 <img src={property.images[0]} alt="cover" className="w-full h-full object-cover" />
@@ -244,12 +292,27 @@ export default function PropertiesManagePage() {
                 <div className="w-full h-full flex items-center justify-center text-gray-400"><Building className="h-10 w-10 opacity-50" /></div>
               )}
             </div>
+
+            {/* Nội dung */}
             <div className="p-5 flex-1 flex flex-col">
               <h3 className="text-lg font-bold text-gray-900 mb-1 truncate pr-6">{property.name}</h3>
               <div className="flex items-start gap-1.5 text-sm text-gray-500 mb-3 h-10">
                 <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="line-clamp-2">{property.address}, {property.district}, {property.city}</span>
               </div>
+
+              {/* THỐNG KÊ NHÀNH */}
+              <div className="flex gap-3 text-xs mb-4">
+                <div className="flex items-center gap-1 text-gray-500">
+                  <Home className="h-3.5 w-3.5" />
+                  <span>{(property as any).totalRooms ?? '?'} phòng</span>
+                </div>
+                <div className="flex items-center gap-1 text-green-600 font-medium">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  <span>{(property as any).availableRooms ?? '?'} trống</span>
+                </div>
+              </div>
+
               <div className="mt-auto">
                 <Link to={`/properties/manage/${property.id}`}><Button variant="secondary" className="w-full">Quản lý phòng</Button></Link>
               </div>
@@ -277,10 +340,21 @@ export default function PropertiesManagePage() {
                 </div>
                 
                 {/* --- KHU VỰC NHẬP ĐỊA CHỈ & LẤY VỊ TRÍ --- */}
+                {/* --- KHỌI NHẬP ĐỊA CHỄ VÀ LẤY VỊ TRÍ --- */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh / Thành phố *</label>
-                    <input required type="text" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: Hồ Chí Minh" />
+                    <select
+                      required
+                      className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none bg-white"
+                      value={formData.city}
+                      onChange={e => setFormData({...formData, city: e.target.value})}
+                    >
+                      <option value="">-- Chọn Tỉnh/TP --</option>
+                      {VIETNAM_CITIES.map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quận / Huyện</label>
@@ -375,6 +449,47 @@ export default function PropertiesManagePage() {
               </Button>
             </div>
             
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* DIALOG XÁC NHẬN XÓA KHU TRỌ */}
+      {/* ============================================================ */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-red-50 rounded-full mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Xóa khu trọ?</h3>
+              <p className="text-sm text-gray-500 mb-1">
+                Bạn có chắc muốn xóa khu trọ
+              </p>
+              <p className="font-semibold text-gray-900 mb-2">"{ deleteConfirm.name}"?</p>
+              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                ⚠️ Hành động này không thể hoàn tác. Tất cả phòng trong khu trọ này cũng sẽ bị xóa.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={isDeleting}
+              >
+                Hủy
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleDeleteConfirmed}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Xóa vĩnh viễn
+              </Button>
+            </div>
           </div>
         </div>
       )}
