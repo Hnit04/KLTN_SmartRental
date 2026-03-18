@@ -36,6 +36,7 @@ import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
+import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
@@ -101,6 +102,7 @@ function App() {
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-otp" element={<VerifyOtpPage />} />
           </Route>
         </Route>
 

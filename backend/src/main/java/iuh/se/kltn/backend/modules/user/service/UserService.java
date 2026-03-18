@@ -126,7 +126,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        user.setLocked(false);
+        user.setIsLocked(false);
         user.setLockUntil(null);
         user.setLockReason(null);
         userRepository.saveAndFlush(user);
@@ -135,7 +135,7 @@ public class UserService {
     @Transactional
     public void lockUserTemporary(Long userId, int durationDays, List<String> reason) {
         User user = userRepository.findById(userId).orElseThrow();
-        user.setLocked(true);
+        user.setIsLocked(true);
         user.setLockedAt(LocalDateTime.now());
         user.setLockUntil(LocalDateTime.now().plusDays(durationDays));
         user.setLockReason(reason);

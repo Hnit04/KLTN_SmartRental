@@ -6,7 +6,7 @@ spring:
     name: smart-rental
   datasource:
     # URL kết nối MariaDB, lưu ý port 3307
-    url: jdbc:mariadb://localhost:3307/smart_rental_db?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8mb4
+    url: jdbc:mariadb://localhost:3306/smart_rental_db?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8mb4
     username: root
     password: root
     # Driver chuẩn của MariaDB
@@ -79,3 +79,9 @@ jpa:
         store_data_at_delete: true
         # Bắt buộc ghi log ngay cả khi các trường không thay đổi giá trị (giúp audit chặt chẽ hơn)
         audit_strategy: org.hibernate.envers.strategy.DefaultAuditStrategy
+brevo:
+  api:
+    key: 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
+  sender:
+    email: tranngochung19112004@gmail.com
+    name: SmartRental

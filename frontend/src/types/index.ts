@@ -34,7 +34,10 @@ export interface User {
   lockUntil?: string | null;
   lockReason?: string | null;
 }
-
+export interface VerifyOtpRequest {
+  email: string;
+  code: string;
+}
 export interface UserHistory {
   id: number;
   fullName: string;

@@ -94,7 +94,7 @@ public class User {
     private String cccdBackUrl;
 
     @Column(name = "is_locked")
-    private boolean isLocked = false;
+    private Boolean isLocked = false;
 
     @Column(name = "locked_at")
     private LocalDateTime lockedAt;
@@ -105,4 +105,10 @@ public class User {
     @Column(name = "lock_reason", columnDefinition = "TEXT")
     @Convert(converter = LockReasonConverter.class)
     private List<String> lockReason = new ArrayList<>();
+    @Column(name= "verification_code")
+    private String verificationCode;
+    @Column(name = "verification_expiry")
+    private LocalDateTime verificationExpiry;
+    @Column(name="is_enabled")
+    private Boolean isEnabled = false;
 }
