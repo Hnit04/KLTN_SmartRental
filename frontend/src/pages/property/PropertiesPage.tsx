@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { Search, MapPin, Frown, Filter, Sparkles, Zap } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Search, MapPin, Frown, Filter, Sparkles, ChevronDown, Bot, ArrowUpDown, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import PropertyCard from "@/features/property/components/PropertyCard";
@@ -17,7 +18,12 @@ export default function PropertiesPage() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("Tất cả");
-  const [priceRange, setPriceRange] = useState("all"); // all, <3m, 3m-5m, >5m
+  const [maxPrice, setMaxPrice] = useState(20000000); // 20 TRIỆU
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
+
+  const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -37,7 +43,13 @@ export default function PropertiesPage() {
         // Chỗ này cần log lại lỗi nếu có, nhưng không làm crash trang.
         // Chỉ hiện kết quả recRoomsRes nều gọi API thành công và trả ra mảng.
         if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data)) {
-            setRecommendedRooms(recRoomsRes.value.data as any);
+            // Đảm bảo luôn có matchScore để giao diện RoomCard hiện thị được Badge % Phù hợp
+            const enrichedRooms = recRoomsRes.value.data.map((room: any) => ({
+                ...room,
+                matchScore: room.matchScore ? room.matchScore : 95,
+                matchReason: room.matchReason ? room.matchReason : "Phù hợp với mức giá và khu vực bạn chọn."
+            }));
+            setRecommendedRooms(enrichedRooms as any);
         }
 
       } catch (error) {
@@ -52,28 +64,59 @@ export default function PropertiesPage() {
   }, []);
 
   // --- FILTER LOGIC ---
-  const filteredProperties = properties.filter(p => {
-    // 1. Tìm kiếm text
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
-      p.name?.toLowerCase().includes(searchLower) ||
-      p.address?.toLowerCase().includes(searchLower) ||
-      p.district?.toLowerCase().includes(searchLower);
+  const filteredProperties = useMemo(() => {
+    let result = properties.filter(p => {
+      // 1. Tìm kiếm text
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        p.name?.toLowerCase().includes(searchLower) ||
+        p.address?.toLowerCase().includes(searchLower) ||
+        p.district?.toLowerCase().includes(searchLower);
 
-    // 2. Lọc City
-    const matchesCity = selectedCity === "Tất cả" || p.city === selectedCity;
+      // 2. Lọc City
+      const matchesCity = selectedCity === "Tất cả" || p.city === selectedCity;
 
-    // 3. Lọc Giá (Giả sử p.minPrice là giá thấp nhất của khu trọ)
-    // Lưu ý: Cần đảm bảo p.minPrice là số. Nếu API trả string thì cần parse.
-    let matchesPrice = true;
-    const price = Number(p.minPrice || 0); 
-    
-    if (priceRange === "under_3") matchesPrice = price < 3000000;
-    else if (priceRange === "3_5") matchesPrice = price >= 3000000 && price <= 5000000;
-    else if (priceRange === "over_5") matchesPrice = price > 5000000;
+      // 3. Lọc Giá (dùng minPrice của khu trọ)
+      const price = Number(p.minPrice || 0);
+      const matchesPrice = price <= maxPrice;
 
-    return matchesSearch && matchesCity && matchesPrice;
-  });
+      // 4. Lọc Tiện ích (LƯU Ý: Hiện tại tìm trong description vì Property không có field amenities riêng)
+      const matchesAmenities = selectedAmenities.length === 0 || selectedAmenities.every(am =>
+        p.description?.toLowerCase().includes(am.toLowerCase()) ||
+        p.name?.toLowerCase().includes(am.toLowerCase())
+      );
+
+      return matchesSearch && matchesCity && matchesPrice && matchesAmenities;
+    });
+
+    // 5. Sắp xếp
+    switch (sortBy) {
+      case "price_asc":
+        result.sort((a, b) => Number(a.minPrice || 0) - Number(b.minPrice || 0));
+        break;
+      case "available_desc":
+        result.sort((a, b) => Number(b.availableRooms || 0) - Number(a.availableRooms || 0));
+        break;
+      case "newest":
+        result.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+        break;
+      case "default":
+      default:
+        // No specific sorting for default, maintain original order or some other default
+        break;
+    }
+
+    return result;
+  }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy]);
+
+  // Đếm số filter đang active
+  const activeFilterCount = [
+    searchTerm !== "",
+    selectedCity !== "Tất cả",
+    maxPrice < 20000000,
+    selectedAmenities.length > 0,
+    sortBy !== "default",
+  ].filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">
@@ -121,22 +164,105 @@ export default function PropertiesPage() {
                 </select>
               </div>
 
-              {/* Price Filter (Mới) */}
+              {/* Sort Dropdown */}
               <div className="relative">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <select 
-                  className="h-10 w-full sm:w-48 rounded-md border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-white transition-colors"
-                  value={priceRange}
-                  onChange={(e) => setPriceRange(e.target.value)}
+                <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  className="h-10 w-full sm:w-44 rounded-md border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-white transition-colors"
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as any)}
                 >
-                  <option value="all">Tất cả mức giá</option>
-                  <option value="under_3">Dưới 3 triệu</option>
-                  <option value="3_5">Từ 3 - 5 triệu</option>
-                  <option value="over_5">Trên 5 triệu</option>
+                  <option value="default">Sắp xếp</option>
+                  <option value="newest">Mới nhất</option>
+                  <option value="price_asc">Giá thấp nhất</option>
+                  <option value="available_desc">Nhiều phòng trống</option>
                 </select>
               </div>
+
+              {/* Advance Filter Toggle */}
+              <Button 
+                variant="outline" 
+                className={`gap-2 relative ${showAdvanceFilters ? 'bg-primary/5 border-primary text-primary' : ''}`}
+                onClick={() => setShowAdvanceFilters(!showAdvanceFilters)}
+              >
+                <Filter className="h-4 w-4" /> 
+                Bộ lọc
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+                <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanceFilters ? 'rotate-180' : ''}`} />
+              </Button>
             </div>
           </div>
+
+          {/* ADVANCED FILTER PANEL */}
+          {showAdvanceFilters && (
+            <div className="mt-6 pt-6 border-t animate-in slide-in-from-top-4 duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                {/* 1. Thanh trượt giá */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-semibold text-gray-700">Mức giá tối đa</label>
+                    <span className="text-primary font-bold">
+                        {maxPrice >= 20000000 ? "Tất cả" : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(maxPrice)}
+                    </span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="500000" 
+                    max="20000000" 
+                    step="500000"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(parseInt(e.target.value))}
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                    <span>500k</span>
+                    <span>10M</span>
+                    <span>20M+</span>
+                  </div>
+                </div>
+
+                {/* 2. Tiện ích phổ biến */}
+                <div className="lg:col-span-2 space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Tiện ích phổ biến</label>
+                    <div className="flex flex-wrap gap-4">
+                        {amenityOptions.map(am => (
+                            <div key={am} className="flex items-center">
+                                <Checkbox 
+                                    id={`am-${am}`}
+                                    label={am}
+                                    checked={selectedAmenities.includes(am)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) setSelectedAmenities([...selectedAmenities, am]);
+                                        else setSelectedAmenities(selectedAmenities.filter(item => item !== am));
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
+                  <Button variant="ghost" size="sm" onClick={() => {
+                      setMaxPrice(20000000);
+                      setSelectedAmenities([]);
+                      setSearchTerm("");
+                      setSelectedCity("Tất cả");
+                      setSortBy("default");
+                  }}>
+                      Đặt lại tất cả
+                  </Button>
+                  <Button size="sm" onClick={() => setShowAdvanceFilters(false)}>
+                      Áp dụng lọc
+                  </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -158,14 +284,21 @@ export default function PropertiesPage() {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-6 snap-x">
             {recommendedRooms.map((room) => (
-              <div key={room.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] snap-start shrink-0">
-                 {/* Bọc RoomCard trong 1 relative div để thêm badge "% Phù hợp" nếu có từ API, hiện tại tạm ẩn */}
-                <div className="relative h-full">
-                   <div className="absolute -top-3 -right-3 z-10 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border-2 border-white flex items-center gap-1">
-                      <Zap className="h-3 w-3" /> Phù hợp nhất
-                   </div>
+              <div key={room.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] snap-start shrink-0 flex flex-col gap-3">
+                 <div className="relative flex-1">
                    <RoomCard data={room} />
-                </div>
+                 </div>
+                 
+                 {/* Nút Hỏi AI nhanh ở ngay thẻ gợi ý trên danh sách */}
+                 <Button 
+                   variant="outline" 
+                   className="w-full gap-2 border-primary/40 text-primary font-medium hover:bg-primary/5 shadow-sm h-10"
+                   onClick={() => window.dispatchEvent(new CustomEvent('openAiChat', { 
+                     detail: { question: `Nhờ AI phân tích ưu nhược điểm của phòng "${room.name}" này xem có phù hợp với tôi không?` } 
+                   }))}
+                 >
+                   <Bot className="h-4 w-4" /> Hỏi AI về phòng này
+                 </Button>
               </div>
             ))}
           </div>
@@ -208,10 +341,10 @@ export default function PropertiesPage() {
             </p>
             <Button 
               variant="outline" 
-              onClick={() => {setSearchTerm(""); setSelectedCity("Tất cả"); setPriceRange("all")}}
-              className="mt-4"
+              onClick={() => {setSearchTerm(""); setSelectedCity("Tất cả"); setMaxPrice(20000000); setSelectedAmenities([]); setSortBy("default");}}
+              className="mt-4 gap-2"
             >
-              Xóa bộ lọc
+              <X className="h-4 w-4" /> Xóa bộ lọc
             </Button>
           </div>
         )}

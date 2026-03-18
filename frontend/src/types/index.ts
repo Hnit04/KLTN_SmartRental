@@ -120,6 +120,8 @@ export interface Room {
   waterPrice?: number;
   internetPrice?: number;
   defaultTerms?: string;
+  matchScore?: number; // AI match score
+  matchReason?: string; // Reason for AI match
 }
 
 // ==========================================
