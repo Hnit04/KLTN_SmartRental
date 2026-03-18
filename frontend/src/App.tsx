@@ -17,6 +17,7 @@ import ProfilePage from "./pages/user/ProfilePage";
 // --- PROPERTY PAGES ---
 import PropertiesPage from "./pages/property/PropertiesPage";
 import PropertyDetailPage from "./pages/property/PropertyDetailPage";
+import RoomDetailPage from "./pages/property/RoomDetailPage";
 import PropertiesManagePage from "./pages/property/PropertiesManagePage";
 import PropertyManageDetailPage from "./pages/property/PropertyManageDetailPage";
 import BillManagePage from "./pages/finance/BillManagePage";
@@ -25,6 +26,7 @@ import ContractsPage from "./pages/contract/ContractsPage";
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
 import DashboardPage from "./pages/dashboard/DashboardPage";
+import TenantDashboardPage from "./pages/dashboard/TenantDashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
 
 // ✅ 1. IMPORT TRANG QUẢN LÝ LỊCH HẸN VÀO ĐÂY
@@ -47,7 +49,7 @@ const PublicRoute = () => {
 
   if (isAuthenticated && (location.pathname === "/login" || location.pathname === "/register")) {
     // Điều hướng dựa theo Role
-    return <Navigate to={user?.role === 'LANDLORD' ? "/dashboard" : "/"} replace />; 
+    return <Navigate to={user?.role === 'LANDLORD' ? "/dashboard" : "/tenant-dashboard"} replace />; 
   }
 
   return <Outlet />;
@@ -78,6 +80,7 @@ function App() {
             {/* PROPERTY ROUTES */}
             <Route path="/properties" element={<PropertiesPage />} />
             <Route path="/properties/:id" element={<PropertyDetailPage />} />
+            <Route path="/rooms/:id" element={<RoomDetailPage />} />
             
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/help" element={<HelpCenter />} />
@@ -106,6 +109,11 @@ function App() {
                 
                 <Route path="/finance" element={<BillManagePage />} />
                 <Route path="/reports" element={<ReportsPage />} />
+              </Route>
+
+              {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}
+              <Route element={<RoleRoute allowedRoles={['TENANT']} />}>
+                <Route path="/tenant-dashboard" element={<TenantDashboardPage />} />
               </Route>
               
               {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}

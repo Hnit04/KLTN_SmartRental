@@ -22,6 +22,8 @@ export default function AppointmentManagePage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [viewingApt, setViewingApt] = useState<AppointmentResponse | null>(null);
 
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('ALL');
+
   const fetchAppointments = async () => {
     if (!user) return;
     try {
@@ -29,17 +31,14 @@ export default function AppointmentManagePage() {
       let res;
       
       if (user.role === 'LANDLORD') {
-        res = await appointmentApi.getPendingByLandlord(user.id); 
+        // Dùng endpoint mới: lấy tất cả lịch hẹn (không chỉ PENDING)
+        res = await appointmentApi.getAllByLandlord();
       } else {
         res = await appointmentApi.getMyAppointments();
       }
       
       let data = (res as any)?.data !== undefined ? (res as any).data : res;
-      
-      if (!Array.isArray(data)) {
-        data = [];
-      }
-
+      if (!Array.isArray(data)) data = [];
       setAppointments(data);
     } catch (error) {
       toast.error("Không thể tải danh sách lịch hẹn!");
@@ -73,12 +72,13 @@ export default function AppointmentManagePage() {
 
   const filteredAppointments = appointments.filter(apt => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchSearch =
       (apt.roomName?.toLowerCase().includes(searchLower)) || 
       (apt.tenantFullName?.toLowerCase().includes(searchLower)) ||
       (apt.landlordFullName?.toLowerCase().includes(searchLower)) ||
-      (apt.tenantPhone?.includes(searchTerm))
-    );
+      (apt.tenantPhone?.includes(searchTerm));
+    const matchStatus = filterStatus === 'ALL' || apt.status === filterStatus;
+    return matchSearch && matchStatus;
   });
 
   const pendingCount = appointments.filter(a => a.status === 'PENDING').length;
@@ -113,9 +113,27 @@ export default function AppointmentManagePage() {
       </div>
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50">
-          <h3 className="font-bold text-gray-800">Danh sách yêu cầu xem phòng</h3>
-          
+        {/* FILTER TABS */}
+        <div className="p-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50">
+          <div className="flex flex-wrap gap-1.5">
+            {(['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                  filterStatus === s
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {s === 'ALL' ? `Tất cả (${appointments.length})` 
+                  : s === 'PENDING' ? `Chờ duyệt (${pendingCount})`
+                  : s === 'CONFIRMED' ? `Đã chốt (${confirmedCount})`
+                  : `Đã hủy (${rejectedCount})`
+                }
+              </button>
+            ))}
+          </div>
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input 

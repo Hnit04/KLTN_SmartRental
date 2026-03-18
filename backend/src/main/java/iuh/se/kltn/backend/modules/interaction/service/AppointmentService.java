@@ -63,7 +63,26 @@ public class AppointmentService {
 
     public List<AppointmentResponse> getPendingAppointmentsByLandlord(Long landlordId) {
         List<Appointment> appointments = appointmentRepo.findByLandlordIdAndStatus(landlordId, AppointmentStatus.PENDING);
+        return appointments.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
+    // Lấy tất cả lịch hẹn của Tenant đang đăng nhập
+    public List<AppointmentResponse> getMyAppointments(String username) {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+        List<Appointment> appointments = appointmentRepo.findByTenantId(user.getId());
+        return appointments.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Lấy tất cả lịch hẹn của Chủ trọ đang đăng nhập (tất cả trạng thái)
+    public List<AppointmentResponse> getAllByLandlord(String username) {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+        List<Appointment> appointments = appointmentRepo.findByLandlordId(user.getId());
         return appointments.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

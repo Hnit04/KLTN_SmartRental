@@ -24,6 +24,20 @@ public class AppointmentController {
         return ResponseEntity.ok(response);
     }
 
+    // ✅ Tenant xem danh sách lịch hẹn của chính mình
+    @GetMapping("/mine")
+    public ResponseEntity<List<AppointmentResponse>> getMyAppointments(Principal principal) {
+        List<AppointmentResponse> appointments = appointmentService.getMyAppointments(principal.getName());
+        return ResponseEntity.ok(appointments);
+    }
+
+    // ✅ Chủ trọ xem TẤT CẢ lịch hẹn (mọi trạng thái)
+    @GetMapping("/my-appointments")
+    public ResponseEntity<List<AppointmentResponse>> getAllByLandlord(Principal principal) {
+        List<AppointmentResponse> appointments = appointmentService.getAllByLandlord(principal.getName());
+        return ResponseEntity.ok(appointments);
+    }
+
     @GetMapping("/landlord/{landlordId}/pending")
     public ResponseEntity<List<AppointmentResponse>> getPendingAppointments(@PathVariable Long landlordId) {
         List<AppointmentResponse> appointments = appointmentService.getPendingAppointmentsByLandlord(landlordId);
@@ -51,4 +65,4 @@ public class AppointmentController {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-}
+}

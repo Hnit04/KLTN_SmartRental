@@ -13,12 +13,17 @@ export const appointmentApi = {
     return axiosClient.post("/appointments", data);
   },
 
-  // 2. Khách thuê lấy danh sách lịch hẹn của mình (Chuẩn bị cho bước sau)
+  // 2. Khách thuê lấy danh sách lịch hẹn của mình
   getMyAppointments: () => {
     return axiosClient.get("/appointments/mine");
   },
-  
-  // 3. Chủ nhà lấy danh sách lịch hẹn đang chờ duyệt
+
+  // 3. Chủ trọ lấy TẤT CẢ lịch hẹn (mọi trạng thái)
+  getAllByLandlord: () => {
+    return axiosClient.get("/appointments/my-appointments");
+  },
+
+  // 4. Chủ nhà lấy danh sách lịch hẹn đang chờ duyệt (legacy)
   getPendingByLandlord: (landlordId: number | string) => {
     return axiosClient.get(`/appointments/landlord/${landlordId}/pending`);
   },

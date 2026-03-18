@@ -432,15 +432,26 @@ export default function PropertyDetailPage() {
         )}
 
         {filteredRooms.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRooms.map((room) => (
-              <RoomCard 
-                key={room.id} 
-                data={room} 
-                onBookAppointment={() => handleOpenBookingModal(room)} 
-              />
+              <div key={room.id} className="group relative">
+                <Link to={`/rooms/${room.id}`} className="block transition-transform hover:scale-[1.01] active:scale-[0.99]">
+                  <RoomCard 
+                    data={room} 
+                    onBookAppointment={() => handleOpenBookingModal(room)} 
+                  />
+                </Link>
+                {/* Nút đặt lịch nhanh — ngăn event nổi lên Link */}
+                <button
+                  onClick={e => { e.stopPropagation(); e.preventDefault(); handleOpenBookingModal(room); }}
+                  className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg hover:bg-primary/90"
+                >
+                  Đặt lịch
+                </button>
+              </div>
             ))}
           </div>
+
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-dashed">
              <div className="bg-gray-50 p-4 rounded-full mb-3">

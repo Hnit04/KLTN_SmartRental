@@ -55,17 +55,22 @@ const Sidebar = () => {
   // 2. Menu dành cho NGƯỜI THUÊ
   const tenantItems = [
     {
+      title: 'Trang chủ',
+      path: '/tenant-dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      title: 'Tìm phòng trọ',
+      path: '/properties',
+      icon: Home,
+    },
+    {
       title: 'Hợp đồng của tôi',
       path: '/contracts',
       icon: FileText,
     },
     {
-      title: 'Hóa đơn & Thanh toán',
-      path: '/my-bills',
-      icon: Receipt,
-    },
-    {
-      title: 'Lịch sử xem phòng',
+      title: 'Lịch hẹn xem phòng',
       path: '/appointments', 
       icon: Calendar,
     },
