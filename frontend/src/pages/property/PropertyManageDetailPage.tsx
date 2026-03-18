@@ -291,9 +291,13 @@ export default function PropertyManageDetailPage() {
                   <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
                 )}
                 <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
-                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
+                  room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
+                  'bg-red-500 text-white'
                 }`}>
-                  {room.status === 'AVAILABLE' ? 'Trống' : 'Đã thuê'}
+                  {room.status === 'AVAILABLE' ? 'Trống' : 
+                   room.status === 'RESERVED' ? 'Giữ chỗ' : 
+                   'Đã thuê'}
                 </span>
               </div>
 
@@ -318,6 +322,12 @@ export default function PropertyManageDetailPage() {
                     <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
                         <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
+                      </Button>
+                    </Link>
+                  ) : room.status === 'RESERVED' ? (
+                    <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full text-orange-600 border-orange-200 hover:bg-orange-50">
+                        <FileText className="h-4 w-4 mr-1.5" /> HĐ chờ ký
                       </Button>
                     </Link>
                   ) : (

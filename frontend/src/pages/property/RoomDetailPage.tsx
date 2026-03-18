@@ -108,6 +108,7 @@ export default function RoomDetailPage() {
   } catch { images = []; amenities = []; }
 
   const isAvailable = room.status === "AVAILABLE";
+  const isReserved = room.status === "RESERVED";
   const formatPrice = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
 
   return (
@@ -199,8 +200,14 @@ export default function RoomDetailPage() {
                     </Link>
                   )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${isAvailable ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {isAvailable ? <><CheckCircle className="h-3.5 w-3.5" /> Còn trống</> : <><XCircle className="h-3.5 w-3.5" /> Đã thuê</>}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                  isAvailable ? "bg-green-100 text-green-700" : 
+                  isReserved ? "bg-orange-100 text-orange-700" : 
+                  "bg-gray-100 text-gray-500"
+                }`}>
+                  {isAvailable ? <><CheckCircle className="h-3.5 w-3.5" /> Còn trống</> : 
+                   isReserved ? <><CalendarClock className="h-3.5 w-3.5" /> Chờ ký HĐ</> : 
+                   <><XCircle className="h-3.5 w-3.5" /> Đã thuê</>}
                 </span>
               </div>
 
@@ -309,7 +316,8 @@ export default function RoomDetailPage() {
                   onClick={handleBooking}
                 >
                   <CalendarClock className="h-4 w-4" />
-                  {isAvailable ? "Đặt lịch xem phòng" : "Phòng đã có người thuê"}
+                  {isAvailable ? "Đặt lịch xem phòng" : 
+                   isReserved ? "Đang có người chờ ký" : "Phòng đã có người thuê"}
                 </Button>
 
                 {isAvailable && isAuthenticated && user?.role !== "LANDLORD" && (

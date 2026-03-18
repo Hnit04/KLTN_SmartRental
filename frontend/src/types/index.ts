@@ -100,7 +100,7 @@ export interface Property {
   availableRooms?: number;
 }
 
-export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
+export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
 
 export interface Room {
   id: number;

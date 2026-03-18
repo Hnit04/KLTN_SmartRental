@@ -32,7 +32,7 @@ export default function PropertyDetailPage() {
 
   // --- STATE FILTER PHÒNG ---
   const [roomSortBy, setRoomSortBy] = useState<"default" | "price_asc" | "price_desc" | "area_asc">("default");
-  const [roomStatusFilter, setRoomStatusFilter] = useState<"ALL" | "AVAILABLE" | "RENTED">("ALL");
+  const [roomStatusFilter, setRoomStatusFilter] = useState<"ALL" | "AVAILABLE" | "RESERVED" | "RENTED">("ALL");
   const [showRoomFilter, setShowRoomFilter] = useState(false);
 
   // --- STATE CHO MODAL ĐẶT LỊCH ---
@@ -394,7 +394,7 @@ export default function PropertyDetailPage() {
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</label>
               <div className="flex gap-2">
-                {(["ALL", "AVAILABLE", "RENTED"] as const).map(s => (
+                {(["ALL", "AVAILABLE", "RESERVED", "RENTED"] as const).map(s => (
                   <button
                     key={s}
                     onClick={() => setRoomStatusFilter(s)}
@@ -404,7 +404,7 @@ export default function PropertyDetailPage() {
                         : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {s === "ALL" ? "Tất cả" : s === "AVAILABLE" ? "Còn trống" : "Đã thuê"}
+                    {s === "ALL" ? "Tất cả" : s === "AVAILABLE" ? "Còn trống" : s === "RESERVED" ? "Giữ chỗ" : "Đã thuê"}
                   </button>
                 ))}
               </div>
@@ -442,12 +442,14 @@ export default function PropertyDetailPage() {
                   />
                 </Link>
                 {/* Nút đặt lịch nhanh — ngăn event nổi lên Link */}
-                <button
-                  onClick={e => { e.stopPropagation(); e.preventDefault(); handleOpenBookingModal(room); }}
-                  className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg hover:bg-primary/90"
-                >
-                  Đặt lịch
-                </button>
+                {room.status === 'AVAILABLE' && (
+                  <button
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); handleOpenBookingModal(room); }}
+                    className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg hover:bg-primary/90"
+                  >
+                    Đặt lịch
+                  </button>
+                )}
               </div>
             ))}
           </div>

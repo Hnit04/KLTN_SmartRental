@@ -18,6 +18,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
   // 1. Kiểm tra trạng thái phòng
   const isAvailable = data.status === "AVAILABLE";
+  const isReserved = data.status === "RESERVED";
 
   // 2. Format giá tiền
   const formatPrice = (price: number) => 
@@ -67,6 +68,10 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             {isAvailable ? (
               <span className="bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
                 <CheckCircle className="h-3 w-3" /> Còn trống
+              </span>
+            ) : isReserved ? (
+              <span className="bg-orange-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
+                <CalendarClock className="h-3 w-3" /> Giữ chỗ
               </span>
             ) : (
               <span className="bg-gray-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
@@ -175,8 +180,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                         </div>
                         <div className="bg-gray-50 p-3 rounded-lg">
                             <span className="text-xs text-gray-500 uppercase font-bold">Trạng thái</span>
-                            <p className={`font-semibold ${isAvailable ? 'text-green-600' : 'text-gray-500'}`}>
-                                {isAvailable ? "Sẵn sàng đón khách" : "Đang có người thuê"}
+                            <p className={`font-semibold ${isAvailable ? 'text-green-600' : isReserved ? 'text-orange-600' : 'text-gray-500'}`}>
+                                {isAvailable ? "Sẵn sàng đón khách" : isReserved ? "Đang có người đợi ký HĐ" : "Đang có người thuê"}
                             </p>
                         </div>
                     </div>
