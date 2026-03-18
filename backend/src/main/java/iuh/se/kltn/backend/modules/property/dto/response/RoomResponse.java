@@ -10,6 +10,9 @@ public class RoomResponse {
     private String name;
     private Double price;
     private Float area;
+    private String type;
+    private Boolean hasMezzanine;
+    private Boolean hasBalcony;
     private RoomStatus status;
     private List<String> amenities;
     private List<String> images;

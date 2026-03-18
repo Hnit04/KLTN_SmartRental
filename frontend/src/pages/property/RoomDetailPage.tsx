@@ -199,6 +199,29 @@ export default function RoomDetailPage() {
                       {room.propertyName} · {room.propertyAddress || room.address}
                     </Link>
                   )}
+                  {/* Loại phòng + badge không gian */}
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    {room.type && (
+                      <span className="text-xs font-medium text-primary bg-primary/5 border border-primary/20 px-2.5 py-1 rounded-full">
+                        {room.type === 'STUDIO' ? 'Phòng Studio' :
+                         room.type === 'ONE_BEDROOM' ? '1 Phòng ngủ' :
+                         room.type === 'TWO_BEDROOM' ? '2 Phòng ngủ' :
+                         room.type === 'SINGLE_ROOM' ? 'Phòng đơn' :
+                         room.type === 'SHARED_ROOM' ? 'Phòng ghép' :
+                         room.type === 'MEZZANINE_ROOM' ? 'Phòng có gác lửng' : ''}
+                      </span>
+                    )}
+                    {room.hasMezzanine && (
+                      <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                        Có gác lửng
+                      </span>
+                    )}
+                    {room.hasBalcony && (
+                      <span className="text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-full">
+                        Có ban công
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                   isAvailable ? "bg-green-100 text-green-700" : 

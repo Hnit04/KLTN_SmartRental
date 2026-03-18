@@ -91,6 +91,8 @@ export interface Property {
   elecPrice: number;
   waterPrice: number;
   internetPrice: number;
+  latitude?: number;
+  longitude?: number;
   images: string[];
   landlordId?: number;
   landlordName?: string;
@@ -102,6 +104,7 @@ export interface Property {
 }
 
 export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
+export type RoomType = "STUDIO" | "ONE_BEDROOM" | "TWO_BEDROOM" | "SINGLE_ROOM" | "SHARED_ROOM" | "MEZZANINE_ROOM";
 
 export interface Room {
   id: number;
@@ -109,6 +112,9 @@ export interface Room {
   price: number;
   area: number;
   status: RoomStatus;
+  type?: RoomType;
+  hasMezzanine?: boolean;
+  hasBalcony?: boolean;
   images: string[];
   amenities: string[]; 
   description?: string;

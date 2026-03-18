@@ -10,6 +10,10 @@ public class PropertyRequest {
     private String district;
     private String city;
     private String description;
+    
+    // Tọa độ
+    private Double latitude;
+    private Double longitude;
 
     private Double elecPrice;
     private Double waterPrice;

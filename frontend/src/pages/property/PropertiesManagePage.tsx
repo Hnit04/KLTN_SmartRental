@@ -41,6 +41,8 @@ export default function PropertiesManagePage() {
   const [formData, setFormData] = useState({
     name: '', city: '', district: '', address: '',
     elecPrice: '', waterPrice: '', internetPrice: '', description: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     images: [] as string[] // Chứa các URL ảnh đã upload thành công hoặc ảnh cũ
   });
 
@@ -69,7 +71,9 @@ export default function PropertiesManagePage() {
     setEditingId(null);
     setFormData({ 
       name: '', city: '', district: '', address: '', 
-      elecPrice: '', waterPrice: '', internetPrice: '', description: '', images: [] 
+      elecPrice: '', waterPrice: '', internetPrice: '', description: '',
+      latitude: undefined, longitude: undefined,
+      images: [] 
     });
     setSelectedFiles([]);
     setPreviewUrls([]);
@@ -83,6 +87,8 @@ export default function PropertiesManagePage() {
       name: property.name || '', city: property.city || '', district: property.district || '', address: property.address || '',
       elecPrice: property.elecPrice?.toString() || '', waterPrice: property.waterPrice?.toString() || '',
       internetPrice: property.internetPrice?.toString() || '', description: property.description || '',
+      latitude: property.latitude ?? undefined,
+      longitude: property.longitude ?? undefined,
       images: property.images || []
     });
     setSelectedFiles([]);
@@ -147,7 +153,9 @@ export default function PropertiesManagePage() {
               ...prev,
               city: city.replace('Thành phố ', '').replace('Tỉnh ', ''),
               district: district.replace('Quận ', '').replace('Huyện ', ''),
-              address: `${houseNumber}${street}`.trim() || data.display_name.split(',')[0]
+              address: `${houseNumber}${street}`.trim() || data.display_name.split(',')[0],
+              latitude: lat,
+              longitude: lon
             }));
             
             toast.success("Đã lấy được vị trí hiện tại!", { id: toastId });
@@ -232,6 +240,8 @@ export default function PropertiesManagePage() {
       const payload = {
         name: formData.name, city: formData.city, district: formData.district, address: formData.address,
         description: formData.description,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         elecPrice: Number(formData.elecPrice) || 0, waterPrice: Number(formData.waterPrice) || 0, internetPrice: Number(formData.internetPrice) || 0,
         images: finalImagesList 
       };

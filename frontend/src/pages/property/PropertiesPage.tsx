@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, MapPin, Frown, Filter, Sparkles, ChevronDown, Bot, ArrowUpDown, X } from "lucide-react";
+import { Search, MapPin, Frown, Filter, Sparkles, ChevronDown, Bot, ArrowUpDown, X, List, Map as MapIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import PropertyCard from "@/features/property/components/PropertyCard";
+import PropertyMap from "@/features/property/components/PropertyMap";
 import RoomCard from "@/features/property/components/RoomCard";
 import { propertyApi } from "@/api/propertyApi";
 import type { Property, Room } from "@/types/index";
@@ -14,6 +15,7 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [recommendedRooms, setRecommendedRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -315,7 +317,23 @@ export default function PropertiesPage() {
 
       {/* --- LIST CONTENT --- */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
-        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">Khám Phá Khu Trọ Toàn Quốc</h2>
+        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2 flex justify-between items-center">
+            <span>Khám Phá Khu Trọ Toàn Quốc</span>
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+              <button 
+                onClick={() => setViewMode("list")} 
+                className={`p-1.5 px-3 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+              >
+                <List className="h-4 w-4" /> Danh sách
+              </button>
+              <button 
+                onClick={() => setViewMode("map")} 
+                className={`p-1.5 px-3 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === "map" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+              >
+                <MapIcon className="h-4 w-4" /> Bản đồ
+              </button>
+            </div>
+        </h2>
         {isLoading ? (
           // SKELETON LOADING (Thay cho Spinner xoay)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -334,11 +352,17 @@ export default function PropertiesPage() {
           </div>
         ) : filteredProperties.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {filteredProperties.map((property) => (
-                <PropertyCard key={property.id} data={property} />
-              ))}
-            </div>
+            {viewMode === "list" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {filteredProperties.map((property) => (
+                  <PropertyCard key={property.id} data={property} />
+                ))}
+              </div>
+            ) : (
+              <div className="animate-in zoom-in-95 duration-500">
+                <PropertyMap properties={filteredProperties} />
+              </div>
+            )}
             
             {page < totalPages - 1 && (
               <div className="flex justify-center mt-10">

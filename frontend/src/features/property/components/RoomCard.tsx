@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
-  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles
+  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";
@@ -43,6 +43,18 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
     if (!isAvailable) return;
     // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
     navigate(`/contracts/create?roomId=${data.id}`);
+  };
+
+  const mapRoomType = (type?: string) => {
+    switch (type) {
+      case "STUDIO": return "Phòng Studio";
+      case "ONE_BEDROOM": return "1 Phòng Ngủ";
+      case "TWO_BEDROOM": return "2 Phòng Ngủ";
+      case "SINGLE_ROOM": return "Phòng Đơn";
+      case "SHARED_ROOM": return "Phòng Ghép / Ở Chung";
+      case "MEZZANINE_ROOM": return "Phòng Có Gác Lửng";
+      default: return "";
+    }
   };
 
   return (
@@ -105,10 +117,31 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             </span>
           </div>
 
-          <div className="space-y-2 mb-4">
-            <div className="flex items-center text-sm text-gray-500">
-              <Maximize className="h-4 w-4 mr-2 text-gray-400" />
-              <span>Diện tích: <strong>{data.area} m²</strong></span>
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center text-[13px] text-gray-500 justify-between flex-wrap gap-1">
+              <span className="flex items-center">
+                 <Maximize className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                 {data.area} m²
+              </span>
+              {data.type && (
+                <span className="flex items-center text-primary font-medium bg-primary/5 px-2 py-0.5 rounded-sm">
+                   <Home className="h-3.5 w-3.5 mr-1 text-primary" />
+                   {mapRoomType(data.type)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+                {data.hasMezzanine && (
+                  <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded flex items-center">
+                    <Layers className="h-3 w-3 mr-1" /> Có gác lửng
+                  </span>
+                )}
+                {data.hasBalcony && (
+                  <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded flex items-center">
+                    <Sun className="h-3 w-3 mr-1" /> Có ban công / Cửa sổ
+                  </span>
+                )}
             </div>
           </div>
 
@@ -175,12 +208,19 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                     
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-gray-50 p-3 rounded-lg">
-                            <span className="text-xs text-gray-500 uppercase font-bold">Diện tích</span>
-                            <p className="font-semibold">{data.area} m²</p>
+                            <span className="text-xs text-gray-500 uppercase font-bold">Diện tích & Không gian</span>
+                            <p className="font-semibold text-sm mt-1">{data.area} m²</p>
+                            {(data.hasMezzanine || data.hasBalcony || data.type) && (
+                              <div className="mt-1 flex gap-1 flex-wrap">
+                                {data.type && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{mapRoomType(data.type)}</span>}
+                                {data.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Gác lửng</span>}
+                                {data.hasBalcony && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Ban công</span>}
+                              </div>
+                            )}
                         </div>
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                            <span className="text-xs text-gray-500 uppercase font-bold">Trạng thái</span>
-                            <p className={`font-semibold ${isAvailable ? 'text-green-600' : isReserved ? 'text-orange-600' : 'text-gray-500'}`}>
+                        <div className="bg-gray-50 p-3 rounded-lg flex flex-col justify-center">
+                            <span className="text-xs text-gray-500 uppercase font-bold mb-1">Trạng thái</span>
+                            <p className={`font-semibold text-sm ${isAvailable ? 'text-green-600' : isReserved ? 'text-orange-600' : 'text-gray-500'}`}>
                                 {isAvailable ? "Sẵn sàng đón khách" : isReserved ? "Đang có người đợi ký HĐ" : "Đang có người thuê"}
                             </p>
                         </div>
