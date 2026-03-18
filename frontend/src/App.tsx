@@ -9,6 +9,8 @@ import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
 import HomePage from "./pages/core/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ContactPage from "./pages/core/ContactPage";
 import HelpCenter from "./pages/core/HelpCenter";
@@ -103,6 +105,8 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-otp" element={<VerifyOtpPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>
         </Route>
 

@@ -139,6 +139,41 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    public void initiateForgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại trong hệ thống!"));
+
+        // Tạo mã OTP mới cho việc reset mật khẩu
+        String resetCode = String.format("%06d", new Random().nextInt(1000000));
+        user.setVerificationCode(resetCode);
+        user.setVerificationExpiry(LocalDateTime.now().plusMinutes(10)); // Cho 10 phút để đổi
+        userRepository.save(user);
+
+        // Gửi mail
+        emailService.sendForgotPasswordEmail(email, resetCode);
+    }
+
+    public void resetPassword(String email, String code, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại!"));
+
+        // Kiểm tra mã
+        if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code.trim())) {
+            throw new RuntimeException("Mã xác thực không chính xác!");
+        }
+
+        // Kiểm tra hết hạn
+        if (user.getVerificationExpiry() == null || user.getVerificationExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Mã xác thực đã hết hạn!");
+        }
+
+        // Cập nhật mật khẩu mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setVerificationCode(null); // Xóa mã sau khi dùng
+        user.setVerificationExpiry(null);
+        userRepository.save(user);
+    }
+
     private boolean hasText(String str) {
         return str != null && !str.trim().isEmpty();
     }

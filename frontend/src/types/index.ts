@@ -34,6 +34,11 @@ export interface User {
   lockUntil?: string | null;
   lockReason?: string | null;
 }
+export interface ResetPasswordRequest{
+  email: string;
+  code: string;
+  newPassword: string;
+}
 export interface VerifyOtpRequest {
   email: string;
   code: string;

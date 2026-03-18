@@ -1,9 +1,6 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
-import iuh.se.kltn.backend.modules.user.dto.request.LoginRequest;
-import iuh.se.kltn.backend.modules.user.dto.request.TokenRefreshRequest;
-import iuh.se.kltn.backend.modules.user.dto.request.UserRegisterRequest;
-import iuh.se.kltn.backend.modules.user.dto.request.VerifyOtpRequest;
+import iuh.se.kltn.backend.modules.user.dto.request.*;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.service.AuthService;
 import iuh.se.kltn.backend.modules.user.service.EmailService;
@@ -75,6 +72,26 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        try {
+            authService.initiateForgotPassword(email);
+            return ResponseEntity.ok("Mã khôi phục đã được gửi đến email của bạn.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        try {
+            authService.resetPassword(request.getEmail(), request.getCode(), request.getNewPassword());
+            return ResponseEntity.ok("Đổi mật khẩu thành công!");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
 
 
     // API Đăng nhập
@@ -94,4 +111,5 @@ public class AuthController {
             return ResponseEntity.status(403).body("Lỗi làm mới token: " + e.getMessage());
         }
     }
+
 }

@@ -5,8 +5,8 @@ import type {
   RegisterRequest, 
   User,
   TokenRefreshResponse,
-  // Đừng quên thêm các type mới vào file types của bạn
-  VerifyOtpRequest 
+  VerifyOtpRequest,
+  ResetPasswordRequest
 } from '../types';
 
 export const authApi = {
@@ -34,6 +34,15 @@ export const authApi = {
   resendOtp: async (email: string): Promise<string> => {
     // API resend-otp nhận body là Map<String, String> { "email": "..." }
     const response = await axiosClient.post('/auth/resend-otp', { email });
+    return response.data;
+  },
+  forgotPassword: async (email: string): Promise<string> => {
+    // Backend nhận: Map<String, String> body = body.get("email")
+    const response = await axiosClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+  resetPassword: async (data: ResetPasswordRequest): Promise<string> => {
+    const response = await axiosClient.post('/auth/reset-password', data);
     return response.data;
   },
 
