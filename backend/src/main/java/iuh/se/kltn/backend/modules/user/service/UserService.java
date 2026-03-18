@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.user.service;
 
+import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
@@ -7,9 +8,18 @@ import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.enums.KYCStatus;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.envers.AuditReader;
+import org.hibernate.envers.AuditReaderFactory;
+import org.hibernate.envers.query.AuditEntity;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class UserService {
@@ -19,6 +29,11 @@ public class UserService {
 
     @Autowired
     private ModelMapper modelMapper;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+
 
     public UserProfileResponse getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -98,4 +113,33 @@ public class UserService {
         }
         userRepository.save(user);
     }
+
+    public List<UserProfileResponse> getAllByRole(Role role) {
+        List<User> users = userRepository.findAllByRole(role);
+        return users.stream()
+                .map(user -> modelMapper.map(user, UserProfileResponse.class))
+                .toList();
+    }
+
+    @Transactional
+    public void unlockUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        user.setLocked(false);
+        user.setLockUntil(null);
+        user.setLockReason(null);
+        userRepository.saveAndFlush(user);
+    }
+
+    @Transactional
+    public void lockUserTemporary(Long userId, int durationDays, List<String> reason) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setLocked(true);
+        user.setLockedAt(LocalDateTime.now());
+        user.setLockUntil(LocalDateTime.now().plusDays(durationDays));
+        user.setLockReason(reason);
+        userRepository.saveAndFlush(user);
+    }
+
 }
