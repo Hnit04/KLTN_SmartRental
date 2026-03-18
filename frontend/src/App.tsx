@@ -2,6 +2,8 @@
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext"; // KHÔNG cần import AuthProvider nữa
 import { Toaster } from "sonner"; 
+import { AuthProvider } from "./context/AuthContext";
+import { BrowserRouter } from "react-router-dom";  
 
 import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
@@ -79,7 +81,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <>
+    <AuthProvider>
+        <BrowserRouter>  
       <Routes>
         {/* ─── GROUP: PUBLIC PAGES ─── */}
         <Route element={<PublicLayout />}>
@@ -132,9 +135,10 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </BrowserRouter>
 
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-    </>
+      </AuthProvider>
   );
 }
 
