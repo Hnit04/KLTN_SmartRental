@@ -1,19 +1,39 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
+import iuh.se.kltn.backend.common.enums.Role;
+import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.common.service.CloudinaryService;
 import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
+import iuh.se.kltn.backend.modules.user.dto.response.UserHistoryResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.user.entity.CustomRevisionEntity;
+import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.user.service.UserService;
+import jakarta.persistence.EntityManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.envers.AuditReader;
+import org.hibernate.envers.AuditReaderFactory;
+import org.hibernate.envers.query.AuditEntity;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import iuh.se.kltn.backend.common.service.CloudinaryService;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -21,12 +41,21 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private CloudinaryService cloudinaryService;
 
     @Autowired
     private OcrService ocrService;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private ModelMapper modelMapper;
+
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
@@ -105,5 +134,84 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Lỗi xử lý: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/by-role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserProfileResponse>> getUsersByRole(
+            @RequestParam Role role,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<UserProfileResponse> users = userService.getAllByRole(role);
+        return ResponseEntity.ok(users);
+    }
+    @Transactional
+    @PostMapping("/{userId}/lock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> lockUser(
+            @PathVariable Long userId,
+            @RequestParam int durationDays,
+            @RequestParam List<String> reason,
+            @AuthenticationPrincipal UserPrincipal admin) {
+
+        // Có thể thêm validation
+        if (durationDays <= 0) {
+            return ResponseEntity.badRequest().body("Số ngày khóa phải lớn hơn 0");
+        }
+        if (reason == null) {
+            return ResponseEntity.badRequest().body("Vui lòng cung cấp lý do khóa tài khoản");
+        }
+
+        userService.lockUserTemporary(userId, durationDays, reason);
+
+        return ResponseEntity.ok(String.format("Tài khoản ID %d đã bị khóa %d ngày. Lý do: %s",
+                userId, durationDays, reason));
+    }
+
+    @Transactional
+    @PostMapping("/{userId}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> unlockUser(@PathVariable Long userId) {
+        userService.unlockUser(userId);
+        return ResponseEntity.ok("Đã mở khóa tài khoản ID " + userId);
+    }
+    @GetMapping("/{userId}/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserHistoryResponse>> getUserAuditHistory(@PathVariable Long userId) {
+
+        AuditReader auditReader = AuditReaderFactory.get(entityManager);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> revisions = auditReader.createQuery()
+                .forRevisionsOfEntity(User.class, false, true)  // true = selectEntitiesOnly, true = selectDeletedEntities
+                .add(AuditEntity.id().eq(userId))
+                .getResultList();
+
+        List<UserHistoryResponse> history = revisions.stream()
+                .map(row -> {
+                    User auditedUser = (User) row[0];                // phần tử 0: entity ở revision đó
+                    CustomRevisionEntity revInfo = (CustomRevisionEntity) row[1];  // phần tử 1: CustomRevisionEntity
+
+                    UserHistoryResponse dto = modelMapper.map(auditedUser, UserHistoryResponse.class);
+
+                    if (revInfo != null) {
+                        dto.setModifiedBy(revInfo.getModifiedBy());
+                        dto.setModifiedByFullName(revInfo.getModifiedByFullName());
+
+                        // Chuyển timestamp (millis since epoch) sang LocalDateTime
+                        Instant instant = Instant.ofEpochMilli(revInfo.getTimestamp());
+                        LocalDateTime modifiedAt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+                        // Hoặc dùng múi giờ VN: ZoneId.of("Asia/Ho_Chi_Minh")
+                        dto.setModifiedAt(modifiedAt);
+
+                        dto.setAuditRemark(revInfo.getAuditRemark());
+                    }
+
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+         history.sort(Comparator.comparing(UserHistoryResponse::getModifiedAt).reversed());
+
+        return ResponseEntity.ok(history);
     }
 }

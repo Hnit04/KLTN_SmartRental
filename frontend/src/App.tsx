@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+// App.tsx
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext"; // KHÔNG cần import AuthProvider nữa
 import { Toaster } from "sonner"; 
 
 import MainLayout from "./components/layout/MainLayout";
@@ -29,18 +30,21 @@ import DashboardPage from "./pages/dashboard/DashboardPage";
 import TenantDashboardPage from "./pages/dashboard/TenantDashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
 
-// ✅ 1. IMPORT TRANG QUẢN LÝ LỊCH HẸN VÀO ĐÂY
+// --- ADMIN PAGES ---
+import AdminDashboardPage from "./pages/admin/AdminPage";
+import UserManagementPage from "./pages/admin/UserManagementPage";
+import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 
-// 1. Bảo vệ các trang yêu cầu Đăng Nhập
+// 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
-// 2. Chặn truy cập Login/Register khi ĐÃ Đăng Nhập
+// 2. PublicRoute (chặn login/register khi đã đăng nhập)
 const PublicRoute = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
@@ -48,21 +52,36 @@ const PublicRoute = () => {
   if (isLoading) return null;
 
   if (isAuthenticated && (location.pathname === "/login" || location.pathname === "/register")) {
-    // Điều hướng dựa theo Role
-    return <Navigate to={user?.role === 'LANDLORD' ? "/dashboard" : "/tenant-dashboard"} replace />; 
+    if (user?.role === 'ADMIN') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    
+    if (user?.role === 'LANDLORD') {
+      return <Navigate to="/dashboard" replace />;
+    }
+    
+    if (user?.role === 'TENANT') {
+      return <Navigate to="/tenant-dashboard" replace />;
+    }
+    
+    return <Navigate to="/" replace />;
+
   }
 
   return <Outlet />;
 };
 
-// 3. Phân quyền truy cập các trang chuyên biệt theo Role
+// 3. RoleRoute (phân quyền theo role)
 const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" />;
   
-  if (!allowedRoles.includes(user.role)) {
-    // Redirect đúng theo role: Landlord → dashboard, Tenant → tenant-dashboard
-    return <Navigate to={user.role === 'LANDLORD' ? '/dashboard' : '/tenant-dashboard'} replace />;
+  if (!allowedRoles.includes(user.role ?? '')) {
+    if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+    if (user?.role === 'LANDLORD') return <Navigate to="/dashboard" replace />;
+     if (user?.role === 'TENANT') return <Navigate to="/tenant-dashboard" replace />;
+    return <Navigate to="/" replace />;
+
   }
   
   return <Outlet />;
@@ -87,15 +106,17 @@ function App() {
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
-            
-            {/* AUTH ROUTES */}
-            <Route element={<PublicRoute />}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-            </Route>
-          </Route>
 
-          {/* ─── GROUP: PROTECTED PAGES (Cần đăng nhập - Dùng MainLayout) ─── */}
+            
+            {/* LANDLORD ONLY */}
+            <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/properties/manage" element={<PropertiesManagePage />} />
+              <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
+              <Route path="/finance" element={<BillManagePage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+            </Route>
+
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
  
@@ -123,21 +144,32 @@ function App() {
               
               {/* ✅ 2. THAY THẾ DIV GIỮ CHỖ BẰNG COMPONENT THẬT */}
               <Route path="/appointments" element={<AppointmentManagePage />} />
-              
+            </Route> 
+
+            <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
+
             </Route>
+            
+            {/* SHARED: CONTRACT & APPOINTMENT */}
+            <Route path="/contracts/create" element={<CreateContractPage />} />
+            <Route path="/contracts/:id" element={<ContractDetailPage />} />
+            <Route path="/contracts" element={<ContractsPage />} />
+            <Route path="/appointments" element={<AppointmentManagePage />} />
           </Route>
+        </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </BrowserRouter>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
 
-      {/* 🔥 TOASTER CONFIG */}
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-      
       {/* 🤖 GLOBAL AI CHATBOT */}
       <AiChatBot />
     </AuthProvider>
+
   );
 }
 
