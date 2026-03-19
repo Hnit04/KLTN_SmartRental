@@ -10,6 +10,9 @@ public class RoomResponse {
     private String name;
     private Double price;
     private Float area;
+    private String type;
+    private Boolean hasMezzanine;
+    private Boolean hasBalcony;
     private RoomStatus status;
     private List<String> amenities;
     private List<String> images;
@@ -21,4 +24,6 @@ public class RoomResponse {
     private Double waterPrice;
     private Double internetPrice;
     private String defaultTerms;
+    private Double matchScore; // Thêm điểm phù hợp AI
+    private String matchReason; // Lý do phù hợp (Vd: "Giá tốt, có gác lửng")
 }

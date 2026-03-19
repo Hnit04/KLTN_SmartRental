@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
-  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText
+  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
+  Trash2, AlertTriangle, Layers
 } from 'lucide-react';
+import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -16,6 +18,16 @@ const COMMON_AMENITIES = [
   "Chỗ để xe", "Thang máy", "Wifi tốc độ cao", "An ninh 24/7",
   "Máy hút mùi", "Sofa", "Smart TV", "Bàn ghế làm việc"
 ];
+
+// Mapping loại phòng
+const ROOM_TYPE_LABELS: Record<RoomType, string> = {
+  STUDIO: 'Phòng trọ Studio',
+  ONE_BEDROOM: '1 Phòng ngủ',
+  TWO_BEDROOM: '2 Phòng ngủ',
+  SINGLE_ROOM: 'Phòng đơn',
+  SHARED_ROOM: 'Phòng ghép / Ở chung',
+  MEZZANINE_ROOM: 'Phòng có gác lửng',
+};
 
 // ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN DÀNH CHO CHỦ TRỌ
 const LANDLORD_SUGGESTED_TERMS = [
@@ -38,9 +50,16 @@ export default function PropertyManageDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
+
+  // --- STATE XÓA PHÒNG ---
+  const [deleteRoomConfirm, setDeleteRoomConfirm] = useState<Room | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '', price: '', area: '', description: '',
+    type: 'STUDIO' as RoomType,
+    hasMezzanine: false,
+    hasBalcony: false,
     amenities: [] as string[], 
     customAmenitiesInput: '', 
     images: [] as string[],
@@ -72,11 +91,28 @@ export default function PropertyManageDetailPage() {
     }
   };
 
+  // Hàm xóa phòng sau khi xác nhận
+  const handleDeleteRoom = async () => {
+    if (!deleteRoomConfirm) return;
+    setIsDeleting(true);
+    try {
+      await propertyApi.deleteRoom(deleteRoomConfirm.id);
+      toast.success(`Đã xóa phòng “${deleteRoomConfirm.name}”!`);
+      setDeleteRoomConfirm(null);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Xóa phòng thất bại.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // --- MỞ MODAL THÊM / SỬA ---
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormData({ 
       name: '', price: '', area: '', description: '', 
+      type: 'STUDIO' as RoomType, hasMezzanine: false, hasBalcony: false,
       amenities: [], customAmenitiesInput: '', images: [],
       defaultTerms: '' 
     });
@@ -104,6 +140,9 @@ export default function PropertyManageDetailPage() {
       price: room.price.toString(), 
       area: room.area.toString(),
       description: room.description || '', 
+      type: room.type || 'STUDIO',
+      hasMezzanine: room.hasMezzanine ?? false,
+      hasBalcony: room.hasBalcony ?? false,
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '), 
       images: room.images || [],
@@ -209,6 +248,9 @@ export default function PropertyManageDetailPage() {
         name: formData.name,
         price: Number(formData.price),
         area: Number(formData.area),
+        type: formData.type,
+        hasMezzanine: formData.hasMezzanine,
+        hasBalcony: formData.hasBalcony,
         description: formData.description,
         amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
@@ -270,15 +312,25 @@ export default function PropertyManageDetailPage() {
                   <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
                 )}
                 <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
-                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
+                  room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
+                  'bg-red-500 text-white'
                 }`}>
-                  {room.status === 'AVAILABLE' ? 'Trống' : 'Đã thuê'}
+                  {room.status === 'AVAILABLE' ? 'Trống' : 
+                   room.status === 'RESERVED' ? 'Giữ chỗ' : 
+                   'Đã thuê'}
                 </span>
               </div>
 
               {/* Thông tin phòng */}
               <div className="p-4 flex-1 flex flex-col">
-                <h3 className="text-xl font-bold text-gray-900 mb-3">Phòng {room.name}</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">Phòng {room.name}</h3>
+                {/* Loại phòng + badges */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                  <span className="text-xs font-medium text-gray-500">{ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}</span>
+                  {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
+                  {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
+                </div>
                 <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
                   <p className="flex justify-between"><span>Giá thuê:</span> <strong className="text-primary">{room.price?.toLocaleString()}đ</strong></p>
                   <p className="flex justify-between"><span>Diện tích:</span> <strong className="text-gray-900">{room.area} m²</strong></p>
@@ -288,7 +340,7 @@ export default function PropertyManageDetailPage() {
                 </div>
                 
                 {/* NÚT THAO TÁC */}
-                <div className="flex gap-2 border-t pt-4 mt-auto">
+                <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap">
                   <Button variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleOpenEdit(room)}>
                     <Edit className="h-4 w-4 mr-1.5" /> Sửa
                   </Button>
@@ -299,6 +351,12 @@ export default function PropertyManageDetailPage() {
                         <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
                       </Button>
                     </Link>
+                  ) : room.status === 'RESERVED' ? (
+                    <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full text-orange-600 border-orange-200 hover:bg-orange-50">
+                        <FileText className="h-4 w-4 mr-1.5" /> HĐ chờ ký
+                      </Button>
+                    </Link>
                   ) : (
                     <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
@@ -306,6 +364,16 @@ export default function PropertyManageDetailPage() {
                       </Button>
                     </Link>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-500 border-red-200 hover:bg-red-50 px-2"
+                    onClick={() => setDeleteRoomConfirm(room)}
+                    title="Xóa phòng này"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -338,6 +406,46 @@ export default function PropertyManageDetailPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Giá thuê (VND) *</label>
                     <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  </div>
+                </div>
+
+                {/* Loại phòng + Không gian */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                      <Layers className="h-3.5 w-3.5 text-gray-500" /> Loại phòng
+                    </label>
+                    <select
+                      value={formData.type}
+                      onChange={e => setFormData({...formData, type: e.target.value as RoomType})}
+                      className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none bg-white"
+                    >
+                      {(Object.keys(ROOM_TYPE_LABELS) as RoomType[]).map(key => (
+                        <option key={key} value={key}>{ROOM_TYPE_LABELS[key]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <label className="flex items-center gap-2.5 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 hover:bg-amber-100 transition w-full">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasMezzanine}
+                        onChange={e => setFormData({...formData, hasMezzanine: e.target.checked})}
+                        className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 h-4 w-4 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-amber-800">Có gác lửng</span>
+                    </label>
+                  </div>
+                  <div className="flex items-end">
+                    <label className="flex items-center gap-2.5 cursor-pointer bg-sky-50 border border-sky-200 rounded-lg px-4 py-2.5 hover:bg-sky-100 transition w-full">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasBalcony}
+                        onChange={e => setFormData({...formData, hasBalcony: e.target.checked})}
+                        className="rounded border-gray-300 text-sky-600 focus:ring-sky-500 h-4 w-4 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-sky-800">Có ban công</span>
+                    </label>
                   </div>
                 </div>
 
@@ -461,6 +569,32 @@ export default function PropertyManageDetailPage() {
               <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={isSubmitting}>Hủy</Button>
               <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px]">
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? 'Lưu thay đổi' : 'Lưu phòng mới')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIALOG XÁC NHẬN XÓA PHÒNG */}
+      {deleteRoomConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-red-50 rounded-full mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Xóa phòng?</h3>
+              <p className="text-sm text-gray-500 mb-1">Bạn có chắc muốn xóa phòng</p>
+              <p className="font-semibold text-gray-900 mb-3">“{deleteRoomConfirm.name}”?</p>
+              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                ⚠️ Hành động này không thể hoàn tác. Phòng đang có hợp đồng sẽ không thể xóa.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteRoomConfirm(null)} disabled={isDeleting}>Hủy</Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteRoom} disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Xóa phòng
               </Button>
             </div>
           </div>

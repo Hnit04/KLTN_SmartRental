@@ -1,4 +1,4 @@
-package iuh.se.kltn.backend.modules.contract.dto;
+package iuh.se.kltn.backend.modules.contract.dto.response;
 
 public class MonthlyRevenueResponse {
 

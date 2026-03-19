@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,4 +21,6 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findContractsByLandlordId(@Param("landlordId") Long landlordId);
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
+
+    List<Contract> findByStatusAndCreatedAtBefore(ContractStatus status, LocalDateTime time);
 }

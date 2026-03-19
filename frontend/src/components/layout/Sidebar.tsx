@@ -4,12 +4,11 @@ import {
   FileText, 
   Home, 
   Calendar, 
-  Settings, 
   LogOut,
   UserCircle,
   Building,
-  Receipt,
   PieChart,
+  Wallet,
   Users,          // Thêm icon cho Quản lý người dùng
   Database,       // Thêm icon phù hợp cho Logs Blockchain
 } from 'lucide-react';
@@ -40,7 +39,8 @@ const Sidebar = () => {
     {
       title: 'Tài chính & Hóa đơn',
       path: '/finance',
-      icon: Receipt,
+      icon: Wallet,
+
     },
     {
       title: 'Quản lý Lịch hẹn',
@@ -57,21 +57,27 @@ const Sidebar = () => {
   // 2. Menu dành cho NGƯỜI THUÊ (TENANT / USER mặc định)
   const tenantItems = [
     {
+      title: 'Trang chủ',
+      path: '/tenant-dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      title: 'Tìm phòng trọ',
+      path: '/properties',
+      icon: Home,
+    },
+    {
       title: 'Hợp đồng của tôi',
       path: '/contracts',
       icon: FileText,
     },
     {
-      title: 'Hóa đơn & Thanh toán',
-      path: '/my-bills',
-      icon: Receipt,
-    },
-    {
-      title: 'Lịch sử xem phòng',
+      title: 'Lịch hẹn xem phòng',
       path: '/appointments', 
       icon: Calendar,
     },
   ];
+
 
   // 3. Menu dành cho ADMIN (mới thêm)
   const adminItems = [
@@ -92,17 +98,11 @@ const Sidebar = () => {
     },
   ];
 
-  // 4. Menu Cài đặt & Profile (dùng chung dưới cùng)
   const bottomItems = [
     {
       title: 'Hồ sơ cá nhân',
       path: '/profile',
       icon: UserCircle,
-    },
-    {
-      title: 'Cài đặt tài khoản',
-      path: '/settings',
-      icon: Settings,
     },
   ];
 

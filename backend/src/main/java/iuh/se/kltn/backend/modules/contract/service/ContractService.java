@@ -103,6 +103,12 @@ public class ContractService {
 
         Contract saved = contractRepository.save(contract);
 
+        // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ
+        if (room != null) {
+            room.setStatus(RoomStatus.RESERVED);
+            roomRepository.save(room);
+        }
+
         // ✅ TỰ ĐỘNG TẠO ĐỀ XUẤT CHỈNH SỬA NẾU LÀ KHÁCH THUÊ TẠO HỢP ĐỒNG
         if (isTenantCreating) {
             String proposedTerms = request.getAdditionalTerms() != null ? request.getAdditionalTerms() : "";

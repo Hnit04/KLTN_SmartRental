@@ -1,3 +1,9 @@
+// src/types/index.ts
+
+// ==========================================
+// 1. USER & AUTH TYPES
+// ==========================================
+
 export type UserRole = "TENANT" | "LANDLORD" | "ADMIN";
 export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED"; 
 
@@ -27,22 +33,25 @@ export interface User {
   reputationScore: number; 
   kycStatus: KYCStatus;
   createdAt: string;       
-  updatedAt: string; 
-  
+  updatedAt: string;       
+
   locked?: boolean;
   lockedAt?: string | null;
   lockUntil?: string | null;
   lockReason?: string | null;
 }
+
 export interface ResetPasswordRequest{
   email: string;
   code: string;
   newPassword: string;
 }
+
 export interface VerifyOtpRequest {
   email: string;
   code: string;
 }
+
 export interface UserHistory {
   id: number;
   fullName: string;
@@ -111,6 +120,10 @@ export interface Property {
   elecPrice: number;
   waterPrice: number;
   internetPrice: number;
+
+  latitude?: number;
+  longitude?: number;
+
   images: string[];
   landlordId?: number;
   landlordName?: string;
@@ -121,7 +134,15 @@ export interface Property {
   availableRooms?: number;
 }
 
-export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
+export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
+
+export type RoomType =
+  | "STUDIO"
+  | "ONE_BEDROOM"
+  | "TWO_BEDROOM"
+  | "SINGLE_ROOM"
+  | "SHARED_ROOM"
+  | "MEZZANINE_ROOM";
 
 export interface Room {
   id: number;
@@ -129,6 +150,12 @@ export interface Room {
   price: number;
   area: number;
   status: RoomStatus;
+
+  // 🔥 Merge thêm
+  type?: RoomType;
+  hasMezzanine?: boolean;
+  hasBalcony?: boolean;
+
   images: string[];
   amenities: string[]; 
   description?: string;
@@ -141,16 +168,23 @@ export interface Room {
   waterPrice?: number;
   internetPrice?: number;
   defaultTerms?: string;
+
+  matchScore?: number;
+  matchReason?: string;
 }
 
 // ==========================================
 // 3. CONTRACT TYPES
 // ==========================================
 
-export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY";
+export type ContractStatus =
+  | "PENDING_SIGNATURE"
+  | "ACTIVE"
+  | "EXPIRED"
+  | "TERMINATED_EARLY";
+
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED";
 
-// ✅ 1. Thêm Enum phương thức ký
 export type ContractSignMethod = "TRADITIONAL" | "BLOCKCHAIN";
 
 export interface Contract {
@@ -164,47 +198,54 @@ export interface Contract {
   endDate: string;
   signDate?: string;
   
-  actualPrice: number;   // Khớp với Backend Contract.java
+  actualPrice: number;
   depositAmount: number;
   additionalTerms?: string;
+
+  // 🔥 Giữ version đầy đủ
   status: "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "CANCELLED";
-  signMethod: "TRADITIONAL" | "BLOCKCHAIN";
+
+  signMethod: ContractSignMethod;
   
-  // Các trường Flattened để hiển thị UI
+  // UI fields
   roomName?: string;
   propertyAddress?: string;
   tenantName?: string;
   landlordName?: string;
   isTenantSigned?: boolean;
   isLandlordSigned?: boolean;
-  // Blockchain fields
+
+  // Blockchain
   smartContractAddress?: string;
   deployTxHash?: string;
   contractHash?: string;
 }
 
-// Payload để tạo hợp đồng
 export interface CreateContractPayload {
   roomId: number | string;
   startDate: string;
-  endDate: string;           // Dùng endDate thay cho duration
-  depositAmount?: number;    // Thêm tiền cọc
-  additionalTerms?: string;  // Thêm điều khoản
-  tenantEmail?: string;      // Thêm email khách
-  signMethod?: string;       // Thêm phương thức ký
+  endDate: string;
+  depositAmount?: number;
+  additionalTerms?: string;
+  tenantEmail?: string;
+  signMethod?: string;
 }
 
-// ✅ 4. Payload để Ký hợp đồng
 export interface SignContractPayload {
   signMethod: ContractSignMethod;
-  signatureImage?: string; // Optional (cho truyền thống nếu cần sau này)
+  signatureImage?: string;
 }
 
 // ==========================================
-// 4. UTILITY TYPES (Bills, Notifications...)
+// 4. UTILITY TYPES
 // ==========================================
 
-export type NotificationType = "SYSTEM" | "PAYMENT_REMINDER" | "CONTRACT_UPDATE" | "NEW_REVIEW";
+export type NotificationType =
+  | "SYSTEM"
+  | "PAYMENT_REMINDER"
+  | "CONTRACT_UPDATE"
+  | "NEW_REVIEW";
+
 export interface Notification {
   id: number;
   title: string;
@@ -238,10 +279,14 @@ export interface TokenRefreshResponse {
 }
 
 // ==========================================
-// 5. APPOINTMENT TYPES (Lịch hẹn xem phòng)
+// 5. APPOINTMENT TYPES
 // ==========================================
 
-export type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+export type AppointmentStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "COMPLETED";
 
 export interface Appointment {
   id: number;
@@ -254,8 +299,7 @@ export interface Appointment {
   meetTime: string;      
   status: AppointmentStatus;
   note?: string;
-  meetingLink?: string
-  
+  meetingLink?: string;
   createdAt: string;
 }
 
@@ -275,16 +319,17 @@ export interface AppointmentResponse {
   roomId: number;
   roomName: string;
   landlordId: number;
-  landlordFullName: string; // ✅ Đổi từ landlordName thành landlordFullName
+  landlordFullName: string;
   tenantId: number;
-  tenantFullName: string;   // ✅ Đổi từ tenantName thành tenantFullName
+  tenantFullName: string;
   tenantPhone: string;
   meetTime: string; 
-  status: 'PENDING' | 'CONFIRMED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'; // ✅ Thêm APPROVED
+  status: 'PENDING' | 'CONFIRMED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
   note: string;
   meetingLink?: string;
   createdAt: string;
 }
+
 // ==========================================
 // 6. BILLING & FINANCE TYPES
 // ==========================================
@@ -325,11 +370,16 @@ export interface Bill {
   deadline: string;
   paymentTxHash?: string;
 }
+
 export interface RevenueChartData {
-    name: string; 
-    total: number; 
+  name: string; 
+  total: number; 
 }
-// --- REVIEW TYPES ---
+
+// ==========================================
+// 7. REVIEW & REQUEST
+// ==========================================
+
 export interface ReviewResponse {
   id: number;
   contractId: number;
@@ -347,7 +397,14 @@ export interface ReviewRequest {
   rating: number;
   comment: string;
 }
-export type RequestType = "RENT_INCREASE" | "EXTENSION" | "TERMINATION" | "CHANGE_TERMS" | "CHANGE_SIGN_METHOD";
+
+export type RequestType =
+  | "RENT_INCREASE"
+  | "EXTENSION"
+  | "TERMINATION"
+  | "CHANGE_TERMS"
+  | "CHANGE_SIGN_METHOD";
+
 export type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
 export interface ContractChangeRequest {

@@ -96,6 +96,14 @@ public class User {
     @Column(name = "is_locked")
     private Boolean isLocked = false;
 
+    public boolean isLocked() {
+        return Boolean.TRUE.equals(this.isLocked);
+    }
+
+    public void setLocked(boolean locked) {
+        this.isLocked = locked;
+    }
+
     @Column(name = "locked_at")
     private LocalDateTime lockedAt;
 

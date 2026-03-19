@@ -1,6 +1,6 @@
 package iuh.se.kltn.backend.modules.contract.service;
 
-import iuh.se.kltn.backend.modules.contract.dto.MonthlyRevenueResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.MonthlyRevenueResponse;
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillResponse;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillingStatusResponse;

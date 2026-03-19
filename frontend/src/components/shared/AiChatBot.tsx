@@ -93,6 +93,21 @@ export default function AiChatBot() {
     scrollToBottom();
   }, [messages]);
 
+  // Lắng nghe event mở ChatBot từ bên ngoài
+  useEffect(() => {
+    const handleOpenAiChat = ((e: CustomEvent) => {
+      setIsOpen(true);
+      if (e.detail?.question) {
+        setInput(e.detail.question);
+        // Tùy chọn: tự động submit luôn hoặc để user tự bấm
+        // handleSend();
+      }
+    }) as EventListener;
+
+    window.addEventListener('openAiChat', handleOpenAiChat);
+    return () => window.removeEventListener('openAiChat', handleOpenAiChat);
+  }, []);
+
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!input.trim()) return;

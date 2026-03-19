@@ -1,13 +1,12 @@
 import { Outlet, Link } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { Home, Star } from "lucide-react";
+import { Home, Star, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { UserNav } from "../shared/UserNav"; 
-// ✅ THÊM IMPORT CHUÔNG THÔNG BÁO Ở ĐÂY
 import NotificationBell from "../shared/NotificationBell"; 
 
 export default function PublicLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -36,6 +35,16 @@ export default function PublicLayout() {
             <Link to="/help" className="text-sm font-medium text-muted-foreground hover:text-primary">
               Trợ giúp
             </Link>
+            {/* Khi đã đăng nhập: hiện link đến Dashboard theo role */}
+            {isAuthenticated && (
+              <Link
+                to={user?.role === 'LANDLORD' ? '/dashboard' : '/tenant-dashboard'}
+                className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 border border-primary/20 bg-primary/5 px-3 py-1 rounded-full transition-colors hover:bg-primary/10"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                {user?.role === 'LANDLORD' ? 'Quản lý' : 'Của tôi'}
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
