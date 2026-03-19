@@ -38,7 +38,7 @@ export interface User {
   locked?: boolean;
   lockedAt?: string | null;
   lockUntil?: string | null;
-  lockReason?: string | null;
+  lockReason?: string[] | null;
 }
 
 export interface ResetPasswordRequest{

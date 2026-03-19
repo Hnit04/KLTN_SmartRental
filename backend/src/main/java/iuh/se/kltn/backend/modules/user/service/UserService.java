@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class UserService {
@@ -44,6 +45,12 @@ public class UserService {
             response.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
         }
         return response;
+    }
+
+    public UserProfileResponse findByUsername(String username){
+        User user= userRepository.findByUsername(username)
+                .orElseThrow(()-> new ResourceNotFoundException("User","id", username));
+        return modelMapper.map(user, UserProfileResponse.class);
     }
 
     public UserProfileResponse updateUserProfile(Long userId, UpdateProfileRequest request) {
