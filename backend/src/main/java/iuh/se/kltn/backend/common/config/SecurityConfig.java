@@ -87,7 +87,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // API Auth (Đăng ký, Đăng nhập, Refresh Token)
                         .requestMatchers("/api/auth/**").permitAll()
-
+                        // demo crawl data
+                        .requestMatchers("/api/v1/crawler/**").permitAll()
                         // Swagger UI
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/ai/**").permitAll()
