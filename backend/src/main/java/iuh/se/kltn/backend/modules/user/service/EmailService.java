@@ -4,6 +4,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 @Service
 public class EmailService {
@@ -130,5 +133,57 @@ public class EmailService {
             System.err.println("LỖI GỬI MAIL RESET PASSWORD: " + e.getMessage());
             throw new RuntimeException("Không thể gửi email khôi phục mật khẩu. Vui lòng thử lại sau.");
         }
+
+    }
+    // Trong EmailService.java
+    public void sendAppointmentReminder(String toEmail, String name, String room, String time, String partner) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Nhắc nhở lịch hẹn sắp tới");
+        LocalDateTime dateTime = LocalDateTime.parse(time);
+        DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE, dd/MM/yyyy", new Locale("vi", "VN"));
+        String formattedTime = dateTime.format(displayFormatter);
+
+        String html = String.format(
+                """
+                <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+                    <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h2 style="color: #2c7be5; text-align: center;"> Nhắc nhở lịch hẹn</h2>
+                        <p style="font-size: 16px; color: #333;">
+                            Chào <b>%s</b>,
+                        </p>
+                        <p style="font-size: 15px; color: #555;">
+                            Bạn có một lịch xem phòng sắp diễn ra với thông tin chi tiết như sau:
+                        </p>
+                        <div style="background: #f1f5ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <p style="margin: 5px 0;"><b>Phòng:</b> %s</p>
+                            <p style="margin: 5px 0;"><b>Thời gian:</b> %s</p>
+                            <p style="margin: 5px 0;"><b>Người gặp:</b> %s</p>
+                        </div>
+                        <p style="font-size: 15px; color: #555;">
+                            Vui lòng sắp xếp thời gian để có mặt đúng giờ.
+                        </p>
+
+                        <p style="margin-top: 25px; font-size: 13px; color: #999; text-align: center;">
+                            Đây là email tự động, vui lòng không trả lời.
+                        </p>
+                    </div>
+                </div>
+                """,
+                name, room, formattedTime, partner
+        );
+        body.put("htmlContent", html);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders());
+        new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+    }
+
+    // Hàm helper để tránh lỗi resolve method
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", apiKey.trim());
+        return headers;
     }
 }
