@@ -94,7 +94,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/ai/**").permitAll()
                         // Trang lỗi và API Public
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/properties/**", "/api/rooms/**", "/api/appointments/**", "/api/bills/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**", "/api/rooms/**", "/api/appointments/**", "/api/bills/**","/api/users/username").permitAll()
                         .requestMatchers("/ws/**").permitAll() // ✅ Cho phép WebSocket handshake
                         .requestMatchers(HttpMethod.POST, "/api/appointments/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll() // Xem ảnh

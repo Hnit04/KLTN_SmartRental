@@ -213,8 +213,16 @@ const ProfilePage = () => {
               <h1 className="text-2xl font-bold text-gray-900">{user.fullName || user.username}</h1>
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <ShieldCheck className="h-4 w-4 text-green-500" />
-                <span>Tài khoản {user.role === 'LANDLORD' ? 'Chủ cho thuê' : 'Người thuê'}</span>
-              </div>
+                  <span>
+                    Tài khoản {
+                      user.role === 'LANDLORD'
+                        ? 'Chủ cho thuê'
+                        : user.role === 'ADMIN'
+                        ? 'Quản trị viên'
+                        : 'Người thuê'
+                    }
+                  </span>              
+                  </div>
             </div>
             
             <Button variant="outline" className="gap-2 mb-2" onClick={() => setIsEditModalOpen(true)}>

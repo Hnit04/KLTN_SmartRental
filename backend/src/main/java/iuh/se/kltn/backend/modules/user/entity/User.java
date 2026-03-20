@@ -113,4 +113,10 @@ public class User {
     @Column(name = "lock_reason", columnDefinition = "TEXT")
     @Convert(converter = LockReasonConverter.class)
     private List<String> lockReason = new ArrayList<>();
+    @Column(name= "verification_code")
+    private String verificationCode;
+    @Column(name = "verification_expiry")
+    private LocalDateTime verificationExpiry;
+    @Column(name="is_enabled")
+    private Boolean isEnabled = false;
 }

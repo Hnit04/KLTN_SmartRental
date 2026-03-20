@@ -3,10 +3,13 @@ import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext"; // KHÔNG cần import AuthProvider nữa
 import { Toaster } from "sonner"; 
 
+
 import MainLayout from "./components/layout/MainLayout";
 import PublicLayout from "./components/layout/PublicLayout";
 import HomePage from "./pages/core/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ContactPage from "./pages/core/ContactPage";
 import HelpCenter from "./pages/core/HelpCenter";
@@ -36,6 +39,7 @@ import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
+import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
@@ -110,6 +114,9 @@ function App() {
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-otp" element={<VerifyOtpPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
             </Route>
           </Route>
 
@@ -140,14 +147,16 @@ function App() {
               <Route path="/contracts" element={<ContractsPage />} />
               
               <Route path="/appointments" element={<AppointmentManagePage />} />
-            </Route> 
 
-            {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
-            <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-              <Route path="/admin/users" element={<UserManagementPage />} />
-              <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
-            </Route>
+                          {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
+              <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route path="/admin/users" element={<UserManagementPage />} />
+                <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
+              </Route>
+          </Route> 
+
+
           </Route>
 
         {/* Fallback */}

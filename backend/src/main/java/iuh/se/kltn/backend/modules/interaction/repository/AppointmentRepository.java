@@ -24,4 +24,18 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // Truy vấn nâng cao: Tìm các lịch hẹn đang chờ xác nhận (PENDING) của một chủ trọ
 //    @Query("SELECT a FROM Appointment a WHERE a.landlord.id = :landlordId AND a.status = 'PENDING'")
     List<Appointment> findByLandlordIdAndStatus(Long landlordId, AppointmentStatus status);
+    @Query("SELECT a FROM Appointment a " +
+            "JOIN FETCH a.tenant " +   // Lấy luôn thông tin Tenant
+            "JOIN FETCH a.landlord " + // Lấy luôn thông tin Landlord
+            "JOIN FETCH a.room " +     // Lấy luôn thông tin Room
+            "WHERE a.status = :status " +
+            "AND a.reminderSent = :reminderSent " +
+            "AND a.meetTime > :now " +
+            "AND a.meetTime <= :threshold")
+    List<Appointment> findUpcomingAppointments(
+            @Param("now") java.time.LocalDateTime now,
+            @Param("threshold") java.time.LocalDateTime threshold,
+            @Param("status") iuh.se.kltn.backend.modules.interaction.enums.AppointmentStatus status,
+            @Param("reminderSent") boolean reminderSent
+    );
 }
