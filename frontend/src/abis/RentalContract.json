@@ -40,11 +40,6 @@
 				"internalType": "uint256",
 				"name": "_waterPrice",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_paymentGracePeriod",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -83,19 +78,13 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "month",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "year",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
 				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "deadline",
 				"type": "uint256"
 			}
 		],
@@ -216,32 +205,6 @@
 			{
 				"indexed": false,
 				"internalType": "address",
-				"name": "subTenant",
-				"type": "address"
-			}
-		],
-		"name": "SubTenantAdded",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "subTenant",
-				"type": "address"
-			}
-		],
-		"name": "SubTenantRemoved",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
 				"name": "account",
 				"type": "address"
 			}
@@ -260,45 +223,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MAX_PENALTY_PERCENT",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_expectedRentAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "acceptRentIncrease",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_subTenant",
-				"type": "address"
-			}
-		],
-		"name": "addSubTenant",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -402,6 +326,11 @@
 				"internalType": "uint256",
 				"name": "_waterUsage",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_gracePeriodInSeconds",
+				"type": "uint256"
 			}
 		],
 		"name": "createBill",
@@ -456,106 +385,14 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getAllSubTenants",
-		"outputs": [
-			{
-				"internalType": "address[]",
-				"name": "",
-				"type": "address[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_id",
-				"type": "uint256"
-			}
-		],
-		"name": "getBill",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "id",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "month",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "year",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "deadline",
-						"type": "uint256"
-					},
-					{
-						"internalType": "bool",
-						"name": "isPaid",
-						"type": "bool"
-					},
-					{
-						"internalType": "uint256",
-						"name": "paidAt",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "penalty",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RentalContract.Bill",
-				"name": "",
-				"type": "tuple"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getUnpaidBills",
-		"outputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "",
-				"type": "uint256[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
-		"name": "isBillCreatedForMonth",
+		"name": "externalBillPaid",
 		"outputs": [
 			{
 				"internalType": "bool",
@@ -580,25 +417,6 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "isSubTenant",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "landlord",
 		"outputs": [
@@ -609,13 +427,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -645,16 +456,16 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "paymentGracePeriod",
-		"outputs": [
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_backendBillId",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "payExternalBill",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -668,32 +479,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_newAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "proposeRentIncrease",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_subTenant",
-				"type": "address"
-			}
-		],
-		"name": "removeSubTenant",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -736,25 +521,6 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "subTenants",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "tenant",
 		"outputs": [
@@ -765,13 +531,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -93,8 +94,8 @@ public class BillService {
         bill.setAdditionalFee(addFee);
         bill.setDiscountAmount(discount);
         bill.setNote(request.getNote());
-        // Lưu tỷ giá ETH/VND tại thời điểm tạo
-        bill.setExchangeRate(2500.0);
+        // Lưu tỷ giá ETH/VND tại thời điểm tạo (1 ETH ≈ 80 triệu VND)
+        bill.setExchangeRate(80000000.0);
 
         // Lưu vào DB
         Bill savedBill = billRepository.save(bill);
@@ -318,5 +319,27 @@ public class BillService {
         }
 
         return chartData;
+    }
+
+    @Transactional
+    public BillResponse confirmWeb3Payment(Long billId, String txHash) {
+        Bill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new RuntimeException("Hóa đơn không tồn tại"));
+
+        if (bill.getStatus() == BillStatus.PAID) {
+            throw new RuntimeException("Hóa đơn này đã được thanh toán!");
+        }
+
+        bill.setPaymentTxHash(txHash);
+        bill.setStatus(BillStatus.PAID);
+        bill.setPaidAt(LocalDateTime.now());
+
+        Bill savedBill = billRepository.save(bill);
+
+        Property property = savedBill.getContract().getRoom().getProperty();
+        double elecCost = (savedBill.getNewElecIndex() - savedBill.getOldElecIndex()) * property.getElecPrice();
+        double waterCost = (savedBill.getNewWaterIndex() - savedBill.getOldWaterIndex()) * property.getWaterPrice();
+
+        return mapToResponse(savedBill, elecCost, waterCost, savedBill.getContract().getActualPrice());
     }
 }

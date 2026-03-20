@@ -19,4 +19,5 @@ public class BillResponse {
     private BillStatus status;
     private LocalDateTime deadline;
     private String paymentTxHash;
+    private Double exchangeRate;
 }
