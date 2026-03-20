@@ -73,4 +73,11 @@ public class BillController {
 
         return ResponseEntity.ok(data);
     }
+
+    @PostMapping("/{billId}/confirm-web3")
+    public ResponseEntity<?> confirmWeb3Payment(@PathVariable Long billId,
+                                                @RequestBody Map<String, String> request) {
+        String txHash = request.get("txHash");
+        return ResponseEntity.ok(billService.confirmWeb3Payment(billId, txHash));
+    }
 }
