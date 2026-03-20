@@ -120,18 +120,35 @@ export default function LoginPage() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl border shadow-lg">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">Đăng nhập</h1>
-            <p className="text-sm text-gray-500 mt-2">
-              Chào mừng quay trở lại SmartRental
+      {/* Container chính với Background Image */}
+      <div 
+        className="relative min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: "url('https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop')",
+        }}
+      >
+        {/* Lớp Overlay làm mờ (Blur) và tối màu */}
+        <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[6px]"></div>
+
+        {/* Card Đăng nhập */}
+        <div className="relative w-full max-w-md space-y-8 bg-white/95 backdrop-blur-xl p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/40">
+          
+          <div className="text-center space-y-2">
+            {/* Logo/Icon Thuê nhà */}
+            <div className="mx-auto bg-blue-50 text-primary w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">SmartRental</h1>
+            <p className="text-sm text-gray-500 font-medium">
+              Tìm kiếm tổ ấm hoàn hảo của bạn
             </p>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-6 mt-8" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="username">Tên đăng nhập</Label>
+              <Label htmlFor="username" className="text-gray-700 font-semibold">Tên đăng nhập</Label>
               <Input
                 id="username"
                 type="text"
@@ -140,15 +157,16 @@ export default function LoginPage() {
                 value={formData.username}
                 onChange={handleChange}
                 autoFocus
+                className="bg-white/50 focus:bg-white transition-colors"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Mật khẩu</Label>
+                <Label htmlFor="password" className="text-gray-700 font-semibold">Mật khẩu</Label>
                 <Link
                   to="/forgot-password"
-                  className="text-sm font-medium text-blue-600 hover:underline"
+                  className="text-sm font-semibold text-primary text-decoration-none hover:text-primary-700 hover:underline transition-colors"
                 >
                   Quên mật khẩu?
                 </Link>
@@ -160,41 +178,51 @@ export default function LoginPage() {
                 required
                 value={formData.password}
                 onChange={handleChange}
+                className="bg-white/50 focus:bg-white transition-colors"
               />
             </div>
 
-            <Button className="w-full" type="submit" disabled={isLoading}>
-              {isLoading ? "Đang xử lý..." : "Đăng nhập"}
+            <Button 
+              className="w-full bg-primary hover:bg-primary-700 text-white font-semibold py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]" 
+              type="submit" 
+              disabled={isLoading}
+            >
+              {isLoading ? "Đang xử lý..." : "Đăng nhập vào hệ thống"}
             </Button>
           </form>
 
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-gray-600 pt-4 border-t border-gray-200/60 mt-6">
             Chưa có tài khoản?{" "}
-            <Link to="/register" className="font-medium text-blue-600 hover:underline">
+            <Link to="/register" className="font-bold text-primary hover:text-primary-700 hover:underline transition-colors">
               Đăng ký ngay
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Modal thông báo khóa tài khoản - dùng HTML + Tailwind */}
+      {/* Modal thông báo khóa tài khoản */}
       {showLockedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="p-6 border-b bg-red-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all">
+            <div className="p-6 flex items-center gap-3 border-b bg-red-50/50">
+              <div className="bg-red-100 text-red-600 p-2 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
               <h3 className="text-xl font-bold text-red-700">Tài khoản bị khóa</h3>
             </div>
 
-            <div className="p-6 whitespace-pre-line text-gray-800">
+            <div className="p-6 whitespace-pre-line text-gray-700 font-medium leading-relaxed">
               {lockMessage}
             </div>
 
-            <div className="p-6 border-t bg-gray-50 flex justify-end">
+            <div className="p-5 border-t bg-gray-50 flex justify-end">
               <button
                 onClick={() => setShowLockedModal(false)}
-                className="px-5 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition"
+                className="px-6 py-2.5 bg-gray-800 text-white font-semibold rounded-xl hover:bg-gray-900 active:scale-95 transition-all shadow-sm"
               >
-                Đóng
+                Đã hiểu
               </button>
             </div>
           </div>

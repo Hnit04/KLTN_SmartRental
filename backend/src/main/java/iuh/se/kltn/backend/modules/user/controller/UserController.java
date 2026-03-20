@@ -7,6 +7,7 @@ import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserHistoryResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.user.dto.response.UserRe;
 import iuh.se.kltn.backend.modules.user.entity.CustomRevisionEntity;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
@@ -61,7 +62,7 @@ public class UserController {
         return ResponseEntity.ok(userProfile);
     }
     @GetMapping("/username")
-    public UserProfileResponse findByUsername(String username) {
+    public UserRe findByUsername(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -74,7 +75,7 @@ public class UserController {
             }
         }
 
-        return modelMapper.map(user, UserProfileResponse.class);
+        return modelMapper.map(user, UserRe.class);
     }
 
     @PutMapping("/profile")
