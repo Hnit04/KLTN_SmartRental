@@ -43,8 +43,15 @@ export interface User {
 
 export interface ResetPasswordRequest{
   email: string;
-  code: string;
+  code?: string;
   newPassword: string;
+}
+export interface GoogleLoginRequest {
+  idToken: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+  googleId?: string;
 }
 
 export interface VerifyOtpRequest {

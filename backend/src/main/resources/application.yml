@@ -85,3 +85,5 @@ brevo:
   sender:
     email: tranngochung19112004@gmail.com
     name: SmartRental
+google:
+  client-id: 853040464300-f2l17df4g8vf714ainbi1n4a74hk87g2.apps.googleusercontent.com

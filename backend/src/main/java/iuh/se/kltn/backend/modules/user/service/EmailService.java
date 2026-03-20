@@ -87,8 +87,7 @@ public class EmailService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey.trim());
 
-        // Link trỏ về trang đổi mật khẩu trên Frontend (React/Vite)
-        // Lưu ý: Đổi port 5173 thành port bạn đang chạy Frontend nếu khác
+
         String resetLink = "http://localhost:5173/reset-password?email=" + toEmail + "&code=" + code;
 
         Map<String, Object> body = new HashMap<>();
@@ -135,7 +134,67 @@ public class EmailService {
         }
 
     }
-    // Trong EmailService.java
+    public void sendSecurityAlert(String toEmail) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", apiKey.trim());
+
+
+        String resetLink = "http://localhost:5173/reset-password?email=" + toEmail;
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Khôi phục mật khẩu của bạn");
+
+        String htmlContent =
+                "<html>" +
+                        "<body style='font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px;'>" +
+                        "<div style='max-width: 550px; margin: auto; background: white; padding: 30px; border-radius: 12px; border: 1px solid #e5e7eb;'>" +
+                        "<h2 style='color: #1f2937; text-align: center;'>Thông báo bảo mật 🛡️</h2>" +
+
+                        "<p style='color: #4b5563; line-height: 1.6;'>" +
+                        "Chào bạn, hệ thống ghi nhận bạn vừa đăng nhập vào <b>SmartRental</b> bằng Tên đăng nhập là: "+ toEmail+" mật khẩu mặc định (1111)." +
+                        "</p>" +
+
+                        "<div style='background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;'>" +
+                        "<p style='color: #92400e; margin: 0; font-size: 14px;'>" +
+                        "<b>Lưu ý:</b> Để đảm bảo an toàn cho tài khoản và các giao dịch thuê phòng, bạn vui lòng thay đổi mật khẩu ngay lập tức." +
+                        "</p>" +
+                        "</div>" +
+
+                        "<div style='text-align: center; margin: 30px 0;'>" +
+                        "<a href='" + resetLink + "' style='" +
+                        "background-color: #2563eb; color: white; padding: 14px 28px; " +
+                        "text-decoration: none; border-radius: 8px; display: inline-block; " +
+                        "font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>" +
+                        "Cập nhật mật khẩu ngay</a>" +
+                        "</div>" +
+
+                        "<hr style='border: 0; border-top: 1px solid #f3f4f6; margin: 20px 0;'>" +
+
+                        "<p style='font-size: 12px; color: #9ca3af; text-align: center;'>" +
+                        "Nếu bạn không thực hiện đăng nhập này, vui lòng liên hệ hỗ trợ kỹ thuật.<br>" +
+                        "© 2026 SmartRental Team." +
+                        "</p>" +
+                        "</div>" +
+                        "</body>" +
+                        "</html>";
+
+        body.put("htmlContent", htmlContent);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        try {
+            String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+            restTemplate.postForEntity(BREVO_API_URL, entity, String.class);
+            System.out.println("Gửi mail reset password thành công tới: " + toEmail);
+        } catch (Exception e) {
+            System.err.println("LỖI GỬI MAIL RESET PASSWORD: " + e.getMessage());
+            throw new RuntimeException("Không thể gửi email khôi phục mật khẩu. Vui lòng thử lại sau.");
+        }
+    }
     public void sendAppointmentReminder(String toEmail, String name, String room, String time, String partner) {
         Map<String, Object> body = new HashMap<>();
         body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));

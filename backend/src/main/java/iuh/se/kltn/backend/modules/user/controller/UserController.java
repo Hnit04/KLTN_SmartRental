@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -228,5 +229,9 @@ public class UserController {
          history.sort(Comparator.comparing(UserHistoryResponse::getModifiedAt).reversed());
 
         return ResponseEntity.ok(history);
+    }
+    @GetMapping("/userId")
+    public Optional<User> findById(String username){
+        return userRepository.findByUsername(username);
     }
 }

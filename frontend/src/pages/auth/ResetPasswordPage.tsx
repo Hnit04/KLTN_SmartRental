@@ -19,32 +19,48 @@ export default function ResetPasswordPage() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.newPassword !== formData.confirmPassword) {
-      return toast.error("Mật khẩu nhập lại không khớp!");
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  // 1. Kiểm tra mật khẩu khớp nhau
+  if (formData.newPassword !== formData.confirmPassword) {
+    return toast.error("Mật khẩu nhập lại không khớp!");
+  }
+
+  setIsLoading(true);
+  try {
+    const payload = {
+      email: formData.email,
+      code: formData.code, 
+      newPassword: formData.newPassword,
+    };
+
+    if (!formData.code || formData.code.trim() === "") {
+      console.log("Sử dụng resetPasswordNoOtp");
+      await authApi.resetPasswordNoOtp(payload);
+    } else {
+      console.log("Sử dụng resetPassword có OTP");
+      await authApi.resetPassword(payload);
     }
 
-    setIsLoading(true);
-    try {
-      // Gọi hàm resetPassword từ authApi
-      await authApi.resetPassword({
-        email: formData.email,
-        code: formData.code,
-        newPassword: formData.newPassword,
-      });
+    toast.success("Thành công!", {
+      description: "Mật khẩu đã được đổi",
+    });
 
-      toast.success("Thành công!", {
-        description: "Mật khẩu đã được đổi. Vui lòng đăng nhập lại.",
-      });
-
-      setTimeout(() => navigate("/login"), 2000);
-    } catch (error: any) {
-      toast.error(error?.response?.data || "Mã xác thực không đúng hoặc đã hết hạn.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setTimeout(() => navigate("/login"), 2000);
+  } catch (error: any) {
+    console.error("Lỗi đổi mật khẩu:", error);
+    const errorMessage = 
+      error?.response?.data?.message || 
+      error?.response?.data || 
+      "Đã có lỗi xảy ra. Vui lòng thử lại.";
+    
+    toast.error(errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -60,16 +76,6 @@ export default function ResetPasswordPage() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="code">Mã xác thực (OTP)</Label>
-            <Input
-              id="code"
-              placeholder="Nhập mã 6 số"
-              required
-              value={formData.code}
-              onChange={(e) => setFormData({...formData, code: e.target.value})}
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="newPassword">Mật khẩu mới</Label>
