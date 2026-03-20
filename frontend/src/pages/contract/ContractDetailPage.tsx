@@ -220,11 +220,11 @@ export default function ContractDetailPage() {
             method: 'wallet_addEthereumChain',
             params: [
               {
-                chainId: '0xaa36a7',
-                chainName: 'Sepolia Test Network',
+                chainId: import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID || '0xaa36a7',
+                chainName: import.meta.env.VITE_BLOCKCHAIN_CHAIN_NAME || 'Sepolia Test Network',
                 nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
-                rpcUrls: ['https://rpc.sepolia.org'],
-                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+                rpcUrls: [import.meta.env.VITE_BLOCKCHAIN_RPC_URL || 'https://rpc.sepolia.org'],
+                blockExplorerUrls: [import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'],
               },
             ],
           });
@@ -665,13 +665,13 @@ export default function ContractDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Contract Address</span>
-                    <a href={`https://sepolia.etherscan.io/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
+                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
                       {contract.smartContractAddress.substring(0, 10)}...{contract.smartContractAddress.substring(38)}
                     </a>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Tx Deploy Hash</span>
-                    <a href={`https://sepolia.etherscan.io/tx/${contract.deployTxHash}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
+                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/tx/${contract.deployTxHash}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
                       {contract.deployTxHash?.substring(0, 10)}...
                     </a>
                   </div>
