@@ -58,7 +58,7 @@ blockchain:
   chain-id: 11155111
 gemini:
   api:
-    key: "${GEMINI_API_KEY:AIzaSyDO3xhNcIUb0zgH7lPtPjPryZtfVU8DiBU}"
+    key: "${GEMINI_API_KEY:AIzaSyAxR0Wp6zXBS8W8ZpByhpoS5-WY3F3zONg}"
 jpa:
   hibernate:
     ddl-auto: update

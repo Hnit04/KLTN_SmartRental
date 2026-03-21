@@ -12,6 +12,7 @@ import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
@@ -45,6 +46,15 @@ public class AiOrchestratorService {
      */
     @PostConstruct
     public void initVectorCache() {
+        // --- TỘI: Fix lỗi Data Truncated cho cột type (Chạy thủ công) ---
+        try {
+            System.out.println("🛠️ Đang cưỡng bức cập nhật độ dài cột 'type' bảng notifications...");
+            jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50)");
+            System.out.println("✅ Đã cập nhật xong!");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Không cần cập nhật: " + e.getMessage());
+        }
+
         System.out.println("🔄 Đang nạp Kho tri thức SQL vào Vector Store trên RAM...");
         List<AiSqlCache> allCaches = cacheRepository.findAll();
         for (AiSqlCache cache : allCaches) {
@@ -65,6 +75,24 @@ public class AiOrchestratorService {
     // 1. Thêm 2 tham số role và userId vào hàm
     public Object processDataQuery(String question, String role, Long userId) {
         String sqlToExecute = null;
+
+        String roleRules = "";
+        if (role.equalsIgnoreCase("TENANT")) {
+            roleRules = "1. HỌ KHÔNG ĐƯỢC XEM DOANH THU CỦA CHỦ TRỌ.\n" +
+                    "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC.\n" +
+                    "3. Tuy nhiên, nếu họ hỏi về hóa đơn hay hợp đồng, BẮT BUỘC phải JOIN với bảng contracts và lọc bằng `contracts.tenant_id = {{userId}}`.\n" +
+                    "4. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản (giá, tên, trạng thái).\n" +
+                    "5. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm (District/City/Address), BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
+                    "6. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê (TENANT) nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`, hãy giữ SQL như tìm kiếm khách ngoài bình thường.";
+        } else if (role.equalsIgnoreCase("LANDLORD")) {
+            roleRules = "1. BẮT BUỘC phải thêm điều kiện `properties.landlord_id = {{userId}}` vào TẤT CẢ các câu query để họ không xem trộm được nhà trọ của chủ khác.\n" +
+                    "2. MẸO JOIN BẢNG: Nếu truy cập bảng rooms, bills, hay contracts, BẮT BUỘC JOIN với properties để có thể lọc `properties.landlord_id`.\n" +
+                    "3. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm (address LIKE hoặc district LIKE).";
+        } else {
+            roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI. KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
+                    "2. CẦN JOIN bảng `rooms` với bảng `properties` nếu tra địa điểm.\n" +
+                    "3. CHỈ được SELECT từ bảng rooms và properties.";
+        }
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();
 
@@ -87,8 +115,12 @@ public class AiOrchestratorService {
             System.out.println("⚡ Lấy SQL từ RAM: " + sqlToExecute);
         } else {
             System.out.println("🐌 [CACHE MISS] Câu hỏi mới, gọi Gemini sinh SQL...");
-            // 2. Truyền role và userId xuống cho Kỹ sư Data
-            sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId);
+            try {
+                sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, roleRules);
+            } catch (Exception llmEx) {
+                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
+                return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
+            }
 
             sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
 
@@ -115,33 +147,47 @@ public class AiOrchestratorService {
             if (!sqlToExecute.contains(userId.toString())) {
                 System.out.println("🚨 [SECURITY WARNING] SQL lấy từ Cache không khớp ID Chủ trọ! Đang ép sinh lại...");
 
-                // Ép AI sinh lại SQL mới cho đúng ID của Chủ trọ hiện tại
-                sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId);
+                try {
+                    sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, roleRules);
+                } catch (Exception llmEx) {
+                    System.err.println("⚠️ Lỗi gọi AI sinh SQL lại: " + llmEx.getMessage());
+                    return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ạ!";
+                }
+
                 sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
                 int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
                 if (selectIndex >= 0) {
                     sqlToExecute = sqlToExecute.substring(selectIndex);
                 }
 
-                // Đánh dấu là Cache Miss để tí nữa hệ thống lưu câu mới này vào Database/RAM
                 matches.clear();
             }
         }
 
-        // Chặn 3: Đề phòng AI lỡ "ảo giác" quên chèn luật cho Tenant
         if (role.equalsIgnoreCase("TENANT")) {
             String upperSql = sqlToExecute.toUpperCase();
-            // Nếu khách hỏi mà SQL có chữ SUM (tổng tiền) hoặc không bị khóa theo tenant_id -> Chặn!
             if (upperSql.contains("SUM(") || upperSql.contains("REVENUE")) {
                 return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
             }
         }
         
-        // Chặn 4: Cấm tuyệt đối SQL Injection phá hoại CSDL
         String upperCaseSql = sqlToExecute.toUpperCase();
         if (upperCaseSql.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE)\\b.*")) {
             System.err.println("🚨 [SECURITY ALERT] Phát hiện lệnh cấm mạo danh AI: " + sqlToExecute);
             return "Dạ, yêu cầu của bạn chứa truy vấn không an toàn. Hệ thống đã huỷ bỏ yêu cầu này để bảo mật dữ liệu.";
+        }
+
+        // Chặn 5: Java Regex Security Gate cho SQL (Đảm bảo ID Isolation)
+        if (role.equalsIgnoreCase("LANDLORD") && !upperCaseSql.contains("UNAUTHORIZED")) {
+            if (!upperCaseSql.contains("LANDLORD_ID")) {
+                System.err.println("🚨 [HARD SECURITY ALERT] SQL của Chủ trọ thiếu điều kiện phân quyền: " + sqlToExecute);
+                return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm luồng bảo mật dữ liệu.";
+            }
+        } else if (role.equalsIgnoreCase("TENANT") && !upperCaseSql.contains("UNAUTHORIZED")) {
+            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS")) && !upperCaseSql.contains("TENANT_ID")) {
+                System.err.println("🚨 [HARD SECURITY ALERT] SQL của Khách thuê truy cập bảng nhạy cảm mà thiếu tenant_id: " + sqlToExecute);
+                return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm quyền riêng tư của khách hàng khác.";
+            }
         }
         // ====================================================================
 
@@ -165,11 +211,36 @@ public class AiOrchestratorService {
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
             System.out.println("Dữ liệu thô: " + rawDataStr);
 
-            return dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+            try {
+                return dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+            } catch (Exception llmEx) {
+                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ (Hết Token/Timeout): " + llmEx.getMessage());
+                if (results.isEmpty()) {
+                    return "Dạ hiện AI đang quá tải, nhưng hệ thống ghi nhận không có dữ liệu nào khớp với yêu cầu của bạn ạ.";
+                }
+                
+                StringBuilder fallbackResponse = new StringBuilder("Dạ hiện AI đang quá tải (Hóa đơn Token), em xin tự động trích xuất kết quả dưới cơ sở dữ liệu lên cho bạn xem nhé:\n\n");
+                for (Map<String, Object> row : results) {
+                    Object roomId = row.getOrDefault("room_id", row.get("id"));
+                    if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
+                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s]\n", roomId, row.get("name"), row.get("price")));
+                    } else {
+                        fallbackResponse.append("- ").append(row.toString()).append("\n");
+                    }
+                }
+                return fallbackResponse.toString();
+            }
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
             return "Dạ, hệ thống đang gặp chút khó khăn khi tra cứu thông tin này. Bạn vui lòng thử lại sau nhé!";
         }
+    }
+    @Transactional
+    public void clearSqlCache() {
+        System.out.println("🧹 Đang xoá bộ nhớ đệm SQL (Cache)...");
+        cacheRepository.deleteAll(); // Xoá trong DB
+        embeddingStore.removeAll(); // Xoá trên RAM (Vector Store)
+        System.out.println("✅ Đã xoá sạch Cache AI.");
     }
 }

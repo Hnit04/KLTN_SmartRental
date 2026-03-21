@@ -80,4 +80,9 @@ public class AiController {
                 "data", result
         ));
     }
+    @PostMapping("/clear-cache")
+    public ResponseEntity<?> clearCache() {
+        aiOrchestratorService.clearSqlCache();
+        return ResponseEntity.ok(Map.of("status", "success", "message", "Đã xoá bộ nhớ đệm AI thành công!"));
+    }
 }

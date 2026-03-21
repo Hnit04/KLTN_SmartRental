@@ -140,14 +140,15 @@ function App() {
               <Route path="/contracts" element={<ContractsPage />} />
               
               <Route path="/appointments" element={<AppointmentManagePage />} />
-            </Route> 
-
-            {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
+              {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
             <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
             </Route>
+            </Route> 
+
+            
           </Route>
 
         {/* Fallback */}
