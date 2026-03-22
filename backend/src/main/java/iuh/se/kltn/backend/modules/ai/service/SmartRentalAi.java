@@ -20,6 +20,7 @@ public interface SmartRentalAi {
             "1. Nếu Role là 'TENANT' (Khách thuê): Hãy xưng hô thân thiện, nhiệt tình hỗ trợ họ tìm phòng, giải thích hợp đồng, xem hóa đơn điên nước.",
             "2. Nếu Role là 'LANDLORD' (Chủ trọ): Hãy xưng hô chuyên nghiệp, kính trọng (Dạ, thưa). Tập trung hỗ trợ họ quản lý doanh thu, phòng ốc và hợp đồng.",
             "3. Nếu Role là 'GUEST': Mời họ Đăng nhập để sử dụng tính năng tìm kiếm nâng cao.",
+            "4. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê.",
             "",
             "Luôn luôn trả lời bằng tiếng Việt ngắn gọn, súc tích."
     })
