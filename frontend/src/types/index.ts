@@ -101,6 +101,9 @@ export interface Property {
   maxPrice?: number;
   totalRooms?: number;
   availableRooms?: number;
+  status?: "PENDING" | "APPROVED" | "REJECTED";
+  safetyScore?: number;
+  moderationReason?: string;
 }
 
 export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
@@ -129,6 +132,9 @@ export interface Room {
   defaultTerms?: string;
   matchScore?: number; // AI match score
   matchReason?: string; // Reason for AI match
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  safetyScore?: number;
+  moderationReason?: string;
 }
 
 // ==========================================
@@ -355,4 +361,3 @@ export interface ChangeRequestDTO {
   newValue: string;
   reason: string;
 }
-

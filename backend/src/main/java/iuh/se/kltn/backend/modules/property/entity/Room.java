@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.property.entity;
 
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.enums.RoomType;
 import jakarta.persistence.*;
@@ -44,5 +45,13 @@ public class Room {
     @Column(columnDefinition = "TEXT")
     private String images; // JSON ảnh phòng
 
+    @Enumerated(EnumType.STRING)
+    private PropertyStatus approvalStatus = PropertyStatus.PENDING;
+
     private String metaDataHash;
+
+    private Integer safetyScore;
+
+    @Column(columnDefinition = "TEXT")
+    private String moderationReason;
 }

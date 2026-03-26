@@ -9,11 +9,15 @@ import iuh.se.kltn.backend.modules.property.dto.response.RoomResponse;
 import iuh.se.kltn.backend.modules.property.entity.Property;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
+import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
+import iuh.se.kltn.backend.modules.ai.service.ModerationService;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,13 +43,27 @@ public class PropertyService {
     private UserRepository userRepository;
     @Autowired
     private ModelMapper modelMapper;
+    @Autowired
+    private ModerationService moderationService;
 
-    // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public)
+    // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public) - CHỈ LẤY "APPROVED"
     public Page<PropertyResponse> getAllProperties(Pageable pageable) {
-        Page<Property> properties = propertyRepository.findAll(pageable);
+        Page<Property> properties = propertyRepository.findByStatus(PropertyStatus.APPROVED, pageable);
 
-        // Convert từng Entity sang Response (đã bao gồm tính toán giá)
+        // Convert từng Entity sang Response
         return properties.map(this::mapToPropertyResponse);
+    }
+
+    private String buildPropertyContentCheck(PropertyRequest request) {
+        return String.format("Tên khu trọ: %s\nĐịa chỉ: %s, %s, %s\nMô tả: %s\nGiá điện: %s\nGiá nước: %s\nInternet: %s",
+                request.getName(), request.getAddress(), request.getDistrict(), request.getCity(),
+                request.getDescription(), request.getElecPrice(), request.getWaterPrice(), request.getInternetPrice());
+    }
+
+    private String buildRoomContentCheck(RoomRequest request) {
+        return String.format("Tên/Số phòng: %s\nGiá phòng: %s\nDiện tích: %s\nLoại phòng: %s\nTiện ích: %s\nMô tả/Nội quy: %s",
+                request.getName(), request.getPrice(), request.getArea(), request.getType(),
+                request.getAmenities(), request.getDefaultTerms());
     }
 
     // TẠO KHU TRỌ MỚI
@@ -58,9 +76,21 @@ public class PropertyService {
             throw new RuntimeException("Chỉ chủ trọ mới được đăng bài!");
         }
 
+        // KIỂM DUYỆT NỘI DUNG (AI Moderation) - Chỉ để gợi ý cho Admin
+        ModerationResult modResult = moderationService
+                .checkContent("Khu trọ", buildPropertyContentCheck(request), request.getImages());
+        
+        PropertyStatus aiStatus = PropertyStatus.PENDING;
+
         Property property = modelMapper.map(request, Property.class);
         property.setLandlord((Landlord) user);
         property.setImages(JsonUtil.convertListToJson(request.getImages()));
+        property.setStatus(aiStatus);
+        property.setSafetyScore(modResult.getScore());
+        property.setModerationReason(modResult.getReason());
+
+        System.out
+                .println(" [DEBUG] AI Result for property '" + request.getName() + "': Score=" + modResult.getScore());
 
         Property saved = propertyRepository.save(property);
         return mapToPropertyResponse(saved);
@@ -76,11 +106,20 @@ public class PropertyService {
             throw new RuntimeException("Bạn không phải chủ khu trọ này!");
         }
 
+        // KIỂM DUYỆT NỘI DUNG PHÒNG - Chỉ để gợi ý cho Admin
+        ModerationResult modResult = moderationService.checkContent(
+                "Phòng trọ", buildRoomContentCheck(request), request.getImages());
+        
+        PropertyStatus aiStatus = PropertyStatus.PENDING;
+
         Room room = modelMapper.map(request, Room.class);
         room.setProperty(property);
         room.setStatus(RoomStatus.AVAILABLE);
+        room.setApprovalStatus(aiStatus);
         room.setImages(JsonUtil.convertListToJson(request.getImages()));
         room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));
+        room.setSafetyScore(modResult.getScore());
+        room.setModerationReason(modResult.getReason());
 
         Room savedRoom = roomRepository.save(room);
         return mapToRoomResponse(savedRoom);
@@ -94,12 +133,22 @@ public class PropertyService {
     }
 
     // LẤY DANH SÁCH PHÒNG CỦA 1 KHU TRỌ
-    public List<RoomResponse> getRoomsByProperty(Long propertyId) {
-        return roomRepository.findByPropertyId(propertyId).stream()
-                .map(this::mapToRoomResponse)
-                .collect(Collectors.toList());
-    }
+    public List<RoomResponse> getRoomsByProperty(Long propertyId, Long currentUserId) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
 
+        if (currentUserId != null && property.getLandlord().getId().equals(currentUserId)) {
+            // Chủ trọ xem tất cả phòng của mình
+            return roomRepository.findByPropertyId(propertyId).stream()
+                    .map(this::mapToRoomResponse)
+                    .collect(Collectors.toList());
+        } else {
+            // User bình thường chỉ xem phòng đã duyệt
+            return roomRepository.findByPropertyIdAndApprovalStatus(propertyId, PropertyStatus.APPROVED).stream()
+                    .map(this::mapToRoomResponse)
+                    .collect(Collectors.toList());
+        }
+    }
 
     // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
@@ -138,6 +187,8 @@ public class PropertyService {
             res.setTotalRooms(0);
         }
 
+        res.setSafetyScore(p.getSafetyScore());
+        res.setModerationReason(p.getModerationReason());
         return res;
     }
 
@@ -154,41 +205,68 @@ public class PropertyService {
     public PropertyResponse getPropertyById(Long id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trọ với ID: " + id));
+        // Có thể thêm kiểm tra nếu không phải owner thì phải được APPROVED mới xem được
         return mapToPropertyResponse(property);
     }
+
     @Transactional
     public PropertyResponse updateProperty(Long landlordId, Long propertyId, PropertyRequest request) {
         // 1. Tìm khu trọ theo ID
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại với ID: " + propertyId));
 
-        // 2. Kiểm tra quyền sở hữu (Chỉ cho phép Chủ trọ sở hữu mới được sửa)
+        // 2. Kiểm tra quyền sở hữu
         if (!property.getLandlord().getId().equals(landlordId)) {
             throw new RuntimeException("Bạn không có quyền chỉnh sửa khu trọ này!");
         }
 
-        // 3. Cập nhật dữ liệu từ request
+        // 3. KIỂM DUYỆT NỘI DUNG - Chỉ để gợi ý cho Admin
+        ModerationResult modResult = moderationService
+                .checkContent("Khu trọ", buildPropertyContentCheck(request), request.getImages());
+        
+        PropertyStatus aiStatus = PropertyStatus.PENDING;
+
+        // 4. Cập nhật dữ liệu
         property.setName(request.getName());
         property.setCity(request.getCity());
         property.setDistrict(request.getDistrict());
         property.setAddress(request.getAddress());
         property.setDescription(request.getDescription());
+        property.setStatus(aiStatus); // Đưa về PENDING hoặc APPROVED dựa theo AI
+        property.setSafetyScore(modResult.getScore());
+        property.setModerationReason(modResult.getReason());
 
         property.setElecPrice(request.getElecPrice());
         property.setWaterPrice(request.getWaterPrice());
         property.setInternetPrice(request.getInternetPrice());
 
-        // Cập nhật list hình ảnh (nếu có gửi lên)
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             property.setImages(JsonUtil.convertListToJson(request.getImages()));
         }
 
-        // 4. Lưu vào Database và trả về
         Property saved = propertyRepository.save(property);
         return mapToPropertyResponse(saved);
     }
+
+    // === ADMIN Duyệt tin ===
+    public List<PropertyResponse> getPropertiesByStatus(PropertyStatus status) {
+        return propertyRepository.findByStatus(status).stream()
+                .map(this::mapToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateStatus(Long propertyId, PropertyStatus status) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
+        property.setStatus(status);
+        propertyRepository.save(property);
+    }
+
     public String reverseGeocode(double lat, double lon) {
-        String url = String.format("https://nominatim.openstreetmap.org/reverse?format=json&lat=%s&lon=%s&addressdetails=1&accept-language=vi", lat, lon);
+        String url = String.format(
+                "https://nominatim.openstreetmap.org/reverse?format=json&lat=%s&lon=%s&addressdetails=1&accept-language=vi",
+                lat, lon);
 
         RestTemplate restTemplate = new RestTemplate();
 

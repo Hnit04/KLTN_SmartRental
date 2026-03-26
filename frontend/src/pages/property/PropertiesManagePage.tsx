@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed, Trash2, AlertTriangle, Home, CheckCircle } from 'lucide-react';
+import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed, Trash2, AlertTriangle, Home, CheckCircle, Sparkles } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -257,8 +257,9 @@ export default function PropertiesManagePage() {
       
       setShowModal(false);
       fetchProperties(); 
-    } catch (error) {
-      toast.error(editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+    } catch (error: any) {
+      const msg = error.response?.data?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+      toast.error(msg);
       console.error(error);
     } finally {
       setIsSubmitting(false);
@@ -301,6 +302,25 @@ export default function PropertiesManagePage() {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400"><Building className="h-10 w-10 opacity-50" /></div>
               )}
+
+              {/* NHÃN TRẠNG THÁI */}
+              <div className="absolute top-2 left-2 flex gap-1">
+                {property.status === 'PENDING' && (
+                  <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" /> CHỜ DUYỆT
+                  </span>
+                )}
+                {property.status === 'APPROVED' && (
+                  <span className="px-2 py-0.5 bg-green-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                    <CheckCircle className="h-2.5 w-2.5" /> ĐÃ DUYỆT
+                  </span>
+                )}
+                {property.status === 'REJECTED' && (
+                  <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                    <AlertTriangle className="h-2.5 w-2.5" /> BỊ TỪ CHỐI
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Nội dung */}
@@ -446,7 +466,17 @@ export default function PropertiesManagePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">Mô tả chung</label>
-                  <textarea rows={3} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                  <textarea 
+                    rows={4} 
+                    value={formData.description} 
+                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                    className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none resize-none" 
+                    placeholder="VD: Khu trọ an ninh, có camera 24/7. Giá thuê các phòng từ 1tr5 - 3tr. Liên hệ xem phòng giờ hành chính (gọi trước 30p)..."
+                  />
+                  <p className="text-xs text-blue-600 mt-1.5 flex items-start gap-1 bg-blue-50 p-2.5 rounded-md border border-blue-100">
+                    <Sparkles className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-blue-500" /> 
+                    <span><strong>Mẹo duyệt bài nhanh:</strong> Hệ thống AI sẽ chấm điểm độ chi tiết của bạn. Bạn hãy nhập rõ khoảng giá, tiện ích và nội quy để nhận điểm AI cao, giúp Admin duyệt bài của bạn ngay lập tức!</span>
+                  </p>
                 </div>
               </form>
             </div>

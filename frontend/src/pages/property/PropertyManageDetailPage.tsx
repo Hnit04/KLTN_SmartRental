@@ -320,6 +320,20 @@ export default function PropertyManageDetailPage() {
                    room.status === 'RESERVED' ? 'Giữ chỗ' : 
                    'Đã thuê'}
                 </span>
+
+                {/* NHÃN TRẠNG THÁI DUYỆT (CHO CHỦ TRỌ) */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  {room.approvalStatus === 'PENDING' && (
+                    <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                      CHỜ DUYỆT
+                    </span>
+                  )}
+                  {room.approvalStatus === 'REJECTED' && (
+                    <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                      BỊ TỪ CHỐI
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Thông tin phòng */}
@@ -491,7 +505,8 @@ export default function PropertyManageDetailPage() {
                         Tạo bằng AI
                       </Button>
                     </div>
-                    <textarea rows={6} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none" placeholder="Nhập mô tả..." />
+                    <textarea rows={6} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none text-sm" placeholder="Nhập mô tả... VD: Phòng rộng rãi có cửa sổ thoáng mát, giờ giấc tự do, điện 3k rác 50k..." />
+                    <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">Mẹo: Bạn có thể nhập Tên, Giá, Diện tích rồi bấm "Tạo bằng AI" để được viết tự động chuẩn SEO.</p>
                   </div>
 
                   {/* ✅ KHU VỰC CẤU HÌNH ĐIỀU KHOẢN MẪU CÓ GIAO DIỆN CHIPS */}
