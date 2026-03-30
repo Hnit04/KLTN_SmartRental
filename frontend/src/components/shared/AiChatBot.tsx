@@ -181,8 +181,12 @@ export default function AiChatBot() {
         }
       } else {
         // Chat thông thường (hỏi linh tinh, hỏi luật)
-        const chatRes = await aiApi.chat(userMsg, "web-session");
-        replyText = chatRes.reply;
+        try {
+          const chatRes = await aiApi.chat(userMsg, "web-session");
+          replyText = chatRes.reply;
+        } catch (error: any) {
+          replyText = error.response?.data?.message || "Xin lỗi, mình đang gặp sự cố kết nối. Vui lòng thử lại sau.";
+        }
       }
 
       setMessages((prev) => [

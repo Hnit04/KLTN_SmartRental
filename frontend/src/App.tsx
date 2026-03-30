@@ -37,6 +37,7 @@ import ReportsPage from "./pages/dashboard/ReportsPage";
 import AdminDashboardPage from "./pages/admin/AdminPage";
 import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
+import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
@@ -149,12 +150,13 @@ function App() {
               <Route path="/appointments" element={<AppointmentManagePage />} />
 
                           {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
-              <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
-                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-                <Route path="/admin/users" element={<UserManagementPage />} />
-                <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
-              </Route>
-          </Route> 
+            <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/approvals" element={<AdminApprovalPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
+            </Route>
+            </Route> 
 
 
           </Route>

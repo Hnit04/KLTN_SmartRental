@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 
 import java.util.Map;
 
@@ -35,5 +37,26 @@ public class RoomController {
 
         Map<String, Long> stats = roomService.getRoomStatsForLandlord(currentUser.getId());
         return ResponseEntity.ok(stats);
+    }
+
+    // === ADMIN Duyệt phòng ===
+    @GetMapping("/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getPendingRooms() {
+        return ResponseEntity.ok(roomService.getPendingRooms());
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> approveRoom(@PathVariable Long id) {
+        roomService.updateApprovalStatus(id, PropertyStatus.APPROVED);
+        return ResponseEntity.ok("Đã duyệt phòng");
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> rejectRoom(@PathVariable Long id) {
+        roomService.updateApprovalStatus(id, PropertyStatus.REJECTED);
+        return ResponseEntity.ok("Đã từ chối phòng");
     }
 }

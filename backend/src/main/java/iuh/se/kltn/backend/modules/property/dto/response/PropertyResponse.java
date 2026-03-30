@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.property.dto.response;
 
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import lombok.Data;
 import java.util.List;
 
@@ -11,6 +12,7 @@ public class PropertyResponse {
     private String district;
     private String city;
     private String description;
+    private PropertyStatus status;
 
     // Tọa độ
     private Double latitude;
@@ -32,4 +34,7 @@ public class PropertyResponse {
     private Double maxPrice;
     private Integer availableRooms;
     private Integer totalRooms;
+
+    private Integer safetyScore;
+    private String moderationReason;
 }
