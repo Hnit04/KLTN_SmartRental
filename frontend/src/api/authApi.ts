@@ -7,7 +7,8 @@ import type {
   TokenRefreshResponse,
   VerifyOtpRequest,
   ResetPasswordRequest,
-  GoogleLoginRequest
+  GoogleLoginRequest,
+  ChangePasswordRequest
 } from '../types';
 
 export const authApi = {
@@ -62,5 +63,9 @@ export const authApi = {
       refreshToken: refreshToken
     });
     return response.data;
-  }
+  },
+  changePassword: async (data: ChangePasswordRequest): Promise<string> => {
+    const response = await axiosClient.post('/auth/change-password', data);
+    return response.data;
+  },
 };

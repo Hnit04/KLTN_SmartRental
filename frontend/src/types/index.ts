@@ -54,6 +54,12 @@ export interface GoogleLoginRequest {
   googleId?: string;
 }
 
+export interface ChangePasswordRequest {
+  oldPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
+
 export interface VerifyOtpRequest {
   email: string;
   code: string;

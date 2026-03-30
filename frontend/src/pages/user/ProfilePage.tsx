@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   User, Mail, Phone, ShieldCheck, Wallet, 
-  MapPin, Calendar, Edit3, CheckCircle2, X, Save, MessageCircle, Camera 
+  MapPin, Calendar, Edit3, CheckCircle2, X, Save, 
+  MessageCircle, Camera, Lock 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import axiosClient from '@/api/axiosClient';
 import { userApi } from '@/api/userApi'; 
+import { authApi } from '@/api/authApi'; 
 import { toast } from 'sonner';
 
 // Khai báo global interface cho MetaMask
@@ -25,10 +26,19 @@ const ProfilePage = () => {
   const [isUpdatingWallet, setIsUpdatingWallet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   // State quản lý Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+
+  // State Form đổi mật khẩu
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
+  });
 
   // State Form & KYC
   const [kycFiles, setKycFiles] = useState<{ front: File | null, back: File | null }>({ front: null, back: null });
@@ -53,7 +63,11 @@ const ProfilePage = () => {
         fullName: user.fullName || '',
         phoneNumber: user.phoneNumber || '',
         zaloPhone: user.zaloPhone || '',
-        dateOfBirth: user.dateOfBirth ? (Array.isArray(user.dateOfBirth) ? convertArrDateToString(user.dateOfBirth) : user.dateOfBirth) : '',
+        dateOfBirth: user.dateOfBirth 
+          ? (Array.isArray(user.dateOfBirth) 
+              ? convertArrDateToString(user.dateOfBirth) 
+              : user.dateOfBirth) 
+          : '',
         currentAddress: user.currentAddress || '',
         cccdNumber: user.cccdNumber || '',
       });
@@ -67,6 +81,17 @@ const ProfilePage = () => {
       setKycPreviews({ front: '', back: '' });
     }
   }, [isKycModalOpen, user]);
+
+  // Reset form password khi đóng modal
+  useEffect(() => {
+    if (!isChangePasswordModalOpen) {
+      setPasswordForm({
+        oldPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+    }
+  }, [isChangePasswordModalOpen]);
 
   const convertArrDateToString = (dateArr: any) => {
     if (!Array.isArray(dateArr)) return dateArr;
@@ -106,7 +131,7 @@ const ProfilePage = () => {
       setIsUpdatingWallet(true);
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const address = accounts[0];
-      await axiosClient.put('/users/wallet', null, { params: { address: address } });
+      await axiosClient.put('/users/wallet', null, { params: { address } });
       if (user) updateUser({ ...user, walletAddress: address });
       toast.success("Kết nối ví thành công!");
     } catch (error) {
@@ -118,8 +143,8 @@ const ProfilePage = () => {
 
   const validateForm = () => {
     if (!formData.fullName.trim()) {
-        toast.error("Vui lòng nhập họ tên.");
-        return false;
+      toast.error("Vui lòng nhập họ tên.");
+      return false;
     }
     return true;
   };
@@ -159,19 +184,86 @@ const ProfilePage = () => {
       const isAutoVerified = message.toLowerCase().includes("thành công");
       if (user) {
         updateUser({ 
-            ...user, 
-            cccdNumber: kycCCCD,
-            kycStatus: isAutoVerified ? 'VERIFIED' : 'PENDING',
-            cccdFrontUrl: kycPreviews.front, 
-            cccdBackUrl: kycPreviews.back 
+          ...user, 
+          cccdNumber: kycCCCD,
+          kycStatus: isAutoVerified ? 'VERIFIED' : 'PENDING',
         });
       }
       toast.success(message);
       setIsKycModalOpen(false);
     } catch (error: any) {
-      toast.error("Gửi thất bại.");
+      toast.error("Gửi hồ sơ xác thực thất bại.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // ==================== ĐỔI MẬT KHẨU ====================
+    // ==================== ĐỔI MẬT KHẨU ====================
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
+      toast.error("Vui lòng nhập đầy đủ thông tin!");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      toast.error("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast.error("Mật khẩu mới phải có ít nhất 6 ký tự!");
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+
+      await authApi.changePassword({
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+        confirmNewPassword: passwordForm.confirmNewPassword,
+      });
+
+      toast.success("Đổi mật khẩu thành công!");
+      setIsChangePasswordModalOpen(false);
+      
+      // Reset form
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+
+    } catch (error: any) {
+      console.error("Change password error:", error);
+
+      let errorMessage = "Đổi mật khẩu thất bại. Vui lòng thử lại.";
+
+      // Xử lý lỗi từ backend
+      if (error.response?.data) {
+        const data = error.response.data;
+
+        // Trường hợp backend trả về object có message
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } 
+        else if (data.message) {
+          errorMessage = data.message;
+        } 
+        else if (data.error) {
+          errorMessage = data.error;
+        }
+        // Trường hợp backend trả về lỗi validation hoặc exception
+        else if (typeof data === 'object') {
+          errorMessage = JSON.stringify(data); // fallback, ít dùng
+        }
+      } 
+      else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -180,13 +272,13 @@ const ProfilePage = () => {
   return (
     <div className="space-y-6 relative pb-20">
       
-      {/* ─── BANNER & AVATAR ─── */}
+      {/* BANNER & AVATAR */}
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-primary/20 to-primary/5" />
         <div className="px-8 pb-8">
           <div className="relative flex flex-col md:flex-row items-end gap-5 -mt-12">
             
-            {/* Avatar Box */}
+            {/* Avatar */}
             <div className="relative group">
               <div 
                 className="h-24 w-24 rounded-2xl bg-white p-1 shadow-lg cursor-pointer transition-transform hover:scale-105"
@@ -197,7 +289,7 @@ const ProfilePage = () => {
                     <img src={user.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-3xl font-bold text-primary">
-                      {user.fullName?.charAt(0).toUpperCase() || user.username.charAt(0).toUpperCase()}
+                      {user.fullName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase()}
                     </span>
                   )}
                   <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isUploadingAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -208,31 +300,38 @@ const ProfilePage = () => {
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
             </div>
             
-            {/* User Name & Role */}
+            {/* Info */}
             <div className="flex-1 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">{user.fullName || user.username}</h1>
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <ShieldCheck className="h-4 w-4 text-green-500" />
-                  <span>
-                    Tài khoản {
-                      user.role === 'LANDLORD'
-                        ? 'Chủ cho thuê'
-                        : user.role === 'ADMIN'
-                        ? 'Quản trị viên'
-                        : 'Người thuê'
-                    }
-                  </span>              
-                  </div>
+                <span>
+                  Tài khoản {
+                    user.role === 'LANDLORD' ? 'Chủ cho thuê' :
+                    user.role === 'ADMIN' ? 'Quản trị viên' : 'Người thuê'
+                  }
+                </span>              
+              </div>
             </div>
             
-            <Button variant="outline" className="gap-2 mb-2" onClick={() => setIsEditModalOpen(true)}>
-              <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ
-            </Button>
+            {/* Buttons */}
+            <div className="flex gap-3 mb-2">
+              <Button variant="outline" className="gap-2" onClick={() => setIsEditModalOpen(true)}>
+                <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ
+              </Button>
+              <Button 
+                variant="outline" 
+                className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50"
+                onClick={() => setIsChangePasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" /> Đổi mật khẩu
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ─── NỘI DUNG CHÍNH (KHÔNG CÒN TAB) ─── */}
+      {/* Nội dung chính */}
       <div className="grid lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
         
         {/* CỘT TRÁI: THÔNG TIN & VÍ */}
@@ -254,7 +353,7 @@ const ProfilePage = () => {
                     ? (Array.isArray(user.dateOfBirth) 
                         ? new Date(user.dateOfBirth[0], user.dateOfBirth[1] - 1, user.dateOfBirth[2]).toLocaleDateString('vi-VN')
                         : new Date(user.dateOfBirth).toLocaleDateString('vi-VN'))
-                    : null
+                    : "Chưa cập nhật"
                 } 
                 icon={<Calendar className="h-4 w-4" />} 
               />
@@ -265,24 +364,24 @@ const ProfilePage = () => {
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái xác thực</p>
                 <div className="flex items-center gap-3">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      user.kycStatus === 'VERIFIED' ? 'bg-green-100 text-green-700' : 
-                      user.kycStatus === 'PENDING' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {user.kycStatus === 'VERIFIED' && <CheckCircle2 className="h-3 w-3" />}
-                      {user.kycStatus}
-                    </div>
-                    {user.kycStatus !== 'VERIFIED' && user.kycStatus !== 'PENDING' && (
-                      <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setIsKycModalOpen(true)}>
-                        Xác thực ngay
-                      </Button>
-                    )}
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    user.kycStatus === 'VERIFIED' ? 'bg-green-100 text-green-700' : 
+                    user.kycStatus === 'PENDING' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {user.kycStatus === 'VERIFIED' && <CheckCircle2 className="h-3 w-3" />}
+                    {user.kycStatus}
+                  </div>
+                  {user.kycStatus !== 'VERIFIED' && (
+                    <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setIsKycModalOpen(true)}>
+                      Xác thực ngay
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Block Ví MetaMask */}
+          {/* Block Ví */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
               <Wallet className="h-5 w-5 text-primary" /> Kết nối Blockchain
@@ -323,24 +422,28 @@ const ProfilePage = () => {
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h4 className="font-bold mb-4 text-sm uppercase">Hoạt động</h4>
             <div className="space-y-4">
-          <ActivityItem 
-            label="Ngày tham gia" 
-            value={new Date(user.createdAt).toLocaleString('vi-VN')} 
-            icon={<Calendar />} 
-          />              
-          <ActivityItem label="Cập nhật cuối" value={new Date(user.updatedAt).toLocaleString('vi-VN')} icon={<Edit3 />} />
+              <ActivityItem 
+                label="Ngày tham gia" 
+                value={new Date(user.createdAt).toLocaleString('vi-VN')} 
+                icon={<Calendar />} 
+              />              
+              <ActivityItem 
+                label="Cập nhật cuối" 
+                value={new Date(user.updatedAt).toLocaleString('vi-VN')} 
+                icon={<Edit3 />} 
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── MODAL EDIT PROFILE ─── */}
+      {/* MODAL CHỈNH SỬA HỒ SƠ */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-4 mb-4">
               <h3 className="text-xl font-bold text-gray-900">Cập nhật hồ sơ</h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
+              <button onClick={() => setIsEditModalOpen(false)} className="rounded-full p-1 hover:bg-gray-100">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
@@ -373,17 +476,93 @@ const ProfilePage = () => {
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t mt-6">
                 <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
-                <Button type="submit" isLoading={isSaving} className="gap-2"><Save className="h-4 w-4" /> Lưu thay đổi</Button>
+                <Button type="submit" isLoading={isSaving} className="gap-2">
+                  <Save className="h-4 w-4" /> Lưu thay đổi
+                </Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ─── MODAL KYC ─── */}
+      {/* MODAL ĐỔI MẬT KHẨU */}
+      {isChangePasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-4 mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Lock className="h-5 w-5 text-orange-600" /> Đổi mật khẩu
+              </h3>
+              <button 
+                onClick={() => setIsChangePasswordModalOpen(false)} 
+                className="rounded-full p-1 hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="oldPassword">Mật khẩu hiện tại</Label>
+                <Input
+                  id="oldPassword"
+                  type="password"
+                  value={passwordForm.oldPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                  placeholder="Nhập mật khẩu cũ"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Mật khẩu mới</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmNewPassword">Xác nhận mật khẩu mới</Label>
+                <Input
+                  id="confirmNewPassword"
+                  type="password"
+                  value={passwordForm.confirmNewPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                  placeholder="Nhập lại mật khẩu mới"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsChangePasswordModalOpen(false)}
+                >
+                  Hủy bỏ
+                </Button>
+                <Button 
+                  type="submit" 
+                  isLoading={isChangingPassword} 
+                  className="gap-2"
+                >
+                  <Save className="h-4 w-4" /> Đổi mật khẩu
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KYC */}
       {isKycModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" /> Xác thực danh tính (eKYC)
@@ -448,19 +627,15 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* ─── SỞ THÍCH THUÊ PHÒNG (Tenant Only) ─── */}
-      {user.role === 'TENANT' && (
-        <TenantPreferenceSection />
-      )}
+      {/* Sở thích thuê phòng (Tenant Only) */}
+      {user.role === 'TENANT' && <TenantPreferenceSection />}
     </div>
   );
 };
-
-// Component con xử lý Sở thích
 import { tenantPreferenceApi } from '@/api/tenantPreferenceApi';
 import type { TenantPreference } from '@/types/index';
 import { Home, Lightbulb } from 'lucide-react';
-
+// ==================== COMPONENT CON ====================
 const TenantPreferenceSection = () => {
   const [pref, setPref] = useState<Partial<TenantPreference>>({});
   const [isSavingPref, setIsSavingPref] = useState(false);
@@ -575,8 +750,6 @@ const TenantPreferenceSection = () => {
   );
 };
 
-
-// UI Components nhỏ
 const InfoItem = ({ label, value, icon }: any) => (
   <div className="space-y-1">
     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>

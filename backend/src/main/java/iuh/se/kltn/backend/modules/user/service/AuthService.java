@@ -362,5 +362,29 @@ public class AuthService {
             throw new RuntimeException("Lỗi xác thực Google: " + e.getMessage());
         }
     }
+    // ĐỔI MẬT KHẨU (khi đã đăng nhập)
+    public void changePassword(Long userId, String oldPassword, String newPassword, String confirmNewPassword) {
+
+        if (!newPassword.equals(confirmNewPassword)) {
+            throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản!"));
+
+        // Kiểm tra mật khẩu cũ có đúng không
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu cũ không chính xác!");
+        }
+
+        // Kiểm tra mật khẩu mới không được trùng với mật khẩu cũ
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu mới phải khác với mật khẩu cũ!");
+        }
+
+        // Cập nhật mật khẩu mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 
 }

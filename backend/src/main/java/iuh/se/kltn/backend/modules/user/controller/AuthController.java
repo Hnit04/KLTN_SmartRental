@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
+import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.user.dto.request.*;
 import iuh.se.kltn.backend.modules.user.dto.response.LoginResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.LoginResponseGoogle;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -138,6 +140,33 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Lỗi hệ thống khi xác thực Google: " + e.getMessage()));
+        }
+    }
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        try {
+            if (userPrincipal == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Vui lòng đăng nhập để thực hiện thao tác này!");
+            }
+
+            authService.changePassword(
+                    userPrincipal.getId(),
+                    request.getOldPassword(),
+                    request.getNewPassword(),
+                    request.getConfirmNewPassword()
+            );
+
+            return ResponseEntity.ok("Đổi mật khẩu thành công!");
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Lỗi hệ thống: " + e.getMessage());
         }
     }
 
