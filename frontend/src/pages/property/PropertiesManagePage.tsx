@@ -20,7 +20,7 @@ const VIETNAM_CITIES = [
   "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam",
   "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La",
   "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên - Huế",
-  "Tiền Giang", "Tp. Hồ Chí Minh", "Trà Vinh", "Tuyên Quang", "Vĩnh Long",
+  "Tiền Giang", "Hồ Chí Minh", "Trà Vinh", "Tuyên Quang", "Vĩnh Long",
   "Vĩnh Phúc", "Yên Bái", "Đà Nẵng"
 ];
 
@@ -130,37 +130,99 @@ export default function PropertiesManagePage() {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
 
-          // ✅ 1. GỌI VỀ BACKEND SPRING BOOT CỦA MÌNH
+          // 1. GỌI VỀ BACKEND SPRING BOOT
           const response = await propertyApi.reverseGeocode(lat, lon);
           
-          // ✅ 2. XỬ LÝ DỮ LIỆU JSON
-          // Tùy cấu hình Axios, dữ liệu có thể nằm ở response.data hoặc trực tiếp ở response
           let data = (response as any).data || response;
-          // Vì Spring Boot trả về chuỗi String JSON nguyên xi, nên ta cần parse nó ra Object
           if (typeof data === 'string') {
             data = JSON.parse(data);
           }
 
-          if (data && data.address) {
-            const addr = data.address;
+          // 🔥 BẮT TẬN TAY API TRẢ VỀ GÌ
+          console.log("=== DỮ LIỆU ĐỊA CHỈ TỪ API ===", data);
+
+          if (data) {
+            const addr = data.address || {};
+            const fullAddress = (data.display_name || data.formatted_address || "").toLowerCase();
             
-            const city = addr.city || addr.province || addr.state || '';
-            const district = addr.county || addr.suburb || addr.city_district || addr.district || '';
             const street = addr.road || addr.pedestrian || '';
             const houseNumber = addr.house_number ? `${addr.house_number} ` : '';
             
+            // Helper 1: Xóa dấu Tiếng Việt cực mạnh
+            const removeAccents = (str: string) => {
+              if (!str) return '';
+              return str.toString().normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+            };
+
+            // Helper 2: Chuẩn hóa cắt bỏ cả Tiếng Việt lẫn Tiếng Anh ("City", "Province")
+            const normalizeCitySearch = (s: string) => {
+              if (!s) return '';
+              let res = removeAccents(s.toLowerCase());
+              res = res.replace(/^(thanh pho|tinh|tp\.?|quan|huyen|thi xa)\s+/i, '')
+                       .replace(/\s+(city|province|town|municipality)$/i, '')
+                       .replace(/-/g, ' ') // Xử lý vụ Bà Rịa - Vũng Tàu
+                       .trim();
+              return res;
+            };
+
+            const candidateCities = [
+              addr.state, addr.city, addr.province, addr.town, addr.county, addr.region
+            ].filter(Boolean);
+            
+            let matchedCity = '';
+            
+            // CHIẾN THUẬT 1: Tìm trong các biến trả về của API
+            for (const candidate of candidateCities) {
+              const stripped = normalizeCitySearch(candidate);
+              const found = VIETNAM_CITIES.find(city => {
+                const opt = normalizeCitySearch(city);
+                return opt === stripped || opt.includes(stripped) || stripped.includes(opt);
+              });
+              if (found) { 
+                matchedCity = found; 
+                break; 
+              }
+            }
+
+            // CHIẾN THUẬT 2 (Vũ khí cuối): Quét toàn bộ chuỗi địa chỉ dài nếu Chiến thuật 1 xịt
+            if (!matchedCity && fullAddress) {
+               const noAccentFullAddr = removeAccents(fullAddress);
+               const foundFallback = VIETNAM_CITIES.find(city => {
+                 return noAccentFullAddr.includes(normalizeCitySearch(city));
+               });
+               if (foundFallback) {
+                 matchedCity = foundFallback;
+               }
+            }
+            
+            // Xử lý Quận/Huyện
+            const rawCity = addr.city || '';
+            const rawDistrict = addr.county || addr.suburb || addr.city_district || addr.district || '';
+            let finalDistrict = rawDistrict;
+            if (rawCity && normalizeCitySearch(rawCity) !== normalizeCitySearch(matchedCity)) {
+              finalDistrict = rawCity;
+            }
+            const stripPrefixOnly = (s: string) => s ? s.replace(/^(Thành phố|Tỉnh|Tp\.?|Quận|Huyện|Thị xã)\s+/i, '').trim() : '';
+            
             setFormData(prev => ({
               ...prev,
-              city: city.replace('Thành phố ', '').replace('Tỉnh ', ''),
-              district: district.replace('Quận ', '').replace('Huyện ', ''),
-              address: `${houseNumber}${street}`.trim() || data.display_name.split(',')[0],
+              city: matchedCity,
+              district: stripPrefixOnly(finalDistrict),
+              address: `${houseNumber}${street}`.trim() || fullAddress.split(',')[0],
               latitude: lat,
               longitude: lon
             }));
             
-            toast.success("Đã lấy được vị trí hiện tại!", { id: toastId });
+            if (matchedCity) {
+              toast.success("Đã lấy được vị trí hiện tại!", { id: toastId });
+            } else {
+              toast.warning(`Đã lấy tọa độ nhưng chưa tự nhận diện được tỉnh.`, { id: toastId });
+            }
           }
         } catch (error) {
+          console.error("Lỗi Geocode:", error);
           toast.error("Không thể phân tích địa chỉ từ tọa độ.", { id: toastId });
         } finally {
           setIsFetchingLocation(false);
