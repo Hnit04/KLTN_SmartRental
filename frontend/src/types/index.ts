@@ -167,6 +167,7 @@ export interface Room {
   propertyName?: string;
   address?: string;      
   propertyAddress?: string;
+  maxOccupants?: number;
   landlordName?: string; 
   elecPrice?: number;
   waterPrice?: number;

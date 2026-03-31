@@ -123,35 +123,60 @@ export default function PropertyManageDetailPage() {
   };
 
   // --- NHÂN BẢN PHÒNG ---
-  const handleDuplicate = (room: any) => {
-    setEditingId(null);
-    const standardAmenities: string[] = [];
-    const customAmenities: string[] = [];
-    (room.amenities || []).forEach((item: string) => {
-      if (COMMON_AMENITIES.includes(item)) {
-        standardAmenities.push(item);
-      } else {
-        customAmenities.push(item);
-      }
-    });
-    setFormData({
-      name: '', // Để trống tên để tránh trùng
-      price: room.price?.toString() || '', 
-      area: room.area?.toString() || '',
-      description: room.description || '', 
-      type: room.type || 'STUDIO',
-      hasMezzanine: room.hasMezzanine ?? false,
-      hasBalcony: room.hasBalcony ?? false,
-      maxOccupants: room.maxOccupants?.toString() || '',
-      amenities: standardAmenities,
-      customAmenitiesInput: customAmenities.join(', '), 
-      images: [], // Không copy ảnh
-      defaultTerms: room.defaultTerms || '' 
-    });
-    setSelectedFiles([]); setPreviewUrls([]);
-    setShowModal(true);
-    toast.info('Đã sao chép thông tin phòng! Hãy nhập số phòng mới.');
-  };
+const handleDuplicate = async (room: any) => {
+  console.log("Dữ liệu phòng gốc:", room); 
+  // 1. Kiểm tra an toàn nếu không tìm thấy phòng
+  if (!room) {
+    toast.error('Không tìm thấy dữ liệu phòng để sao chép');
+    return;
+  }
+
+  setEditingId(null);
+
+  // 2. Xử lý Amenities (Hỗ trợ cả Array hoặc chuỗi JSON từ Backend)
+  let rawAmenities: string[] = [];
+  try {
+    rawAmenities = Array.isArray(room.amenities) 
+      ? room.amenities 
+      : JSON.parse(room.amenities || '[]');
+  } catch (e) {
+    rawAmenities = [];
+  }
+
+  const standardAmenities: string[] = [];
+  const customAmenities: string[] = [];
+
+  rawAmenities.forEach((item: string) => {
+    if (COMMON_AMENITIES.includes(item)) {
+      standardAmenities.push(item);
+    } else {
+      customAmenities.push(item);
+    }
+  });
+
+  // 3. Map dữ liệu vào Form
+  setFormData({
+    name: '', // Bắt buộc nhập mới
+    price: room.price?.toString() || '', 
+    area: room.area?.toString() || '',
+    description: room.description || '', 
+    type: room.type || 'STUDIO',
+    hasMezzanine: room.hasMezzanine ?? false,
+    hasBalcony: room.hasBalcony ?? false,
+    maxOccupants: room.maxOccupants?.toString() || '',
+    amenities: standardAmenities,
+    customAmenitiesInput: customAmenities.join(', '), 
+    images: [], // Không sao chép ảnh cũ để tránh rác dữ liệu Cloudinary
+    defaultTerms: room.defaultTerms || '' 
+  });
+
+  // 4. Reset trạng thái file và hiển thị modal
+  setSelectedFiles([]); 
+  setPreviewUrls([]);
+  setShowModal(true);
+  
+  toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
+};
 
   const handleOpenEdit = (room: any) => { 
     setEditingId(room.id);
