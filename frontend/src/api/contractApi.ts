@@ -45,5 +45,10 @@ export const contractApi = {
   // --- CẬP NHẬT ĐIỀU KHOẢN TRỰC TIẾP ---
   updateTerms: (id: number | string, data: { terms: string }) => {
     return axiosClient.put(`/contracts/${id}/terms`, data);
+  },
+
+  // --- XÁC NHẬN HOÀN CỌC ---
+  confirmDepositRefund: (id: number | string) => {
+    return axiosClient.put(`/contracts/${id}/confirm-deposit-refund`);
   }
 };

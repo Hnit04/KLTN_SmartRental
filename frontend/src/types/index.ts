@@ -41,6 +41,11 @@ export interface User {
   lockedAt?: string | null;
   lockUntil?: string | null;
   lockReason?: string[] | null;
+  // Bank info
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
+  bankQrUrl?: string;
 }
 
 export interface ResetPasswordRequest{
@@ -96,7 +101,11 @@ export interface UpdateProfileRequest {
   dateOfBirth?: string;   
   currentAddress?: string;
   cccdNumber?: string;
-  avatarUrl?: string; 
+  avatarUrl?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
+  bankQrUrl?: string;
 }
 
 export interface TenantPreference {
@@ -173,8 +182,8 @@ export interface Room {
 // 3. CONTRACT TYPES
 // ==========================================
 
-export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY";
-export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED";
+export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY" | "CANCELLED";
+export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED" | "PENALIZED";
 
 // ✅ 1. Thêm Enum phương thức ký
 export type ContractSignMethod = "TRADITIONAL" | "BLOCKCHAIN";
@@ -193,7 +202,8 @@ export interface Contract {
   actualPrice: number;   // Khớp với Backend Contract.java
   depositAmount: number;
   additionalTerms?: string;
-  status: "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  status: ContractStatus;
+  depositStatus?: DepositStatus;
   signMethod: "TRADITIONAL" | "BLOCKCHAIN";
   
   // Các trường Flattened để hiển thị UI

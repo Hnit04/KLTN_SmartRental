@@ -74,6 +74,12 @@ public class UserService {
             }
         }
 
+        // 💰 Thông tin ngân hàng
+        if (hasText(request.getBankName())) user.setBankName(request.getBankName());
+        if (hasText(request.getBankAccountNumber())) user.setBankAccountNumber(request.getBankAccountNumber());
+        if (hasText(request.getBankAccountHolder())) user.setBankAccountHolder(request.getBankAccountHolder());
+        if (hasText(request.getBankQrUrl())) user.setBankQrUrl(request.getBankQrUrl());
+
         User updatedUser = userRepository.save(user);
         return modelMapper.map(updatedUser, UserProfileResponse.class);
     }

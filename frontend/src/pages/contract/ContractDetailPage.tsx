@@ -37,6 +37,16 @@ interface ContractDetail extends Contract {
   elecPrice?: number;
   waterPrice?: number;
   internetPrice?: number;
+  tenantWalletAddress?: string;
+  tenantBankName?: string;
+  tenantBankAccountNumber?: string;
+  tenantBankAccountHolder?: string;
+  tenantBankQrUrl?: string;
+  landlordWalletAddress?: string;
+  landlordBankName?: string;
+  landlordBankAccountNumber?: string;
+  landlordBankAccountHolder?: string;
+  landlordBankQrUrl?: string;
 }
 
 export default function ContractDetailPage() {
@@ -72,6 +82,9 @@ export default function ContractDetailPage() {
   const [isEditTermsModalOpen, setIsEditTermsModalOpen] = useState(false);
   const [editTermsContent, setEditTermsContent] = useState("");
   const [isUpdatingTerms, setIsUpdatingTerms] = useState(false);
+
+  // Xác nhận thanh toán Cọc
+  const [isDepositPaid, setIsDepositPaid] = useState(false);
 
   const [changeForm, setChangeForm] = useState<{type: RequestType, newValue: string, reason: string}>({
     type: 'RENT_INCREASE',
@@ -174,6 +187,11 @@ export default function ContractDetailPage() {
   };
 
   const handleSignContract = async () => {
+    if (user?.role === 'TENANT' && contract?.signMethod === 'TRADITIONAL' && !isDepositPaid) {
+      toast.warning("Vui lòng xác nhận đã thanh toán tiền cọc!");
+      return;
+    }
+
     setIsSigning(true);
     try {
       if (contract?.signMethod === 'BLOCKCHAIN') {
@@ -183,7 +201,32 @@ export default function ContractDetailPage() {
           return;
         }
         await window.ethereum.request({ method: 'eth_requestAccounts' });
-        toast.info("Đang gọi Web3 Provider...");
+        
+        if (user?.role === 'TENANT') {
+          if (!contract?.landlordWalletAddress) {
+            toast.error("Không tìm thấy địa chỉ ví của Chủ trọ để chuyển cọc!");
+            setIsSigning(false);
+            return;
+          }
+          toast.info("Đang tạo giao dịch chuyển tiền cọc qua Web3...");
+          const provider = new ethers.BrowserProvider(window.ethereum as any);
+          const signer = await provider.getSigner();
+          
+          const exchangeRate = 80000000; // VND/ETH
+          const ethAmount = ((contract?.depositAmount || 0) / exchangeRate).toFixed(18);
+          const weiAmount = ethers.parseEther(ethAmount);
+
+          const tx = await signer.sendTransaction({
+            to: contract.landlordWalletAddress,
+            value: weiAmount
+          });
+
+          toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
+          await tx.wait();
+          toast.success("Thanh toán tiền cọc qua Web3 thành công!");
+        } else {
+          toast.info("Đang gọi Web3 Provider...");
+        }
       }
 
       await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
@@ -191,7 +234,7 @@ export default function ContractDetailPage() {
       setIsSignModalOpen(false);
       fetchContractData(); 
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Lỗi khi ký hợp đồng.");
+      toast.error(error.reason || error.message || error.response?.data?.message || "Lỗi khi ký hợp đồng.");
     } finally {
       setIsSigning(false);
     }
@@ -751,6 +794,91 @@ export default function ContractDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* ═══ HOÀN CỌC (Deposit Refund) ═══ */}
+            {contract && (contract.status === 'EXPIRED' || contract.status === 'TERMINATED_EARLY') && contract.depositStatus !== 'REFUNDED' && user?.role === 'LANDLORD' && (
+              <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-2xl border border-rose-200 shadow-sm p-6">
+                <h3 className="text-md font-bold mb-3 flex items-center gap-2 text-rose-900">
+                  💸 Hoàn cọc cho Khách thuê
+                </h3>
+                <p className="text-xs text-rose-700 mb-4">
+                  Hợp đồng đã kết thúc. Vui lòng hoàn cọc <strong>{contract.depositAmount?.toLocaleString('vi-VN')}đ</strong> cho khách thuê theo thông tin bên dưới.
+                </p>
+
+                {contract.signMethod === 'BLOCKCHAIN' ? (
+                  <div className="bg-white rounded-xl p-4 border border-rose-200/70 space-y-2">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">Ví Blockchain của Khách thuê</p>
+                    <p className="font-mono text-sm text-indigo-700 break-all">{contract.tenantWalletAddress || 'Chưa cập nhật'}</p>
+                    <p className="text-xs text-gray-500 mt-2">Chuyển ETH tương ứng từ ví cá nhân của bạn tới địa chỉ trên.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl p-4 border border-rose-200/70 space-y-3">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">Thông tin ngân hàng Khách thuê</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-400 text-xs">Ngân hàng</p>
+                        <p className="font-bold text-gray-800">{contract.tenantBankName || 'Chưa cập nhật'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-xs">Số tài khoản</p>
+                        <p className="font-bold text-gray-800 font-mono">{contract.tenantBankAccountNumber || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-xs">Chủ tài khoản</p>
+                        <p className="font-bold text-gray-800">{contract.tenantBankAccountHolder || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-xs">SĐT</p>
+                        <p className="font-bold text-gray-800">{contract.tenantPhone || '—'}</p>
+                      </div>
+                    </div>
+                    {contract.tenantBankQrUrl && (
+                      <div className="text-center mt-3">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mb-2">Mã QR chuyển khoản</p>
+                        <img src={contract.tenantBankQrUrl} alt="QR Banking" className="mx-auto max-w-[200px] rounded-lg border" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full mt-4 bg-rose-600 hover:bg-rose-700"
+                  onClick={async () => {
+                    if (!window.confirm(`Xác nhận đã hoàn cọc ${contract.depositAmount?.toLocaleString('vi-VN')}đ cho khách thuê ${contract.tenantName}?`)) return;
+                    try {
+                      const res = await contractApi.confirmDepositRefund(contract.id);
+                      setContract(prev => prev ? {...prev, depositStatus: (res as any).depositStatus || 'REFUNDED'} : prev);
+                      toast.success('Đã xác nhận hoàn cọc thành công!');
+                    } catch (err: any) {
+                      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra!');
+                    }
+                  }}
+                >
+                  💸 Xác nhận đã hoàn cọc
+                </Button>
+              </div>
+            )}
+
+            {/* Khách thuê thấy trạng thái hoàn cọc */}
+            {contract && (contract.status === 'EXPIRED' || contract.status === 'TERMINATED_EARLY') && user?.role === 'TENANT' && (
+              <div className={`rounded-2xl border shadow-sm p-6 ${
+                contract.depositStatus === 'REFUNDED' ? 'bg-green-50 border-green-200' :
+                contract.depositStatus === 'PENALIZED' ? 'bg-red-50 border-red-200' :
+                'bg-gray-50 border-gray-200'
+              }`}>
+                <h3 className="text-md font-bold mb-2 flex items-center gap-2">
+                  💰 Trạng thái Tiền cọc
+                </h3>
+                {contract.depositStatus === 'REFUNDED' ? (
+                  <p className="text-green-700 flex items-center gap-2"><CheckCircle2 className="h-5 w-5" /> Chủ trọ đã xác nhận hoàn cọc <strong>{contract.depositAmount?.toLocaleString('vi-VN')}đ</strong></p>
+                ) : contract.depositStatus === 'PENALIZED' ? (
+                  <p className="text-red-700 flex items-center gap-2"><XCircle className="h-5 w-5" /> Tiền cọc <strong>{contract.depositAmount?.toLocaleString('vi-VN')}đ</strong> đã bị giữ lại do chấm dứt hợp đồng sớm. Chờ Chủ trọ xác nhận hoàn cọc nếu có thỏa thuận khác.</p>
+                ) : (
+                  <p className="text-gray-600">Đang chờ xử lý từ Chủ trọ...</p>
+                )}
+              </div>
+            )}
+
           </div>
 
           <div className="space-y-6">
@@ -805,7 +933,10 @@ export default function ContractDetailPage() {
                     <Button 
                       variant="outline" 
                       className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
-                      onClick={() => setIsRequestModalOpen(true)}
+                      onClick={() => {
+                        setChangeForm(prev => ({ ...prev, type: 'CHANGE_TERMS', newValue: '' }));
+                        setIsRequestModalOpen(true);
+                      }}
                     >
                       <MessageSquare className="h-4 w-4 mr-2" /> Đề xuất chỉnh sửa
                     </Button>
@@ -819,7 +950,10 @@ export default function ContractDetailPage() {
                     <Button 
                       variant="outline" 
                       className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
-                      onClick={() => setIsRequestModalOpen(true)}
+                      onClick={() => {
+                        setChangeForm(prev => ({ ...prev, type: user?.role === 'TENANT' ? 'TERMINATION' : 'EXTENSION', newValue: '' }));
+                        setIsRequestModalOpen(true);
+                      }}
                     >
                       <MessageSquare className="h-4 w-4 mr-2" /> Đề xuất Cập nhật / Ra đi
                     </Button>
@@ -899,10 +1033,10 @@ export default function ContractDetailPage() {
                 <Label className="text-gray-700 font-bold mb-3 block">Bạn muốn đề xuất điều gì?</Label>
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   {[
-                    { type: 'EXTENSION', label: 'Gia hạn Hợp đồng', desc: 'Đề xuất đổi ngày kết thúc', icon: <Calendar className="w-5 h-5"/>, color: 'text-blue-600 bg-blue-50 border-blue-200 ring-blue-500' },
-                    { type: 'TERMINATION', label: 'Trả phòng trước hạn', desc: 'Chấm dứt hợp đồng sớm', icon: <LogOut className="w-5 h-5"/>, color: 'text-red-600 bg-red-50 border-red-200 ring-red-500' },
-                    { type: 'RENT_INCREASE', label: 'Điều chỉnh Giá thuê', desc: 'Đề xuất tăng/giảm giá', icon: <TrendingUp className="w-5 h-5"/>, color: 'text-orange-600 bg-orange-50 border-orange-200 ring-orange-500' },
-                    { type: 'CHANGE_TERMS', label: 'Thay đổi Nội quy', desc: 'Thêm bớt điều khoản', icon: <FileText className="w-5 h-5"/>, color: 'text-green-600 bg-green-50 border-green-200 ring-green-500' },
+                    { type: 'EXTENSION', label: user?.role === 'LANDLORD' ? 'Gia hạn Hợp đồng' : 'Xin gia hạn Hợp đồng', desc: 'Đề xuất đổi ngày kết thúc', icon: <Calendar className="w-5 h-5"/>, color: 'text-blue-600 bg-blue-50 border-blue-200 ring-blue-500', hidden: contract.status !== 'ACTIVE' },
+                    { type: 'TERMINATION', label: user?.role === 'LANDLORD' ? 'Lấy lại phòng trước hạn' : 'Xin trả phòng trước hạn', desc: 'Chấm dứt hợp đồng sớm', icon: <LogOut className="w-5 h-5"/>, color: 'text-red-600 bg-red-50 border-red-200 ring-red-500', hidden: contract.status !== 'ACTIVE' },
+                    { type: 'RENT_INCREASE', label: contract.status === 'ACTIVE' ? 'Điều chỉnh Giá thuê' : 'Thương lượng Giá thuê', desc: contract.status === 'ACTIVE' ? 'Đề xuất tăng/giảm giá' : 'Thương thảo lại giá', icon: <TrendingUp className="w-5 h-5"/>, color: 'text-orange-600 bg-orange-50 border-orange-200 ring-orange-500', hidden: contract.status === 'ACTIVE' && user?.role === 'TENANT' },
+                    { type: 'CHANGE_TERMS', label: contract.status === 'ACTIVE' ? (user?.role === 'LANDLORD' ? 'Thay đổi Nội quy' : 'Xin thay đổi Nội quy') : 'Thương lượng Điều khoản', desc: 'Thêm bớt điều khoản', icon: <FileText className="w-5 h-5"/>, color: 'text-green-600 bg-green-50 border-green-200 ring-green-500' },
                     { type: 'CHANGE_SIGN_METHOD', label: 'Sửa cách ký', desc: 'Đổi phương thức ký', icon: <PenTool className="w-5 h-5"/>, color: 'text-purple-600 bg-purple-50 border-purple-200 ring-purple-500', hidden: contract.status === 'ACTIVE' }
                   ].filter(opt => !opt.hidden).map((opt) => (
                     <div 
@@ -1048,9 +1182,55 @@ export default function ContractDetailPage() {
                           </div>
                       </div>
                   )}
+
+                  {/* Phần yêu cầu thanh toán cọc cho KHÁCH THUÊ */}
+                  {user?.role === 'TENANT' && contract.depositStatus !== 'DEPOSITED' && (
+                    <div className="mt-4 p-4 rounded-xl border-2 border-orange-200 bg-orange-50 space-y-3">
+                       <h4 className="font-bold text-orange-900 flex items-center gap-2">
+                         💰 Cần Thanh toán Cọc: {contract.depositAmount?.toLocaleString()}đ
+                       </h4>
+                       {contract.signMethod === 'BLOCKCHAIN' ? (
+                         <p className="text-xs text-orange-800 leading-relaxed">
+                           Khi bấm "Ký Web3 ngay", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / 80000000).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
+                         </p>
+                       ) : (
+                         <div className="space-y-3">
+                           <p className="text-xs text-orange-800 font-medium">Bạn vui lòng chuyển khoản cọc theo thông tin sau và xác nhận bên dưới:</p>
+                           <div className="bg-white p-3 rounded-lg border border-orange-200 text-xs shadow-sm flex gap-4 items-center">
+                             {contract.landlordBankQrUrl && (
+                               <div className="shrink-0 relative group rounded-lg overflow-hidden border border-gray-100 shadow-sm w-24 h-24">
+                                 <img 
+                                   src={contract.landlordBankQrUrl} 
+                                   alt="Mã QR Thanh Toán" 
+                                   className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                 />
+                               </div>
+                             )}
+                             <div className="flex-1">
+                               <p className="text-gray-500 mb-1 uppercase font-bold text-[10px]">Tài khoản thụ hưởng</p>
+                               <p className="font-bold text-gray-800">{contract.landlordBankName || 'Đang cập nhật'}</p>
+                               <p className="font-mono text-lg text-primary my-1">{contract.landlordBankAccountNumber || 'Chưa cung cấp STK'}</p>
+                               <p className="font-semibold text-gray-700">{contract.landlordBankAccountHolder || contract.landlordName}</p>
+                             </div>
+                           </div>
+                           <label className="flex items-start gap-2 cursor-pointer mt-2 group bg-white/50 p-2 rounded border border-orange-200/50">
+                              <input 
+                                type="checkbox" 
+                                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer" 
+                                checked={isDepositPaid} 
+                                onChange={(e) => setIsDepositPaid(e.target.checked)} 
+                              />
+                              <span className="text-xs text-gray-800 font-bold group-hover:text-black">
+                                Tôi xác nhận đã chuyển khoản thành công Tiền cọc trên.
+                              </span>
+                           </label>
+                         </div>
+                       )}
+                    </div>
+                  )}
                   
                   <p className="text-[11px] text-gray-400 text-center italic mt-3">
-                      * Phương thức ký đã được chốt. Nếu muốn thay đổi, vui lòng đóng hộp thoại này và sử dụng tính năng "Đề xuất chỉnh sửa".
+                      * Phương thức ký đã được chốt. Nếu muốn thay đổi, vui lòng đóng hộp thoại này và dùng tính năng "Đề xuất chỉnh sửa".
                   </p>
               </div>
 

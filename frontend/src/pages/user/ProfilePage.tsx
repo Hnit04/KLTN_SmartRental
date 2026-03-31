@@ -44,6 +44,10 @@ const ProfilePage = () => {
     dateOfBirth: '',
     currentAddress: '',
     cccdNumber: '',
+    bankName: '',
+    bankAccountNumber: '',
+    bankAccountHolder: '',
+    bankQrUrl: '',
   });
 
   // --- USE EFFECTS ---
@@ -56,6 +60,10 @@ const ProfilePage = () => {
         dateOfBirth: user.dateOfBirth ? (Array.isArray(user.dateOfBirth) ? convertArrDateToString(user.dateOfBirth) : user.dateOfBirth) : '',
         currentAddress: user.currentAddress || '',
         cccdNumber: user.cccdNumber || '',
+        bankName: user.bankName || '',
+        bankAccountNumber: user.bankAccountNumber || '',
+        bankAccountHolder: user.bankAccountHolder || '',
+        bankQrUrl: user.bankQrUrl || '',
       });
     }
   }, [isEditModalOpen, user]);
@@ -282,6 +290,27 @@ const ProfilePage = () => {
             </div>
           </div>
 
+          {/* Block Thông tin Ngân hàng */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
+              🏦 Thông tin Ngân hàng
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4 -mt-3">Dùng để nhận hoàn cọc khi kết thúc hợp đồng thuê.</p>
+            <div className="grid sm:grid-cols-2 gap-y-6 gap-x-12">
+              <InfoItem label="Ngân hàng" value={user.bankName} />
+              <InfoItem label="Số tài khoản" value={user.bankAccountNumber} />
+              <InfoItem label="Chủ tài khoản" value={user.bankAccountHolder} />
+              <div className="space-y-1">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Mã QR</p>
+                {user.bankQrUrl ? (
+                  <img src={user.bankQrUrl} alt="QR" className="max-w-[120px] rounded-lg border" />
+                ) : (
+                  <span className="font-medium text-gray-700">Chưa cập nhật</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Block Ví MetaMask */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
@@ -371,6 +400,67 @@ const ProfilePage = () => {
                 <Label htmlFor="currentAddress">Địa chỉ hiện tại</Label>
                 <Input id="currentAddress" value={formData.currentAddress} onChange={(e) => setFormData({...formData, currentAddress: e.target.value})} />
               </div>
+
+              {/* Bank Info */}
+              <div className="border-t pt-4 mt-2">
+                <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1">🏦 Thông tin Ngân hàng (cho hoàn cọc)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bankName">Ngân hàng</Label>
+                    <Input id="bankName" placeholder="VD: Vietcombank" value={formData.bankName} onChange={(e) => setFormData({...formData, bankName: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bankAccountNumber">Số tài khoản</Label>
+                    <Input id="bankAccountNumber" placeholder="VD: 1017726354" value={formData.bankAccountNumber} onChange={(e) => setFormData({...formData, bankAccountNumber: e.target.value})} />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-3">
+                  <Label htmlFor="bankAccountHolder">Chủ tài khoản</Label>
+                  <Input id="bankAccountHolder" placeholder="VD: NGUYEN VAN A" value={formData.bankAccountHolder} onChange={(e) => setFormData({...formData, bankAccountHolder: e.target.value})} />
+                </div>
+                <div className="space-y-2 mt-3">
+                  <Label>Ảnh mã QR chuyển khoản</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 flex flex-col items-center justify-center h-24 w-24 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
+                      {formData.bankQrUrl ? (
+                        <img src={formData.bankQrUrl} alt="QR" className="h-full w-full object-contain rounded" />
+                      ) : (
+                        <div className="text-center text-gray-400">
+                          <Camera className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                          <span className="text-[10px]">Tải ảnh</span>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            setIsSaving(true);
+                            const url = await userApi.uploadQr(file);
+                            setFormData(prev => ({ ...prev, bankQrUrl: url }));
+                            toast.success("Tải ảnh QR thành công!");
+                          } catch (err) {
+                            toast.error("Lỗi tải ảnh QR!");
+                          } finally {
+                            setIsSaving(false);
+                          }
+                        }} 
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground">Chọn hoặc kéo thả ảnh QR thanh toán của bạn vào ô bên cạnh. Định dạng: JPG, PNG.</p>
+                      {formData.bankQrUrl && (
+                        <Button type="button" variant="ghost" className="mt-2 text-red-500 hover:text-red-700 hover:bg-red-50 h-7 text-xs px-2" onClick={() => setFormData(prev => ({...prev, bankQrUrl: ''}))}>
+                          Xóa ảnh
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="flex justify-end gap-3 pt-4 border-t mt-6">
                 <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
                 <Button type="submit" isLoading={isSaving} className="gap-2"><Save className="h-4 w-4" /> Lưu thay đổi</Button>
@@ -459,7 +549,7 @@ const ProfilePage = () => {
 // Component con xử lý Sở thích
 import { tenantPreferenceApi } from '@/api/tenantPreferenceApi';
 import type { TenantPreference } from '@/types/index';
-import { Home, Lightbulb } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 
 const TenantPreferenceSection = () => {
   const [pref, setPref] = useState<Partial<TenantPreference>>({});

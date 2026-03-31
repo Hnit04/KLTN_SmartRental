@@ -38,9 +38,16 @@ public class ContractService {
     @Autowired private ContractRepository contractRepository;
     @Autowired private RoomRepository roomRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private ModelMapper modelMapper;
+    
+    private final ModelMapper modelMapper;
+    
     @Autowired private BlockchainService blockchainService;
     @Autowired private ContractChangeRequestRepository changeRequestRepository;
+
+    @Autowired
+    public ContractService(ModelMapper modelMapper) {
+        this.modelMapper = modelMapper;
+    }
 
     // --- 1. Tạo Hợp đồng mới ---
     @Transactional
@@ -301,6 +308,7 @@ public class ContractService {
         if (Boolean.TRUE.equals(contract.getIsTenantSigned()) && Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
             contract.setSignDate(LocalDateTime.now());
             contract.setStatus(ContractStatus.ACTIVE);
+            contract.setDepositStatus(DepositStatus.DEPOSITED); // Xác nhận đã nộp cọc khi ký xong HĐ
 
             if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
                 try {
@@ -356,6 +364,11 @@ public class ContractService {
                 res.setPropertyAddress(contract.getRoom().getProperty().getAddress());
                 if (contract.getRoom().getProperty().getLandlord() != null) {
                     res.setLandlordName(contract.getRoom().getProperty().getLandlord().getFullName());
+                    res.setLandlordWalletAddress(contract.getRoom().getProperty().getLandlord().getWalletAddress());
+                    res.setLandlordBankName(contract.getRoom().getProperty().getLandlord().getBankName());
+                    res.setLandlordBankAccountNumber(contract.getRoom().getProperty().getLandlord().getBankAccountNumber());
+                    res.setLandlordBankAccountHolder(contract.getRoom().getProperty().getLandlord().getBankAccountHolder());
+                    res.setLandlordBankQrUrl(contract.getRoom().getProperty().getLandlord().getBankQrUrl());
                 }
                 res.setElecPrice(contract.getRoom().getProperty().getElecPrice());
                 res.setWaterPrice(contract.getRoom().getProperty().getWaterPrice());
@@ -364,9 +377,41 @@ public class ContractService {
         }
         if (contract.getTenant() != null) {
             res.setTenantName(contract.getTenant().getFullName());
+            res.setTenantPhone(contract.getTenant().getPhoneNumber());
+            res.setTenantCccd(contract.getTenant().getCccdNumber());
+            res.setTenantWalletAddress(contract.getTenant().getWalletAddress());
+            res.setTenantBankName(contract.getTenant().getBankName());
+            res.setTenantBankAccountNumber(contract.getTenant().getBankAccountNumber());
+            res.setTenantBankAccountHolder(contract.getTenant().getBankAccountHolder());
+            res.setTenantBankQrUrl(contract.getTenant().getBankQrUrl());
         }
         res.setActualPrice(contract.getActualPrice());
         return res;
+    }
+
+    // --- Xác nhận hoàn cọc ---
+    @Transactional
+    public ContractResponse confirmDepositRefund(Long contractId, Long currentUserId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        // Chỉ Chủ trọ mới được xác nhận hoàn cọc
+        if (currentUser.getRole() != iuh.se.kltn.backend.common.enums.Role.LANDLORD) {
+            throw new RuntimeException("Chỉ Chủ trọ mới có quyền xác nhận hoàn cọc!");
+        }
+
+        // Chỉ cho phép khi hợp đồng đã kết thúc
+        if (contract.getStatus() != ContractStatus.EXPIRED 
+                && contract.getStatus() != ContractStatus.TERMINATED_EARLY) {
+            throw new RuntimeException("Chỉ có thể hoàn cọc khi hợp đồng đã kết thúc!");
+        }
+
+        contract.setDepositStatus(DepositStatus.REFUNDED);
+        Contract saved = contractRepository.save(contract);
+        return mapToResponse(saved);
     }
 
     private String calculateSHA256(String data) {

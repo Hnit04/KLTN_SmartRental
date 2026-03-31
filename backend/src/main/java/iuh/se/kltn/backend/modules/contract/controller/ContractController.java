@@ -141,6 +141,18 @@ public class ContractController {
         }
     }
 
+    // 💰 Xác nhận đã hoàn cọc
+    @PutMapping("/{id}/confirm-deposit-refund")
+    public ResponseEntity<?> confirmDepositRefund(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(contractService.confirmDepositRefund(id, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
     private ResponseEntity<?> handleAiException(Exception e) {
         if (e.getMessage() != null && e.getMessage().contains("429")) {
             return ResponseEntity.status(429).body(java.util.Collections.singletonMap("message", "AI đang quá tải (Rate Limit). Vui lòng thử lại sau ít phút!"));
