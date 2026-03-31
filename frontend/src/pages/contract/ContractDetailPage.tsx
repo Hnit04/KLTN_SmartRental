@@ -4,7 +4,7 @@ import {
   FileText, Download, PenTool, CheckCircle, Calendar, 
   MapPin,  ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star,
-  MessageSquare, XCircle, Check, Sparkles, Home, User
+  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -530,11 +530,32 @@ export default function ContractDetailPage() {
                   <p className="font-semibold">{contract.landlordName || "Đang cập nhật..."}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Giá thuê & Tiền cọc</p>
+                  <p className="text-gray-500 mb-1">Giá thuê</p>
                   <p className="font-bold text-primary">
                     {contract.actualPrice ? `${contract.actualPrice.toLocaleString()}đ` : "Đang cập nhật..."} 
                     <span className="text-gray-400 font-normal"> /tháng</span>
                   </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Tiền cọc</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-gray-800">
+                      {contract.depositAmount ? `${contract.depositAmount.toLocaleString()}đ` : "—"}
+                    </p>
+                    {contract.depositStatus && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                        contract.depositStatus === 'REFUNDED' ? 'bg-green-100 text-green-700 border-green-300' :
+                        contract.depositStatus === 'PENALIZED' ? 'bg-red-100 text-red-700 border-red-300' :
+                        contract.depositStatus === 'DEPOSITED' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                        'bg-gray-100 text-gray-600 border-gray-300'
+                      }`}>
+                        {contract.depositStatus === 'REFUNDED' ? '✅ Đã hoàn cọc' :
+                         contract.depositStatus === 'PENALIZED' ? '⛔ Bị giữ cọc' :
+                         contract.depositStatus === 'DEPOSITED' ? '💰 Đã đặt cọc' :
+                         '⏳ Chưa đặt cọc'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -611,6 +632,58 @@ export default function ContractDetailPage() {
                 </div>
               );
             })()}
+
+            {/* ═══ PHỤ LỤC HỢP ĐỒNG (Addendums) ═══ */}
+            {changeRequests.filter(r => r.status === 'ACCEPTED').length > 0 && (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 shadow-sm p-6">
+                <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-amber-900">
+                  📝 Phụ lục Hợp đồng ({changeRequests.filter(r => r.status === 'ACCEPTED').length})
+                </h3>
+                <p className="text-xs text-amber-700 mb-4 -mt-2">
+                  Các thay đổi đã được cả 2 bên đồng ý và áp dụng chính thức vào hợp đồng.
+                </p>
+                <div className="space-y-3">
+                  {changeRequests
+                    .filter(r => r.status === 'ACCEPTED')
+                    .map((req, idx) => {
+                      const typeLabels: Record<string, { label: string; color: string }> = {
+                        'RENT_INCREASE': { label: 'Điều chỉnh Giá thuê', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+                        'EXTENSION': { label: 'Gia hạn Hợp đồng', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+                        'TERMINATION': { label: 'Chấm dứt sớm', color: 'bg-red-100 text-red-800 border-red-300' },
+                        'CHANGE_TERMS': { label: 'Sửa Nội quy', color: 'bg-green-100 text-green-800 border-green-300' },
+                        'CHANGE_SIGN_METHOD': { label: 'Đổi cách ký', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+                      };
+                      const typeInfo = typeLabels[req.type] || { label: req.type, color: 'bg-gray-100 text-gray-800 border-gray-300' };
+                      
+                      return (
+                        <div key={req.id} className="bg-white rounded-xl p-4 border border-amber-200/70 shadow-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-amber-600 text-sm">Phụ lục #{idx + 1}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${typeInfo.color}`}>
+                                {typeInfo.label}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(req.requestDate).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-gray-50 p-2 rounded-lg">
+                              <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Giá trị cũ</p>
+                              <p className="text-gray-600 line-through">{req.type === 'RENT_INCREASE' ? Number(req.oldValue).toLocaleString('vi-VN') + 'đ' : req.oldValue || '—'}</p>
+                            </div>
+                            <div className="bg-emerald-50 p-2 rounded-lg">
+                              <p className="text-[10px] text-emerald-500 font-bold uppercase mb-0.5">Giá trị mới</p>
+                              <p className="text-emerald-700 font-bold">{req.type === 'RENT_INCREASE' ? Number(req.newValue).toLocaleString('vi-VN') + 'đ' : req.newValue}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
             {changeRequests.length > 0 && (
               <div className="bg-white rounded-2xl border shadow-sm p-6">
@@ -740,13 +813,26 @@ export default function ContractDetailPage() {
                 </div>
               )}
 
-              {contract.status === 'ACTIVE' && user?.role === 'TENANT' && (
-                <Button 
-                  className="w-full mt-6 gap-2 h-11 bg-yellow-500 hover:bg-yellow-600 text-white shadow-md shadow-yellow-200" 
-                  onClick={() => setIsReviewModalOpen(true)}
-                >
-                  <Star className="h-4 w-4 fill-white" /> Viết Đánh Giá
-                </Button>
+              {contract.status === 'ACTIVE' && (
+                <div className="mt-6 space-y-3">
+                  {!pendingRequest && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
+                      onClick={() => setIsRequestModalOpen(true)}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" /> Đề xuất Cập nhật / Ra đi
+                    </Button>
+                  )}
+                  {user?.role === 'TENANT' && (
+                    <Button 
+                      className="w-full gap-2 h-11 bg-yellow-500 hover:bg-yellow-600 text-white shadow-md shadow-yellow-200" 
+                      onClick={() => setIsReviewModalOpen(true)}
+                    >
+                      <Star className="h-4 w-4 fill-white" /> Viết Đánh Giá
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
             
@@ -810,17 +896,29 @@ export default function ContractDetailPage() {
             
             <div className="space-y-4">
               <div>
-                <Label>Loại thay đổi</Label>
-                <select 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                  value={changeForm.type}
-                  onChange={(e) => setChangeForm({...changeForm, type: e.target.value as RequestType, newValue: ''})}
-                >
-                  <option value="RENT_INCREASE">Điều chỉnh Giá thuê (VNĐ)</option>
-                  <option value="EXTENSION">Gia hạn / Đổi ngày kết thúc</option>
-                  <option value="CHANGE_TERMS">Thay đổi điều khoản khác</option>
-                  <option value="CHANGE_SIGN_METHOD">Thay đổi Phương thức ký hợp đồng</option> 
-                </select>
+                <Label className="text-gray-700 font-bold mb-3 block">Bạn muốn đề xuất điều gì?</Label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  {[
+                    { type: 'EXTENSION', label: 'Gia hạn Hợp đồng', desc: 'Đề xuất đổi ngày kết thúc', icon: <Calendar className="w-5 h-5"/>, color: 'text-blue-600 bg-blue-50 border-blue-200 ring-blue-500' },
+                    { type: 'TERMINATION', label: 'Trả phòng trước hạn', desc: 'Chấm dứt hợp đồng sớm', icon: <LogOut className="w-5 h-5"/>, color: 'text-red-600 bg-red-50 border-red-200 ring-red-500' },
+                    { type: 'RENT_INCREASE', label: 'Điều chỉnh Giá thuê', desc: 'Đề xuất tăng/giảm giá', icon: <TrendingUp className="w-5 h-5"/>, color: 'text-orange-600 bg-orange-50 border-orange-200 ring-orange-500' },
+                    { type: 'CHANGE_TERMS', label: 'Thay đổi Nội quy', desc: 'Thêm bớt điều khoản', icon: <FileText className="w-5 h-5"/>, color: 'text-green-600 bg-green-50 border-green-200 ring-green-500' },
+                    { type: 'CHANGE_SIGN_METHOD', label: 'Sửa cách ký', desc: 'Đổi phương thức ký', icon: <PenTool className="w-5 h-5"/>, color: 'text-purple-600 bg-purple-50 border-purple-200 ring-purple-500', hidden: contract.status === 'ACTIVE' }
+                  ].filter(opt => !opt.hidden).map((opt) => (
+                    <div 
+                      key={opt.type}
+                      onClick={() => setChangeForm({...changeForm, type: opt.type as RequestType, newValue: ''})}
+                      className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex flex-col items-center text-center gap-1 
+                        ${changeForm.type === opt.type ? `ring-2 ring-offset-1 ${opt.color} shadow-sm` : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50'}`}
+                    >
+                      <div className={`${changeForm.type === opt.type ? '' : 'text-gray-400'}`}>
+                        {opt.icon}
+                      </div>
+                      <span className={`font-bold text-xs ${changeForm.type === opt.type ? '' : 'text-gray-700'}`}>{opt.label}</span>
+                      <span className="text-[10px] text-gray-500 leading-tight">{opt.desc}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -844,10 +942,11 @@ export default function ContractDetailPage() {
                     value={changeForm.newValue}
                     onChange={(e) => setChangeForm({...changeForm, newValue: e.target.value})}
                   />
-                ) : changeForm.type === 'EXTENSION' ? (
+                ) : (changeForm.type === 'EXTENSION' || changeForm.type === 'TERMINATION') ? (
                   <Input 
                     type="date" 
                     className="mt-1"
+                    min={new Date().toISOString().split('T')[0]}
                     value={changeForm.newValue}
                     onChange={(e) => setChangeForm({...changeForm, newValue: e.target.value})}
                   />

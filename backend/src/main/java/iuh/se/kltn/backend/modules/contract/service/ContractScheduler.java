@@ -35,6 +35,8 @@ public class ContractScheduler {
             // Cập nhật trạng thái hợp đồng thành EXPIRED (hoặc CANCELLED nếu bạn có enum CANCELLED)
             // Trong ContractStatus đang có EXPIRED
             contract.setStatus(ContractStatus.EXPIRED);
+            // 💰 Hợp đồng chưa ký bị hủy → Hoàn cọc (nếu đã đặt)
+            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
             contractRepository.save(contract);
 
             // Nhả phòng về AVAILABLE
@@ -47,6 +49,31 @@ public class ContractScheduler {
         
         if (!expiredContracts.isEmpty()) {
             System.out.println("Đã hủy tự động " + expiredContracts.size() + " hợp đồng quá hạn 24h.");
+        }
+    }
+    // Chạy hàng ngày lúc 01:00 sáng
+    @Scheduled(cron = "0 0 1 * * ?")
+    @Transactional
+    public void expireActiveContracts() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<Contract> expiredContracts = contractRepository.findByStatusAndEndDateBefore(ContractStatus.ACTIVE, today);
+        
+        for (Contract contract : expiredContracts) {
+            contract.setStatus(ContractStatus.EXPIRED); // Hoàn thành hợp đồng
+            // 💰 Hết hạn tự nhiên → Hoàn cọc cho khách thuê
+            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
+            contractRepository.save(contract);
+            
+            // Xử lý nhả phòng trống cho hệ thống
+            Room room = contract.getRoom();
+            if (room != null && room.getStatus() != RoomStatus.AVAILABLE) {
+                room.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(room);
+            }
+        }
+        
+        if (!expiredContracts.isEmpty()) {
+            System.out.println("Đã kết thúc tự động " + expiredContracts.size() + " hợp đồng hết hạn.");
         }
     }
 }

@@ -166,10 +166,25 @@ public class ContractService {
 
                 java.util.List<java.util.Map<String, Object>> comparisons = new java.util.ArrayList<>();
 
-                // So sánh rentAmount
+                // So sánh rentAmount (ÁP DỤNG ADDENDUM PATTERN)
                 java.math.BigInteger onChainRent = (java.math.BigInteger) onChain.get("rentAmount");
                 long dbRent = contract.getActualPrice() != null ? contract.getActualPrice().longValue() : 0;
-                comparisons.add(createComparison("rentAmount", String.valueOf(dbRent), onChainRent.toString()));
+                java.util.Map<String, Object> rentComp = createComparison("rentAmount", String.valueOf(dbRent), onChainRent.toString());
+                
+                // 🔍 Addendum Pattern: Nếu giá lệch, kiểm tra có Phụ lục hợp pháp không
+                if (!Boolean.TRUE.equals(rentComp.get("match"))) {
+                    java.util.List<ContractChangeRequest> rentAddendums = changeRequestRepository
+                            .findByContractIdAndStatusAndType(id, RequestStatus.ACCEPTED, RequestType.RENT_INCREASE);
+                    if (!rentAddendums.isEmpty()) {
+                        ContractChangeRequest latestAddendum = rentAddendums.get(rentAddendums.size() - 1);
+                        rentComp.put("match", true); // Lệch hợp pháp
+                        rentComp.put("modified", true);
+                        rentComp.put("addendum", "Phụ lục #" + latestAddendum.getId() 
+                                + " (Duyệt ngày " + latestAddendum.getRequestDate().toLocalDate() + ")"
+                                + " | Gốc: " + latestAddendum.getOldValue() + " → Mới: " + latestAddendum.getNewValue());
+                    }
+                }
+                comparisons.add(rentComp);
 
                 // So sánh depositAmount
                 java.math.BigInteger onChainDeposit = (java.math.BigInteger) onChain.get("depositAmount");

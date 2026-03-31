@@ -33,6 +33,8 @@ interface Comparison {
   database: string;
   onChain: string;
   match: boolean;
+  modified?: boolean;   // Addendum Pattern: lệch hợp pháp do có Phụ lục
+  addendum?: string;    // Mô tả Phụ lục (ví dụ: "Phụ lục #5 duyệt ngày...")
 }
 
 interface VerifyResult {
@@ -471,7 +473,14 @@ export default function BlockchainLogsPage() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               {comp.match ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Khớp</span>
+                                comp.modified ? (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 text-orange-600 font-semibold text-xs">📝 Phụ lục</span>
+                                    {comp.addendum && <p className="text-[10px] text-orange-500 mt-1 leading-tight">{comp.addendum}</p>}
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Khớp</span>
+                                )
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-red-600 font-bold"><XCircle className="h-4 w-4" /> Lệch!</span>
                               )}
