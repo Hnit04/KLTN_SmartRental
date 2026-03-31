@@ -7,6 +7,8 @@ import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
 import iuh.se.kltn.backend.modules.ai.service.ModerationService;
+import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.user.entity.User;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -134,5 +136,18 @@ public class RoomService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
         room.setApprovalStatus(status);
         roomRepository.save(room);
+    }
+    public List<UserProfileResponse> getTenantsByRoomId(Long roomId) {
+        // Kiểm tra phòng có tồn tại không
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
+
+        // Lấy danh sách từ hợp đồng (Cần inject ContractRepository)
+        List<User> tenants = roomRepository.findTenantsByRoomId(roomId);
+
+        // Map sang DTO để trả về
+        return tenants.stream()
+                .map(user -> modelMapper.map(user, UserProfileResponse.class))
+                .collect(Collectors.toList());
     }
 }

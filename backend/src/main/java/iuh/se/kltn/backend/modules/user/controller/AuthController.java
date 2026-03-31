@@ -108,7 +108,6 @@ public class AuthController {
     }
 
 
-    // API Đăng nhập
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {

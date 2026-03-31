@@ -59,4 +59,9 @@ public class RoomController {
         roomService.updateApprovalStatus(id, PropertyStatus.REJECTED);
         return ResponseEntity.ok("Đã từ chối phòng");
     }
+    @GetMapping("/{id}/tenants")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'ADMIN', 'TENANT')")
+    public ResponseEntity<?> getRoomTenants(@PathVariable Long id) {
+        return ResponseEntity.ok(roomService.getTenantsByRoomId(id));
+    }
 }
