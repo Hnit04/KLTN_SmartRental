@@ -1,7 +1,6 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
 import iuh.se.kltn.backend.common.enums.Role;
-import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.common.service.CloudinaryService;
 import iuh.se.kltn.backend.common.service.OcrService;
@@ -30,7 +29,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,6 +59,22 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
         return ResponseEntity.ok(userProfile);
+    }
+    @GetMapping("/username")
+    public UserProfileResponse findByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.isLocked() && user.getLockUntil() != null) {
+            if (user.getLockUntil().isBefore(LocalDateTime.now())) {
+                user.setLocked(false);
+                user.setLockUntil(null);
+                user.setLockReason(null);
+                userRepository.save(user);
+            }
+        }
+
+        return modelMapper.map(user, UserProfileResponse.class);
     }
 
     @PutMapping("/profile")

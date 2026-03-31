@@ -27,7 +27,7 @@ public class UserLockTask {
 
         if (!expiredLockedUsers.isEmpty()) {
             for (User user : expiredLockedUsers) {
-                user.setLocked(false);
+                user.setIsLocked(false);
                 user.setLockUntil(null);
                 user.setLockReason(null);
                 // System.out.println("Auto unlocked user: " + user.getUsername());
