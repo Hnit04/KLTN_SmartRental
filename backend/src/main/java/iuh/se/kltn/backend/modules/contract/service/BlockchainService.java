@@ -4,7 +4,11 @@ import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.crypto.Credentials;
@@ -12,6 +16,8 @@ import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthCall;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -19,7 +25,7 @@ import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 import java.math.BigInteger;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -56,8 +62,6 @@ public class BlockchainService {
         Web3j web3j = Web3j.build(new HttpService(rpcUrl, httpClient, false));
         Credentials credentials = Credentials.create(privateKey);
 
-        // 1. Mã hóa Constructor (khớp với ABI mới: _landlord, _tenant, _roomName, _contractHash, _rentAmount, _depositAmount, _elecPrice, _waterPrice)
-        // Lấy địa chỉ ví chủ trọ từ tham số thay vì dùng msg.sender
         String encodedConstructor = FunctionEncoder.encodeConstructor(Arrays.asList(
                 new Address(landlordAddress),
                 new Address(tenantAddress),
@@ -68,15 +72,12 @@ public class BlockchainService {
                 new Uint256(BigInteger.valueOf(3500)),
                 new Uint256(BigInteger.valueOf(20000))));
 
-        // 2. Ghép Data
         String data = CONTRACT_BINARY + encodedConstructor;
 
-        // 3. Lấy Nonce
         EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
                 credentials.getAddress(), DefaultBlockParameterName.LATEST).send();
         BigInteger nonce = ethGetTransactionCount.getTransactionCount();
 
-        // 4. Tạo Transaction
         BigInteger gasLimit = BigInteger.valueOf(3000000);
         BigInteger currentGasPrice = web3j.ethGasPrice().send().getGasPrice();
         BigInteger gasPrice = currentGasPrice.add(currentGasPrice.divide(BigInteger.valueOf(10)));
@@ -84,14 +85,10 @@ public class BlockchainService {
         RawTransaction rawTransaction = RawTransaction.createContractTransaction(
                 nonce, gasPrice, gasLimit, BigInteger.ZERO, data);
 
-        // 🔥🔥🔥 BƯỚC KHẮC PHỤC EIP-155 Ở ĐÂY 🔥🔥🔥
-        // Cũ: TransactionEncoder.signMessage(rawTransaction, credentials); -> Bị lỗi
-        // Mới: Thêm chainId vào hàm ký
         byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, chainId, credentials);
 
         String hexValue = Numeric.toHexString(signedMessage);
 
-        // 6. Gửi Giao dịch
         EthSendTransaction transactionResponse = web3j.ethSendRawTransaction(hexValue).send();
 
         if (transactionResponse.hasError()) {
@@ -101,7 +98,6 @@ public class BlockchainService {
         String transactionHash = transactionResponse.getTransactionHash();
         System.out.println("🚀 Đang Deploy... Tx Hash: " + transactionHash);
 
-        // 7. Chờ xác nhận
         for (int i = 0; i < 40; i++) {
             Thread.sleep(5000);
             TransactionReceipt receipt = web3j.ethGetTransactionReceipt(transactionHash).send().getTransactionReceipt()
@@ -115,5 +111,71 @@ public class BlockchainService {
         }
 
         throw new RuntimeException("Hết thời gian chờ (Timeout) khi đợi Blockchain xác nhận.");
+    }
+
+    // ========================================================================================
+    // 🔍 ĐỌC DỮ LIỆU TỪ SMART CONTRACT TRÊN BLOCKCHAIN (Level 3 Verification)
+    // ========================================================================================
+
+    /**
+     * Đọc dữ liệu từ Smart Contract trên Sepolia để so sánh với Database.
+     * Trả về Map chứa: rentAmount, depositAmount, roomName từ on-chain.
+     */
+    public Map<String, Object> readContractData(String contractAddress) throws Exception {
+        Web3j web3j = Web3j.build(new HttpService(rpcUrl));
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // 1. Đọc rentAmount() → uint256 (selector: 0xf8ef1e13)
+        BigInteger onChainRent = readUint256(web3j, contractAddress, "rentAmount");
+        result.put("rentAmount", onChainRent);
+
+        // 2. Đọc depositAmount() → uint256 (selector: 0x419759f5)
+        BigInteger onChainDeposit = readUint256(web3j, contractAddress, "depositAmount");
+        result.put("depositAmount", onChainDeposit);
+
+        // 3. Đọc roomName() → string (selector: 0x64d77cea)
+        String onChainRoom = readString(web3j, contractAddress, "roomName");
+        result.put("roomName", onChainRoom);
+
+        // 4. Đọc contractHash() → string (selector: 0x904c6094)
+        String onChainHash = readString(web3j, contractAddress, "contractHash");
+        result.put("contractHash", onChainHash);
+
+        web3j.shutdown();
+        return result;
+    }
+
+    // --- Helper: đọc uint256 ---
+    private BigInteger readUint256(Web3j web3j, String contractAddress, String functionName) throws Exception {
+        Function function = new Function(functionName,
+                Collections.emptyList(),
+                Arrays.asList(new TypeReference<Uint256>() {}));
+
+        String encodedFunction = FunctionEncoder.encode(function);
+        EthCall response = web3j.ethCall(
+                Transaction.createEthCallTransaction(null, contractAddress, encodedFunction),
+                DefaultBlockParameterName.LATEST
+        ).send();
+
+        List<Type> decoded = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+        if (decoded.isEmpty()) return BigInteger.ZERO;
+        return ((Uint256) decoded.get(0)).getValue();
+    }
+
+    // --- Helper: đọc string ---
+    private String readString(Web3j web3j, String contractAddress, String functionName) throws Exception {
+        Function function = new Function(functionName,
+                Collections.emptyList(),
+                Arrays.asList(new TypeReference<Utf8String>() {}));
+
+        String encodedFunction = FunctionEncoder.encode(function);
+        EthCall response = web3j.ethCall(
+                Transaction.createEthCallTransaction(null, contractAddress, encodedFunction),
+                DefaultBlockParameterName.LATEST
+        ).send();
+
+        List<Type> decoded = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+        if (decoded.isEmpty()) return "";
+        return decoded.get(0).getValue().toString();
     }
 }

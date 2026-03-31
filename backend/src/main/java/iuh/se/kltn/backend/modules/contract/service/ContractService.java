@@ -143,6 +143,82 @@ public class ContractService {
         return contracts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    // --- Admin: Lấy tất cả hợp đồng ---
+    public List<ContractResponse> getAllContracts() {
+        return contractRepository.findAll().stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---
+    public java.util.Map<String, Object> verifyContract(Long id) {
+        Contract contract = contractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("contractId", id);
+
+        boolean hasBlockchain = contract.getSmartContractAddress() != null
+                && !contract.getSmartContractAddress().isEmpty();
+
+        if (hasBlockchain) {
+            // === LEVEL 3: ĐỌC TỪ BLOCKCHAIN VÀ SO SÁNH ===
+            try {
+                java.util.Map<String, Object> onChain = blockchainService.readContractData(contract.getSmartContractAddress());
+
+                java.util.List<java.util.Map<String, Object>> comparisons = new java.util.ArrayList<>();
+
+                // So sánh rentAmount
+                java.math.BigInteger onChainRent = (java.math.BigInteger) onChain.get("rentAmount");
+                long dbRent = contract.getActualPrice() != null ? contract.getActualPrice().longValue() : 0;
+                comparisons.add(createComparison("rentAmount", String.valueOf(dbRent), onChainRent.toString()));
+
+                // So sánh depositAmount
+                java.math.BigInteger onChainDeposit = (java.math.BigInteger) onChain.get("depositAmount");
+                long dbDeposit = contract.getDepositAmount() != null ? contract.getDepositAmount().longValue() : 0;
+                comparisons.add(createComparison("depositAmount", String.valueOf(dbDeposit), onChainDeposit.toString()));
+
+                // So sánh contractHash
+                String onChainHash = (String) onChain.get("contractHash");
+                String dbHash = contract.getContractHash() != null ? contract.getContractHash() : "";
+                comparisons.add(createComparison("contractHash", dbHash, onChainHash));
+
+                // So sánh roomName
+                String onChainRoom = (String) onChain.get("roomName");
+                String dbRoom = contract.getRoom() != null ? contract.getRoom().getName() : "";
+                comparisons.add(createComparison("roomName", dbRoom, onChainRoom));
+
+                boolean allMatch = comparisons.stream()
+                        .allMatch(c -> Boolean.TRUE.equals(c.get("match")));
+
+                result.put("valid", allMatch);
+                result.put("verifyLevel", "BLOCKCHAIN");
+                result.put("comparisons", comparisons);
+                result.put("smartContractAddress", contract.getSmartContractAddress());
+
+            } catch (Exception e) {
+                result.put("valid", false);
+                result.put("verifyLevel", "BLOCKCHAIN_ERROR");
+                result.put("error", "Không thể đọc dữ liệu từ blockchain: " + e.getMessage());
+            }
+        } else {
+            // === LEVEL 2: CHỈ KIỂM TRA SỰ TỒN TẠI CỦA HASH ===
+            boolean hasHash = contract.getContractHash() != null && !contract.getContractHash().isEmpty();
+            result.put("valid", hasHash);
+            result.put("verifyLevel", "DATABASE");
+            result.put("message", hasHash ? "Hash tồn tại trong DB" : "Không tìm thấy hash trong DB");
+        }
+
+        return result;
+    }
+
+    private java.util.Map<String, Object> createComparison(String field, String dbValue, String onChainValue) {
+        java.util.Map<String, Object> comp = new java.util.LinkedHashMap<>();
+        comp.put("field", field);
+        comp.put("database", dbValue);
+        comp.put("onChain", onChainValue);
+        comp.put("match", dbValue.equals(onChainValue));
+        return comp;
+    }
+
     public ContractResponse getContractById(Long id) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));
@@ -232,7 +308,7 @@ public class ContractService {
                     BigInteger depositWei = BigInteger.valueOf(depositVal);
 
                     String deployedAddress = blockchainService.deployRentalContract(
-                            landlordWallet, tenantWallet, "Phong " + (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
+                            landlordWallet, tenantWallet, (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
                             contractHashData, rentWei, depositWei
                     );
 
