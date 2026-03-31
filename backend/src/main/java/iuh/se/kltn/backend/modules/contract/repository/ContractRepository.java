@@ -23,4 +23,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
 
     List<Contract> findByStatusAndCreatedAtBefore(ContractStatus status, LocalDateTime time);
+    
+    // Tìm hợp đồng ACTIVE đã hết hạn
+    List<Contract> findByStatusAndEndDateBefore(ContractStatus status, java.time.LocalDate endDate);
 }

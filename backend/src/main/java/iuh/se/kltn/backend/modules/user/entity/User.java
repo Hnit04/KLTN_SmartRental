@@ -58,6 +58,12 @@ public class User {
 
     private String walletAddress;
 
+    // 💰 Thông tin ngân hàng (cho hoàn cọc off-chain)
+    private String bankName;           // VD: "Vietcombank"
+    private String bankAccountNumber;  // VD: "1017726354"
+    private String bankAccountHolder;  // VD: "NGUYEN VAN A"
+    private String bankQrUrl;          // URL ảnh QR chuyển khoản
+
     private String avatarUrl;
 
     @Pattern(regexp = "^\\d{12}$", message = "Số CCCD phải gồm 12 chữ số")

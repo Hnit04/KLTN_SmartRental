@@ -21,5 +21,25 @@ export const aiApi = {
   queryData: async (question: string): Promise<QueryDataResponse> => {
     const response = await axiosClient.post('/ai/query-data', { question });
     return response.data;
-  }
+  },
+
+  // Admin: thống kê AI NLP
+  getAnalytics: () => {
+    return axiosClient.get("/ai/admin/analytics");
+  },
+
+  // Admin: sửa 1 câu AI đã học
+  updateCache: (id: number, generatedSql: string) => {
+    return axiosClient.put(`/ai/admin/cache/${id}`, { generatedSql });
+  },
+
+  // Admin: xóa 1 câu AI đã học
+  deleteCache: (id: number) => {
+    return axiosClient.delete(`/ai/admin/cache/${id}`);
+  },
+
+  // Admin: xóa cache AI
+  clearCache: () => {
+    return axiosClient.post("/ai/clear-cache");
+  },
 };

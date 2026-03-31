@@ -41,4 +41,10 @@ export const billApi = {
   confirmWeb3Payment: (billId: number, txHash: string) => {
     return axiosClient.post(`/bills/${billId}/confirm-web3`, { txHash });
   },
+  tenantNotifyPayment: (billId: number) => {
+    return axiosClient.post(`/bills/${billId}/tenant-paid`);
+  },
+  landlordConfirmPayment: (billId: number) => {
+    return axiosClient.post(`/bills/${billId}/landlord-confirm`);
+  },
 };

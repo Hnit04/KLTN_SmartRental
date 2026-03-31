@@ -80,4 +80,16 @@ public class BillController {
         String txHash = request.get("txHash");
         return ResponseEntity.ok(billService.confirmWeb3Payment(billId, txHash));
     }
+
+    @PostMapping("/{billId}/tenant-paid")
+    public ResponseEntity<?> tenantNotifyPayment(@PathVariable Long billId,
+                                                 @AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(billService.tenantNotifyPayment(billId, currentUser.getId()));
+    }
+
+    @PostMapping("/{billId}/landlord-confirm")
+    public ResponseEntity<?> landlordConfirmPayment(@PathVariable Long billId,
+                                                    @AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(billService.landlordConfirmPayment(billId, currentUser.getId()));
+    }
 }

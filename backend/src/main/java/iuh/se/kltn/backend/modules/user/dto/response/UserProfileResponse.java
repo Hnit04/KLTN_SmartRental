@@ -39,4 +39,9 @@ public class UserProfileResponse {
     private LocalDateTime lockedAt;
     private LocalDateTime lockUntil;
     private List<String> lockReason;
+    // 💰 Thông tin ngân hàng
+    private String bankName;
+    private String bankAccountNumber;
+    private String bankAccountHolder;
+    private String bankQrUrl;
 }

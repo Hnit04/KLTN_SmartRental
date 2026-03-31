@@ -13,4 +13,9 @@ public class UpdateProfileRequest {
     private String currentAddress;
     private String cccdNumber;
     private String avatarUrl;
+    // 💰 Thông tin ngân hàng
+    private String bankName;
+    private String bankAccountNumber;
+    private String bankAccountHolder;
+    private String bankQrUrl;
 }

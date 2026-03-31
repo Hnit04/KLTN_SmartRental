@@ -84,6 +84,38 @@ public class AiController {
                 "data", result
         ));
     }
+    // Admin: Lấy thống kê AI NLP (tất cả cache SQL)
+    @GetMapping("/admin/analytics")
+    public ResponseEntity<?> getAiAnalytics() {
+        return ResponseEntity.ok(aiOrchestratorService.getAnalytics());
+    }
+
+    // Admin: Update câu SQL bị AI sinh sai
+    @PutMapping("/admin/cache/{id}")
+    public ResponseEntity<?> updateCache(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        String newSql = request.get("generatedSql");
+        if (newSql == null || newSql.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "SQL không được để trống"));
+        }
+        try {
+            aiOrchestratorService.updateCacheEntry(id, newSql);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Đã cập nhật câu lệnh SQL thành công!"));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    // Admin: Xóa 1 câu AI đã học
+    @DeleteMapping("/admin/cache/{id}")
+    public ResponseEntity<?> deleteCache(@PathVariable Long id) {
+        try {
+            aiOrchestratorService.deleteCacheEntry(id);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Đã xóa câu hỏi khỏi bộ nhớ AI!"));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/clear-cache")
     public ResponseEntity<?> clearCache() {
         aiOrchestratorService.clearSqlCache();

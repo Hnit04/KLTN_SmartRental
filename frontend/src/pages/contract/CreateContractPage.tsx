@@ -304,11 +304,11 @@ export default function CreateContractPage() {
                 </div>
 
                 <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 border border-blue-100 mt-2">
-                    <p className="font-semibold">Tổng thanh toán dự kiến tháng đầu:</p>
+                    <p className="font-semibold">Thanh toán Cọc dự kiến (khi ký hợp đồng):</p>
                     <p className="text-xl font-bold mt-1">
-                        {new Intl.NumberFormat('vi-VN').format(room.price * 2)}đ
+                        {new Intl.NumberFormat('vi-VN').format(room.price)}đ
                     </p>
-                    <p className="text-xs text-blue-600 mt-1">(Bao gồm 1 tháng cọc + 1 tháng tiền nhà)</p>
+                    <p className="text-xs text-blue-600 mt-1">(Tiền nhà tháng đầu sẽ thu chung với Tiền Điện/Nước vào cuối tháng)</p>
                 </div>
 
                 <div className="pt-4 space-y-3">
