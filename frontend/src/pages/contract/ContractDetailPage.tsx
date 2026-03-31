@@ -4,7 +4,7 @@ import {
   FileText, Download, PenTool, CheckCircle, Calendar, 
   MapPin,  ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star,
-  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp
+  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp, QrCode
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -59,6 +59,12 @@ export default function ContractDetailPage() {
   
   const [isSigning, setIsSigning] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
+
+  // --- TRADITIONAL PAYMENT STATE ---
+  const [isTraditionalPaymentModalOpen, setIsTraditionalPaymentModalOpen] = useState(false);
+  const [selectedBillToPay, setSelectedBillToPay] = useState<any>(null);
+  const [isNotifyingPayment, setIsNotifyingPayment] = useState(false);
+
   const [signMethod, setSignMethod] = useState<ContractSignMethod>('TRADITIONAL');
 
   const [activeTab, setActiveTab] = useState<'INFO' | 'BILLS'>('INFO');
@@ -320,7 +326,27 @@ export default function ContractDetailPage() {
     }
   };
 
-  const handleSubmitChangeRequest = async () => {
+  const openTraditionalPaymentModal = (bill: any) => {
+    setSelectedBillToPay(bill);
+    setIsTraditionalPaymentModalOpen(true);
+  };
+
+  const handleNotifyTraditionalPayment = async () => {
+    if (!selectedBillToPay) return;
+    setIsNotifyingPayment(true);
+    try {
+      await billApi.tenantNotifyPayment(selectedBillToPay.id);
+      toast.success("Đã thông báo thanh toán cho Chủ trọ!");
+      setBills(bills.map(b => b.id === selectedBillToPay.id ? { ...b, status: 'PENDING' } : b));
+      setIsTraditionalPaymentModalOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi giao dịch, thử lại sau!");
+    } finally {
+      setIsNotifyingPayment(false);
+    }
+  };
+
+  const handleRentIncrease = async () => {
     if (!changeForm.newValue || !changeForm.reason) {
       toast.warning("Vui lòng nhập đầy đủ giá trị mới và lý do!");
       return;
@@ -1007,9 +1033,15 @@ export default function ContractDetailPage() {
                           <p className="text-xl font-black text-primary">{(bill.totalAmount).toLocaleString()}đ</p>
                           {bill.status === 'PAID' ? (
                             <span className="text-green-600 font-bold text-sm">Đã thu</span>
+                          ) : bill.status === 'PENDING' ? (
+                            <span className="text-orange-600 font-bold text-sm bg-orange-50 px-3 py-1 rounded-full border border-orange-200">Chờ xác nhận</span>
                           ) : (
                             user?.role === 'TENANT' && (
-                              <Button size="sm" onClick={() => handlePayWeb3(bill)} isLoading={isPaying}>Thanh toán Web3</Button>
+                              contract.signMethod === 'BLOCKCHAIN' ? (
+                                <Button size="sm" onClick={() => handlePayWeb3(bill)} isLoading={isPaying}>Thanh toán Web3</Button>
+                              ) : (
+                                <Button size="sm" variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50" onClick={() => openTraditionalPaymentModal(bill)}>Thanh toán C.Khoản</Button>
+                              )
                             )
                           )}
                        </div>
@@ -1346,6 +1378,56 @@ export default function ContractDetailPage() {
             )}
         </div>
       </div>
+
+      {/* --- MODAL THANH TOÁN TRUYỀN THỐNG (Khách Thuê) --- */}
+      {isTraditionalPaymentModalOpen && selectedBillToPay && contract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900">
+              <Receipt className="h-5 w-5 text-orange-500" />
+              Thanh toán Hóa đơn tháng {selectedBillToPay.month}/{selectedBillToPay.year}
+            </h2>
+            
+            <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 mb-6 relative overflow-hidden group">
+              {contract.landlordBankQrUrl ? (
+                <div className="mb-4 flex justify-center">
+                  <img src={contract.landlordBankQrUrl} alt="Mã QR Chuyển Khoản" className="w-40 h-40 object-contain rounded-lg shadow-sm border border-orange-200 bg-white p-2" />
+                </div>
+              ) : (
+                <div className="absolute top-0 right-0 p-2 opacity-10"><QrCode className="h-24 w-24 text-orange-600" /></div>
+              )}
+              <p className="text-sm text-orange-800 font-medium mb-2">Thông tin tài khoản ngân hàng của Chủ trọ:</p>
+              <div className="space-y-1 relative z-10">
+                <p className="text-xs text-gray-500">Ngân hàng:</p>
+                <p className="font-bold text-gray-900">{contract.landlordBankName || "Chưa cập nhật"}</p>
+                <p className="text-xs text-gray-500 mt-2">Số tài khoản:</p>
+                <p className="font-mono text-xl font-bold tracking-wider text-orange-700 bg-white inline-block px-2 py-1 rounded border border-orange-200">{contract.landlordBankAccountNumber || "Chưa cập nhật"}</p>
+                <p className="text-xs text-gray-500 mt-2">Chủ tài khoản:</p>
+                <p className="font-bold text-gray-900 uppercase">{contract.landlordBankAccountHolder || "Chưa cập nhật"}</p>
+                
+                <div className="pt-3 mt-3 border-t border-orange-200/50">
+                    <p className="text-xs text-gray-500">Số tiền cần chuyển:</p>
+                    <p className="text-2xl font-black text-red-600">{Number(selectedBillToPay.totalAmount).toLocaleString('vi-VN')}đ</p>
+                    <p className="text-xs text-gray-500 mt-2">Nội dung chuyển khoản (gợi ý):</p>
+                    <p className="font-mono text-sm bg-white p-2 rounded text-gray-800 border border-orange-100 font-medium">THANH TOAN TIEN PHONG {contract.roomName} THANG {selectedBillToPay.month}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-4">
+              <Button variant="outline" onClick={() => setIsTraditionalPaymentModalOpen(false)}>Quay lại</Button>
+              <Button 
+                onClick={handleNotifyTraditionalPayment} 
+                isLoading={isNotifyingPayment}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                Tôi đã chuyển khoản thành công
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

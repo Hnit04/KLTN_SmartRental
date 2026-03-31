@@ -329,6 +329,7 @@ export type BillStatus = "UNBILLED" | "PENDING" | "PAID" | "LATE";
 
 export interface ContractBilling {
   id: number;
+  billId?: number;
   roomName: string;
   tenantName: string;
   actualPrice: number;
@@ -346,6 +347,8 @@ export interface ContractBilling {
   additionalFee?: number;
   discountAmount?: number;
   note?: string;
+  elecMeterImageUrl?: string;
+  waterMeterImageUrl?: string;
 }
 
 export interface Bill {

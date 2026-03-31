@@ -148,6 +148,51 @@ public class BillService {
         return res;
     }
 
+    @Transactional
+    public BillResponse tenantNotifyPayment(Long billId, Long tenantId) {
+        Bill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new RuntimeException("Hóa đơn không tồn tại"));
+
+        if (!bill.getContract().getTenant().getId().equals(tenantId)) {
+            throw new RuntimeException("Bạn không phải người thuê của hợp đồng này!");
+        }
+
+        if (bill.getStatus() != BillStatus.UNPAID && bill.getStatus() != BillStatus.LATE) {
+            throw new RuntimeException("Hóa đơn này không thể thanh toán!");
+        }
+
+        bill.setStatus(BillStatus.PENDING);
+        Bill saved = billRepository.save(bill);
+
+        Property property = bill.getContract().getRoom().getProperty();
+        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
+        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+        return mapToResponse(saved, elecCost, waterCost, bill.getContract().getActualPrice());
+    }
+
+    @Transactional
+    public BillResponse landlordConfirmPayment(Long billId, Long landlordId) {
+        Bill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new RuntimeException("Hóa đơn không tồn tại"));
+
+        if (!bill.getContract().getRoom().getProperty().getLandlord().getId().equals(landlordId)) {
+            throw new RuntimeException("Bạn không phải chủ trọ của hợp đồng này!");
+        }
+
+        if (bill.getStatus() == BillStatus.PAID) {
+            throw new RuntimeException("Hóa đơn này đã được xác nhận thanh toán rồi!");
+        }
+
+        bill.setStatus(BillStatus.PAID);
+        bill.setPaidAt(LocalDateTime.now());
+        Bill saved = billRepository.save(bill);
+
+        Property property = bill.getContract().getRoom().getProperty();
+        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
+        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+        return mapToResponse(saved, elecCost, waterCost, bill.getContract().getActualPrice());
+    }
+
     public List<BillingStatusResponse> getBillingStatus(Long landlordId, int month, int year) {
         // 1. Lấy tất cả Hợp đồng đang ACTIVE của Chủ trọ này
         List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
@@ -172,7 +217,8 @@ public class BillService {
             if (currentBillOpt.isPresent()) {
                 // NẾU ĐÃ CHỐT SỔ -> Lấy dữ liệu của hóa đơn hiện tại
                 Bill currentBill = currentBillOpt.get();
-                res.setBillStatus(currentBill.getStatus().name()); // UNPAID, PAID, LATE
+                res.setBillId(currentBill.getId());
+                res.setBillStatus(currentBill.getStatus().name()); // UNPAID, PENDING, PAID, LATE
                 res.setOldElecIndex(currentBill.getOldElecIndex());
                 res.setOldWaterIndex(currentBill.getOldWaterIndex());
                 res.setTotalAmount(currentBill.getTotalAmount());
