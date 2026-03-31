@@ -4,9 +4,8 @@ import { userApi } from '@/api/userApi';
 import type { User } from '@/types';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
-import { Badge } from "@/components/ui/badge";
-import { Input } from '@/components/ui/Input'; // Giả sử bạn có component Input
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog'; // shadcn/ui dialog
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,DialogDescription } from '@/components/ui/Dialog'; // shadcn/ui dialog
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState<'tenant' | 'landlord'>('tenant');
@@ -14,7 +13,9 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [lockReasons, setLockReasons] = useState<string[]>([]);  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
-  const [userHistory, setUserHistory] = useState<any[]>([]); // tạm any, sau có thể định nghĩa type UserHistory
+  const [userHistory, setUserHistory] = useState<any[]>([]); 
+  const [showUnlockModal, setShowUnlockModal] = useState(false); 
+
   const QUICK_REASONS = [
     "Vi phạm nội quy",
     "Đăng tin giả mạo",
@@ -26,8 +27,8 @@ export default function UserManagementPage() {
   const toggleReason = (reason: string) => {
   setLockReasons((prev) =>
     prev.includes(reason)
-      ? prev.filter((r) => r !== reason) // Nếu đã có thì xóa đi
-      : [...prev, reason]               // Nếu chưa có thì thêm vào
+      ? prev.filter((r) => r !== reason) 
+      : [...prev, reason]             
   );
 };
   const [lockDuration, setLockDuration] = useState(7); 
@@ -71,35 +72,48 @@ export default function UserManagementPage() {
 
   // Mutation khóa user
   const lockMutation = useMutation({
-  // 1. Cập nhật kiểu dữ liệu của 'reason' thành string[]
   mutationFn: ({ userId, durationDays, reason }: { userId: number; durationDays: number; reason: string[] }) =>
     userApi.lockUser(userId, durationDays, reason),
 
   onSuccess: () => {
-    // 2. Làm mới danh sách người dùng để cập nhật trạng thái mới nhất
     queryClient.invalidateQueries({ queryKey: ['users', activeTab.toUpperCase()] });
     
-    // 3. Đóng Modal và Reset toàn bộ trạng thái form
     setShowLockModal(false);
-    setLockReasons([]); // Reset mảng lý do (đã đổi tên từ setLockReason thành setLockReasons)
-    setLockDuration(7);   // Reset về số ngày mặc định nếu cần
+    setLockReasons([]); 
+    setLockDuration(7);   
     
-    alert('Khóa tài khoản thành công!');
+    toast.success("Đã khóa tài khoản!", {
+        description: "Tài khoản đã được khóa và không thể đăng nhập.",
+        duration: 3000,
+      });
   },
 
   onError: (err: any) => {
-    // Hiển thị lỗi chi tiết từ Backend trả về
     const errorMessage = err.response?.data?.message || err.message;
     alert('Lỗi khi khóa: ' + errorMessage);
   },
 });
+
+  const handleLockUnlockClick = (user: User) => {
+    setSelectedUser(user);
+    if (user.locked) {
+      setShowUnlockModal(true);
+    } else {
+      setShowLockModal(true);   
+    }
+  };
 
   // Mutation mở khóa
   const unlockMutation = useMutation({
     mutationFn: (userId: number) => userApi.unlockUser(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', activeTab.toUpperCase()] });
-      alert('Đã mở khóa tài khoản!');
+      setShowUnlockModal(false); 
+      setSelectedUser(null); 
+      toast.success("Mở khóa thành công!", {
+        description: "Tài khoản đã được mở khóa và có thể đăng nhập lại bình thường.",
+        duration: 3000,
+      });
     },
     onError: (err: any) => {
       alert('Lỗi khi mở khóa: ' + (err.response?.data?.message || err.message));
@@ -121,43 +135,26 @@ export default function UserManagementPage() {
   };
   console.log("User history:", userHistory);
 
-  const handleLockClick = (user: User) => {
-    if (user.locked) {
-      if (confirm(`Bạn có chắc muốn MỞ KHÓA tài khoản ${user.fullName || user.email}?`)) {
-        unlockMutation.mutate(user.id);
-      }
-    } else {
-      setSelectedUser(user);
-      setShowLockModal(true);
-    }
-  };
-
+  
   const confirmLock = () => {
-  // 1. Kiểm tra danh sách lý do (vì là mảng nên kiểm tra độ dài)
   if (lockReasons.length === 0) {
     alert('Vui lòng chọn ít nhất một lý do khóa tài khoản');
     return;
   }
 
-  // 2. Kiểm tra xem đã chọn user chưa
   if (selectedUser?.id) {
-    // Gọi mutation để gửi dữ liệu lên Backend
     lockMutation.mutate(
       {
         userId: selectedUser.id,
         durationDays: lockDuration, 
-        // Gửi mảng lockReasons trực tiếp để khớp với List<String> ở Backend
         reason: lockReasons, 
       },
       {
         onSuccess: () => {
-          // Thông báo thành công
-          alert(`Đã khóa tài khoản ${selectedUser.fullName} thành công!`);
           
-          // Sau khi thành công thì đóng Modal và reset form về trạng thái ban đầu
           setShowLockModal(false);
-          setLockReasons([]); // Reset mảng lý do về rỗng
-          setLockDuration(7); // Reset về mặc định 7 ngày
+          setLockReasons([]);
+          setLockDuration(7); 
         },
         onError: (error: any) => {
           console.error("Lỗi khi khóa tài khoản:", error);
@@ -295,14 +292,12 @@ export default function UserManagementPage() {
                     </td>
                     <td className="px-6 py-4 flex gap-2">
                       <Button
-                        variant={user.locked ? 'default' : 'destructive'}
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => handleLockClick(user)}
-                        disabled={lockMutation.isPending || unlockMutation.isPending}
-                      >
-                        {user.locked ? 'Mở khóa' : 'Khóa'}
-                      </Button>
+                      variant={user.locked ? 'default' : 'destructive'}
+                      size="sm"
+                      onClick={() => handleLockUnlockClick(user)}
+                    >
+                      {user.locked ? 'Mở khóa' : 'Khóa'}
+                    </Button>
 
                       <Button
                         variant="outline"
@@ -332,7 +327,6 @@ export default function UserManagementPage() {
     </DialogHeader>
 
     <div className="py-4 space-y-6">
-      {/* 1. Chọn thời gian khóa */}
       <div>
         <label className="block text-sm font-medium mb-3 text-red-600">Thời hạn khóa:</label>
         <div className="grid grid-cols-3 gap-2">
@@ -350,7 +344,6 @@ export default function UserManagementPage() {
         </div>
       </div>
 
-      {/* 2. Chọn nhiều lý do vi phạm */}
       <div>
         <label className="block text-sm font-medium mb-2">Lý do vi phạm (Chọn nhiều):</label>
         <div className="flex flex-wrap gap-2 mb-3">
@@ -372,7 +365,6 @@ export default function UserManagementPage() {
           })}
         </div>
         
-        {/* Hiển thị tóm tắt các lý do đã chọn */}
         <div className="text-xs text-muted-foreground italic min-h-[1.5rem]">
           {lockReasons.length > 0 
             ? `Đã chọn: ${lockReasons.join(", ")}` 
@@ -384,7 +376,7 @@ export default function UserManagementPage() {
     <DialogFooter>
       <Button variant="outline" onClick={() => {
         setShowLockModal(false);
-        setLockReasons([]); // Reset lý do khi hủy
+        setLockReasons([]);
       }}>
         Hủy
       </Button>
@@ -392,7 +384,6 @@ export default function UserManagementPage() {
         variant="destructive" 
         onClick={() => {
           if (selectedUser?.id) {
-            // lockMutation.mutate gọi đến UserService.lockUserTemporary
             confirmLock(selectedUser.id, lockDuration, lockReasons);
           }
         }} 
@@ -403,6 +394,32 @@ export default function UserManagementPage() {
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
+      <Dialog open={showUnlockModal} onOpenChange={setShowUnlockModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Xác nhận mở khóa</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn mở khóa cho tài khoản <span className="font-bold text-gray-900">{selectedUser?.fullName || selectedUser?.email}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-500">
+              Sau khi mở khóa, người dùng này có thể đăng nhập và sử dụng các tính năng của hệ thống ngay lập tức.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUnlockModal(false)}>Hủy</Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => selectedUser && unlockMutation.mutate(selectedUser.id)}
+              disabled={unlockMutation.isPending}
+            >
+              {unlockMutation.isPending ? "Đang xử lý..." : "Xác nhận mở khóa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal xem lịch sử */}
       <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>

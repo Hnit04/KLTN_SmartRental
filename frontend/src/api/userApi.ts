@@ -78,4 +78,11 @@ export const userApi = {
     const response = await axiosClient.get<UserHistory[]>(`/users/${userId}/history`);
     return response.data;
   },
+  //9. Tìm kiếm user theo username
+  findByUsername: async (username: string): Promise<User> => {
+  const response = await axiosClient.get<User>('/users/username', {
+    params: { username },
+  });
+  return response.data;
+  },
 };

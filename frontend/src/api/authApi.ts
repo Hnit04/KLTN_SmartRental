@@ -4,8 +4,11 @@ import type {
   LoginResponse, 
   RegisterRequest, 
   User,
-  TokenRefreshResponse 
+  TokenRefreshResponse,
+  VerifyOtpRequest,
+  ResetPasswordRequest
 } from '../types';
+
 export const authApi = {
   // Đăng nhập
   login: async (data: LoginRequest): Promise<LoginResponse> => {
@@ -14,8 +17,32 @@ export const authApi = {
   },
 
   // Đăng ký
-  register: async (data: RegisterRequest): Promise<User> => {
-    const response = await axiosClient.post<User>('/auth/register', data);
+  register: async (data: RegisterRequest): Promise<any> => {
+    // Lưu ý: Kết quả trả về từ API register hiện tại là một Map (Object) 
+    // chứa status "PENDING_VERIFICATION" chứ không phải object User hoàn chỉnh.
+    const response = await axiosClient.post('/auth/register', data);
+    return response.data;
+  },
+
+  // Xác thực mã OTP
+  verifyOtp: async (data: VerifyOtpRequest): Promise<{ status: string; message: string }> => {
+    const response = await axiosClient.post('/auth/verify-otp', data);
+    return response.data;
+  },
+
+  // Gửi lại mã OTP
+  resendOtp: async (email: string): Promise<string> => {
+    // API resend-otp nhận body là Map<String, String> { "email": "..." }
+    const response = await axiosClient.post('/auth/resend-otp', { email });
+    return response.data;
+  },
+  forgotPassword: async (email: string): Promise<string> => {
+    // Backend nhận: Map<String, String> body = body.get("email")
+    const response = await axiosClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+  resetPassword: async (data: ResetPasswordRequest): Promise<string> => {
+    const response = await axiosClient.post('/auth/reset-password', data);
     return response.data;
   },
 

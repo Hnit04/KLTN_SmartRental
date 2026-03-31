@@ -48,4 +48,7 @@ public class Appointment {
 
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Column(name = "reminder_sent", nullable = false)
+    private Boolean reminderSent = false;
 }

@@ -35,6 +35,38 @@ export interface User {
   kycStatus: KYCStatus;
   createdAt: string;       
   updatedAt: string;       
+
+
+  locked?: boolean;
+  lockedAt?: string | null;
+  lockUntil?: string | null;
+  lockReason?: string[] | null;
+}
+
+export interface ResetPasswordRequest{
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface VerifyOtpRequest {
+  email: string;
+  code: string;
+}
+
+export interface UserHistory {
+  id: number;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  isLocked: boolean;
+  lockUntil: string | null;     
+  lockReason: string | null;
+  modifiedBy: string;
+  modifiedAt: string;    
+  modifiedByFullName: string;       
+  auditRemark: string | null;
+
 }
 
 export interface AuthResponse {

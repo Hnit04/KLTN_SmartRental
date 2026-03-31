@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class UserService {
@@ -44,6 +45,12 @@ public class UserService {
             response.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
         }
         return response;
+    }
+
+    public UserProfileResponse findByUsername(String username){
+        User user= userRepository.findByUsername(username)
+                .orElseThrow(()-> new ResourceNotFoundException("User","id", username));
+        return modelMapper.map(user, UserProfileResponse.class);
     }
 
     public UserProfileResponse updateUserProfile(Long userId, UpdateProfileRequest request) {
@@ -126,7 +133,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        user.setLocked(false);
+        user.setIsLocked(false);
         user.setLockUntil(null);
         user.setLockReason(null);
         userRepository.saveAndFlush(user);
@@ -135,7 +142,7 @@ public class UserService {
     @Transactional
     public void lockUserTemporary(Long userId, int durationDays, List<String> reason) {
         User user = userRepository.findById(userId).orElseThrow();
-        user.setLocked(true);
+        user.setIsLocked(true);
         user.setLockedAt(LocalDateTime.now());
         user.setLockUntil(LocalDateTime.now().plusDays(durationDays));
         user.setLockReason(reason);
