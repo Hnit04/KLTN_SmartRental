@@ -3,6 +3,7 @@ package iuh.se.kltn.backend.modules.property.controller;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import iuh.se.kltn.backend.modules.property.service.RoomService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +27,7 @@ public class RoomController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateRoom(
             @PathVariable Long id,
-            @RequestBody RoomRequest request) {
+            @Valid @RequestBody RoomRequest request) {
         return ResponseEntity.ok(roomService.updateRoom(id, request));
     }
 
@@ -49,14 +50,15 @@ public class RoomController {
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> approveRoom(@PathVariable Long id) {
-        roomService.updateApprovalStatus(id, PropertyStatus.APPROVED);
+        roomService.updateApprovalStatus(id, PropertyStatus.APPROVED, null);
         return ResponseEntity.ok("Đã duyệt phòng");
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> rejectRoom(@PathVariable Long id) {
-        roomService.updateApprovalStatus(id, PropertyStatus.REJECTED);
+    public ResponseEntity<?> rejectRoom(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        String reason = (body != null) ? body.get("reason") : null;
+        roomService.updateApprovalStatus(id, PropertyStatus.REJECTED, reason);
         return ResponseEntity.ok("Đã từ chối phòng");
     }
 }

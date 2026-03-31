@@ -17,6 +17,8 @@ import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
 import iuh.se.kltn.backend.modules.ai.service.ModerationService;
+import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
+import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,12 +47,12 @@ public class PropertyService {
     private ModelMapper modelMapper;
     @Autowired
     private ModerationService moderationService;
+    @Autowired
+    private NotificationService notificationService;
 
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public) - CHỈ LẤY "APPROVED"
     public Page<PropertyResponse> getAllProperties(Pageable pageable) {
         Page<Property> properties = propertyRepository.findByStatus(PropertyStatus.APPROVED, pageable);
-
-        // Convert từng Entity sang Response
         return properties.map(this::mapToPropertyResponse);
     }
 
@@ -121,6 +123,11 @@ public class PropertyService {
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
 
+        // Map maxOccupants nếu có
+        if (request.getMaxOccupants() != null) {
+            room.setMaxOccupants(request.getMaxOccupants());
+        }
+
         Room savedRoom = roomRepository.save(room);
         return mapToRoomResponse(savedRoom);
     }
@@ -138,12 +145,10 @@ public class PropertyService {
                 .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
 
         if (currentUserId != null && property.getLandlord().getId().equals(currentUserId)) {
-            // Chủ trọ xem tất cả phòng của mình
             return roomRepository.findByPropertyId(propertyId).stream()
                     .map(this::mapToRoomResponse)
                     .collect(Collectors.toList());
         } else {
-            // User bình thường chỉ xem phòng đã duyệt
             return roomRepository.findByPropertyIdAndApprovalStatus(propertyId, PropertyStatus.APPROVED).stream()
                     .map(this::mapToRoomResponse)
                     .collect(Collectors.toList());
@@ -161,16 +166,10 @@ public class PropertyService {
             res.setLandlordPhone(p.getLandlord().getPhoneNumber());
         }
 
-        // --- TÍNH TOÁN GIÁ VÀ PHÒNG TRỐNG ---
         List<Room> rooms = p.getRooms();
         if (rooms != null && !rooms.isEmpty()) {
-            // Tính giá thấp nhất
             double min = rooms.stream().mapToDouble(Room::getPrice).min().orElse(0.0);
-
-            // Tính giá cao nhất
             double max = rooms.stream().mapToDouble(Room::getPrice).max().orElse(0.0);
-
-            // Đếm phòng còn trống (AVAILABLE)
             long available = rooms.stream()
                     .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
                     .count();
@@ -180,7 +179,6 @@ public class PropertyService {
             res.setAvailableRooms((int) available);
             res.setTotalRooms(rooms.size());
         } else {
-            // Nếu nhà chưa có phòng nào
             res.setMinPrice(0.0);
             res.setMaxPrice(0.0);
             res.setAvailableRooms(0);
@@ -205,34 +203,29 @@ public class PropertyService {
     public PropertyResponse getPropertyById(Long id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trọ với ID: " + id));
-        // Có thể thêm kiểm tra nếu không phải owner thì phải được APPROVED mới xem được
         return mapToPropertyResponse(property);
     }
 
     @Transactional
     public PropertyResponse updateProperty(Long landlordId, Long propertyId, PropertyRequest request) {
-        // 1. Tìm khu trọ theo ID
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại với ID: " + propertyId));
 
-        // 2. Kiểm tra quyền sở hữu
         if (!property.getLandlord().getId().equals(landlordId)) {
             throw new RuntimeException("Bạn không có quyền chỉnh sửa khu trọ này!");
         }
 
-        // 3. KIỂM DUYỆT NỘI DUNG - Chỉ để gợi ý cho Admin
         ModerationResult modResult = moderationService
                 .checkContent("Khu trọ", buildPropertyContentCheck(request), request.getImages());
         
         PropertyStatus aiStatus = PropertyStatus.PENDING;
 
-        // 4. Cập nhật dữ liệu
         property.setName(request.getName());
         property.setCity(request.getCity());
         property.setDistrict(request.getDistrict());
         property.setAddress(request.getAddress());
         property.setDescription(request.getDescription());
-        property.setStatus(aiStatus); // Đưa về PENDING hoặc APPROVED dựa theo AI
+        property.setStatus(aiStatus);
         property.setSafetyScore(modResult.getScore());
         property.setModerationReason(modResult.getReason());
 
@@ -256,11 +249,45 @@ public class PropertyService {
     }
 
     @Transactional
-    public void updateStatus(Long propertyId, PropertyStatus status) {
+    public void updateStatus(Long propertyId, PropertyStatus status, String rejectionReason) {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
         property.setStatus(status);
+
+        // Lưu lý do từ chối nếu có
+        if (status == PropertyStatus.REJECTED && rejectionReason != null && !rejectionReason.isBlank()) {
+            property.setModerationReason("Admin từ chối: " + rejectionReason);
+        }
+
         propertyRepository.save(property);
+
+        // Gửi thông báo cho chủ trọ
+        try {
+            User landlord = property.getLandlord();
+            if (status == PropertyStatus.APPROVED) {
+                notificationService.createNotification(
+                        landlord,
+                        "Khu trọ đã được duyệt ✅",
+                        "Khu trọ \"" + property.getName() + "\" của bạn đã được Admin duyệt và hiển thị công khai.",
+                        NotificationType.PROPERTY_APPROVED,
+                        property.getId()
+                );
+            } else if (status == PropertyStatus.REJECTED) {
+                String msg = "Khu trọ \"" + property.getName() + "\" của bạn đã bị Admin từ chối.";
+                if (rejectionReason != null && !rejectionReason.isBlank()) {
+                    msg += "\nLý do: " + rejectionReason;
+                }
+                notificationService.createNotification(
+                        landlord,
+                        "Khu trọ bị từ chối ❌",
+                        msg,
+                        NotificationType.PROPERTY_REJECTED,
+                        property.getId()
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi gửi notification: " + e.getMessage());
+        }
     }
 
     public String reverseGeocode(double lat, double lon) {
@@ -270,15 +297,13 @@ public class PropertyService {
 
         RestTemplate restTemplate = new RestTemplate();
 
-        // Khai báo User-Agent (Tên đồ án) để OpenStreetMap không chặn
         HttpHeaders headers = new HttpHeaders();
         headers.set("User-Agent", "KLTN_SmartRental_App_Version_1.0");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        // Bắn request lấy dữ liệu
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
-        return response.getBody(); // Trả về chuỗi JSON chuẩn
+        return response.getBody();
     }
 }

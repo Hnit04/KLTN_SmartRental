@@ -6,6 +6,7 @@ import iuh.se.kltn.backend.modules.property.dto.request.PropertyRequest;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.service.PropertyService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Sort;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/properties")
@@ -48,21 +50,22 @@ public class PropertyController {
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> approveProperty(@PathVariable Long id) {
-        propertyService.updateStatus(id, PropertyStatus.APPROVED);
+        propertyService.updateStatus(id, PropertyStatus.APPROVED, null);
         return ResponseEntity.ok("Đã duyệt khu trọ");
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> rejectProperty(@PathVariable Long id) {
-        propertyService.updateStatus(id, PropertyStatus.REJECTED);
+    public ResponseEntity<?> rejectProperty(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        String reason = (body != null) ? body.get("reason") : null;
+        propertyService.updateStatus(id, PropertyStatus.REJECTED, reason);
         return ResponseEntity.ok("Đã từ chối khu trọ");
     }
 
     // Tạo Khu trọ mới
     @PostMapping
     public ResponseEntity<?> createProperty(@AuthenticationPrincipal UserPrincipal currentUser,
-                                            @RequestBody PropertyRequest request) {
+                                            @Valid @RequestBody PropertyRequest request) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body("Bạn cần đăng nhập để thực hiện thao tác này");
         }
@@ -73,7 +76,7 @@ public class PropertyController {
     @PostMapping("/{propertyId}/rooms")
     public ResponseEntity<?> addRoom(@AuthenticationPrincipal UserPrincipal currentUser,
                                      @PathVariable Long propertyId,
-                                     @RequestBody RoomRequest request) {
+                                     @Valid @RequestBody RoomRequest request) {
         return ResponseEntity.ok(propertyService.addRoom(currentUser.getId(), propertyId, request));
     }
 
@@ -101,7 +104,7 @@ public class PropertyController {
     public ResponseEntity<?> updateProperty(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
-            @RequestBody PropertyRequest request
+            @Valid @RequestBody PropertyRequest request
     ) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body("Bạn cần đăng nhập để thực hiện thao tác này");
