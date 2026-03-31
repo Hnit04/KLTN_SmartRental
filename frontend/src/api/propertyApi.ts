@@ -29,17 +29,13 @@ export const propertyApi = {
   deleteRoom: (roomId: number | string) => axiosClient.delete(`/rooms/${roomId}`),
 
   // --- HÀM TÍCH HỢP AI (MỚI) ---
-  // API này sẽ truyền từ khóa lên Backend để Backend gọi tới FPT AI hoặc Gemini trả về đoạn văn
   generateRoomDescription: (keywords: string) => 
     axiosClient.post<{ description: string }>("/ai/generate-room-description", { prompt: keywords }),
   uploadImages: async (files: File[]) => {
     const formData = new FormData();
     files.forEach(file => {
-      // Tên 'files' phải khớp chính xác với @RequestParam("files") bên Spring Boot
       formData.append('files', file); 
     });
-    
-    // axiosClient của bạn đã tự cấu hình token, chỉ cần thêm header multipart
     return axiosClient.post<string[]>("/properties/upload-images", formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
@@ -47,4 +43,16 @@ export const propertyApi = {
   reverseGeocode: (lat: number, lon: number) => {
     return axiosClient.get(`/properties/reverse-geocode?lat=${lat}&lon=${lon}`);
   },
+
+  // --- CÁC HÀM DÀNH CHO ADMIN ---
+  getPendingProperties: () => axiosClient.get<Property[]>("/properties/pending"),
+  approveProperty: (id: number | string) => axiosClient.post(`/properties/${id}/approve`),
+  rejectProperty: (id: number | string, reason?: string) => 
+    axiosClient.post(`/properties/${id}/reject`, reason ? { reason } : {}),
+
+  // --- ADMIN DUYỆT PHÒNG ---
+  getPendingRooms: () => axiosClient.get<Room[]>("/rooms/pending"),
+  approveRoom: (id: number | string) => axiosClient.post(`/rooms/${id}/approve`),
+  rejectRoom: (id: number | string, reason?: string) => 
+    axiosClient.post(`/rooms/${id}/reject`, reason ? { reason } : {}),
 };

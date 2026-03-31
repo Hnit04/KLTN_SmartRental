@@ -11,6 +11,7 @@ import {
   Wallet,
   Users,          // Thêm icon cho Quản lý người dùng
   Database,       // Thêm icon phù hợp cho Logs Blockchain
+  CheckSquare,    // Thêm icon cho Duyệt tin
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -90,6 +91,11 @@ const Sidebar = () => {
       title: 'Quản lý người dùng',
       path: '/admin/users',
       icon: Users,
+    },
+    {
+      title: 'Duyệt tin bài đăng',
+      path: '/admin/approvals',
+      icon: CheckSquare,
     },
     {
       title: 'Kiểm tra Logs Blockchain',

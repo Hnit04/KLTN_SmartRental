@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.property.entity;
 
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -43,6 +44,14 @@ public class Property {
 
     @Column(columnDefinition = "TEXT")
     private String images;
+
+    @Enumerated(EnumType.STRING)
+    private PropertyStatus status = PropertyStatus.PENDING;
+
+    private Integer safetyScore;
+    
+    @Column(columnDefinition = "TEXT")
+    private String moderationReason;
 
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
     private List<Room> rooms;

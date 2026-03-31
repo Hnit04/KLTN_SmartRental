@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.property.dto.response;
 
+import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import lombok.Data;
 import java.util.List;
@@ -14,6 +15,7 @@ public class RoomResponse {
     private Boolean hasMezzanine;
     private Boolean hasBalcony;
     private RoomStatus status;
+    private PropertyStatus approvalStatus;
     private List<String> amenities;
     private List<String> images;
 
@@ -26,4 +28,6 @@ public class RoomResponse {
     private String defaultTerms;
     private Double matchScore; // Thêm điểm phù hợp AI
     private String matchReason; // Lý do phù hợp (Vd: "Giá tốt, có gác lửng")
+    private Integer safetyScore;
+    private String moderationReason;
 }

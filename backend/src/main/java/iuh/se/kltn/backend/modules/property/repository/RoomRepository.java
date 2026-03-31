@@ -13,8 +13,12 @@ import java.util.List;
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByPropertyId(Long propertyId);
+    
+    List<Room> findByPropertyIdAndApprovalStatus(Long propertyId, iuh.se.kltn.backend.modules.property.enums.PropertyStatus approvalStatus);
 
     List<Room> findByStatus(RoomStatus status);
+    
+    List<Room> findByApprovalStatus(iuh.se.kltn.backend.modules.property.enums.PropertyStatus approvalStatus);
 
 
     @Query("""

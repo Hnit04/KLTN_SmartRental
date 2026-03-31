@@ -214,8 +214,16 @@ public class ContractService {
             if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
                 try {
                     String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
-                    String tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2";
-                    String landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4";
+                    
+                    String tenantWallet = contract.getTenant().getWalletAddress();
+                    if (tenantWallet == null || tenantWallet.isEmpty()) {
+                        tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"; // fallback
+                    }
+
+                    String landlordWallet = contract.getRoom().getProperty().getLandlord().getWalletAddress();
+                    if (landlordWallet == null || landlordWallet.isEmpty()) {
+                        landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"; // fallback
+                    }
 
                     long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
                     long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;

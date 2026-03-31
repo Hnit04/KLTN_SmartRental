@@ -27,7 +27,36 @@ export default function AiChatBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated } = useAuth();
 
-  // --- HÀM RENDER TIN NHẮN CHỨA CARD UI ---
+  // --- HÀM RENDER TIN NHẮN CHỨA CARD UI VÀ MARKDOWN ---
+  const formatText = (t: string): ReactNode => {
+    return t.split('\n').map((line, i) => {
+      let parsedLine = line.trim();
+      let isList = false;
+      
+      if (/^[-*]\s*/.test(parsedLine)) {
+        isList = true;
+        parsedLine = parsedLine.replace(/^[-*]\s*/, '');
+      }
+
+      const boldParts = parsedLine.split(/(\*\*.*?\*\*)/g);
+      const lineContent = boldParts.map((part, j) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={j} className="font-semibold text-primary/90">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+
+      if (!line.trim() && !isList) return <br key={i} />;
+
+      return (
+        <div key={i} className={`mb-1 ${isList ? "flex items-start gap-1.5 ml-1" : ""}`}>
+          {isList && <span className="text-[14px] mt-0.5">•</span>}
+          <span className="leading-relaxed whitespace-pre-wrap flex-1">{lineContent}</span>
+        </div>
+      );
+    });
+  };
+
   const renderMessageWithCards = (text: string): ReactNode => {
     // Regex tìm chuỗi [ROOM_CARD: id | name | price]
     const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/g;
@@ -38,7 +67,7 @@ export default function AiChatBot() {
     while ((match = regex.exec(text)) !== null) {
       // 1. Đưa phần text bình thường trước cái match vào (nếu có)
       if (match.index > lastIndex) {
-        parts.push(text.substring(lastIndex, match.index));
+        parts.push(<span key={`text-${lastIndex}`}>{formatText(text.substring(lastIndex, match.index))}</span>);
       }
 
       // 2. Parse thông tin từ match
@@ -46,7 +75,7 @@ export default function AiChatBot() {
       
       // 3. Render Card Giao diện
       parts.push(
-        <div key={match.index} className="w-full bg-background border border-border/60 rounded-xl shadow-sm mt-3 mb-2 overflow-hidden hover:shadow-md transition-shadow">
+        <div key={`card-${match.index}`} className="w-full bg-background border border-border/60 rounded-xl shadow-sm mt-3 mb-2 overflow-hidden hover:shadow-md transition-shadow">
           <div className="p-3 bg-primary/10 flex items-center justify-between border-b border-border/40">
             <div className="flex items-center gap-2 font-semibold text-primary">
               <Home className="w-4 h-4" />
@@ -57,7 +86,7 @@ export default function AiChatBot() {
             <div className="flex items-center gap-2 mb-2">
               <span className="text-muted-foreground">Giá thuê:</span>
               <span className="font-bold text-destructive flex items-center gap-1">
-                {priceStr.trim()} <DollarSign className="w-3 h-3" />
+                {priceStr.trim()} VNĐ
               </span>
             </div>
             <Button
@@ -77,11 +106,11 @@ export default function AiChatBot() {
 
     // 4. Còn thừa text nào phía sau cuối cùng thì push nốt vào
     if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
+      parts.push(<span key={`text-end`}>{formatText(text.substring(lastIndex))}</span>);
     }
 
     // Trả về mảng các element (text và component đan xen)
-    return parts.length > 0 ? parts : text;
+    return parts.length > 0 ? parts : formatText(text);
   };
 
   // Tự động cuộn xuống cuối khi có tin nhắn mới
@@ -152,8 +181,12 @@ export default function AiChatBot() {
         }
       } else {
         // Chat thông thường (hỏi linh tinh, hỏi luật)
-        const chatRes = await aiApi.chat(userMsg, "web-session");
-        replyText = chatRes.reply;
+        try {
+          const chatRes = await aiApi.chat(userMsg, "web-session");
+          replyText = chatRes.reply;
+        } catch (error: any) {
+          replyText = error.response?.data?.message || "Xin lỗi, mình đang gặp sự cố kết nối. Vui lòng thử lại sau.";
+        }
       }
 
       setMessages((prev) => [

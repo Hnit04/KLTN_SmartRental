@@ -38,4 +38,7 @@ export const billApi = {
   return axiosClient.get<RevenueChartData[]>("/bills/revenue/last-6-months");
     },
 
+  confirmWeb3Payment: (billId: number, txHash: string) => {
+    return axiosClient.post(`/bills/${billId}/confirm-web3`, { txHash });
+  },
 };

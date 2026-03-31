@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { contractApi } from "@/api/contractApi"; 
 import { billApi } from "@/api/billApi"; 
+import { ethers } from "ethers";
+import { getSmartContract } from "@/utils/contractHelper";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { toast } from "sonner";
 import { Bot } from "lucide-react";
@@ -200,26 +202,76 @@ export default function ContractDetailPage() {
       toast.error("Vui lòng cài đặt ví MetaMask để thanh toán!");
       return;
     }
+    if (!contract?.smartContractAddress) {
+      toast.error("Hợp đồng này chưa được triển khai trên Blockchain.");
+      return;
+    }
     setIsPaying(true);
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const senderAddress = accounts[0];
+      // Yêu cầu chuyển sang mạng Sepolia
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID || '0xaa36a7',
+                chainName: import.meta.env.VITE_BLOCKCHAIN_CHAIN_NAME || 'Sepolia Test Network',
+                nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
+                rpcUrls: [import.meta.env.VITE_BLOCKCHAIN_RPC_URL || 'https://rpc.sepolia.org'],
+                blockExplorerUrls: [import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'],
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
 
-      const ethAmount = (bill.totalAmount / 80000000).toFixed(6); 
-      const weiAmount = '0x' + (parseFloat(ethAmount) * 1e18).toString(16);
+      // Kết nối MetaMask
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-      const targetAddress = contract?.smartContractAddress || '0x0000000000000000000000000000000000000000'; 
-      
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{ from: senderAddress, to: targetAddress, value: weiAmount }],
-      });
+      // Tính số ETH cần chuyển từ tỷ giá trong hóa đơn
+      const exchangeRate = bill.exchangeRate || 80000000; // VND/ETH
+      const ethAmount = (bill.totalAmount / exchangeRate).toFixed(18);
+      const weiAmount = ethers.parseEther(ethAmount).toString();
 
-      toast.success(`Giao dịch đã được gửi! Hash: ${txHash.substring(0, 10)}...`);
+      toast.info("Đang gọi Smart Contract...");
+
+      // Kết nối Smart Contract và gọi hàm payExternalBill
+      // Hàm này: Nhận tiền -> Chuyển thẳng cho chủ trọ -> Ghi log on-chain
+      const smartContract = await getSmartContract(contract.smartContractAddress);
+      const tx = await smartContract.payExternalBill(bill.id, { value: weiAmount });
+
+      toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
+
+      // Chờ blockchain xác nhận
+      const receipt = await tx.wait();
+      const txHash = receipt.hash;
+
+      toast.info("Giao dịch đã được xác nhận trên Blockchain. Đang cập nhật hệ thống...");
+
+      // Cập nhật trạng thái ở Backend
+      await billApi.confirmWeb3Payment(bill.id, txHash);
+
+      toast.success("Thanh toán thành công! Tiền đã chuyển vào ví chủ trọ.");
+
+      // Refresh danh sách hóa đơn
       const res = await billApi.getBillsByContract(Number(id));
       setBills(res.data);
+
     } catch (error: any) {
-      toast.error(error.message || "Thanh toán bị hủy hoặc thất bại.");
+      const reason = error.reason || error.message || "Thanh toán bị hủy hoặc thất bại.";
+      if (reason.includes("da duoc thanh toan")) {
+        toast.error("Hóa đơn này đã được thanh toán trên Blockchain!");
+      } else {
+        toast.error(reason);
+      }
     } finally {
       setIsPaying(false);
     }
@@ -613,13 +665,13 @@ export default function ContractDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Contract Address</span>
-                    <a href={`https://sepolia.etherscan.io/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
+                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
                       {contract.smartContractAddress.substring(0, 10)}...{contract.smartContractAddress.substring(38)}
                     </a>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Tx Deploy Hash</span>
-                    <a href={`https://sepolia.etherscan.io/tx/${contract.deployTxHash}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
+                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/tx/${contract.deployTxHash}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
                       {contract.deployTxHash?.substring(0, 10)}...
                     </a>
                   </div>

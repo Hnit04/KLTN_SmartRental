@@ -37,7 +37,7 @@ export const depositContract = async (contractAddress: string, amountWei: string
   }
 };
 
-// 2. Hàm Thanh toán hóa đơn (Pay Bill)
+// 2. Hàm Thanh toán hóa đơn (Pay Bill) - On-chain bill
 export const payBill = async (contractAddress: string, billId: number, amountWei: string) => {
   try {
     const contract = await getSmartContract(contractAddress);
@@ -49,6 +49,25 @@ export const payBill = async (contractAddress: string, billId: number, amountWei
     return tx.hash;
   } catch (error) {
     console.error("Lỗi thanh toán:", error);
+    throw error;
+  }
+};
+
+// 3. Hàm Thanh toán hóa đơn từ Backend (Payment Gateway)
+// Gọi payExternalBill() trên Smart Contract -> Tiền chuyển thẳng cho chủ trọ + Ghi log on-chain
+export const payExternalBill = async (contractAddress: string, backendBillId: number, amountWei: string) => {
+  try {
+    const contract = await getSmartContract(contractAddress);
+    
+    // Gọi hàm payExternalBill(_backendBillId) trên smart contract
+    const tx = await contract.payExternalBill(backendBillId, { value: amountWei });
+    
+    console.log("Đang chờ xác nhận giao dịch...", tx.hash);
+    const receipt = await tx.wait(); // Chờ blockchain xác nhận
+    console.log("Thanh toán thành công!", receipt.hash);
+    return receipt.hash;
+  } catch (error) {
+    console.error("Lỗi thanh toán Web3:", error);
     throw error;
   }
 };

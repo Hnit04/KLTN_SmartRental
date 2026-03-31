@@ -12,6 +12,8 @@ import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
+import iuh.se.kltn.backend.modules.ai.service.ModerationService;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,7 @@ public class CrawlerService {
     private final PropertyRepository propertyRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final ModerationService moderationService;
 
     public List<CrawlerResultDto> crawlPhongTro123() {
         List<Map<String, String>> resultList = new ArrayList<>();
@@ -297,6 +300,11 @@ public class CrawlerService {
             property.setInternetPrice(100000.0);
             property.setImages(imageUrl);
             
+            // --- KIỂM DUYỆT AI CHO DỮ LIỆU CÀO ---
+            ModerationResult modResult = moderationService.checkContent(property.getName() + "\n" + property.getDescription());
+            property.setSafetyScore(modResult.getScore());
+            property.setModerationReason(modResult.getReason());
+            
             property = propertyRepository.save(property);
 
             Room room = new Room();
@@ -313,6 +321,8 @@ public class CrawlerService {
             room.setAmenities("[\"WIFI\", \"PARKING\", \"AIR_CONDITIONER\"]");
             room.setDefaultTerms("Tiền cọc 1 tháng, Hợp đồng tối thiểu 6 tháng");
             room.setImages(imageUrl);
+            room.setSafetyScore(modResult.getScore());
+            room.setModerationReason(modResult.getReason());
             
             roomRepository.save(room);
             savedCount++;
