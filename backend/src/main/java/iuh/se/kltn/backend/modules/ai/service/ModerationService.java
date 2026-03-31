@@ -38,7 +38,10 @@ public class ModerationService {
 
         String tieuChiDiemCao = type.equals("Khu trọ") 
                 ? "- Mô tả rõ ràng về toàn nhà, tiện ích chung, địa chỉ. LƯU Ý: ĐÂY LÀ KHU TRỌ NÊN KHÔNG BẮT BUỘC CÓ GIÁ THUÊ PHÒNG (Tuyệt đối không trừ điểm nếu thiếu thông tin giá thuê phòng)." 
-                : "- Mô tả rõ ràng về phòng, diện tích, giá thuê cụ thể, chi phí phụ, quy trình xem phòng.";
+                : "- Mô tả rõ ràng về phòng, diện tích, giá thuê cụ thể. "
+                + "LƯU Ý QUAN TRỌNG: "
+                + "(1) Chi phí phụ (điện, nước, internet) được quản lý ở cấp KHU TRỌ chứ KHÔNG PHẢI ở phòng → TUYỆT ĐỐI KHÔNG trừ điểm nếu phòng thiếu thông tin chi phí phụ. "
+                + "(2) Quy trình liên hệ/xem phòng do HỆ THỐNG APP xử lý (đặt lịch hẹn online) → KHÔNG trừ điểm nếu thiếu thông tin liên hệ hay quy trình xem phòng.";
 
         String prompt = String.format(
                 "Bạn là chuyên gia kiểm duyệt nội dung cho mạng xã hội bất động sản. " +

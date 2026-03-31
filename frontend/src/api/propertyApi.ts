@@ -47,5 +47,12 @@ export const propertyApi = {
   // --- CÁC HÀM DÀNH CHO ADMIN ---
   getPendingProperties: () => axiosClient.get<Property[]>("/properties/pending"),
   approveProperty: (id: number | string) => axiosClient.post(`/properties/${id}/approve`),
-  rejectProperty: (id: number | string) => axiosClient.post(`/properties/${id}/reject`),
+  rejectProperty: (id: number | string, reason?: string) => 
+    axiosClient.post(`/properties/${id}/reject`, reason ? { reason } : {}),
+
+  // --- ADMIN DUYỆT PHÒNG ---
+  getPendingRooms: () => axiosClient.get<Room[]>("/rooms/pending"),
+  approveRoom: (id: number | string) => axiosClient.post(`/rooms/${id}/approve`),
+  rejectRoom: (id: number | string, reason?: string) => 
+    axiosClient.post(`/rooms/${id}/reject`, reason ? { reason } : {}),
 };

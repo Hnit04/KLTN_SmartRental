@@ -8,6 +8,8 @@ import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
 import iuh.se.kltn.backend.modules.ai.service.ModerationService;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
+import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,9 @@ public class RoomService {
 
     @Autowired
     private ModerationService moderationService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * Lấy chi tiết phòng theo ID
@@ -107,6 +112,11 @@ public class RoomService {
             room.setDefaultTerms(request.getDefaultTerms());
         }
 
+        // Map maxOccupants nếu có
+        if (request.getMaxOccupants() != null) {
+            room.setMaxOccupants(request.getMaxOccupants());
+        }
+
         Room savedRoom = roomRepository.save(room);
         return mapToRoomResponse(savedRoom);
     }
@@ -131,11 +141,47 @@ public class RoomService {
     }
 
     @Transactional
-    public void updateApprovalStatus(Long roomId, PropertyStatus status) {
+    public void updateApprovalStatus(Long roomId, PropertyStatus status, String rejectionReason) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
         room.setApprovalStatus(status);
+
+        // Lưu lý do từ chối nếu có
+        if (status == PropertyStatus.REJECTED && rejectionReason != null && !rejectionReason.isBlank()) {
+            room.setModerationReason("Admin từ chối: " + rejectionReason);
+        }
+
         roomRepository.save(room);
+
+        // Gửi thông báo cho chủ trọ
+        try {
+            User landlord = room.getProperty().getLandlord();
+            String roomLabel = "Phòng \"" + room.getName() + "\" (Khu trọ " + room.getProperty().getName() + ")";
+            
+            if (status == PropertyStatus.APPROVED) {
+                notificationService.createNotification(
+                        landlord,
+                        "Phòng đã được duyệt ✅",
+                        roomLabel + " đã được Admin duyệt và hiển thị công khai.",
+                        NotificationType.ROOM_APPROVED,
+                        room.getId()
+                );
+            } else if (status == PropertyStatus.REJECTED) {
+                String msg = roomLabel + " đã bị Admin từ chối.";
+                if (rejectionReason != null && !rejectionReason.isBlank()) {
+                    msg += "\nLý do: " + rejectionReason;
+                }
+                notificationService.createNotification(
+                        landlord,
+                        "Phòng bị từ chối ❌",
+                        msg,
+                        NotificationType.ROOM_REJECTED,
+                        room.getId()
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi gửi notification phòng: " + e.getMessage());
+        }
     }
     public List<UserProfileResponse> getTenantsByRoomId(Long roomId) {
         // Kiểm tra phòng có tồn tại không

@@ -149,7 +149,7 @@ function App() {
               
               <Route path="/appointments" element={<AppointmentManagePage />} />
 
-                          {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
+              {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
             <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/approvals" element={<AdminApprovalPage />} />
@@ -158,6 +158,7 @@ function App() {
             </Route>
             </Route> 
 
+            
 
           </Route>
 

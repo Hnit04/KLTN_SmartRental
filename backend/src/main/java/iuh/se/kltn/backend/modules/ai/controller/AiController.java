@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.ai.controller;
 
 import iuh.se.kltn.backend.modules.ai.service.AiOrchestratorService;
 import iuh.se.kltn.backend.modules.ai.service.SmartRentalAi;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,9 @@ public class AiController {
 
     @Autowired
     private AiOrchestratorService aiOrchestratorService;
+
+    @Autowired
+    private ChatLanguageModel geminiChatModel;
 
 
     @PostMapping("/chat")
@@ -84,5 +88,31 @@ public class AiController {
     public ResponseEntity<?> clearCache() {
         aiOrchestratorService.clearSqlCache();
         return ResponseEntity.ok(Map.of("status", "success", "message", "Đã xoá bộ nhớ đệm AI thành công!"));
+    }
+
+    /**
+     * Tạo mô tả phòng trọ tự động bằng AI Gemini.
+     * Frontend gửi keywords (tên phòng, diện tích, giá, tiện ích) → AI viết mô tả chuẩn SEO.
+     */
+    @PostMapping("/generate-room-description")
+    public ResponseEntity<?> generateRoomDescription(@RequestBody Map<String, String> request) {
+        String prompt = request.get("prompt");
+        if (prompt == null || prompt.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Vui lòng cung cấp thông tin phòng"));
+        }
+
+        try {
+            String aiPrompt = String.format(
+                "Bạn là chuyên gia viết nội dung cho website cho thuê phòng trọ. " +
+                "Hãy viết một đoạn mô tả phòng trọ hấp dẫn, ngắn gọn (3-5 câu), bằng tiếng Việt, " +
+                "dựa trên thông tin sau. Chỉ trả về nội dung mô tả, KHÔNG thêm tiêu đề hay giải thích gì khác.\n\n" +
+                "Thông tin phòng: %s", prompt);
+
+            String description = geminiChatModel.generate(aiPrompt);
+            return ResponseEntity.ok(Map.of("description", description));
+        } catch (Exception e) {
+            System.err.println("Lỗi AI generate description: " + e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", "Không thể tạo mô tả. Vui lòng thử lại."));
+        }
     }
 }

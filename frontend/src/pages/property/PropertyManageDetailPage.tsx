@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
   Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
-  Trash2, AlertTriangle, Layers
+  Trash2, AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users
 } from 'lucide-react';
 import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
@@ -60,6 +60,7 @@ export default function PropertyManageDetailPage() {
     type: 'STUDIO' as RoomType,
     hasMezzanine: false,
     hasBalcony: false,
+    maxOccupants: '',
     amenities: [] as string[], 
     customAmenitiesInput: '', 
     images: [] as string[],
@@ -113,11 +114,43 @@ export default function PropertyManageDetailPage() {
     setFormData({ 
       name: '', price: '', area: '', description: '', 
       type: 'STUDIO' as RoomType, hasMezzanine: false, hasBalcony: false,
+      maxOccupants: '',
       amenities: [], customAmenitiesInput: '', images: [],
       defaultTerms: '' 
     });
     setSelectedFiles([]); setPreviewUrls([]);
     setShowModal(true);
+  };
+
+  // --- NHÂN BẢN PHÒNG ---
+  const handleDuplicate = (room: any) => {
+    setEditingId(null);
+    const standardAmenities: string[] = [];
+    const customAmenities: string[] = [];
+    (room.amenities || []).forEach((item: string) => {
+      if (COMMON_AMENITIES.includes(item)) {
+        standardAmenities.push(item);
+      } else {
+        customAmenities.push(item);
+      }
+    });
+    setFormData({
+      name: '', // Để trống tên để tránh trùng
+      price: room.price?.toString() || '', 
+      area: room.area?.toString() || '',
+      description: room.description || '', 
+      type: room.type || 'STUDIO',
+      hasMezzanine: room.hasMezzanine ?? false,
+      hasBalcony: room.hasBalcony ?? false,
+      maxOccupants: room.maxOccupants?.toString() || '',
+      amenities: standardAmenities,
+      customAmenitiesInput: customAmenities.join(', '), 
+      images: [], // Không copy ảnh
+      defaultTerms: room.defaultTerms || '' 
+    });
+    setSelectedFiles([]); setPreviewUrls([]);
+    setShowModal(true);
+    toast.info('Đã sao chép thông tin phòng! Hãy nhập số phòng mới.');
   };
 
   const handleOpenEdit = (room: any) => { 
@@ -143,6 +176,7 @@ export default function PropertyManageDetailPage() {
       type: room.type || 'STUDIO',
       hasMezzanine: room.hasMezzanine ?? false,
       hasBalcony: room.hasBalcony ?? false,
+      maxOccupants: room.maxOccupants?.toString() || '',
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '), 
       images: room.images || [],
@@ -251,6 +285,7 @@ export default function PropertyManageDetailPage() {
         type: formData.type,
         hasMezzanine: formData.hasMezzanine,
         hasBalcony: formData.hasBalcony,
+        maxOccupants: formData.maxOccupants ? Number(formData.maxOccupants) : null,
         description: formData.description,
         amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
@@ -352,6 +387,30 @@ export default function PropertyManageDetailPage() {
                     Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
                   </p>
                 </div>
+
+                {/* AI SAFETY SCORE */}
+                {(room as any).safetyScore != null && (
+                  <div className="mb-3 flex items-center gap-2 text-xs">
+                    {(room as any).safetyScore >= 80 ? (
+                      <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
+                        <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    ) : (room as any).safetyScore >= 50 ? (
+                      <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                        <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                        <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    )}
+                    {(room as any).moderationReason && (
+                      <span className="text-gray-400 italic truncate max-w-[150px]" title={(room as any).moderationReason}>
+                        {(room as any).moderationReason}
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 {/* NÚT THAO TÁC */}
                 <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap">
@@ -378,6 +437,16 @@ export default function PropertyManageDetailPage() {
                       </Button>
                     </Link>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-violet-500 border-violet-200 hover:bg-violet-50 px-2"
+                    onClick={() => handleDuplicate(room)}
+                    title="Nhân bản phòng này"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
 
                   <Button
                     variant="outline"
@@ -421,6 +490,14 @@ export default function PropertyManageDetailPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Giá thuê (VND) *</label>
                     <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                   </div>
+                </div>
+
+                {/* Số người tối đa */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5 text-gray-500" /> Số người tối đa
+                  </label>
+                  <input type="number" min="1" value={formData.maxOccupants} onChange={e => setFormData({...formData, maxOccupants: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3" />
                 </div>
 
                 {/* Loại phòng + Không gian */}
