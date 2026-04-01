@@ -4,10 +4,12 @@ export const roomApi = {
   getLandlordRoomStats: () => {
     return axiosClient.get("/rooms/stats/landlord");
   },
-  getRoomTenants: (roomId: number | string): Promise<User[]> => {
-    return axiosClient.get(`/rooms/${roomId}/tenants`);
+  getRoomTenants: async (roomId: number | string): Promise<User[]> => {
+    const response = await axiosClient.get(`/rooms/${roomId}/tenants`);
+    return response.data;
   },
-  getRoomDetail: (roomId: number | string): Promise<Room> => {
-    return axiosClient.get(`/rooms/${roomId}`);
-  }
+  getRoomDetail: async (roomId: number | string): Promise<Room> => {
+    const response = await axiosClient.get(`/rooms/${roomId}`);
+    return response.data;          
+  },
 };

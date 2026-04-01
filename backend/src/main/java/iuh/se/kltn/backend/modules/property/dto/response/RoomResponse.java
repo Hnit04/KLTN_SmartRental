@@ -30,4 +30,5 @@ public class RoomResponse {
     private String matchReason; // Lý do phù hợp (Vd: "Giá tốt, có gác lửng")
     private Integer safetyScore;
     private String moderationReason;
+    private String description;
 }

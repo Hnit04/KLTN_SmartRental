@@ -97,9 +97,11 @@ public class RoomService {
         room.setName(request.getName());
         room.setPrice(request.getPrice());
         room.setArea(request.getArea());
+        room.setDescription(request.getDescription());
         room.setApprovalStatus(aiStatus); // Duyệt lại khi sửa
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
+
 
         if (request.getAmenities() != null) {
             room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));

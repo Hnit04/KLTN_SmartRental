@@ -118,6 +118,7 @@ public class PropertyService {
         room.setProperty(property);
         room.setStatus(RoomStatus.AVAILABLE);
         room.setApprovalStatus(aiStatus);
+        room.setDescription(request.getDescription());
         room.setImages(JsonUtil.convertListToJson(request.getImages()));
         room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));
         room.setSafetyScore(modResult.getScore());

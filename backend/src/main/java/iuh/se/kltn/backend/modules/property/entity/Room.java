@@ -44,6 +44,8 @@ public class Room {
     private String defaultTerms;
     @Column(columnDefinition = "TEXT")
     private String images; // JSON ảnh phòng
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     @Enumerated(EnumType.STRING)
     private PropertyStatus approvalStatus = PropertyStatus.PENDING;
