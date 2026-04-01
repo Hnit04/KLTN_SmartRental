@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 @Data
 public class BillingStatusResponse {
     private Long id; // ID của Hợp đồng
+    private Long billId; // ID của Hóa đơn (nếu đã chốt)
     private String roomName;
     private String tenantName;
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { toast } from 'sonner';
 import { billApi } from '@/api/billApi';
+import { propertyApi } from '@/api/propertyApi';
 import type { ContractBilling } from '@/types/index';
 
 const formatCurrency = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
@@ -42,6 +43,9 @@ export default function BillManagePage() {
   const [additionalFee, setAdditionalFee] = useState<string>('');
   const [discountAmount, setDiscountAmount] = useState<string>('');
   const [note, setNote] = useState('');
+  
+  // Trạng thái cho nút xác nhận thu tiền
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState<number | null>(null);
   const [deadlineDate, setDeadlineDate] = useState(''); 
 
   // State quản lý ảnh
@@ -63,6 +67,27 @@ export default function BillManagePage() {
     }
   };
 
+  const handleConfirmPayment = async (contract: ContractBilling) => {
+    if (!contract.billId) {
+      toast.error("Không tìm thấy mã hóa đơn!");
+      return;
+    }
+    setIsConfirmingPayment(contract.billId);
+    try {
+      await billApi.landlordConfirmPayment(contract.billId);
+      toast.success("Đã xác nhận thu tiền thành công!");
+      
+      // Cập nhật state ngay lập tức
+      setContracts(contracts.map(c => 
+        c.billId === contract.billId ? { ...c, billStatus: 'PAID' } : c
+      ));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi khi xác nhận thanh toán");
+    } finally {
+      setIsConfirmingPayment(null);
+    }
+  };
+
   useEffect(() => { fetchBillingStatus(); }, [currentMonth, currentYear]);
 
   // Logic Tính Tiền Real-time
@@ -75,11 +100,12 @@ export default function BillManagePage() {
     const elecCost = elecUsed * selectedContract.elecPrice;
     const waterCost = waterUsed * selectedContract.waterPrice;
     const roomCost = selectedContract.actualPrice;
+    const internetCost = selectedContract.internetPrice || 0;
     
     const extra = Number(additionalFee) || 0;
     const discount = Number(discountAmount) || 0;
 
-    const total = roomCost + elecCost + waterCost + extra - discount;
+    const total = roomCost + elecCost + waterCost + internetCost + extra - discount;
     setPreviewTotal(Math.max(0, total)); 
   }, [newElec, newWater, additionalFee, discountAmount, selectedContract]);
 
@@ -131,6 +157,31 @@ export default function BillManagePage() {
 
     setIsSubmitting(true);
     try {
+      let uploadedElecUrl = undefined;
+      let uploadedWaterUrl = undefined;
+      
+      if (meterFiles.elec || meterFiles.water) {
+         try {
+             const filesToUpload = [];
+             if (meterFiles.elec) filesToUpload.push(meterFiles.elec);
+             if (meterFiles.water) filesToUpload.push(meterFiles.water);
+             
+             const uploadRes = await propertyApi.uploadImages(filesToUpload);
+             if (uploadRes.data && uploadRes.data.length > 0) {
+                 if (meterFiles.elec && meterFiles.water) {
+                     uploadedElecUrl = uploadRes.data[0];
+                     uploadedWaterUrl = uploadRes.data[1];
+                 } else if (meterFiles.elec) {
+                     uploadedElecUrl = uploadRes.data[0];
+                 } else {
+                     uploadedWaterUrl = uploadRes.data[0];
+                 }
+             }
+         } catch(e) {
+             toast.error('Lỗi tải ảnh minh chứng. Hóa đơn vẫn được chốt với nội dung gốc.');
+         }
+      }
+
       await billApi.createBill({
         contractId: selectedContract.id,
         month: currentMonth,
@@ -143,6 +194,8 @@ export default function BillManagePage() {
         additionalFee: Number(additionalFee) || 0,
         discountAmount: Number(discountAmount) || 0,
         note: note,
+        elecMeterImageUrl: uploadedElecUrl,
+        waterMeterImageUrl: uploadedWaterUrl,
       });
 
       toast.success('Chốt sổ thành công!');
@@ -293,6 +346,19 @@ export default function BillManagePage() {
                     <Button className="w-full bg-primary" onClick={() => openChotSoModal(contract)}>
                       <Receipt className="h-4 w-4 mr-2" /> Chốt Sổ Ngay
                     </Button>
+                  ) : contract.billStatus === 'PENDING' ? (
+                    <div className="flex w-full gap-2">
+                      <Button className="flex-1" variant="outline" onClick={() => openReceiptModal(contract)} title="Xem Biên Lai">
+                        <FileText className="h-4 w-4" /> 
+                      </Button>
+                      <Button 
+                        className="flex-[3] bg-orange-500 hover:bg-orange-600 text-white" 
+                        onClick={() => handleConfirmPayment(contract)}
+                        isLoading={isConfirmingPayment === contract.billId}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Thực Thu
+                      </Button>
+                    </div>
                   ) : (
                     <Button className="w-full" variant="outline" onClick={() => openReceiptModal(contract)}>
                       <FileText className="h-4 w-4 mr-2" /> Xem Biên Lai
@@ -404,6 +470,10 @@ export default function BillManagePage() {
                                 <span className="text-gray-500">Tiền nước ({Math.max(0, Number(newWater) - selectedContract.oldWaterIndex)} khối):</span>
                                 <span>{formatCurrency(Math.max(0, Number(newWater) - selectedContract.oldWaterIndex) * selectedContract.waterPrice)}</span>
                             </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Mạng / Dịch vụ:</span>
+                                <span>{formatCurrency(selectedContract.internetPrice || 0)}</span>
+                            </div>
                             {Number(additionalFee) > 0 && (
                                 <div className="flex justify-between text-red-600">
                                     <span>Phụ phí:</span>
@@ -429,7 +499,7 @@ export default function BillManagePage() {
                             disabled={!newElec || !newWater || isSubmitting}
                         >
                             {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                            Phát Hành Hóa Đơn
+                            {isSubmitting ? 'Đang tải minh chứng...' : 'Phát Hành Hóa Đơn'}
                         </Button>
                     </div>
                 </div>
@@ -479,6 +549,11 @@ export default function BillManagePage() {
                  </div>
                  
                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-800">Internet & WiFi</span>
+                    <span className="font-semibold">{formatCurrency(viewingContract.internetPrice || 0)}</span>
+                 </div>
+                 
+                 <div className="flex justify-between text-sm">
                     <div className="flex flex-col">
                         <span className="font-medium text-gray-800">Tiền điện</span>
                         <span className="text-xs text-gray-500">
@@ -503,6 +578,27 @@ export default function BillManagePage() {
                         {formatCurrency(Math.max(0, (viewingContract.newWaterIndex || 0) - viewingContract.oldWaterIndex) * viewingContract.waterPrice)}
                     </span>
                  </div>
+
+                 {(viewingContract.elecMeterImageUrl || viewingContract.waterMeterImageUrl) && (
+                     <div className="pt-2 flex gap-3">
+                        {viewingContract.elecMeterImageUrl && (
+                            <div className="flex-1 bg-gray-50 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
+                                <a href={viewingContract.elecMeterImageUrl} target="_blank" rel="noopener noreferrer">
+                                   <img src={viewingContract.elecMeterImageUrl} alt="Đồng hồ điện" className="w-full h-16 object-cover rounded hover:scale-110 transition-transform"/>
+                                   <p className="text-[9px] font-bold text-gray-500 uppercase mt-1">Chỉ số Điện</p>
+                                </a>
+                            </div>
+                        )}
+                        {viewingContract.waterMeterImageUrl && (
+                            <div className="flex-1 bg-gray-50 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
+                                <a href={viewingContract.waterMeterImageUrl} target="_blank" rel="noopener noreferrer">
+                                   <img src={viewingContract.waterMeterImageUrl} alt="Đồng hồ nước" className="w-full h-16 object-cover rounded hover:scale-110 transition-transform"/>
+                                   <p className="text-[9px] font-bold text-gray-500 uppercase mt-1">Chỉ số Nước</p>
+                                </a>
+                            </div>
+                        )}
+                     </div>
+                 )}
 
                  {viewingContract.additionalFee ? (
                     <div className="flex justify-between text-sm text-red-600">

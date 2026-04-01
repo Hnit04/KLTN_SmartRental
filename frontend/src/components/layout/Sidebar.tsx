@@ -12,6 +12,7 @@ import {
   Users,          // Thêm icon cho Quản lý người dùng
   Database,       // Thêm icon phù hợp cho Logs Blockchain
   CheckSquare,    // Thêm icon cho Duyệt tin
+  BrainCircuit,   // Thêm icon cho AI Analytics
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -101,6 +102,11 @@ const Sidebar = () => {
       title: 'Kiểm tra Logs Blockchain',
       path: '/admin/blockchain-logs',
       icon: Database,
+    },
+    {
+      title: 'Thống kê AI & NLP',
+      path: '/admin/ai-analytics',
+      icon: BrainCircuit,
     },
   ];
 

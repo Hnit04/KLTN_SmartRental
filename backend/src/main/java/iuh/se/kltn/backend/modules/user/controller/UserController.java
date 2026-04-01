@@ -117,6 +117,21 @@ public class UserController {
         }
     }
 
+    @PostMapping(value = "/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadQr(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("File không được để trống");
+            }
+            String qrUrl = cloudinaryService.uploadImage(file, "smart-rental/qr");
+            return ResponseEntity.ok(qrUrl);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body("Lỗi upload ảnh QR: " + e.getMessage());
+        }
+    }
+
     @PostMapping(value = "/kyc", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitKYC(
             @AuthenticationPrincipal UserPrincipal currentUser,

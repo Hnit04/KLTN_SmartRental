@@ -2,6 +2,14 @@ import axiosClient from "./axiosClient";
 import type { Contract, SignContractPayload, CreateContractPayload, ChangeRequestDTO, ContractChangeRequest } from "@/types"; 
 
 export const contractApi = {
+  // Admin: lấy tất cả hợp đồng
+  getAll: () => {
+    return axiosClient.get<Contract[]>("/contracts/all");
+  },
+  // Admin: xác minh tính toàn vẹn hợp đồng qua blockchain
+  verify: (id: number | string) => {
+    return axiosClient.get(`/contracts/${id}/verify`);
+  },
   getMyContracts: () => {
     return axiosClient.get<Contract[]>("/contracts/mine");
   },
@@ -37,5 +45,10 @@ export const contractApi = {
   // --- CẬP NHẬT ĐIỀU KHOẢN TRỰC TIẾP ---
   updateTerms: (id: number | string, data: { terms: string }) => {
     return axiosClient.put(`/contracts/${id}/terms`, data);
+  },
+
+  // --- XÁC NHẬN HOÀN CỌC ---
+  confirmDepositRefund: (id: number | string) => {
+    return axiosClient.put(`/contracts/${id}/confirm-deposit-refund`);
   }
 };

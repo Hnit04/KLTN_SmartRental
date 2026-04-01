@@ -39,6 +39,22 @@ public class ContractController {
         return ResponseEntity.ok(contractService.getContractById(id));
     }
 
+    // 3.5. Admin: Lấy tất cả hợp đồng (cho Blockchain Logs)
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllContracts() {
+        return ResponseEntity.ok(contractService.getAllContracts());
+    }
+
+    // 3.6. Admin: Xác minh tính toàn vẹn hợp đồng qua Blockchain
+    @GetMapping("/{id}/verify")
+    public ResponseEntity<?> verifyContract(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(contractService.verifyContract(id));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
     // 4. Ký hợp đồng (✅ ĐÃ ĐỔI SANG POST VÀ BỔ SUNG currentUser)
     @PostMapping("/{id}/sign")
     public ResponseEntity<?> signContract(@AuthenticationPrincipal UserPrincipal currentUser,
@@ -120,6 +136,18 @@ public class ContractController {
         String newTerms = (request != null && request.containsKey("terms")) ? request.get("terms") : "";
         try {
             return ResponseEntity.ok(contractService.updateContractTerms(id, newTerms, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    // 💰 Xác nhận đã hoàn cọc
+    @PutMapping("/{id}/confirm-deposit-refund")
+    public ResponseEntity<?> confirmDepositRefund(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(contractService.confirmDepositRefund(id, currentUser.getId()));
         } catch (Exception e) {
             return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
         }

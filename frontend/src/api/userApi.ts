@@ -27,6 +27,16 @@ export const userApi = {
     return response.data; 
   },
 
+  // 3.5. Upload QR Ngân hàng
+  uploadQr: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axiosClient.post<string>('/users/qr', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   // ✅ 4. (MỚI) Nộp hồ sơ KYC (Xác thực danh tính)
   submitKYC: async (cccdNumber: string, frontFile: File, backFile: File): Promise<string> => {
     const formData = new FormData();

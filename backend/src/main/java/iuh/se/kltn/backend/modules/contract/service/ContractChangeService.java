@@ -56,21 +56,53 @@ public class ContractChangeService {
         // ✅ THÊM DÒNG NÀY: Lưu lại Role của người tạo yêu cầu (LANDLORD hoặc TENANT)
         req.setRequestedByRole(user.getRole().name());
 
-        // Tự động gán giá trị cũ (oldValue) dựa trên loại Enum
+        // ═══════════════════════════════════════════════════════════════
+        // 🛡️ RÀNG BUỘC NGHIỆP VỤ (Business Constraints)
+        // ═══════════════════════════════════════════════════════════════
         switch (dto.getType()) {
             case RENT_INCREASE:
+                try {
+                    double newPrice = Double.parseDouble(dto.getNewValue());
+                    if (newPrice <= 0) {
+                        throw new RuntimeException("Giá thuê mới phải lớn hơn 0 VNĐ!");
+                    }
+                } catch (NumberFormatException e) {
+                    throw new RuntimeException("Giá thuê mới không hợp lệ (phải là số)!");
+                }
                 req.setOldValue(contract.getActualPrice() != null ? String.valueOf(contract.getActualPrice()) : "0");
                 break;
             case EXTENSION:
+                try {
+                    LocalDate newEnd = LocalDate.parse(dto.getNewValue());
+                    if (contract.getEndDate() != null && !newEnd.isAfter(contract.getEndDate())) {
+                        throw new RuntimeException("Ngày gia hạn phải sau ngày kết thúc hiện tại (" + contract.getEndDate() + ")!");
+                    }
+                } catch (java.time.format.DateTimeParseException e) {
+                    throw new RuntimeException("Ngày gia hạn không hợp lệ!");
+                }
                 req.setOldValue(contract.getEndDate() != null ? contract.getEndDate().toString() : "Chưa có ngày kết thúc");
                 break;
             case TERMINATION:
+                try {
+                    LocalDate termDate = LocalDate.parse(dto.getNewValue());
+                    if (contract.getStartDate() != null && termDate.isBefore(contract.getStartDate())) {
+                        throw new RuntimeException("Ngày chấm dứt không thể trước ngày bắt đầu hợp đồng (" + contract.getStartDate() + ")!");
+                    }
+                    if (contract.getEndDate() != null && termDate.isAfter(contract.getEndDate())) {
+                        throw new RuntimeException("Ngày chấm dứt không thể sau ngày kết thúc hợp đồng (" + contract.getEndDate() + "). Hãy dùng chức năng Gia hạn nếu muốn kéo dài!");
+                    }
+                } catch (java.time.format.DateTimeParseException e) {
+                    throw new RuntimeException("Ngày chấm dứt không hợp lệ!");
+                }
                 req.setOldValue(contract.getEndDate() != null ? contract.getEndDate().toString() : "Chưa có ngày kết thúc");
                 break;
             case CHANGE_TERMS:
                 req.setOldValue(contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "");
                 break;
             case CHANGE_SIGN_METHOD:
+                if (contract.getStatus() == ContractStatus.ACTIVE) {
+                    throw new RuntimeException("Không thể đổi phương thức ký khi hợp đồng đã có hiệu lực!");
+                }
                 req.setOldValue(contract.getSignMethod().name());
                 break;
             default:
@@ -106,9 +138,30 @@ public class ContractChangeService {
                     contract.setEndDate(LocalDate.parse(req.getNewValue()));
                     break;
                 case TERMINATION:
-                    contract.setEndDate(LocalDate.parse(req.getNewValue()));
+                    LocalDate proposedDate = LocalDate.parse(req.getNewValue());
+                    contract.setEndDate(proposedDate);
+                    
                     if (contract.getStatus() == ContractStatus.ACTIVE) {
-                        contract.setStatus(ContractStatus.TERMINATED_EARLY);
+                        // 💰 Trả phòng sớm → Phạt cọc (Chủ nhà giữ lại tiền cọc)
+                        contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.PENALIZED);
+                        
+                        // Nếu ngày chấm dứt <= hôm nay -> Hợp đồng hiệu lực chấm dứt, nhả phòng
+                        if (!proposedDate.isAfter(LocalDate.now())) {
+                            contract.setStatus(ContractStatus.TERMINATED_EARLY);
+                            iuh.se.kltn.backend.modules.property.entity.Room room = contract.getRoom();
+                            if (room != null && room.getStatus() != iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE) {
+                                room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                            }
+                        }
+                        // Nếu ngày chấm dứt ở tương lai -> Chỉ lùi endDate, Scheduler sẽ nhả phòng khi đến hạn.
+                    } else if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        // 💰 Hủy trước khi ký → Hoàn cọc (nếu đã đặt cọc)
+                        contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
+                        contract.setStatus(ContractStatus.EXPIRED);
+                        iuh.se.kltn.backend.modules.property.entity.Room room = contract.getRoom();
+                        if (room != null && room.getStatus() != iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE) {
+                            room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                        }
                     }
                     break;
                 case CHANGE_SIGN_METHOD: // ✅ THÊM ĐOẠN NÀY

@@ -14,6 +14,7 @@ public class ContractResponse {
     private String propertyAddress;
     private String tenantName;
     private String landlordName;
+    private String landlordWalletAddress;
 
     private LocalDate startDate;
     private LocalDate endDate;
@@ -35,4 +36,19 @@ public class ContractResponse {
     private String smartContractAddress;
     private String deployTxHash;
     private LocalDateTime signDate;
+
+    // 💰 Thông tin thanh toán/hoàn cọc của Khách thuê
+    private String tenantPhone;
+    private String tenantCccd;
+    private String tenantWalletAddress;
+    private String tenantBankName;
+    private String tenantBankAccountNumber;
+    private String tenantBankAccountHolder;
+    private String tenantBankQrUrl;
+
+    // 💰 Thông tin ngân hàng của Chủ trọ để Khách thuê thanh toán
+    private String landlordBankName;
+    private String landlordBankAccountNumber;
+    private String landlordBankAccountHolder;
+    private String landlordBankQrUrl;
 }

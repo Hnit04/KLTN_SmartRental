@@ -15,4 +15,9 @@ public interface ContractChangeRequestRepository extends JpaRepository<ContractC
     List<ContractChangeRequest> findByContractIdAndStatus(Long contractId, RequestStatus status);
 
     boolean existsByContractIdAndStatus(Long contractId, RequestStatus status);
+    
+    // Addendum Pattern: Tìm các Phụ lục đã được duyệt theo loại
+    List<ContractChangeRequest> findByContractIdAndStatusAndType(
+            Long contractId, RequestStatus status, 
+            iuh.se.kltn.backend.modules.contract.enums.RequestType type);
 }

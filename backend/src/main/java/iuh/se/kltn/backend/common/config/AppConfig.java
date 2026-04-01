@@ -12,7 +12,9 @@ public class AppConfig {
     public ModelMapper modelMapper() {
         ModelMapper modelMapper = new ModelMapper();
         modelMapper.getConfiguration()
-                .setMatchingStrategy(MatchingStrategies.STANDARD);
+                .setMatchingStrategy(MatchingStrategies.STANDARD)
+                .setAmbiguityIgnored(true); // Ignore ambiguity globally to fix DTO mapping crashes caused by User bank fields
+
         return modelMapper;
     }
 }

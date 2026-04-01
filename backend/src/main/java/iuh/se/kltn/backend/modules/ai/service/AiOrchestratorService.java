@@ -236,6 +236,96 @@ public class AiOrchestratorService {
             return "Dạ, hệ thống đang gặp chút khó khăn khi tra cứu thông tin này. Bạn vui lòng thử lại sau nhé!";
         }
     }
+    // Admin: Thống kê AI NLP
+    public Map<String, Object> getAnalytics() {
+        List<AiSqlCache> allCaches = cacheRepository.findAll();
+        long totalQueries = allCaches.size();
+        long validQueries = allCaches.stream().filter(AiSqlCache::isValid).count();
+        long invalidQueries = totalQueries - validQueries;
+
+        // Phân loại câu hỏi theo keyword
+        long roomQueries = allCaches.stream().filter(c -> {
+            String q = c.getQuestion().toLowerCase();
+            return q.contains("phòng") || q.contains("room");
+        }).count();
+        long priceQueries = allCaches.stream().filter(c -> {
+            String q = c.getQuestion().toLowerCase();
+            return q.contains("giá") || q.contains("price") || q.contains("tiền");
+        }).count();
+        long contractQueries = allCaches.stream().filter(c -> {
+            String q = c.getQuestion().toLowerCase();
+            return q.contains("hợp đồng") || q.contains("contract");
+        }).count();
+        long billQueries = allCaches.stream().filter(c -> {
+            String q = c.getQuestion().toLowerCase();
+            return q.contains("hóa đơn") || q.contains("bill") || q.contains("doanh thu");
+        }).count();
+        long locationQueries = allCaches.stream().filter(c -> {
+            String q = c.getQuestion().toLowerCase();
+            return q.contains("quận") || q.contains("district") || q.contains("thành phố") || q.contains("địa chỉ");
+        }).count();
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("totalQueries", totalQueries);
+        result.put("validQueries", validQueries);
+        result.put("invalidQueries", invalidQueries);
+
+        Map<String, Long> categories = new java.util.LinkedHashMap<>();
+        categories.put("Phòng trọ", roomQueries);
+        categories.put("Giá cả", priceQueries);
+        categories.put("Hợp đồng", contractQueries);
+        categories.put("Hoá đơn/Doanh thu", billQueries);
+        categories.put("Địa điểm", locationQueries);
+        categories.put("Khác", totalQueries - roomQueries - priceQueries - contractQueries - billQueries - locationQueries);
+        result.put("categories", categories);
+
+        // Cache entries
+        List<Map<String, Object>> entries = new java.util.ArrayList<>();
+        for (AiSqlCache c : allCaches) {
+            Map<String, Object> entry = new java.util.LinkedHashMap<>();
+            entry.put("id", c.getId());
+            entry.put("question", c.getQuestion());
+            entry.put("generatedSql", c.getGeneratedSql());
+            entry.put("isValid", c.isValid());
+            entries.add(entry);
+        }
+        result.put("entries", entries);
+
+        return result;
+    }
+
+    // Admin: Sửa cache (Human-in-the-loop)
+    @Transactional
+    public void updateCacheEntry(Long id, String newSql) {
+        AiSqlCache cache = cacheRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy câu hỏi trong Cache (ID: " + id + ")"));
+        
+        cache.setGeneratedSql(newSql);
+        cache.setValid(true); // Đã sửa bằng tay thì coi như valid
+        cacheRepository.save(cache);
+        
+        System.out.println("✏️ Admin đã sửa SQL cho câu hỏi ID " + id);
+        reloadVectorCache();
+    }
+
+    // Admin: Xóa 1 dòng cache
+    @Transactional
+    public void deleteCacheEntry(Long id) {
+        if (!cacheRepository.existsById(id)) {
+            throw new RuntimeException("Không tìm thấy câu hỏi trong Cache (ID: " + id + ")");
+        }
+        cacheRepository.deleteById(id);
+        System.out.println("🗑️ Admin đã xóa câu hỏi ID " + id);
+        reloadVectorCache();
+    }
+
+    // Load lại toàn bộ Vector Store từ DB đã được filter valid=true
+    private void reloadVectorCache() {
+        System.out.println("🔄 Đang load lại Vector Store sau khi có thay đổi từ Admin...");
+        embeddingStore.removeAll();
+        initVectorCache(); // Gọi lại Logic Load mặc định
+    }
+
     @Transactional
     public void clearSqlCache() {
         System.out.println("🧹 Đang xoá bộ nhớ đệm SQL (Cache)...");
