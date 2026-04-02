@@ -27,7 +27,7 @@ export function UserNav() {
         )}
       </div>
       <div className="hidden md:block text-left">
-        <p className="text-sm font-semibold text-gray-700 leading-none">{user.fullName || user.username}</p>
+        <p className="text-sm font-semibold text-gray-700 leading-none">{user.fullName || user.username} {user.role && `${user.role}`}</p>
       </div>
       <ChevronDown className="h-4 w-4 text-gray-400" />
     </button>

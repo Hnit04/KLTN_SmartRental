@@ -12,4 +12,8 @@ export const roomApi = {
     const response = await axiosClient.get(`/rooms/${roomId}`);
     return response.data;          
   },
+  updateRoomVisibility: async (roomId: number | string, status: "HIDDEN" | "AVAILABLE"| "REJECTED"|"MAINTENANCE") => {
+    const response = await axiosClient.put(`/rooms/${roomId}/hide`, { status });
+    return response.data;
+  },
 };

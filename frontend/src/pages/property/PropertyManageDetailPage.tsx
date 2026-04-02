@@ -382,7 +382,8 @@ const handleDuplicate = async (room: any) => {
                 'bg-red-500 text-white'
               }`}>
                 {room.status === 'AVAILABLE' ? 'Trống' : 
-                room.status === 'RESERVED' ? 'Giữ chỗ' : 'Đã thuê'}
+                room.status === 'RESERVED' ? 'Giữ chỗ' :
+                room.status === 'HIDDEN' ? 'Đang ẩn' : 'Đã thuê'}
               </span>
 
               {/* Nhãn trạng thái duyệt */}

@@ -23,6 +23,7 @@ public class RoomResponse {
     private String propertyAddress;
     private String landlordName;
     private Double elecPrice;
+    private Long propertyId;
     private Double waterPrice;
     private Double internetPrice;
     private String defaultTerms;

@@ -157,7 +157,7 @@ export interface Property {
   moderationReason?: string;
 }
 
-export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
+export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED" | "HIDDEN";
 export type RoomType = "STUDIO" | "ONE_BEDROOM" | "TWO_BEDROOM" | "SINGLE_ROOM" | "SHARED_ROOM" | "MEZZANINE_ROOM";
 
 export interface Room {
