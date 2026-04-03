@@ -7,6 +7,7 @@ import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserHistoryResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
+import iuh.se.kltn.backend.modules.user.dto.response.UserRe;
 import iuh.se.kltn.backend.modules.user.entity.CustomRevisionEntity;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.ReputationHistoryRepository;
@@ -33,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -82,7 +84,7 @@ public class UserController {
         return ResponseEntity.ok(history);
     }
     @GetMapping("/username")
-    public UserProfileResponse findByUsername(String username) {
+    public UserRe findByUsername(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -95,7 +97,7 @@ public class UserController {
             }
         }
 
-        return modelMapper.map(user, UserProfileResponse.class);
+        return modelMapper.map(user, UserRe.class);
     }
 
     @PutMapping("/profile")
@@ -263,5 +265,9 @@ public class UserController {
          history.sort(Comparator.comparing(UserHistoryResponse::getModifiedAt).reversed());
 
         return ResponseEntity.ok(history);
+    }
+    @GetMapping("/userId")
+    public Optional<User> findById(String username){
+        return userRepository.findByUsername(username);
     }
 }

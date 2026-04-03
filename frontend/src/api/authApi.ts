@@ -6,13 +6,20 @@ import type {
   User,
   TokenRefreshResponse,
   VerifyOtpRequest,
-  ResetPasswordRequest
+  ResetPasswordRequest,
+  GoogleLoginRequest,
+  ChangePasswordRequest
 } from '../types';
 
 export const authApi = {
   // Đăng nhập
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     const response = await axiosClient.post<LoginResponse>('/auth/login', data);
+    return response.data;
+  },
+  // Đăng nhập bằng Google
+  googleLogin: async (data: GoogleLoginRequest): Promise<LoginResponse> => {
+    const response = await axiosClient.post<LoginResponse>('/auth/google', data);
     return response.data;
   },
 
@@ -45,6 +52,10 @@ export const authApi = {
     const response = await axiosClient.post('/auth/reset-password', data);
     return response.data;
   },
+  resetPasswordNoOtp: async (data: ResetPasswordRequest): Promise<string> => {
+    const response = await axiosClient.post('/auth/reset-password-gg', data);
+    return response.data;
+  },
 
   // Refresh Token
   refreshToken: async (refreshToken: string): Promise<TokenRefreshResponse> => {
@@ -52,5 +63,9 @@ export const authApi = {
       refreshToken: refreshToken
     });
     return response.data;
-  }
+  },
+  changePassword: async (data: ChangePasswordRequest): Promise<string> => {
+    const response = await axiosClient.post('/auth/change-password', data);
+    return response.data;
+  },
 };

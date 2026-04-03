@@ -54,7 +54,7 @@ export default function TermsPage() {
           
           <div className="mt-8 flex items-center text-sm text-muted-foreground bg-background/50 inline-flex px-4 py-2 rounded-full border">
             <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-            Hiệu lực từ: <strong>01/01/2024</strong> (Phiên bản 2.1)
+            Hiệu lực từ: <strong>01/12/2026</strong> (Phiên bản 1.0)
           </div>
         </div>
       </div>
@@ -246,7 +246,7 @@ export default function TermsPage() {
                 <p className="text-muted-foreground mb-2">SmartRental có quyền thực hiện các biện pháp sau tùy theo mức độ vi phạm:</p>
                 <ol className="list-decimal pl-5 space-y-1 font-medium text-foreground/80">
                   <li>Cảnh báo nhắc nhở lần đầu.</li>
-                  <li>Khóa tính năng đăng tin hoặc bình luận trong 7-30 ngày.</li>
+                  <li>Khóa tính năng đăng khu trọ/phòng hoặc bình luận trong 7 ngày- vĩnh viễn.</li>
                   <li>Khóa tài khoản vĩnh viễn và đưa vào danh sách đen (Blacklist).</li>
                   <li>Chuyển hồ sơ sang cơ quan công an nếu có dấu hiệu lừa đảo chiếm đoạt tài sản.</li>
                 </ol>

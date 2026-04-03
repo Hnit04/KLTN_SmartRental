@@ -25,6 +25,7 @@ import RoomDetailPage from "./pages/property/RoomDetailPage";
 import PropertiesManagePage from "./pages/property/PropertiesManagePage";
 import PropertyManageDetailPage from "./pages/property/PropertyManageDetailPage";
 import BillManagePage from "./pages/finance/BillManagePage";
+import PropertyRoomDetailPage from "./pages/property/PropertyRoomDetailPage";
 // --- CONTRACT & DASHBOARD PAGES ---
 import ContractsPage from "./pages/contract/ContractsPage"; 
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
@@ -133,6 +134,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/properties/manage" element={<PropertiesManagePage />} />
                 <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
+                <Route path="/properties/manage/:propertyId/rooms/:roomId" element={<PropertyRoomDetailPage />} />
                 
                 <Route path="/finance" element={<BillManagePage />} />
                 <Route path="/reports" element={<ReportsPage />} />

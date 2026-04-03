@@ -1,29 +1,42 @@
 package iuh.se.kltn.backend.modules.user.service;
 
+import com.google.api.client.auth.openidconnect.IdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.common.security.JwtTokenProvider;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.modules.user.dto.request.GoogleLoginRequest;
 import iuh.se.kltn.backend.modules.user.dto.request.LoginRequest;
 import iuh.se.kltn.backend.modules.user.dto.request.TokenRefreshRequest;
 import iuh.se.kltn.backend.modules.user.dto.request.UserRegisterRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.LoginResponse;
+import iuh.se.kltn.backend.modules.user.dto.response.LoginResponseGoogle;
 import iuh.se.kltn.backend.modules.user.dto.response.TokenRefreshResponse;
-import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse; // Import mới
+import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.RefreshToken;
 import iuh.se.kltn.backend.modules.user.entity.Tenant;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.enums.KYCStatus;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
-import org.modelmapper.ModelMapper; // Import mới
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Random;
 
 @Service
@@ -49,6 +62,8 @@ public class AuthService {
 
     @Autowired
     private EmailService emailService;
+
+    private String googleClientId="853040464300-f2l17df4g8vf714ainbi1n4a74hk87g2.apps.googleusercontent.com";
 
     // ĐĂNG KÝ
     public User register(UserRegisterRequest request) {
@@ -167,10 +182,16 @@ public class AuthService {
             throw new RuntimeException("Mã xác thực đã hết hạn!");
         }
 
-        // Cập nhật mật khẩu mới
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setVerificationCode(null); // Xóa mã sau khi dùng
         user.setVerificationExpiry(null);
+        userRepository.save(user);
+    }
+
+    public void resetPasswordNoNeedOTP(String email, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại!"));
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
 
@@ -178,7 +199,7 @@ public class AuthService {
         return str != null && !str.trim().isEmpty();
     }
 
-    // ĐĂNG NHẬP (ĐÃ SỬA)
+    // ĐĂNG NHẬP
     public LoginResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -198,6 +219,35 @@ public class AuthService {
         if (user instanceof Landlord) {
             userProfile.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
         }
+        return new LoginResponse(
+                jwt,
+                refreshToken.getToken(),
+                userProfile
+        );
+    }
+    public LoginResponse loginWithGoogle(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại trong hệ thống"));
+
+        UserPrincipal userPrincipal = UserPrincipal.create(user);
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userPrincipal,
+                null,
+                userPrincipal.getAuthorities()
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = tokenProvider.generateToken(authentication);
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
+
+        UserProfileResponse userProfile = modelMapper.map(user, UserProfileResponse.class);
+        if (user instanceof Landlord) {
+            userProfile.setBusinessLicenseUrl(((Landlord) user).getBusinessLicenseUrl());
+        }
+
         return new LoginResponse(
                 jwt,
                 refreshToken.getToken(),
@@ -224,4 +274,117 @@ public class AuthService {
                 })
                 .orElseThrow(() -> new RuntimeException("Refresh token không tồn tại trong hệ thống!"));
     }
+
+    public LoginResponseGoogle googleLogin(GoogleLoginRequest request) {
+        try {
+
+
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = null;
+            try {
+                idToken = verifier.verify(request.getIdToken());
+            } catch (GeneralSecurityException e) {
+                System.out.println("Signature verification failed: " + e.getMessage());
+                e.printStackTrace();
+                throw new RuntimeException("Lỗi chữ ký token Google: " + e.getMessage());
+            } catch (IOException e) {
+                System.out.println("IO error during verification (có thể không kết nối JWKS): " + e.getMessage());
+                e.printStackTrace();
+                throw new RuntimeException("Lỗi kết nối verify token");
+            }
+
+            if (idToken == null) {
+                System.out.println("Verifier returned null - likely invalid signature, expired, or audience mismatch");
+                throw new RuntimeException("Invalid Google ID Token");
+            }
+
+            Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            boolean emailVerified = Boolean.TRUE.equals(payload.getEmailVerified());
+            String name = (String) payload.get("name");
+            String picture = (String) payload.get("picture");
+            System.out.println("Full Payload: " + payload.toString());
+
+            if (!emailVerified) {
+                throw new RuntimeException("Email Google chưa được xác thực");
+            }
+
+            User user = userRepository.findByEmail(email)
+                    .orElse(null);
+
+            LoginResponseGoogle loginResponseGoogle= new LoginResponseGoogle();
+            if (user == null) {
+                user = new Tenant();
+                user.setEmail(email);
+                user.setFullName(name != null ? name : email.split("@")[0]);
+                user.setUsername(email);
+                user.setAvatarUrl(picture);
+                user.setRole(Role.TENANT);
+                user.setKycStatus(KYCStatus.PENDING);
+                user.setReputationScore(50);
+                user.setIsEnabled(true);
+                user.setIsLocked(false);
+                user.setPassword(passwordEncoder.encode("1111"));
+                user = userRepository.save(user);
+                loginResponseGoogle= new LoginResponseGoogle(user.getUsername(), "1111");
+                emailService.sendSecurityAlert(user.getEmail());
+            } else {
+                boolean needUpdate = false;
+                if (picture != null && !picture.equals(user.getAvatarUrl())) {
+                    user.setAvatarUrl(picture);
+                    needUpdate = true;
+                }
+
+                if (needUpdate) {
+                    userRepository.save(user);
+                }
+                loginResponseGoogle= new LoginResponseGoogle(user.getUsername(), null);
+
+            }
+
+            if (user.isLocked()) {
+                String reasons = user.getLockReason() != null && !user.getLockReason().isEmpty()
+                        ? String.join(", ", user.getLockReason())
+                        : "Không có lý do cụ thể";
+                throw new RuntimeException("Tài khoản bị khóa. Lý do: " + reasons);
+            }
+            System.out.println("--- Chi tiết User đăng nhập Google ---");
+            System.out.println("Username: " + loginResponseGoogle.getUsername());
+            System.out.println("Password (Hash): " + loginResponseGoogle.getPassword());
+            return loginResponseGoogle;
+        } catch (Exception e) {
+            System.out.println("Unexpected error in googleLogin: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Lỗi xác thực Google: " + e.getMessage());
+        }
+    }
+    // ĐỔI MẬT KHẨU (khi đã đăng nhập)
+    public void changePassword(Long userId, String oldPassword, String newPassword, String confirmNewPassword) {
+
+        if (!newPassword.equals(confirmNewPassword)) {
+            throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản!"));
+
+        // Kiểm tra mật khẩu cũ có đúng không
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu cũ không chính xác!");
+        }
+
+        // Kiểm tra mật khẩu mới không được trùng với mật khẩu cũ
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu mới phải khác với mật khẩu cũ!");
+        }
+
+        // Cập nhật mật khẩu mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
 }

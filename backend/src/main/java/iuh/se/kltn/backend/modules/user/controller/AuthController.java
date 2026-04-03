@@ -1,6 +1,9 @@
 package iuh.se.kltn.backend.modules.user.controller;
 
+import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.user.dto.request.*;
+import iuh.se.kltn.backend.modules.user.dto.response.LoginResponse;
+import iuh.se.kltn.backend.modules.user.dto.response.LoginResponseGoogle;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.service.AuthService;
 import iuh.se.kltn.backend.modules.user.service.EmailService;
@@ -8,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -93,12 +97,25 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/reset-password-gg")
+    public ResponseEntity<?> resetPasswordNoNeedOTP(@RequestBody ResetPasswordRequest request) {
+        try {
+            authService.resetPasswordNoNeedOTP(request.getEmail(), request.getNewPassword());
+            return ResponseEntity.ok("Đổi mật khẩu thành công!");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
 
-    // API Đăng nhập
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            return ResponseEntity.ok(authService.login(request));
+            if (request.getPassword()==null){
+                return ResponseEntity.ok(authService.loginWithGoogle(request.getUsername()));
+            }else {
+                return ResponseEntity.ok(authService.login(request));
+            }
         } catch (Exception e) {
             return ResponseEntity.status(401).body("Sai thông tin đăng nhập: " + e.getMessage());
         }
@@ -111,5 +128,47 @@ public class AuthController {
             return ResponseEntity.status(403).body("Lỗi làm mới token: " + e.getMessage());
         }
     }
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
+        try {
+            LoginResponseGoogle response = authService.googleLogin(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Lỗi hệ thống khi xác thực Google: " + e.getMessage()));
+        }
+    }
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        try {
+            if (userPrincipal == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Vui lòng đăng nhập để thực hiện thao tác này!");
+            }
+
+            authService.changePassword(
+                    userPrincipal.getId(),
+                    request.getOldPassword(),
+                    request.getNewPassword(),
+                    request.getConfirmNewPassword()
+            );
+
+            return ResponseEntity.ok("Đổi mật khẩu thành công!");
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Lỗi hệ thống: " + e.getMessage());
+        }
+    }
+
+
 
 }

@@ -39,7 +39,7 @@ export default function PropertiesPage() {
           propertyApi.getAll(page, 12),
           page === 0 ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
-
+        console.log("API responses:", { propsRes, recRoomsRes });
         if (propsRes.status === "fulfilled") {
             const pageData = propsRes.value.data as any;
             if (page === 0) {
