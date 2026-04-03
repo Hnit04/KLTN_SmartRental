@@ -1,0 +1,16 @@
+package iuh.se.kltn.backend.modules.user.enums;
+
+public enum ReputationAction {
+    EKYC_VERIFIED,
+    WALLET_LINKED,
+    CONTRACT_SIGNED,
+    CONTRACT_COMPLETED,
+    BILL_PAID_ON_TIME,
+    BILL_LATE,
+    SMART_CONTRACT_PENALTY,
+    GOOD_REVIEW_RECEIVED,
+    REVIEW_SUBMITTED,
+    EARLY_TERMINATION,
+    UNFAIR_DEPOSIT_HOLD,
+    VIOLATION_REPORTED
+}

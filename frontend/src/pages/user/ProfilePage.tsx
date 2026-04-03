@@ -29,6 +29,11 @@ const ProfilePage = () => {
   // State quản lý Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  
+  // State Reputation History
+  const [reputationHistory, setReputationHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // State Form & KYC
   const [kycFiles, setKycFiles] = useState<{ front: File | null, back: File | null }>({ front: null, back: null });
@@ -180,6 +185,18 @@ const ProfilePage = () => {
       toast.error("Gửi thất bại.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const loadReputationHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const data = await userApi.getReputationHistory();
+      setReputationHistory(data);
+    } catch (err) {
+      toast.error("Không thể tải lịch sử uy tín.");
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -348,6 +365,16 @@ const ProfilePage = () => {
             <p className="text-[11px] text-muted-foreground mt-4 leading-relaxed">
               Điểm uy tín được tính dựa trên lịch sử thanh toán và tuân thủ hợp đồng.
             </p>
+            <Button 
+              variant="link" 
+              className="text-xs h-auto py-1 mt-2 -mb-2 text-primary"
+              onClick={() => {
+                setIsHistoryModalOpen(true);
+                loadReputationHistory();
+              }}
+            >
+              Xem chi tiết lịch sử <MessageCircle className="h-3 w-3 ml-1" />
+            </Button>
           </div>
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h4 className="font-bold mb-4 text-sm uppercase">Hoạt động</h4>
@@ -533,6 +560,54 @@ const ProfilePage = () => {
               <Button onClick={handleSubmitKYC} isLoading={isSaving} className="bg-green-600 hover:bg-green-700">
                 <ShieldCheck className="h-4 w-4 mr-2" /> Gửi hồ sơ xác thực
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL REPUTATION HISTORY ─── */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 shrink-0">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" /> Lịch sử điểm uy tín
+              </h3>
+              <button onClick={() => setIsHistoryModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {isLoadingHistory ? (
+                <div className="text-center text-sm text-gray-500 py-10">Đang tải lịch sử...</div>
+              ) : reputationHistory.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 py-10">Chưa có ghi nhận nào.</div>
+              ) : (
+                reputationHistory.map((item, idx) => (
+                  <div key={idx} className="flex gap-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                    <div className="shrink-0 pt-1">
+                      {item.pointsChanged > 0 ? (
+                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">
+                          +{item.pointsChanged}
+                        </div>
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-bold text-xs">
+                          {item.pointsChanged}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-800 leading-snug">{item.description}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{new Date(item.createdAt).toLocaleString('vi-VN')}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end shrink-0">
+              <Button onClick={() => setIsHistoryModalOpen(false)}>Đóng</Button>
             </div>
           </div>
         </div>

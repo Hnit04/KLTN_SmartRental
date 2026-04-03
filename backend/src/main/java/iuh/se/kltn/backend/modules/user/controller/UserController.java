@@ -9,6 +9,8 @@ import iuh.se.kltn.backend.modules.user.dto.response.UserHistoryResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.entity.CustomRevisionEntity;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.repository.ReputationHistoryRepository;
+import iuh.se.kltn.backend.modules.user.dto.response.ReputationHistoryResponse;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.user.service.UserService;
 import jakarta.persistence.EntityManager;
@@ -43,6 +45,9 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
+    private ReputationHistoryRepository reputationHistoryRepository;
+
+    @Autowired
     private CloudinaryService cloudinaryService;
 
     @Autowired
@@ -59,6 +64,22 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
         return ResponseEntity.ok(userProfile);
+    }
+
+    @GetMapping("/me/reputation-history")
+    public ResponseEntity<List<ReputationHistoryResponse>> getReputationHistory(@AuthenticationPrincipal UserPrincipal currentUser) {
+        List<ReputationHistoryResponse> history = reputationHistoryRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId())
+                .stream()
+                .map(item -> new ReputationHistoryResponse(
+                        item.getId(),
+                        item.getUser().getId(),
+                        item.getActionType().name(),
+                        item.getPointsChanged(),
+                        item.getDescription(),
+                        item.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(history);
     }
     @GetMapping("/username")
     public UserProfileResponse findByUsername(String username) {
