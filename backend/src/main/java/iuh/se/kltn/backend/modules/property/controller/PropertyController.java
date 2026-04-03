@@ -86,6 +86,12 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.getMyProperties(currentUser.getId()));
     }
 
+    // Xem danh sách nhà của một chủ trọ bất kỳ (Public - theo Username)
+    @GetMapping("/landlord/{username}")
+    public ResponseEntity<?> getLandlordProperties(@PathVariable String username) {
+        return ResponseEntity.ok(propertyService.getPropertiesByUsername(username));
+    }
+
     // Xem danh sách phòng của một khu trọ cụ thể
     @GetMapping("/{propertyId}/rooms")
     public ResponseEntity<?> getRooms(

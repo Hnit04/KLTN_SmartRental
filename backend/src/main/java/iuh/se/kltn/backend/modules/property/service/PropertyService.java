@@ -140,6 +140,13 @@ public class PropertyService {
                 .collect(Collectors.toList());
     }
 
+    // LẤY DANH SÁCH NHÀ CỦA CHU TRO (DÙNG CHO PUBLIC)
+    public List<PropertyResponse> getPropertiesByUsername(String username) {
+        return propertyRepository.findByLandlordUsername(username).stream()
+                .map(this::mapToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
     // LẤY DANH SÁCH PHÒNG CỦA 1 KHU TRỌ
     public List<RoomResponse> getRoomsByProperty(Long propertyId, Long currentUserId) {
         Property property = propertyRepository.findById(propertyId)

@@ -35,6 +35,9 @@ export default function PublicLayout() {
             <NavLink to="/properties" className={navLinkClass}>
               Tìm phòng
             </NavLink>
+            <NavLink to="/top-landlords" className={navLinkClass}>
+              🔥 Bảng Xếp Hạng
+            </NavLink>
             <NavLink to="/contact" className={navLinkClass}>
               Liên hệ
             </NavLink>
@@ -104,6 +107,7 @@ export default function PublicLayout() {
               <h4 className="font-semibold text-foreground">Sản phẩm</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li><Link to="/properties" className="hover:text-primary">Tìm phòng</Link></li>
+                <li><Link to="/top-landlords" className="hover:text-primary">Bảng Xếp Hạng</Link></li>
                 <li><Link to="#" className="hover:text-primary">Tính năng</Link></li>
               </ul>
             </div>
