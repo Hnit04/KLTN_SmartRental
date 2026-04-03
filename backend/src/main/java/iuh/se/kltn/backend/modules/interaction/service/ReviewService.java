@@ -24,6 +24,7 @@ public class ReviewService {
     private final ContractRepository contractRepo;
     private final UserRepository userRepo;
     private final NotificationService notificationService;
+    private final iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
     @Transactional
     public ReviewResponse createReview(ReviewRequest request, String username) {
@@ -60,6 +61,12 @@ public class ReviewService {
         review.setComment(request.getComment());
 
         Review savedReview = reviewRepo.save(review);
+
+        // 4.5. Điểm uy tín
+        reputationService.processPoints(reviewer, iuh.se.kltn.backend.modules.user.enums.ReputationAction.REVIEW_SUBMITTED, 2, "Gửi đánh giá hợp đồng thành công");
+        if (request.getRating() >= 4) {
+            reputationService.processPoints(landlord, iuh.se.kltn.backend.modules.user.enums.ReputationAction.GOOD_REVIEW_RECEIVED, 3, "Nhận được đánh giá tích cực từ khách thuê");
+        }
 
         // 5. TỰ ĐỘNG BẮN THÔNG BÁO CHO CHỦ NHÀ
         String title = "Bạn có một đánh giá mới!";

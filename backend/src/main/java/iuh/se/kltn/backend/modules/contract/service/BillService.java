@@ -40,6 +40,9 @@ public class BillService {
     // Inject thêm NotificationService để tạo thông báo
     @Autowired
     private NotificationService notificationService;
+    
+    @Autowired
+    private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
@@ -186,6 +189,13 @@ public class BillService {
         bill.setStatus(BillStatus.PAID);
         bill.setPaidAt(LocalDateTime.now());
         Bill saved = billRepository.save(bill);
+
+        // Process reputation score
+        if (saved.getPaidAt().toLocalDate().isAfter(saved.getDeadline().toLocalDate())) {
+            reputationService.processPoints(saved.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_LATE, -5, "Thanh toán hóa đơn trễ hạn (Hóa đơn #" + saved.getId() + ")");
+        } else {
+            reputationService.processPoints(saved.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_PAID_ON_TIME, 2, "Thanh toán hóa đơn đúng hạn (Hóa đơn #" + saved.getId() + ")");
+        }
 
         Property property = bill.getContract().getRoom().getProperty();
         double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
@@ -381,6 +391,13 @@ public class BillService {
         bill.setPaidAt(LocalDateTime.now());
 
         Bill savedBill = billRepository.save(bill);
+
+        // Process reputation score for Smart Contract automatic payment tracker
+        if (savedBill.getPaidAt().toLocalDate().isAfter(savedBill.getDeadline().toLocalDate())) {
+            reputationService.processPoints(savedBill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_LATE, -5, "Thanh toán hóa đơn qua Web3 trễ hạn (Hóa đơn #" + savedBill.getId() + ")");
+        } else {
+            reputationService.processPoints(savedBill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_PAID_ON_TIME, 2, "Thanh toán hóa đơn qua Web3 đúng hạn (Hóa đơn #" + savedBill.getId() + ")");
+        }
 
         Property property = savedBill.getContract().getRoom().getProperty();
         double elecCost = (savedBill.getNewElecIndex() - savedBill.getOldElecIndex()) * property.getElecPrice();

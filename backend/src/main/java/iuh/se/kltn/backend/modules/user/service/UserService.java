@@ -29,6 +29,9 @@ public class UserService {
     private UserRepository userRepository;
 
     @Autowired
+    private ReputationService reputationService;
+
+    @Autowired
     private ModelMapper modelMapper;
 
     @PersistenceContext
@@ -100,6 +103,8 @@ public class UserService {
 
         user.setWalletAddress(walletAddress);
         userRepository.save(user);
+        
+        reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.WALLET_LINKED, 5, "Liên kết ví Blockchain hợp lệ");
     }
 
     public void updateAvatar(Long userId, String avatarUrl) {
@@ -120,11 +125,12 @@ public class UserService {
 
         if (isAutoVerified) {
             user.setKycStatus(KYCStatus.VERIFIED);
-            user.setReputationScore(user.getReputationScore() + 20);
+            userRepository.save(user); // Save to ensure user has ID if needed, though Hibernate manages this
+            reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EKYC_VERIFIED, 10, "Hoàn thành xác thực danh tính điện tử (eKYC)");
         } else {
             user.setKycStatus(KYCStatus.PENDING);
+            userRepository.save(user);
         }
-        userRepository.save(user);
     }
 
     public List<UserProfileResponse> getAllByRole(Role role) {

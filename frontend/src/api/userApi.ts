@@ -95,4 +95,10 @@ export const userApi = {
   });
   return response.data;
   },
+
+  // 10. Lấy lịch sử biến động điểm uy tín
+  getReputationHistory: async (): Promise<any[]> => {
+    const response = await axiosClient.get<any[]>('/users/me/reputation-history');
+    return response.data;
+  },
 };

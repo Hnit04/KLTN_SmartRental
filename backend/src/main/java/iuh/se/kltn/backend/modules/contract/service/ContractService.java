@@ -43,6 +43,7 @@ public class ContractService {
     
     @Autowired private BlockchainService blockchainService;
     @Autowired private ContractChangeRequestRepository changeRequestRepository;
+    @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -309,6 +310,10 @@ public class ContractService {
             contract.setSignDate(LocalDateTime.now());
             contract.setStatus(ContractStatus.ACTIVE);
             contract.setDepositStatus(DepositStatus.DEPOSITED); // Xác nhận đã nộp cọc khi ký xong HĐ
+
+            // Cập nhật uy tín cho cả hai bên
+            reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Ký hợp đồng thuê trọ thành công (#" + contract.getId() + ")");
+            reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Ký hợp đồng cho thuê phòng thành công (#" + contract.getId() + ")");
 
             if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
                 try {
