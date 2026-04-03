@@ -346,7 +346,7 @@ export default function ContractDetailPage() {
     }
   };
 
-  const handleRentIncrease = async () => {
+  const handleSubmitChangeRequest = async () => {
     if (!changeForm.newValue || !changeForm.reason) {
       toast.warning("Vui lòng nhập đầy đủ giá trị mới và lý do!");
       return;
