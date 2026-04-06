@@ -213,7 +213,7 @@ public class BillService {
             BillingStatusResponse res = new BillingStatusResponse();
             res.setId(contract.getId());
             res.setRoomName(contract.getRoom().getName());
-            res.setTenantName(contract.getTenant().getFullName()); // Tùy thuộc Entity User/Tenant của bạn
+            res.setTenantName(contract.getTenant().getFullName()); 
             res.setActualPrice(contract.getActualPrice());
 
             Property property = contract.getRoom().getProperty();
