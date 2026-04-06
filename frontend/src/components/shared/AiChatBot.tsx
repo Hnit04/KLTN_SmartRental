@@ -58,45 +58,73 @@ export default function AiChatBot() {
   };
 
   const renderMessageWithCards = (text: string): ReactNode => {
-    // Regex tìm chuỗi [ROOM_CARD: id | name | price]
-    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/g;
+    // Regex tìm chuỗi [ROOM_CARD: id | name | price | imageUrl]
+    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]*)\]/g;
     const parts = [];
     let lastIndex = 0;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
-      // 1. Đưa phần text bình thường trước cái match vào (nếu có)
       if (match.index > lastIndex) {
         parts.push(<span key={`text-${lastIndex}`}>{formatText(text.substring(lastIndex, match.index))}</span>);
       }
 
-      // 2. Parse thông tin từ match
-      const [_, roomId, roomName, priceStr] = match;
+      const [_, roomId, roomName, priceStr, imageUrl] = match;
+      const cleanImgUrl = imageUrl.trim();
+      const cleanPrice = parseInt(priceStr.trim().replace(/\D/g, '')) || 0;
       
-      // 3. Render Card Giao diện
       parts.push(
-        <div key={`card-${match.index}`} className="w-full bg-background border border-border/60 rounded-xl shadow-sm mt-3 mb-2 overflow-hidden hover:shadow-md transition-shadow">
-          <div className="p-3 bg-primary/10 flex items-center justify-between border-b border-border/40">
-            <div className="flex items-center gap-2 font-semibold text-primary">
-              <Home className="w-4 h-4" />
-              <span>{roomName.trim()}</span>
+        <div key={`card-${match.index}`} className="w-full bg-card border border-border/50 rounded-2xl shadow-lg mt-4 mb-3 overflow-hidden group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+          {/* Ảnh phòng - Premium Feel */}
+          <div className="relative h-40 w-full overflow-hidden bg-muted">
+            {cleanImgUrl ? (
+              <img 
+                src={cleanImgUrl} 
+                alt={roomName} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-primary/5">
+                <Home className="w-10 h-10 mb-2 opacity-20" />
+                <span className="text-[10px] uppercase tracking-widest opacity-50">Hình ảnh đang cập nhật</span>
+              </div>
+            )}
+            <div className="absolute top-3 right-3">
+              <div className="bg-background/90 backdrop-blur-md px-3 py-1 rounded-full text-[12px] font-bold text-primary shadow-sm border border-primary/20">
+                {cleanPrice.toLocaleString()}đ
+              </div>
             </div>
           </div>
-          <div className="p-3 text-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-muted-foreground">Giá thuê:</span>
-              <span className="font-bold text-destructive flex items-center gap-1">
-                {priceStr.trim()} VNĐ
-              </span>
+
+          {/* Nội dung chi tiết */}
+          <div className="p-4">
+            <h4 className="font-bold text-foreground text-base mb-1 line-clamp-1">{roomName.trim()}</h4>
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] mb-4">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Đang còn trống • Sẵn sàng dọn vào
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full flex items-center gap-2 text-xs h-8 mt-2"
-              onClick={() => window.open(`/rooms/${roomId.trim()}`, '_blank')}
-            >
-              <ExternalLink className="w-3 h-3" /> Xem chi tiết phòng
-            </Button>
+            
+            <div className="grid grid-cols-2 gap-2 mb-1">
+              <Button
+                size="sm"
+                variant="default"
+                className="w-full flex items-center gap-2 text-[11px] h-9 shadow-md shadow-primary/20"
+                onClick={() => window.open(`/rooms/${roomId.trim()}`, '_blank')}
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Xem chi tiết
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full flex items-center gap-2 text-[11px] h-9 border-primary/20 hover:bg-primary/5 text-primary"
+                onClick={() => {
+                   setIsOpen(false);
+                   window.location.href = `/rooms/${roomId.trim()}`;
+                }}
+              >
+                Liên hệ chủ
+              </Button>
+            </div>
           </div>
         </div>
       );
@@ -104,12 +132,10 @@ export default function AiChatBot() {
       lastIndex = regex.lastIndex;
     }
 
-    // 4. Còn thừa text nào phía sau cuối cùng thì push nốt vào
     if (lastIndex < text.length) {
       parts.push(<span key={`text-end`}>{formatText(text.substring(lastIndex))}</span>);
     }
 
-    // Trả về mảng các element (text và component đan xen)
     return parts.length > 0 ? parts : formatText(text);
   };
 

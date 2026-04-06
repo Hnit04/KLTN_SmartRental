@@ -19,8 +19,14 @@ public class AiSqlCache {
     @Column(name = "question", unique = true, length = 500, nullable = false)
     private String question;
 
-    @Column(name = "generated_sql", length = 1000, nullable = false)
+    @Column(name = "generated_sql", length = 1000)
     private String generatedSql;
+
+    @Column(name = "type", length = 20)
+    private String type = "SQL"; // "SQL" or "FAQ"
+
+    @Column(name = "answer", columnDefinition = "TEXT")
+    private String answer;
 
     @Column(name = "is_valid")
     private boolean isValid = true;
