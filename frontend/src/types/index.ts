@@ -152,7 +152,7 @@ export interface Property {
   maxPrice?: number;
   totalRooms?: number;
   availableRooms?: number;
-  status?: "PENDING" | "APPROVED" | "REJECTED";
+  status?: "PENDING" | "APPROVED" | "REJECTED"| "HIDDEN";
   safetyScore?: number;
   moderationReason?: string;
 }
