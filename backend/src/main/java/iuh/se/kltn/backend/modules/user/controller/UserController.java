@@ -7,9 +7,10 @@ import iuh.se.kltn.backend.common.service.OcrService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserHistoryResponse;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
-import iuh.se.kltn.backend.modules.user.dto.response.UserRe;
 import iuh.se.kltn.backend.modules.user.entity.CustomRevisionEntity;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.repository.ReputationHistoryRepository;
+import iuh.se.kltn.backend.modules.user.dto.response.ReputationHistoryResponse;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.user.service.UserService;
 import jakarta.persistence.EntityManager;
@@ -45,6 +46,9 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
+    private ReputationHistoryRepository reputationHistoryRepository;
+
+    @Autowired
     private CloudinaryService cloudinaryService;
 
     @Autowired
@@ -62,8 +66,24 @@ public class UserController {
         UserProfileResponse userProfile = userService.getUserProfile(currentUser.getId());
         return ResponseEntity.ok(userProfile);
     }
+
+    @GetMapping("/me/reputation-history")
+    public ResponseEntity<List<ReputationHistoryResponse>> getReputationHistory(@AuthenticationPrincipal UserPrincipal currentUser) {
+        List<ReputationHistoryResponse> history = reputationHistoryRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId())
+                .stream()
+                .map(item -> new ReputationHistoryResponse(
+                        item.getId(),
+                        item.getUser().getId(),
+                        item.getActionType().name(),
+                        item.getPointsChanged(),
+                        item.getDescription(),
+                        item.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(history);
+    }
     @GetMapping("/username")
-    public UserRe findByUsername(String username) {
+    public UserProfileResponse findByUsername(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -76,7 +96,7 @@ public class UserController {
             }
         }
 
-        return modelMapper.map(user, UserRe.class);
+        return modelMapper.map(user, UserProfileResponse.class);
     }
 
     @PutMapping("/profile")
@@ -175,6 +195,13 @@ public class UserController {
         List<UserProfileResponse> users = userService.getAllByRole(role);
         return ResponseEntity.ok(users);
     }
+
+    @GetMapping("/top-landlords")
+    public ResponseEntity<List<UserProfileResponse>> getTopLandlords(@RequestParam(defaultValue = "10") int limit) {
+        List<UserProfileResponse> topLandlords = userService.getTopLandlords(limit);
+        return ResponseEntity.ok(topLandlords);
+    }
+
     @Transactional
     @PostMapping("/{userId}/lock")
     @PreAuthorize("hasRole('ADMIN')")

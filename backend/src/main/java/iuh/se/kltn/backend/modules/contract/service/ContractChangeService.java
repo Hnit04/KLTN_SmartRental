@@ -25,6 +25,7 @@ public class ContractChangeService {
     private final ContractRepository contractRepository;
     // ✅ BỔ SUNG: Khai báo UserRepository để lấy Role
     private final UserRepository userRepository;
+    private final iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
     // 1. Gửi yêu cầu (Dành cho Tenant hoặc Landlord tùy logic)
     @Transactional
@@ -153,6 +154,13 @@ public class ContractChangeService {
                                 room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
                             }
                         }
+
+                        // Trừ điểm uy tín bên yêu cầu chấm dứt
+                        iuh.se.kltn.backend.modules.user.entity.User violator = "TENANT".equals(req.getRequestedByRole()) 
+                                ? contract.getTenant() 
+                                : contract.getRoom().getProperty().getLandlord();
+                        
+                        reputationService.processPoints(violator, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EARLY_TERMINATION, -15, "Hủy hợp đồng trước thời hạn không có lý do chính đáng (#" + contract.getId() + ")");
                         // Nếu ngày chấm dứt ở tương lai -> Chỉ lùi endDate, Scheduler sẽ nhả phòng khi đến hạn.
                     } else if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
                         // 💰 Hủy trước khi ký → Hoàn cọc (nếu đã đặt cọc)

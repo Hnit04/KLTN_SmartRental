@@ -210,7 +210,12 @@ export default function BillManagePage() {
 
   // --- XỬ LÝ LỌC & SẮP XẾP ---
   let processedContracts = contracts.filter(c => 
-    (c.roomName.toLowerCase().includes(searchTerm.toLowerCase()) || c.tenantName.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (
+      c.roomName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.tenantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.id.toString() === searchTerm ||
+      searchTerm === `#${c.id}`
+    ) &&
     (filterStatus === 'ALL' || c.billStatus === filterStatus)
   );
 
@@ -264,7 +269,7 @@ export default function BillManagePage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
-            placeholder="Tìm theo tên phòng hoặc người thuê..." 
+            placeholder="Tìm theo tên phòng, người thuê hoặc ID hợp đồng (VD: 5)..." 
             className="pl-10 h-11 rounded-xl bg-white border-gray-200 shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -320,6 +325,9 @@ export default function BillManagePage() {
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Phòng {contract.roomName}</h3>
                   <p className="text-sm text-gray-500">{contract.tenantName}</p>
+                  <p className="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block border border-primary/10">
+                    Hợp đồng #{contract.id}
+                  </p>
                 </div>
                 {contract.billStatus === 'UNBILLED' && <Badge variant="destructive" icon={<AlertCircle />}>Chưa chốt</Badge>}
                 {contract.billStatus === 'PENDING' && <Badge variant="warning" icon={<Clock />}>Chờ đóng</Badge>}
