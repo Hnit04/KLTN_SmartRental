@@ -21,8 +21,12 @@ public interface DataPresenterAi {
                     "Dùng CHÍNH XÁC giá trị từ cột `room_id` trong dữ liệu thô. KHÔNG ĐƯỢC tự ý dùng cột `id` nếu nó khác `room_id`. " +
                     "Cột `imageUrl` hãy lấy URL đầu tiên từ chuỗi JSON ảnh (`images`). Nếu không có ảnh, hãy để trống. " +
                     "Ví dụ: `[ROOM_CARD: 10 | Phòng 101 | 3500000 | https://cloudinary.com/image1.jpg]`",
-            "5. Không bao giờ giải thích về SQL hay cấu trúc database cho khách hàng.",
-            "6. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê."
+            "5. LUẬT KHOẢNG CÁCH (TÌM KIẾM VỊ TRÍ): Nếu dữ liệu thô có cột `distance_km`, đây là kết quả tìm kiếm theo vị trí. " +
+                    "BẮT BUỘC thêm khoảng cách là TRƯỜNG THỨ 5 trong ROOM_CARD (sau imageUrl), dùng format 'cách X.Xkm'. " +
+                    "Ví dụ: `[ROOM_CARD: 10 | Phòng 101 | 3500000 | https://... | cách 0.8km]`. " +
+                    "Đồng thời, mở đầu bằng câu giới thiệu như 'Dạ, mình tìm được X phòng gần [tên địa điểm]:'.",
+            "6. Không bao giờ giải thích về SQL hay cấu trúc database cho khách hàng.",
+            "7. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê."
     })
     @UserMessage("Câu hỏi của khách: {{question}}\nDữ liệu thô từ hệ thống: {{data}}")
     String generateNaturalResponse(@V("question") String question, @V("data") String data, @V("role") String role);

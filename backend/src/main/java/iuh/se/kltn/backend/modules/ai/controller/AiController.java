@@ -88,7 +88,15 @@ public class AiController {
 
         System.out.println("👤 Khách đang tra cứu: ID=" + userId + ", Role=" + role);
 
-        Object result = aiOrchestratorService.processDataQuery(question, role, userId);
+        Object result;
+
+        // 📍 Ưu tiên: Kiểm tra câu hỏi về vị trí/landmark trước
+        if (aiOrchestratorService.isLocationQuery(question)) {
+            System.out.println("📍 [ROUTER] Phát hiện câu hỏi về vị trí → processLocationQuery");
+            result = aiOrchestratorService.processLocationQuery(question, role, userId);
+        } else {
+            result = aiOrchestratorService.processDataQuery(question, role, userId);
+        }
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
