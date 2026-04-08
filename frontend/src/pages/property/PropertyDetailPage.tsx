@@ -394,7 +394,7 @@ export default function PropertyDetailPage() {
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</label>
               <div className="flex gap-2">
-                {(["ALL", "AVAILABLE", "RESERVED", "RENTED"] as const).map(s => (
+                {(["ALL", "AVAILABLE", "RESERVED", "MAINTENANCE", "RENTED"] as const).map(s => (
                   <button
                     key={s}
                     onClick={() => setRoomStatusFilter(s)}
@@ -404,8 +404,17 @@ export default function PropertyDetailPage() {
                         : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {s === "ALL" ? "Tất cả" : s === "AVAILABLE" ? "Còn trống" : s === "RESERVED" ? "Giữ chỗ" : "Đã thuê"}
-                  </button>
+                    {s === "ALL" 
+                      ? "Tất cả" 
+                      : s === "AVAILABLE" 
+                        ? "Còn trống" 
+                        : s === "RESERVED" 
+                          ? "Giữ chỗ" 
+                          : s === "MAINTENANCE" 
+                            ? "Đang bảo trì" 
+                            : "Đã thuê"
+                    }                  
+                    </button>
                 ))}
               </div>
             </div>
