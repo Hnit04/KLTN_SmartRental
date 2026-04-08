@@ -10,6 +10,7 @@ import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
+import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,14 @@ public class AiOrchestratorService {
     @Autowired
     private EmbeddingStore<TextSegment> embeddingStore;
 
+    @Autowired
+    private GeocodingService geocodingService;
+
+    @Autowired
+    private PropertyRepository propertyRepository;
+
+    private static final double DEFAULT_RADIUS_KM = 3.0;
+
     /**
      * Tự động chạy khi Spring Boot khởi động.
      * Đọc toàn bộ SQL từ MariaDB, biến thành Vector và đưa lên RAM.
@@ -48,28 +57,99 @@ public class AiOrchestratorService {
     public void initVectorCache() {
         // --- TỘI: Fix lỗi Data Truncated cho cột type (Chạy thủ công) ---
         try {
-            System.out.println("🛠️ Đang cưỡng bức cập nhật độ dài cột 'type' bảng notifications...");
-            jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50)");
-            System.out.println("✅ Đã cập nhật xong!");
+            System.out.println("🛠️ Đang cưỡng bức dọn dẹp cấu trúc bảng ai_sql_cache để hỗ trợ FAQ...");
+            jdbcTemplate.execute("ALTER TABLE ai_sql_cache MODIFY COLUMN generated_sql VARCHAR(1000) NULL");
+            System.out.println("✅ Đã cập nhật database cho chức năng FAQ!");
         } catch (Exception e) {
-            System.out.println("ℹ️ Không cần cập nhật: " + e.getMessage());
+            System.out.println("ℹ️ Không cần cập nhật DB FAQ: " + e.getMessage());
         }
 
-        System.out.println("🔄 Đang nạp Kho tri thức SQL vào Vector Store trên RAM...");
+        System.out.println("🔄 Đang nạp Kho tri thức (SQL & FAQ) vào Vector Store trên RAM...");
         List<AiSqlCache> allCaches = cacheRepository.findAll();
         for (AiSqlCache cache : allCaches) {
             if (cache.isValid()) {
-                addQuestionToVectorStore(cache.getQuestion(), cache.getGeneratedSql());
+                if ("FAQ".equalsIgnoreCase(cache.getType())) {
+                    addFaqToVectorStore(cache.getQuestion(), cache.getAnswer());
+                } else {
+                    addQuestionToVectorStore(cache.getQuestion(), cache.getGeneratedSql());
+                }
             }
         }
-        System.out.println("✅ Đã nạp xong " + allCaches.size() + " câu SQL vào Vector Store!");
+        System.out.println("✅ Đã nạp xong " + allCaches.size() + " câu vào Vector Store!");
     }
 
     private void addQuestionToVectorStore(String question, String sql) {
         Embedding embedding = embeddingModel.embed(question).content();
-        Metadata metadata = Metadata.from("type", "sql").put("sql", sql);
+        Metadata metadata = Metadata.from("type", "SQL").put("sql", sql != null ? sql : "");
         TextSegment segment = TextSegment.from(question, metadata);
         embeddingStore.add(embedding, segment);
+    }
+
+    private void addFaqToVectorStore(String question, String answer) {
+        Embedding embedding = embeddingModel.embed(question).content();
+        Metadata metadata = Metadata.from("type", "FAQ").put("answer", answer != null ? answer : "");
+        TextSegment segment = TextSegment.from(question, metadata);
+        embeddingStore.add(embedding, segment);
+    }
+
+    public String searchFaq(String question) {
+        try {
+            Embedding queryEmbedding = embeddingModel.embed(question).content();
+
+            EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(queryEmbedding)
+                    .maxResults(1)
+                    .minScore(0.88) // Độ chính xác cao một chút để tránh nhận nhầm câu hỏi mới
+                    .filter(metadataKey("type").isEqualTo("FAQ"))
+                    .build();
+
+            EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);
+            List<EmbeddingMatch<TextSegment>> matches = searchResult.matches();
+
+            if (!matches.isEmpty()) {
+                EmbeddingMatch<TextSegment> bestMatch = matches.get(0);
+                String answer = bestMatch.embedded().metadata().getString("answer");
+                System.out.println("⚡ [FAQ CACHE HIT] Score: " + bestMatch.score() + " -> " + answer);
+                return answer;
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi gọi semantic search cho FAQ: " + e.getMessage());
+        }
+        return null; // Không tìm thấy FAQ tương tự
+    }
+
+    // ====================================================================
+    // 📍 LOCATION-AWARE SEARCH: Tìm phòng theo vị trí / landmark
+    // ====================================================================
+
+    /**
+     * Kiểm tra câu hỏi có phải đang hỏi về vị trí/khoảng cách không.
+     * Ví dụ: "Tìm phòng gần Landmark 81", "Phòng trọ khu vực ĐH Bách Khoa"
+     */
+    public boolean isLocationQuery(String question) {
+        if (question == null) return false;
+        String lower = question.toLowerCase();
+        return (lower.contains("gần") || lower.contains("gan ") || lower.contains("nearby")
+                || lower.contains("khu vực") || lower.contains("quanh "))
+                && (lower.contains("phòng") || lower.contains("trọ") || lower.contains("thuê")
+                    || lower.contains("tìm") || lower.contains("room"));
+    }
+
+    @Autowired
+    private LocationAgentAi locationAgentAi;
+
+    /**
+     * Xử lý câu hỏi tìm phòng theo vị trí.
+     * Sử dụng Agentic Tool Calling (LocationAgentAi + LocationTools)
+     */
+    public Object processLocationQuery(String question, String role, Long userId) {
+        System.out.println("📍 [AGENT ROUTER] Chuyển tiếp câu hỏi cho LocationAgentAi: " + question);
+        try {
+            return locationAgentAi.processLocationQuery(question, role);
+        } catch (Exception e) {
+            System.err.println("❌ Lỗi thực thi LocationAgentAi: " + e.getMessage());
+            return "Dạ, máy chủ AI đang gặp sự cố khi tải dữ liệu định vị bản đồ. Bạn vui lòng thử lại sau nhé!";
+        }
     }
 
     // 1. Thêm 2 tham số role và userId vào hàm
@@ -89,9 +169,9 @@ public class AiOrchestratorService {
                     "2. MẸO JOIN BẢNG: Nếu truy cập bảng rooms, bills, hay contracts, BẮT BUỘC JOIN với properties để có thể lọc `properties.landlord_id`.\n" +
                     "3. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm (address LIKE hoặc district LIKE).";
         } else {
-            roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI. KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
-                    "2. CẦN JOIN bảng `rooms` với bảng `properties` nếu tra địa điểm.\n" +
-                    "3. CHỈ được SELECT từ bảng rooms và properties.";
+            roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
+                        "2. CHỈ ĐƯỢC PHÉP xem thông tin từ bảng `rooms` và `properties` (Ví dụ: giá phòng, địa chỉ, diện tích).\n" +
+                        "3. Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
         }
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();
@@ -101,18 +181,16 @@ public class AiOrchestratorService {
                 .queryEmbedding(queryEmbedding)
                 .maxResults(1)
                 .minScore(0.85)
-                .filter(metadataKey("type").isEqualTo("sql"))
+                .filter(metadataKey("type").isEqualTo("SQL"))
                 .build();
 
         EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);
         List<EmbeddingMatch<TextSegment>> matches = searchResult.matches();
 
+        sqlToExecute = null;
         if (!matches.isEmpty()) {
-            EmbeddingMatch<TextSegment> bestMatch = matches.get(0);
-            sqlToExecute = bestMatch.embedded().metadata().getString("sql");
-            System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + bestMatch.score());
-            System.out.println("⚡ Câu hỏi gốc trong DB: " + bestMatch.embedded().text());
-            System.out.println("⚡ Lấy SQL từ RAM: " + sqlToExecute);
+            sqlToExecute = matches.get(0).embedded().metadata().getString("sql");
+            System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + matches.get(0).score());
         } else {
             System.out.println("🐌 [CACHE MISS] Câu hỏi mới, gọi Gemini sinh SQL...");
             try {
@@ -121,14 +199,12 @@ public class AiOrchestratorService {
                 System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
                 return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
             }
+        }
 
-            sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
-
-            int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
-            if (selectIndex >= 0) {
-                sqlToExecute = sqlToExecute.substring(selectIndex);
-            }
-            System.out.println("🤖 Gemini trả về (Đã làm sạch): " + sqlToExecute);
+        sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
+        int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
+        if (selectIndex >= 0) {
+            sqlToExecute = sqlToExecute.substring(selectIndex);
         }
 
         // ====================================================================
@@ -138,6 +214,16 @@ public class AiOrchestratorService {
         // Chặn 1: Nếu AI phát hiện Khách thuê hỏi sai quyền hạn và trả về chữ UNAUTHORIZED
         if (sqlToExecute.trim().equalsIgnoreCase("UNAUTHORIZED")) {
             return "Dạ, em chỉ là trợ lý ảo nên không có quyền cung cấp thông tin bảo mật này cho khách thuê ạ.";
+        }
+
+        // Chặn 2: Ngăn bảo mật cho GUEST (Khách vãng lai)
+        if (role.equalsIgnoreCase("GUEST")) {
+            String upperSql = sqlToExecute.toUpperCase();
+            if (upperSql.contains("USERS") || upperSql.contains("BILLS") || 
+                upperSql.contains("CONTRACTS") || upperSql.contains("APPOINTMENTS")) {
+                System.err.println("🚨 SECURITY ALERT: GUEST tried to access restricted tables!");
+                return "Dạ, vì lý do bảo mật, khách vãng lai chỉ có thể tra cứu thông tin phòng và khu trọ công khai thôi ạ. Bạn vui lòng đăng nhập để xem các thông tin cá nhân nhé!";
+            }
         }
 
         // Chặn 2: Ngăn chặn Chủ trọ B lấy nhầm Cache của Chủ trọ A
@@ -155,7 +241,7 @@ public class AiOrchestratorService {
                 }
 
                 sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
-                int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
+                selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
                 if (selectIndex >= 0) {
                     sqlToExecute = sqlToExecute.substring(selectIndex);
                 }
@@ -200,12 +286,13 @@ public class AiOrchestratorService {
                 AiSqlCache newCache = AiSqlCache.builder()
                         .question(question)
                         .generatedSql(sqlToExecute)
+                        .type("SQL")
                         .isValid(true)
                         .build();
                 cacheRepository.save(newCache);
 
                 addQuestionToVectorStore(question, sqlToExecute);
-                System.out.println("💾 Đã lưu tri thức mới vào DB và nạp lên Vector Store!");
+                System.out.println("💾 Đã lưu tri thức SQL mới vào DB và nạp lên Vector Store!");
             }
 
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
@@ -219,11 +306,13 @@ public class AiOrchestratorService {
                     return "Dạ hiện AI đang quá tải, nhưng hệ thống ghi nhận không có dữ liệu nào khớp với yêu cầu của bạn ạ.";
                 }
                 
-                StringBuilder fallbackResponse = new StringBuilder("Dạ hiện AI đang quá tải (Hóa đơn Token), em xin tự động trích xuất kết quả dưới cơ sở dữ liệu lên cho bạn xem nhé:\n\n");
+                StringBuilder fallbackResponse = new StringBuilder("Dạ hiện AI đang quá tải (Hóa đơn Token), em xin trích xuất kết quả từ hệ thống cho bạn nhé:\n\n");
                 for (Map<String, Object> row : results) {
                     Object roomId = row.getOrDefault("room_id", row.get("id"));
                     if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
-                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s]\n", roomId, row.get("name"), row.get("price")));
+                        String firstImg = extractFirstImage(row.get("images"));
+                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n", 
+                            roomId, row.get("name"), row.get("price"), firstImg));
                     } else {
                         fallbackResponse.append("- ").append(row.toString()).append("\n");
                     }
@@ -332,5 +421,33 @@ public class AiOrchestratorService {
         cacheRepository.deleteAll(); // Xoá trong DB
         embeddingStore.removeAll(); // Xoá trên RAM (Vector Store)
         System.out.println("✅ Đã xoá sạch Cache AI.");
+    }
+
+    @Transactional
+    public void addFaq(String question, String answer) {
+        AiSqlCache newFaq = AiSqlCache.builder()
+                .question(question)
+                .answer(answer)
+                .type("FAQ")
+                .isValid(true)
+                .build();
+        cacheRepository.save(newFaq);
+
+        addFaqToVectorStore(question, answer);
+        System.out.println("💾 Đã lưu FAQ mới vào DB và nạp lên Vector Store!");
+    }
+
+    private String extractFirstImage(Object imagesObj) {
+        if (imagesObj == null) return "";
+        String imagesStr = imagesObj.toString();
+        if (imagesStr.isEmpty() || imagesStr.equals("[]")) return "";
+        
+        // Regex đơn giản để lấy nội dung trong dấu ngoặc kép đầu tiên của JSON Array ["url",...]
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"([^\"]+)\"");
+        java.util.regex.Matcher matcher = pattern.matcher(imagesStr);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
     }
 }

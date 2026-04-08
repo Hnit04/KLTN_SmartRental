@@ -118,6 +118,7 @@ public class PropertyService {
         room.setProperty(property);
         room.setStatus(RoomStatus.AVAILABLE);
         room.setApprovalStatus(aiStatus);
+        room.setDescription(request.getDescription());
         room.setImages(JsonUtil.convertListToJson(request.getImages()));
         room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));
         room.setSafetyScore(modResult.getScore());
@@ -135,6 +136,13 @@ public class PropertyService {
     // LẤY DANH SÁCH NHÀ CỦA CHU TRO
     public List<PropertyResponse> getMyProperties(Long landlordId) {
         return propertyRepository.findByLandlordId(landlordId).stream()
+                .map(this::mapToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
+    // LẤY DANH SÁCH NHÀ CỦA CHU TRO (DÙNG CHO PUBLIC)
+    public List<PropertyResponse> getPropertiesByUsername(String username) {
+        return propertyRepository.findByLandlordUsername(username).stream()
                 .map(this::mapToPropertyResponse)
                 .collect(Collectors.toList());
     }

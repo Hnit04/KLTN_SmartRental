@@ -11,16 +11,13 @@ import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.transaction.annotation.Transactional;
-import org.hibernate.envers.AuditReader;
-import org.hibernate.envers.AuditReaderFactory;
-import org.hibernate.envers.query.AuditEntity;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class UserService {
@@ -136,6 +133,13 @@ public class UserService {
     public List<UserProfileResponse> getAllByRole(Role role) {
         List<User> users = userRepository.findAllByRole(role);
         return users.stream()
+                .map(user -> modelMapper.map(user, UserProfileResponse.class))
+                .toList();
+    }
+
+    public List<UserProfileResponse> getTopLandlords(int limit) {
+        List<User> topLandlords = userRepository.findTopUsersByRole(Role.LANDLORD, PageRequest.of(0, limit));
+        return topLandlords.stream()
                 .map(user -> modelMapper.map(user, UserProfileResponse.class))
                 .toList();
     }

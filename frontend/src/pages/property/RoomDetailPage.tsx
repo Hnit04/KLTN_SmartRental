@@ -48,6 +48,7 @@ export default function RoomDetailPage() {
     };
     load();
   }, [id]);
+  console.log("Loaded room detail:", room);
 
   const handleBooking = async () => {
     if (!isAuthenticated) {

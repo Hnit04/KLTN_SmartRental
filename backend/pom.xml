@@ -47,6 +47,26 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
+        <!-- Google Auth Library để verify ID Token -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.24.1</version> <!-- hoặc mới hơn, check Maven Central -->
+        </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/com.google.api-client/google-api-client -->
+        <dependency>
+            <groupId>com.google.api-client</groupId>
+            <artifactId>google-api-client</artifactId>
+            <version>2.9.0</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Nếu chưa có, thêm cho NetHttpTransport và GsonFactory -->
+        <dependency>
+            <groupId>com.google.http-client</groupId>
+            <artifactId>google-http-client-gson</artifactId>
+            <version>1.44.2</version>
+        </dependency>
 
         <dependency>
             <groupId>org.hibernate.orm</groupId>

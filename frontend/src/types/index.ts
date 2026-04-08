@@ -1,4 +1,3 @@
-
 // src/types/index.ts
 
 // ==========================================
@@ -36,7 +35,6 @@ export interface User {
   createdAt: string;       
   updatedAt: string;       
 
-
   locked?: boolean;
   lockedAt?: string | null;
   lockUntil?: string | null;
@@ -50,8 +48,21 @@ export interface User {
 
 export interface ResetPasswordRequest{
   email: string;
-  code: string;
+  code?: string;
   newPassword: string;
+}
+export interface GoogleLoginRequest {
+  idToken: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+  googleId?: string;
+}
+
+export interface ChangePasswordRequest {
+  oldPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
 }
 
 export interface VerifyOtpRequest {
@@ -71,7 +82,6 @@ export interface UserHistory {
   modifiedAt: string;    
   modifiedByFullName: string;       
   auditRemark: string | null;
-
 }
 
 export interface AuthResponse {
@@ -147,7 +157,7 @@ export interface Property {
   moderationReason?: string;
 }
 
-export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED";
+export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED" | "HIDDEN";
 export type RoomType = "STUDIO" | "ONE_BEDROOM" | "TWO_BEDROOM" | "SINGLE_ROOM" | "SHARED_ROOM" | "MEZZANINE_ROOM";
 
 export interface Room {
@@ -166,6 +176,7 @@ export interface Room {
   propertyName?: string;
   address?: string;      
   propertyAddress?: string;
+  maxOccupants?: number| null;
   landlordName?: string; 
   elecPrice?: number;
   waterPrice?: number;

@@ -10,12 +10,12 @@ export interface PaginatedResponse<T> {
 }
 
 export const propertyApi = {
-  // --- CÁC HÀM GET (Giữ nguyên của bạn) ---
   getAll: (page: number = 0, size: number = 12) => axiosClient.get<PaginatedResponse<Property>>(`/properties?page=${page}&size=${size}`),
   getDetail: (id: number | string) => axiosClient.get<Property>(`/properties/${id}`),
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
   getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),
   getMyProperties: () => axiosClient.get<Property[]>("/properties/mine"),
+  getPropertiesByLandlord: (landlordId: number | string) => axiosClient.get<Property[]>(`/properties/landlord/${landlordId}`),
   getRecommendedRooms: () => axiosClient.get<Room[]>("/recommendations/rooms"),
 
   // --- CÁC HÀM QUẢN LÝ KHU TRỌ ---

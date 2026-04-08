@@ -4,9 +4,11 @@ import iuh.se.kltn.backend.common.utils.JsonUtil;
 import iuh.se.kltn.backend.modules.property.dto.response.RoomResponse;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
+import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
 import iuh.se.kltn.backend.modules.ai.service.ModerationService;
+import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
 import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 import iuh.se.kltn.backend.modules.user.entity.User;
@@ -59,6 +61,7 @@ public class RoomService {
 
         if (r.getProperty() != null) {
             res.setPropertyName(r.getProperty().getName());
+            res.setPropertyId(r.getProperty().getId());
             String fullAddress = r.getProperty().getAddress() + ", " + r.getProperty().getDistrict() + ", "
                     + r.getProperty().getCity();
             res.setPropertyAddress(fullAddress);
@@ -73,6 +76,7 @@ public class RoomService {
         res.setApprovalStatus(r.getApprovalStatus());
         res.setSafetyScore(r.getSafetyScore());
         res.setModerationReason(r.getModerationReason());
+        System.out.println(res);
         return res;
     }
 
@@ -96,9 +100,11 @@ public class RoomService {
         room.setName(request.getName());
         room.setPrice(request.getPrice());
         room.setArea(request.getArea());
+        room.setDescription(request.getDescription());
         room.setApprovalStatus(aiStatus); // Duyệt lại khi sửa
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
+
 
         if (request.getAmenities() != null) {
             room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));
@@ -181,5 +187,49 @@ public class RoomService {
         } catch (Exception e) {
             System.err.println("⚠️ Lỗi gửi notification phòng: " + e.getMessage());
         }
+    }
+    public List<UserProfileResponse> getTenantsByRoomId(Long roomId) {
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
+
+        // Lấy danh sách từ hợp đồng (Cần inject ContractRepository)
+        List<User> tenants = roomRepository.findTenantsByRoomId(roomId);
+
+        // Map sang DTO để trả về
+        return tenants.stream()
+                .map(user -> modelMapper.map(user, UserProfileResponse.class))
+                .collect(Collectors.toList());
+    }
+    /**
+     * Cập nhật trạng thái phòng (chỉ dùng để ẩn phòng)
+     */
+    @Transactional
+    public RoomResponse updateRoomStatus(Long roomId, RoomStatus newStatus, Long landlordId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
+
+        // Kiểm tra quyền
+        if (!room.getProperty().getLandlord().getId().equals(landlordId)) {
+            throw new RuntimeException("Bạn không có quyền thay đổi trạng thái phòng này.");
+        }
+
+        // Kiểm tra điều kiện kinh doanh trước khi ẩn
+        if (newStatus == RoomStatus.HIDDEN) {
+            if (room.getStatus() == RoomStatus.RENTED) {
+                throw new RuntimeException("Không thể ẩn phòng đang cho thuê. Vui lòng kết thúc hợp đồng trước.");
+            }
+            if (room.getStatus() == RoomStatus.RESERVED) {
+                throw new RuntimeException("Không thể ẩn phòng đang giữ chỗ / đã cọc. Vui lòng hủy giữ chỗ trước.");
+            }
+        }
+
+        // Cập nhật chỉ trường status (tránh lỗi Data truncated)
+        roomRepository.updateRoomStatus(roomId, newStatus);
+
+        // Lấy lại entity để trả về đầy đủ thông tin
+        Room updatedRoom = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng sau khi cập nhật"));
+
+        return mapToRoomResponse(updatedRoom);
     }
 }

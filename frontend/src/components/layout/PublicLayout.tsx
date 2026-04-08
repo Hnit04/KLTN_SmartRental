@@ -1,4 +1,4 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, NavLink } from "react-router-dom"; // Sử dụng NavLink
 import { Button } from "../ui/Button";
 import { Home, Star, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -7,6 +7,12 @@ import NotificationBell from "../shared/NotificationBell";
 
 export default function PublicLayout() {
   const { isAuthenticated, user } = useAuth();
+
+  // Hàm tạo class để xử lý focus khi link active
+  const navLinkClass = ({ isActive }: { isActive: boolean }) => 
+    `text-sm font-medium transition-colors hover:text-primary ${
+      isActive ? "text-primary border-b-2 border-primary pb-1" : "text-muted-foreground"
+    }`;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -21,35 +27,43 @@ export default function PublicLayout() {
             <span className="text-xl font-bold text-foreground">SmartRental</span>
           </Link>
 
-          {/* Menu Chính */}
+          {/* Menu Chính có Focus */}
           <nav className="hidden items-center gap-6 md:flex">
-            <Link to="/" className="text-sm font-medium text-foreground hover:text-primary">
+            <NavLink to="/" className={navLinkClass}>
               Trang chủ
-            </Link>
-            <Link to="/properties" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/properties" className={navLinkClass}>
               Tìm phòng
-            </Link>
-            <Link to="/contact" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/top-landlords" className={navLinkClass}>
+              🔥 Bảng Xếp Hạng
+            </NavLink>
+            <NavLink to="/contact" className={navLinkClass}>
               Liên hệ
-            </Link>
-            <Link to="/help" className="text-sm font-medium text-muted-foreground hover:text-primary">
+            </NavLink>
+            <NavLink to="/help" className={navLinkClass}>
               Trợ giúp
-            </Link>
-            {/* Khi đã đăng nhập: hiện link đến Dashboard theo role */}
+            </NavLink>
+            
             {isAuthenticated && (
-              <Link
+              <NavLink
                 to={user?.role === 'LANDLORD' ? '/dashboard' : '/tenant-dashboard'}
-                className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 border border-primary/20 bg-primary/5 px-3 py-1 rounded-full transition-colors hover:bg-primary/10"
+                className={({ isActive }) => 
+                  `flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full transition-colors ${
+                    isActive 
+                      ? "bg-primary text-primary-foreground" 
+                      : "text-primary border border-primary/20 bg-primary/5 hover:bg-primary/10"
+                  }`
+                }
               >
                 <LayoutDashboard className="h-3.5 w-3.5" />
                 {user?.role === 'LANDLORD' ? 'Quản lý' : 'Của tôi'}
-              </Link>
+              </NavLink>
             )}
           </nav>
 
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              // ✅ ĐÃ SỬA ĐOẠN NÀY: HIỂN THỊ CẢ CHUÔNG VÀ AVATAR
               <>
                 <NotificationBell />
                 <div className="h-6 w-px bg-gray-200 hidden sm:block" />
@@ -93,6 +107,7 @@ export default function PublicLayout() {
               <h4 className="font-semibold text-foreground">Sản phẩm</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li><Link to="/properties" className="hover:text-primary">Tìm phòng</Link></li>
+                <li><Link to="/top-landlords" className="hover:text-primary">Bảng Xếp Hạng</Link></li>
                 <li><Link to="#" className="hover:text-primary">Tính năng</Link></li>
               </ul>
             </div>

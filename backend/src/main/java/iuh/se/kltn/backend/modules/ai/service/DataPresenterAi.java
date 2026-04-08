@@ -17,9 +17,16 @@ public interface DataPresenterAi {
             "1. Chỉ trả lời dựa trên dữ liệu được cung cấp, tuyệt đối không bịa số liệu.",
             "2. Nếu là 'LANDLORD' (Chủ trọ): Trả lời chuyên nghiệp, báo cáo rõ ràng dữ liệu tài chính, khách hàng (Dạ, thưa anh/chị chủ trọ).",
             "3. Nếu là 'TENANT' (Khách thuê): Trả lời gần gũi, thân thiện, giải thích các số tiền phạt, hóa đơn một cách dễ hiểu (Dạ, thưa bạn/anh/chị).",
-            "4. LUẬT RICH UI (QUAN TRỌNG): Nếu trả về danh sách phòng, bạn PHẢI dùng định dạng `[ROOM_CARD: room_id | name | price]`. Dùng CHÍNH XÁC giá trị từ cột `room_id` trong dữ liệu thô. KHÔNG ĐƯỢC tự ý dùng cột `id` nếu nó khác `room_id`. Ví dụ: `[ROOM_CARD: 10 | Phòng 101 | 3500000]`",
-            "5. Không bao giờ giải thích về SQL hay cấu trúc database cho khách hàng.",
-            "6. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê."
+            "4. LUẬT RICH UI (QUAN TRỌNG): Nếu trả về danh sách phòng, bạn PHẢI dùng định dạng `[ROOM_CARD: room_id | name | price | imageUrl]`. " +
+                    "Dùng CHÍNH XÁC giá trị từ cột `room_id` trong dữ liệu thô. KHÔNG ĐƯỢC tự ý dùng cột `id` nếu nó khác `room_id`. " +
+                    "Cột `imageUrl` hãy lấy URL đầu tiên từ chuỗi JSON ảnh (`images`). Nếu không có ảnh, hãy để trống. " +
+                    "Ví dụ: `[ROOM_CARD: 10 | Phòng 101 | 3500000 | https://cloudinary.com/image1.jpg]`",
+            "5. LUẬT KHOẢNG CÁCH (TÌM KIẾM VỊ TRÍ): Nếu dữ liệu thô có cột `distance_km`, đây là kết quả tìm kiếm theo vị trí. " +
+                    "BẮT BUỘC thêm khoảng cách là TRƯỜNG THỨ 5 trong ROOM_CARD (sau imageUrl), dùng format 'cách X.Xkm'. " +
+                    "Ví dụ: `[ROOM_CARD: 10 | Phòng 101 | 3500000 | https://... | cách 0.8km]`. " +
+                    "Đồng thời, mở đầu bằng câu giới thiệu như 'Dạ, mình tìm được X phòng gần [tên địa điểm]:'.",
+            "6. Không bao giờ giải thích về SQL hay cấu trúc database cho khách hàng.",
+            "7. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê."
     })
     @UserMessage("Câu hỏi của khách: {{question}}\nDữ liệu thô từ hệ thống: {{data}}")
     String generateNaturalResponse(@V("question") String question, @V("data") String data, @V("role") String role);

@@ -101,4 +101,10 @@ export const userApi = {
     const response = await axiosClient.get<any[]>('/users/me/reputation-history');
     return response.data;
   },
+
+  // 11. Lấy danh sách Chủ trọ nổi bật
+  getTopLandlords: async (limit: number = 10): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users/top-landlords', { params: { limit } });
+    return response.data;
+  },
 };

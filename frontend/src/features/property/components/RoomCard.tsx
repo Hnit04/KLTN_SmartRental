@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
-  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun
+  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";
@@ -15,6 +15,7 @@ interface RoomCardProps {
 export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   const navigate = useNavigate();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [currImgIndex, setCurrImgIndex] = useState(0);
 
   // 1. Kiểm tra trạng thái phòng
   const isAvailable = data.status === "AVAILABLE";
@@ -37,6 +38,16 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   }
 
   const coverImage = images.length > 0 ? images[0] : null;
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrImgIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrImgIndex(prev => (prev === images.length - 1 ? 0 : prev + 1));
+  };
 
   // ✅ KHÔI PHỤC HÀM "THUÊ NGAY"
   const handleRentNow = () => {
@@ -61,19 +72,47 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
     <>
       <div className={`group border rounded-xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 ${!isAvailable ? 'opacity-70 bg-gray-50' : ''}`}>
         
-        {/* --- ẢNH PHÒNG --- */}
-        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer" onClick={() => setIsDetailOpen(true)}>
-          {coverImage ? (
+        {/* --- ẢNH PHÒNG CAROUSEL --- */}
+        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={() => setIsDetailOpen(true)}>
+          {images.length > 0 ? (
             <img 
-              src={coverImage} 
+              src={images[currImgIndex]} 
               alt={data.name} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
               <ImageIcon className="h-10 w-10 mb-2 opacity-50" />
               <span className="text-xs">Chưa có ảnh</span>
             </div>
+          )}
+
+          {/* Mũi tên Carousel */}
+          {images.length > 1 && (
+             <>
+               <button 
+                 onClick={handlePrevImage} 
+                 className="absolute top-1/2 left-2 -translate-y-1/2 w-7 h-7 bg-white/70 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity z-20"
+               >
+                 <ChevronLeft className="h-4 w-4 text-gray-800" />
+               </button>
+               <button 
+                 onClick={handleNextImage} 
+                 className="absolute top-1/2 right-2 -translate-y-1/2 w-7 h-7 bg-white/70 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity z-20"
+               >
+                 <ChevronRight className="h-4 w-4 text-gray-800" />
+               </button>
+               {/* Chấm bi */}
+               <div className="absolute bottom-2 left-0 right-0 gap-1 flex justify-center z-10 pointer-events-none">
+                 {images.map((_, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`h-1.5 rounded-full transition-all duration-300 ${idx === currImgIndex ? 'w-3 bg-white' : 'w-1.5 bg-white/60'}`} 
+                    />
+                 ))}
+               </div>
+             </>
           )}
 
           <div className="absolute top-3 right-3 shadow-sm z-10">
@@ -165,15 +204,15 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               <Button 
                   variant="outline" 
                   size="sm" 
-                  className="text-xs h-9 hover:text-primary hover:border-primary/50"
+                  className="text-xs h-9 hover:bg-primary/5 text-gray-600 hover:text-primary border-gray-200 transition-colors group/btn1"
                   onClick={() => setIsDetailOpen(true)}
               >
-                  <Eye className="h-3.5 w-3.5 mr-1.5" /> Chi tiết
+                  <Eye className="h-3.5 w-3.5 mr-1.5 group-hover/btn1:-translate-y-0.5 transition-transform" /> Chi tiết
               </Button>
 
               <Button 
                   size="sm"
-                  className={`text-xs h-9 gap-1 ${!isAvailable ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
+                  className={`text-xs h-9 gap-1 group/btn2 transition-all ${!isAvailable ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
                   disabled={!isAvailable}
                   onClick={(e) => {
                       e.stopPropagation();
@@ -181,7 +220,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   }}
               >
                   {isAvailable ? (
-                      <>Đặt lịch xem <CalendarClock className="h-3.5 w-3.5 ml-0.5" /></>
+                      <>Đặt lịch <CalendarClock className="h-3.5 w-3.5 ml-0.5 group-hover/btn2:rotate-12 transition-transform" /></>
                   ) : (
                       "Đã hết"
                   )}

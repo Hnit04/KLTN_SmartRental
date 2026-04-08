@@ -36,10 +36,10 @@ export default function PropertiesPage() {
         if (page === 0) setIsLoading(true);
         // Chạy song song cả hai API
         const [propsRes, recRoomsRes] = await Promise.allSettled([
-          propertyApi.getAll(page, 12),
+          propertyApi.getAll(page, 24),
           page === 0 ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
-
+        console.log("API responses:", { propsRes, recRoomsRes });
         if (propsRes.status === "fulfilled") {
             const pageData = propsRes.value.data as any;
             if (page === 0) {
@@ -141,7 +141,7 @@ export default function PropertiesPage() {
               <p className="text-sm text-gray-500 mt-1">
                 {isLoading 
                   ? "Đang cập nhật dữ liệu..." 
-                  : `Hiện có ${filteredProperties.length} kết quả phù hợp`
+                  : `Đang hiển thị ${filteredProperties.length} khu trọ đã Duyệt`
                 }
               </p>
             </div>

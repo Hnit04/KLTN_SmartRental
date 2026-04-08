@@ -29,4 +29,6 @@ public class RoomRequest {
     private List<String> amenities;
     private List<String> images;
     private String defaultTerms;
+    private String description;
+
 }

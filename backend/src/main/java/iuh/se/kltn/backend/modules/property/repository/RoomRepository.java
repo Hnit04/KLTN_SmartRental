@@ -4,7 +4,9 @@ package iuh.se.kltn.backend.modules.property.repository;
 import iuh.se.kltn.backend.modules.property.dto.response.PropertyLandlordInfo;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
+import iuh.se.kltn.backend.modules.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -47,11 +49,21 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
       AND c.id IS NOT NULL
 """)
     Long countRentedRoomsByLandlord(@Param("landlordId") Long landlordId);
-
+    @Modifying
+    @Query("UPDATE Room r SET r.status = :status WHERE r.id = :roomId")
+    void updateRoomStatus(@Param("roomId") Long roomId, @Param("status") RoomStatus status);
     @Query("""
     SELECT COALESCE(SUM(r.currentOccupants), 0)
     FROM Room r
     WHERE r.property.landlord.id = :landlordId
 """)
     Long sumCurrentOccupantsByLandlord(@Param("landlordId") Long landlordId);
+
+    @Query("""
+    SELECT c.tenant 
+    FROM Contract c 
+    WHERE c.room.id = :roomId 
+      AND c.status = 'ACTIVE'
+""")
+    List<User> findTenantsByRoomId(@Param("roomId") Long roomId);
 }

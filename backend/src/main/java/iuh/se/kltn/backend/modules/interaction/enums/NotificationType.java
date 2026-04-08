@@ -11,6 +11,7 @@ public enum NotificationType {
     PROPERTY_APPROVED,   // Khu trọ được duyệt (Chủ trọ nhận)
     PROPERTY_REJECTED,   // Khu trọ bị từ chối (Chủ trọ nhận)
     ROOM_APPROVED,       // Phòng trọ được duyệt (Chủ trọ nhận)
-    ROOM_REJECTED        // Phòng trọ bị từ chối (Chủ trọ nhận)
+    ROOM_REJECTED,        // Phòng trọ bị từ chối (Chủ trọ nhận)
+    ROOM_UPDATED          // Phòng trọ bị ẩn không hiển thị công khai(Chủ trọ nhận)
 }
 

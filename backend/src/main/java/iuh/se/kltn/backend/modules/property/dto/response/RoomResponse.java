@@ -18,11 +18,12 @@ public class RoomResponse {
     private PropertyStatus approvalStatus;
     private List<String> amenities;
     private List<String> images;
-
+    private Integer maxOccupants;
     private String propertyName;
     private String propertyAddress;
     private String landlordName;
     private Double elecPrice;
+    private Long propertyId;
     private Double waterPrice;
     private Double internetPrice;
     private String defaultTerms;
@@ -30,4 +31,5 @@ public class RoomResponse {
     private String matchReason; // Lý do phù hợp (Vd: "Giá tốt, có gác lửng")
     private Integer safetyScore;
     private String moderationReason;
+    private String description;
 }

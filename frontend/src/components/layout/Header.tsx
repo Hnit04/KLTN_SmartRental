@@ -33,15 +33,7 @@ const Header = () => {
         <h2 className="text-base md:text-lg font-semibold text-gray-800 truncate max-w-[160px] md:max-w-none">
           {pageTitle}
         </h2>
-        
-        {/* Thanh search nhanh — chỉ hiện trên md+ */}
-        <div className="hidden lg:block relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Tìm kiếm..." 
-            className="h-9 w-56 pl-9 bg-gray-50 border-none focus-visible:ring-1" 
-          />
-        </div>
+
       </div>
 
       {/* Bên Phải: Thông báo & User Profile */}
@@ -54,4 +46,4 @@ const Header = () => {
   );
 };
 
-export default Header;
+export default Header;

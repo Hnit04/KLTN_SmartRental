@@ -2,6 +2,8 @@ package iuh.se.kltn.backend.modules.property.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
+import iuh.se.kltn.backend.modules.property.dto.response.RoomResponse;
+import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.service.RoomService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,5 +62,32 @@ public class RoomController {
         String reason = (body != null) ? body.get("reason") : null;
         roomService.updateApprovalStatus(id, PropertyStatus.REJECTED, reason);
         return ResponseEntity.ok("Đã từ chối phòng");
+    }
+    @GetMapping("/{id}/tenants")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'ADMIN', 'TENANT')")
+    public ResponseEntity<?> getRoomTenants(@PathVariable Long id) {
+        return ResponseEntity.ok(roomService.getTenantsByRoomId(id));
+    }
+    @PutMapping("/{id}/hide")
+    @PreAuthorize("hasAnyRole('LANDLORD','ADMIN')")
+    public ResponseEntity<?> updateRoomStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> requestBody,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        String statusStr = requestBody.get("status");
+        if (statusStr == null || statusStr.isBlank()) {
+            return ResponseEntity.badRequest().body("Thiếu trường 'status' trong body");
+        }
+
+        RoomStatus newStatus;
+        try {
+            newStatus = RoomStatus.valueOf(statusStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("Trạng thái không hợp lệ. Các giá trị hợp lệ: AVAILABLE, HIDDEN");
+        }
+
+        RoomResponse response = roomService.updateRoomStatus(id, newStatus, currentUser.getId());
+        return ResponseEntity.ok(response);
     }
 }

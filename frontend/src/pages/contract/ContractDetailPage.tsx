@@ -206,36 +206,49 @@ export default function ContractDetailPage() {
           setIsSigning(false);
           return;
         }
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        
-        if (user?.role === 'TENANT') {
-          if (!contract?.landlordWalletAddress) {
-            toast.error("Không tìm thấy địa chỉ ví của Chủ trọ để chuyển cọc!");
-            setIsSigning(false);
-            return;
-          }
-          toast.info("Đang tạo giao dịch chuyển tiền cọc qua Web3...");
-          const provider = new ethers.BrowserProvider(window.ethereum as any);
-          const signer = await provider.getSigner();
-          
-          const exchangeRate = 80000000; // VND/ETH
-          const ethAmount = ((contract?.depositAmount || 0) / exchangeRate).toFixed(18);
-          const weiAmount = ethers.parseEther(ethAmount);
-
-          const tx = await signer.sendTransaction({
-            to: contract.landlordWalletAddress,
-            value: weiAmount
+        // Chuyển sang mạng Sepolia
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0xaa36a7' }],
           });
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Test Network',
+                nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
+                rpcUrls: ['https://rpc.sepolia.org'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              }],
+            });
+          } else { throw switchError; }
+        }
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        toast.info("Đang ký hợp đồng trên Blockchain...");
+      }
 
-          toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
+      // Gọi API ký hợp đồng (Backend sẽ deploy Smart Contract nếu cả 2 bên đã ký)
+      const signResult = await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
+
+      // Sau khi deploy thành công → Tenant đặt cọc on-chain qua hàm deposit()
+      if (signResult.data?.smartContractAddress && user?.role === 'TENANT' && contract?.signMethod === 'BLOCKCHAIN') {
+        try {
+          toast.info("Smart Contract đã triển khai! Đang đặt cọc on-chain...");
+          const smartContract = await getSmartContract(signResult.data.smartContractAddress);
+          const depositAmount = BigInt(Math.round(signResult.data.depositAmount || contract?.depositAmount || 0));
+          const tx = await smartContract.deposit({ value: depositAmount });
+          toast.info(`Đang chờ xác nhận đặt cọc... (Hash: ${tx.hash.substring(0, 10)}...)`);
           await tx.wait();
-          toast.success("Thanh toán tiền cọc qua Web3 thành công!");
-        } else {
-          toast.info("Đang gọi Web3 Provider...");
+          toast.success("Đặt cọc thành công trên Smart Contract!");
+        } catch (depositError: any) {
+          console.error("Lỗi đặt cọc on-chain:", depositError);
+          toast.warning("Hợp đồng đã ký thành công nhưng đặt cọc on-chain thất bại. Vui lòng thử lại sau.");
         }
       }
 
-      await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
       toast.success("Ký hợp đồng thành công!");
       setIsSignModalOpen(false);
       fetchContractData(); 
@@ -285,17 +298,27 @@ export default function ContractDetailPage() {
       // Kết nối MetaMask
       await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-      // Tính số ETH cần chuyển từ tỷ giá trong hóa đơn
-      const exchangeRate = bill.exchangeRate || 80000000; // VND/ETH
-      const ethAmount = (bill.totalAmount / exchangeRate).toFixed(18);
-      const weiAmount = ethers.parseEther(ethAmount).toString();
+      // Dùng VND amount trực tiếp làm Wei (khớp với giá trị lưu trên Blockchain)
+      const billAmountOnChain = BigInt(Math.round(bill.totalAmount));
+
+      // Đồng bộ hóa đơn lên Blockchain (nếu chưa có trên chain)
+      try {
+        toast.info("Đang đồng bộ hóa đơn lên Blockchain...");
+        await billApi.syncToBlockchain(bill.id);
+      } catch (syncError: any) {
+        // Nếu bill đã tồn tại trên chain → bỏ qua lỗi "Exists" / "Already registered"
+        const syncMsg = syncError.response?.data?.message || syncError.message || "";
+        if (!syncMsg.includes("Exists") && !syncMsg.includes("Already") && !syncMsg.includes("already")) {
+          console.warn("Sync warning:", syncMsg);
+        }
+      }
 
       toast.info("Đang gọi Smart Contract...");
 
       // Kết nối Smart Contract và gọi hàm payExternalBill
       // Hàm này: Nhận tiền -> Chuyển thẳng cho chủ trọ -> Ghi log on-chain
       const smartContract = await getSmartContract(contract.smartContractAddress);
-      const tx = await smartContract.payExternalBill(bill.id, { value: weiAmount });
+      const tx = await smartContract.payExternalBill(bill.id, { value: billAmountOnChain });
 
       toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
 

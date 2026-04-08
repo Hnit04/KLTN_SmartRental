@@ -123,35 +123,60 @@ export default function PropertyManageDetailPage() {
   };
 
   // --- NHÂN BẢN PHÒNG ---
-  const handleDuplicate = (room: any) => {
-    setEditingId(null);
-    const standardAmenities: string[] = [];
-    const customAmenities: string[] = [];
-    (room.amenities || []).forEach((item: string) => {
-      if (COMMON_AMENITIES.includes(item)) {
-        standardAmenities.push(item);
-      } else {
-        customAmenities.push(item);
-      }
-    });
-    setFormData({
-      name: '', // Để trống tên để tránh trùng
-      price: room.price?.toString() || '', 
-      area: room.area?.toString() || '',
-      description: room.description || '', 
-      type: room.type || 'STUDIO',
-      hasMezzanine: room.hasMezzanine ?? false,
-      hasBalcony: room.hasBalcony ?? false,
-      maxOccupants: room.maxOccupants?.toString() || '',
-      amenities: standardAmenities,
-      customAmenitiesInput: customAmenities.join(', '), 
-      images: [], // Không copy ảnh
-      defaultTerms: room.defaultTerms || '' 
-    });
-    setSelectedFiles([]); setPreviewUrls([]);
-    setShowModal(true);
-    toast.info('Đã sao chép thông tin phòng! Hãy nhập số phòng mới.');
-  };
+const handleDuplicate = async (room: any) => {
+  console.log("Dữ liệu phòng gốc:", room); 
+  // 1. Kiểm tra an toàn nếu không tìm thấy phòng
+  if (!room) {
+    toast.error('Không tìm thấy dữ liệu phòng để sao chép');
+    return;
+  }
+
+  setEditingId(null);
+
+  // 2. Xử lý Amenities (Hỗ trợ cả Array hoặc chuỗi JSON từ Backend)
+  let rawAmenities: string[] = [];
+  try {
+    rawAmenities = Array.isArray(room.amenities) 
+      ? room.amenities 
+      : JSON.parse(room.amenities || '[]');
+  } catch (e) {
+    rawAmenities = [];
+  }
+
+  const standardAmenities: string[] = [];
+  const customAmenities: string[] = [];
+
+  rawAmenities.forEach((item: string) => {
+    if (COMMON_AMENITIES.includes(item)) {
+      standardAmenities.push(item);
+    } else {
+      customAmenities.push(item);
+    }
+  });
+
+  // 3. Map dữ liệu vào Form
+  setFormData({
+    name: '', // Bắt buộc nhập mới
+    price: room.price?.toString() || '', 
+    area: room.area?.toString() || '',
+    description: room.description || '', 
+    type: room.type || 'STUDIO',
+    hasMezzanine: room.hasMezzanine ?? false,
+    hasBalcony: room.hasBalcony ?? false,
+    maxOccupants: room.maxOccupants?.toString() || '',
+    amenities: standardAmenities,
+    customAmenitiesInput: customAmenities.join(', '), 
+    images: [], // Không sao chép ảnh cũ để tránh rác dữ liệu Cloudinary
+    defaultTerms: room.defaultTerms || '' 
+  });
+
+  // 4. Reset trạng thái file và hiển thị modal
+  setSelectedFiles([]); 
+  setPreviewUrls([]);
+  setShowModal(true);
+  
+  toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
+};
 
   const handleOpenEdit = (room: any) => { 
     setEditingId(room.id);
@@ -330,138 +355,148 @@ export default function PropertyManageDetailPage() {
 
       {/* --- DANH SÁCH PHÒNG --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
-        {rooms.length === 0 ? (
-          <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
-            <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
-            <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
-          </div>
-        ) : (
-          rooms.map(room => (
-            <div key={room.id} className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col">
-              {/* Ảnh phòng */}
-              <div className="h-40 bg-gray-200 relative">
-                {room.images && room.images.length > 0 ? (
-                  <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
+      {rooms.length === 0 ? (
+        <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
+          <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
+          <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
+          <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
+        </div>
+      ) : (
+        rooms.map(room => (
+          <div 
+            key={room.id} 
+            className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
+            onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`} // ← Click vào phòng chuyển trang
+          >
+            {/* Ảnh phòng */}
+            <div className="h-40 bg-gray-200 relative">
+              {room.images && room.images.length > 0 ? (
+                <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
+              )}
+              
+              <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
+                room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
+                room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
+                'bg-red-500 text-white'
+              }`}>
+                {room.status === 'AVAILABLE' ? 'Trống' : 
+                room.status === 'RESERVED' ? 'Giữ chỗ' :
+                room.status === 'HIDDEN' ? 'Đang ẩn' : 'Đã thuê'}
+              </span>
+
+              {/* Nhãn trạng thái duyệt */}
+              <div className="absolute top-2 left-2 flex flex-col gap-1">
+                {room.approvalStatus === 'PENDING' && (
+                  <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                    CHỜ DUYỆT
+                  </span>
                 )}
-                <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
-                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
-                  room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
-                  'bg-red-500 text-white'
-                }`}>
-                  {room.status === 'AVAILABLE' ? 'Trống' : 
-                   room.status === 'RESERVED' ? 'Giữ chỗ' : 
-                   'Đã thuê'}
-                </span>
-
-                {/* NHÃN TRẠNG THÁI DUYỆT (CHO CHỦ TRỌ) */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1">
-                  {room.approvalStatus === 'PENDING' && (
-                    <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
-                      CHỜ DUYỆT
-                    </span>
-                  )}
-                  {room.approvalStatus === 'REJECTED' && (
-                    <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
-                      BỊ TỪ CHỐI
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Thông tin phòng */}
-              <div className="p-4 flex-1 flex flex-col">
-                <h3 className="text-xl font-bold text-gray-900 mb-1">Phòng {room.name}</h3>
-                {/* Loại phòng + badges */}
-                <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                  <span className="text-xs font-medium text-gray-500">{ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}</span>
-                  {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
-                  {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
-                </div>
-                <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
-                  <p className="flex justify-between"><span>Giá thuê:</span> <strong className="text-primary">{room.price?.toLocaleString()}đ</strong></p>
-                  <p className="flex justify-between"><span>Diện tích:</span> <strong className="text-gray-900">{room.area} m²</strong></p>
-                  <p className="text-xs text-gray-500 mt-2 line-clamp-2" title={room.amenities?.join(', ')}>
-                    Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
-                  </p>
-                </div>
-
-                {/* AI SAFETY SCORE */}
-                {(room as any).safetyScore != null && (
-                  <div className="mb-3 flex items-center gap-2 text-xs">
-                    {(room as any).safetyScore >= 80 ? (
-                      <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
-                        <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
-                      </span>
-                    ) : (room as any).safetyScore >= 50 ? (
-                      <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
-                        <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
-                        <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
-                      </span>
-                    )}
-                    {(room as any).moderationReason && (
-                      <span className="text-gray-400 italic truncate max-w-[150px]" title={(room as any).moderationReason}>
-                        {(room as any).moderationReason}
-                      </span>
-                    )}
-                  </div>
+                {room.approvalStatus === 'REJECTED' && (
+                  <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                    BỊ TỪ CHỐI
+                  </span>
                 )}
-                
-                {/* NÚT THAO TÁC */}
-                <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap">
-                  <Button variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleOpenEdit(room)}>
-                    <Edit className="h-4 w-4 mr-1.5" /> Sửa
-                  </Button>
-
-                  {room.status === 'AVAILABLE' ? (
-                    <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
-                        <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
-                      </Button>
-                    </Link>
-                  ) : room.status === 'RESERVED' ? (
-                    <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full text-orange-600 border-orange-200 hover:bg-orange-50">
-                        <FileText className="h-4 w-4 mr-1.5" /> HĐ chờ ký
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Link to={`/contracts?roomId=${room.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
-                        <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
-                      </Button>
-                    </Link>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-violet-500 border-violet-200 hover:bg-violet-50 px-2"
-                    onClick={() => handleDuplicate(room)}
-                    title="Nhân bản phòng này"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-500 border-red-200 hover:bg-red-50 px-2"
-                    onClick={() => setDeleteRoomConfirm(room)}
-                    title="Xóa phòng này"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
             </div>
-          ))
-        )}
+
+            {/* Thông tin phòng */}
+            <div className="p-4 flex-1 flex flex-col">
+              <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary transition-colors">
+                Phòng {room.name}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <span className="text-xs font-medium text-gray-500">
+                  {ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}
+                </span>
+                {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
+                {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
+              </div>
+
+              <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
+                <p className="flex justify-between">
+                  <span>Giá thuê:</span> 
+                  <strong className="text-primary">{room.price?.toLocaleString()}đ</strong>
+                </p>
+                <p className="flex justify-between">
+                  <span>Diện tích:</span> 
+                  <strong className="text-gray-900">{room.area} m²</strong>
+                </p>
+                <p className="text-xs text-gray-500 mt-2 line-clamp-2" title={room.amenities?.join(', ')}>
+                  Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
+                </p>
+              </div>
+
+              {/* AI Safety Score */}
+              {(room as any).safetyScore != null && (
+                <div className="mb-3 flex items-center gap-2 text-xs">
+                  {(room as any).safetyScore >= 80 ? (
+                    <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
+                      <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                    </span>
+                  ) : (room as any).safetyScore >= 50 ? (
+                    <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                      <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                      <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* NÚT THAO TÁC - Ngăn chặn sự kiện click lan ra card */}
+              <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap" onClick={e => e.stopPropagation()}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={(e) => { e.stopPropagation(); handleOpenEdit(room); }}
+                >
+                  <Edit className="h-4 w-4 mr-1.5" /> Sửa
+                </Button>
+
+                {room.status === 'AVAILABLE' ? (
+                  <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                    <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
+                      <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to={`/contracts?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                    <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
+                      <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
+                    </Button>
+                  </Link>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-violet-500 border-violet-200 hover:bg-violet-50 px-2"
+                  onClick={(e) => { e.stopPropagation(); handleDuplicate(room); }}
+                  title="Nhân bản phòng này"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-500 border-red-200 hover:bg-red-50 px-2"
+                  onClick={(e) => { e.stopPropagation(); setDeleteRoomConfirm(room); }}
+                  title="Xóa phòng này"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
       </div>
 
       {/* --- MODAL THÊM/SỬA PHÒNG --- */}

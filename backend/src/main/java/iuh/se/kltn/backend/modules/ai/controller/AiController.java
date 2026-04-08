@@ -43,12 +43,25 @@ public class AiController {
             userName = currentUser.getUsername(); // Hoặc fullname
         }
 
+        // B1: Thử tìm trong kho tri thức tĩnh (FAQ Cache) trước
+        String faqAnswer = aiOrchestratorService.searchFaq(message);
+        if (faqAnswer != null) {
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "sessionId", sessionId,
+                    "reply", faqAnswer,
+                    "source", "FAQ_CACHE"
+            ));
+        }
+
+        // B2: Nếu không thấy, gọi mô hình LLM
         String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
         
         return ResponseEntity.ok(Map.of(
                 "status", "success",
                 "sessionId", sessionId,
-                "reply", response
+                "reply", response,
+                "source", "GEMINI_AI"
         ));
     }
 
@@ -56,7 +69,6 @@ public class AiController {
     @PostMapping("/query-data")
     public ResponseEntity<?> queryDataWithAi(
             @RequestBody Map<String, String> request,
-            // Lấy thông tin người dùng đang đăng nhập từ Token
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         String question = request.get("question");
@@ -65,18 +77,26 @@ public class AiController {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Câu hỏi không được để trống"));
         }
 
-        // Nếu người dùng chưa đăng nhập (Call API không có JWT Token)
-        if (currentUser == null) {
-            return ResponseEntity.status(401).body(Map.of("status", "error", "message", "Vui lòng đăng nhập để tra cứu số liệu."));
-        }
-
         // Bóc tách Role (Ví dụ từ "ROLE_LANDLORD" thành "LANDLORD")
-        String role = currentUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
-        Long userId = currentUser.getId();
+        String role = "GUEST";
+        Long userId = -1L;
+        
+        if (currentUser != null) {
+            role = currentUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+            userId = currentUser.getId();
+        }
 
         System.out.println("👤 Khách đang tra cứu: ID=" + userId + ", Role=" + role);
 
-        Object result = aiOrchestratorService.processDataQuery(question, role, userId);
+        Object result;
+
+        // 📍 Ưu tiên: Kiểm tra câu hỏi về vị trí/landmark trước
+        if (aiOrchestratorService.isLocationQuery(question)) {
+            System.out.println("📍 [ROUTER] Phát hiện câu hỏi về vị trí → processLocationQuery");
+            result = aiOrchestratorService.processLocationQuery(question, role, userId);
+        } else {
+            result = aiOrchestratorService.processDataQuery(question, role, userId);
+        }
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
@@ -111,6 +131,22 @@ public class AiController {
         try {
             aiOrchestratorService.deleteCacheEntry(id);
             return ResponseEntity.ok(Map.of("status", "success", "message", "Đã xóa câu hỏi khỏi bộ nhớ AI!"));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    // Admin: Thêm mới 1 FAQ vào Tri thức
+    @PostMapping("/admin/faq")
+    public ResponseEntity<?> addFaqCache(@RequestBody Map<String, String> request) {
+        String question = request.get("question");
+        String answer = request.get("answer");
+        if (question == null || answer == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Thiếu câu hỏi hoặc câu trả lời"));
+        }
+        try {
+            aiOrchestratorService.addFaq(question, answer);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Đã thêm câu hỏi FAQ vào kho tri thức thành công!"));
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("status", "error", "message", e.getMessage()));
         }
