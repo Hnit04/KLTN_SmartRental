@@ -41,6 +41,9 @@ export const billApi = {
   confirmWeb3Payment: (billId: number, txHash: string) => {
     return axiosClient.post(`/bills/${billId}/confirm-web3`, { txHash });
   },
+  syncToBlockchain: (billId: number) => {
+    return axiosClient.post(`/bills/${billId}/sync-blockchain`);
+  },
   tenantNotifyPayment: (billId: number) => {
     return axiosClient.post(`/bills/${billId}/tenant-paid`);
   },

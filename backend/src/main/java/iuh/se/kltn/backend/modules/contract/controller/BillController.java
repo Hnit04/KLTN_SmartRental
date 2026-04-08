@@ -81,6 +81,13 @@ public class BillController {
         return ResponseEntity.ok(billService.confirmWeb3Payment(billId, txHash));
     }
 
+    // Đồng bộ bill cũ lên blockchain (dùng trước khi thanh toán Web3)
+    @PostMapping("/{billId}/sync-blockchain")
+    public ResponseEntity<?> syncBillToBlockchain(@PathVariable Long billId) {
+        billService.syncBillToBlockchain(billId);
+        return ResponseEntity.ok(Map.of("message", "Đã đồng bộ hóa đơn #" + billId + " lên Blockchain"));
+    }
+
     @PostMapping("/{billId}/tenant-paid")
     public ResponseEntity<?> tenantNotifyPayment(@PathVariable Long billId,
                                                  @AuthenticationPrincipal UserPrincipal currentUser) {

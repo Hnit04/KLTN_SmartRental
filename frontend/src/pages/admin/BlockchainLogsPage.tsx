@@ -53,6 +53,10 @@ const FIELD_LABELS: Record<string, string> = {
   roomName: 'Tên phòng',
   elecPrice: 'Tiền điện (VNĐ/kWh)',
   waterPrice: 'Tiền nước (VNĐ/khối)',
+  internetPrice: 'Tiền internet (VNĐ)',
+  startDate: 'Ngày bắt đầu (Unix)',
+  endDate: 'Ngày kết thúc (Unix)',
+  latePenaltyPercent: 'Phạt trễ (%/ngày)',
   landlordAddress: 'Ví Web3 (Chủ trọ)',
   tenantAddress: 'Ví Web3 (Khách thuê)',
 };

@@ -44,6 +44,9 @@ public class BillService {
     @Autowired
     private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
+    @Autowired
+    private BlockchainService blockchainService;
+
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
     public BillResponse createBill(Long landlordId, BillRequest request) {
@@ -124,6 +127,23 @@ public class BillService {
         } catch (Exception e) {
             // Log lỗi nếu không gửi được thông báo để không làm gián đoạn việc tạo hóa đơn
             System.err.println("Lỗi khi tạo thông báo hóa đơn: " + e.getMessage());
+        }
+
+        // =========================================================
+        // GHI HÓA ĐƠN LÊN BLOCKCHAIN (registerExternalBill)
+        // =========================================================
+        try {
+            if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
+                long billAmountForChain = Math.round(savedBill.getTotalAmount());
+                blockchainService.registerExternalBill(
+                        contract.getSmartContractAddress(),
+                        savedBill.getId(),
+                        billAmountForChain
+                );
+                System.out.println("✅ Đã đăng ký hóa đơn #" + savedBill.getId() + " lên Blockchain");
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi ghi hóa đơn lên Blockchain (bill vẫn được lưu trong DB): " + e.getMessage());
         }
 
         return mapToResponse(savedBill, elecCost, waterCost, roomCost);
@@ -377,6 +397,33 @@ public class BillService {
         return chartData;
     }
 
+    /**
+     * Đồng bộ hóa đơn cũ (chưa có trên chain) lên Blockchain.
+     * Dùng cho các bill được tạo trước khi tích hợp registerExternalBill.
+     */
+    @Transactional
+    public void syncBillToBlockchain(Long billId) {
+        Bill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new RuntimeException("Hóa đơn không tồn tại"));
+
+        Contract contract = bill.getContract();
+        if (contract.getSmartContractAddress() == null || contract.getSmartContractAddress().isEmpty()) {
+            throw new RuntimeException("Hợp đồng này chưa có Smart Contract trên Blockchain!");
+        }
+
+        try {
+            long billAmountForChain = Math.round(bill.getTotalAmount());
+            blockchainService.registerExternalBill(
+                    contract.getSmartContractAddress(),
+                    bill.getId(),
+                    billAmountForChain
+            );
+            System.out.println("✅ Đã đồng bộ hóa đơn #" + bill.getId() + " lên Blockchain");
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi đăng ký hóa đơn lên Blockchain: " + e.getMessage());
+        }
+    }
+
     @Transactional
     public BillResponse confirmWeb3Payment(Long billId, String txHash) {
         Bill bill = billRepository.findById(billId)
@@ -384,6 +431,11 @@ public class BillService {
 
         if (bill.getStatus() == BillStatus.PAID) {
             throw new RuntimeException("Hóa đơn này đã được thanh toán!");
+        }
+
+        // 🔍 Xác minh giao dịch thật trên Blockchain trước khi ghi nhận
+        if (!blockchainService.verifyTransaction(txHash)) {
+            throw new RuntimeException("Giao dịch không hợp lệ hoặc chưa được xác nhận trên Blockchain!");
         }
 
         bill.setPaymentTxHash(txHash);
