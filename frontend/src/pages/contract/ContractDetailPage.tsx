@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
@@ -127,8 +127,8 @@ export default function ContractDetailPage() {
     }));
   };
 
-  const fetchContractData = async () => {
-    setIsLoading(true);
+  const fetchContractData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const contractRes = await contractApi.getDetail(Number(id));
       setContract(contractRes.data);
@@ -139,16 +139,71 @@ export default function ContractDetailPage() {
       } catch (err) {
         console.log("Chưa có đề xuất nào hoặc lỗi tải lịch sử");
       }
+      
+      if (isSilent) toast.success("Dữ liệu hợp đồng đã được cập nhật mới nhất! ✨", { duration: 2000 });
     } catch (error) {
-      toast.error("Không thể tải thông tin hợp đồng.");
+      if (!isSilent) toast.error("Không thể tải thông tin hợp đồng.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
+  // ── Load dữ liệu lần đầu + Lắng nghe sự kiện refresh từ WebSocket
   useEffect(() => {
     if (id) fetchContractData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] RECEIVED EVENT in ContractDetailPage:", e.detail);
+      fetchContractData(true);
+      if (activeTab === 'BILLS') {
+        billApi.getBillsByContract(Number(id)).then(res => setBills(res.data));
+      }
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
+  }, [id, activeTab, fetchContractData]);
+
+  // ── POLLING FALLBACK: kiểm tra thay đổi hợp đồng mỗi 10 giây (đề phòng WebSocket không hoạt động)
+  const lastDataHash = useRef<string>('');
+  useEffect(() => {
+    if (!id) return;
+
+    const pollForChanges = async () => {
+      try {
+        const contractRes = await contractApi.getDetail(Number(id));
+        let reqData: any[] = [];
+        try {
+          const reqRes = await contractApi.getChangeRequests(Number(id));
+          reqData = (reqRes as any).data || reqRes;
+        } catch { /* no change requests */ }
+
+        // Tạo fingerprint đơn giản từ dữ liệu quan trọng
+        const newHash = JSON.stringify({
+          status: contractRes.data?.status,
+          isTenantSigned: contractRes.data?.isTenantSigned,
+          isLandlordSigned: contractRes.data?.isLandlordSigned,
+          signMethod: contractRes.data?.signMethod,
+          additionalTerms: contractRes.data?.additionalTerms,
+          changeCount: reqData.length,
+          latestChangeStatus: reqData[0]?.status,
+          latestChangeId: reqData[0]?.id,
+        });
+
+        if (lastDataHash.current && lastDataHash.current !== newHash) {
+          console.log("🔄 [Polling] Detected contract change! Updating UI...");
+          setContract(contractRes.data);
+          setChangeRequests(reqData);
+          toast.success("Dữ liệu hợp đồng đã được cập nhật! ✨", { duration: 2000 });
+        }
+        lastDataHash.current = newHash;
+      } catch { /* silent */ }
+    };
+
+    // Chạy 1 lần ngay để thiết lập hash ban đầu
+    pollForChanges();
+    const interval = setInterval(pollForChanges, 10_000); // Mỗi 10 giây
+    return () => clearInterval(interval);
   }, [id]);
 
   useEffect(() => {

@@ -85,6 +85,7 @@ public class NotificationService {
                 "/queue/notifications",      // → /user/{username}/queue/notifications
                 payload
         );
+        System.out.println("🔔 [Realtime] Sent WebSocket notification to user: " + user.getUsername());
     }
 
     // Xóa thông báo
