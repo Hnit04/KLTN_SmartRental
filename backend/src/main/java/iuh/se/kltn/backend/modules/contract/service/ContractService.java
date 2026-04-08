@@ -42,8 +42,9 @@ public class ContractService {
     private final ModelMapper modelMapper;
     
     @Autowired private BlockchainService blockchainService;
-    @Autowired private ContractChangeRequestRepository changeRequestRepository;
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
+    @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+    @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
 
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -122,6 +123,18 @@ public class ContractService {
         contract.setContentUrl("https://smart-rental-storage.com/contracts/sample.pdf");
 
         Contract saved = contractRepository.save(contract);
+
+        // ✅ THÔNG BÁO CHO CHỦ NHÀ / KHÁCH THUÊ
+        User notifyUser = isTenantCreating ? room.getProperty().getLandlord() : tenant;
+        if (notifyUser != null) {
+            notificationService.createNotification(
+                notifyUser,
+                isTenantCreating ? "Đề xuất thuê phòng" : "Hợp đồng mới được soạn",
+                isTenantCreating ? ("Khách " + tenant.getFullName() + " muốn thuê phòng " + room.getName()) : ("Chủ trọ đã soạn hợp đồng cho phòng " + room.getName()),
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                saved.getId()
+            );
+        }
 
         // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ
         if (room != null) {
@@ -337,6 +350,18 @@ public class ContractService {
         contract.setContractHash(calculateSHA256(rawData));
         
         Contract saved = contractRepository.save(contract);
+        
+        // ✅ THÔNG BÁO CHO BÊN CÒN LẠI
+        User notifyUser = (userId.equals(contract.getTenant().getId())) 
+                ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+            notifyUser,
+            "Hợp đồng bị sửa đổi điều khoản",
+            "Nội dung hợp đồng phòng " + contract.getRoom().getName() + " vừa bị thay đổi. Vui lòng kiểm tra và ký lại.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
         return mapToResponse(saved);
     }
 
@@ -437,6 +462,18 @@ public class ContractService {
         }
 
         Contract savedContract = contractRepository.save(contract);
+
+        // ✅ THÔNG BÁO KHI CÓ NGƯỜI KÝ
+        User notifyUser = (currentUserId.equals(contract.getTenant().getId()))
+                ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+            notifyUser,
+            "Bên kia đã ký hợp đồng",
+            currentUser.getFullName() + " đã thực hiện ký hợp đồng cho phòng " + contract.getRoom().getName(),
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
         return mapToResponse(savedContract);
     }
 

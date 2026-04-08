@@ -9,6 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.Objects;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserPrincipal implements UserDetails {
+public class UserPrincipal implements UserDetails, Principal {
     private Long id;
     private String username;
     private String email;
@@ -30,6 +31,11 @@ public class UserPrincipal implements UserDetails {
     private String walletAddress;
 
     private Collection<? extends GrantedAuthority> authorities;
+
+    @Override
+    public String getName() {
+        return username;
+    }
 
     public static UserPrincipal create(User user) {
         List<GrantedAuthority> authorities = Collections.singletonList(

@@ -26,6 +26,7 @@ public class ContractChangeService {
     // ✅ BỔ SUNG: Khai báo UserRepository để lấy Role
     private final UserRepository userRepository;
     private final iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
+    private final iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
 
     // 1. Gửi yêu cầu (Dành cho Tenant hoặc Landlord tùy logic)
     @Transactional
@@ -110,7 +111,20 @@ public class ContractChangeService {
                 req.setOldValue("");
         }
 
-        return requestRepository.save(req);
+        ContractChangeRequest saved = requestRepository.save(req);
+
+        // ✅ THÔNG BÁO CHO BÊN CÒN LẠI
+        User notifyUser = "TENANT".equals(user.getRole().name())
+                ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+                notifyUser,
+                "Yêu cầu thay đổi hợp đồng",
+                user.getFullName() + " đã gửi đề xuất thay đổi cho hợp đồng phòng " + contract.getRoom().getName(),
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+        );
+
+        return saved;
     }
 
     // 2. Lấy danh sách yêu cầu
@@ -187,7 +201,19 @@ public class ContractChangeService {
 
         contractRepository.save(contract);
         req.setStatus(RequestStatus.ACCEPTED);
-        return requestRepository.save(req);
+        ContractChangeRequest saved = requestRepository.save(req);
+
+        // ✅ THÔNG BÁO CHO NGƯỜI YÊU CẦU
+        User notifyUser = "TENANT".equals(req.getRequestedByRole()) ? contract.getTenant() : contract.getRoom().getProperty().getLandlord();
+        notificationService.createNotification(
+                notifyUser,
+                "Yêu cầu được chấp nhận",
+                "Chủ trọ đã đồng ý với đề xuất của bạn cho hợp đồng phòng " + contract.getRoom().getName(),
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+        );
+
+        return saved;
     }
 
     // 4. Từ chối yêu cầu
@@ -201,6 +227,18 @@ public class ContractChangeService {
         }
 
         req.setStatus(RequestStatus.REJECTED);
-        return requestRepository.save(req);
+        ContractChangeRequest saved = requestRepository.save(req);
+
+        // ✅ THÔNG BÁO CHO NGƯỜI YÊU CẦU
+        User notifyUser = "TENANT".equals(req.getRequestedByRole()) ? req.getContract().getTenant() : req.getContract().getRoom().getProperty().getLandlord();
+        notificationService.createNotification(
+                notifyUser,
+                "Yêu cầu bị từ chối",
+                "Đề xuất thay đổi của bạn cho hợp đồng phòng " + req.getContract().getRoom().getName() + " không được chấp thuận.",
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                req.getContract().getId()
+        );
+
+        return saved;
     }
 }

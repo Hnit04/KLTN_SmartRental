@@ -187,6 +187,15 @@ public class BillService {
         bill.setStatus(BillStatus.PENDING);
         Bill saved = billRepository.save(bill);
 
+        // ✅ THÔNG BÁO CHO CHỦ TRỌ
+        notificationService.createNotification(
+                bill.getContract().getRoom().getProperty().getLandlord(),
+                "Thông báo thanh toán",
+                "Khách thuê phòng " + bill.getContract().getRoom().getName() + " thông báo đã chuyển khoản hóa đơn tháng " + bill.getMonth() + ". Vui lòng kiểm tra.",
+                NotificationType.PAYMENT_REMINDER,
+                bill.getContract().getId()
+        );
+
         Property property = bill.getContract().getRoom().getProperty();
         double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
         double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
@@ -209,6 +218,15 @@ public class BillService {
         bill.setStatus(BillStatus.PAID);
         bill.setPaidAt(LocalDateTime.now());
         Bill saved = billRepository.save(bill);
+
+        // ✅ THÔNG BÁO CHO KHÁCH THUÊ
+        notificationService.createNotification(
+                saved.getContract().getTenant(),
+                "Xác nhận thanh toán thành công",
+                "Chủ trọ đã xác nhận thanh toán hóa đơn tháng " + saved.getMonth() + " cho phòng " + saved.getContract().getRoom().getName(),
+                NotificationType.PAYMENT_REMINDER,
+                saved.getContract().getId()
+        );
 
         // Process reputation score
         if (saved.getPaidAt().toLocalDate().isAfter(saved.getDeadline().toLocalDate())) {
@@ -443,6 +461,15 @@ public class BillService {
         bill.setPaidAt(LocalDateTime.now());
 
         Bill savedBill = billRepository.save(bill);
+
+        // ✅ THÔNG BÁO CHO CHỦ TRỌ (Xác nhận tiền đã về ví blockchain)
+        notificationService.createNotification(
+                savedBill.getContract().getRoom().getProperty().getLandlord(),
+                "Thanh toán Web3 thành công",
+                "Khách thuê đã thanh toán hóa đơn tháng " + savedBill.getMonth() + " qua Blockchain cho phòng " + savedBill.getContract().getRoom().getName(),
+                NotificationType.PAYMENT_REMINDER,
+                savedBill.getContract().getId()
+        );
 
         // Process reputation score for Smart Contract automatic payment tracker
         if (savedBill.getPaidAt().toLocalDate().isAfter(savedBill.getDeadline().toLocalDate())) {

@@ -50,6 +50,14 @@ export default function AppointmentManagePage() {
 
   useEffect(() => {
     fetchAppointments();
+
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] Refreshing Appointments...", e.detail);
+      fetchAppointments();
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, [user]);
 
   // ✅ Đã đồng bộ kiểu status thành CONFIRMED và CANCELLED

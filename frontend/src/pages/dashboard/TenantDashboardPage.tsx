@@ -65,41 +65,50 @@ export default function TenantDashboardPage() {
   const activeContract = contracts.find(c => c.status === "ACTIVE");
   const pendingContracts = contracts.filter(c => c.status === "PENDING_SIGNATURE");
 
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const [cRes, aRes] = await Promise.allSettled([
-          contractApi.getMyContracts(),
-          appointmentApi.getMyAppointments(),
-        ]);
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      const [cRes, aRes] = await Promise.allSettled([
+        contractApi.getMyContracts(),
+        appointmentApi.getMyAppointments(),
+      ]);
 
-        let loadedContracts: Contract[] = [];
-        if (cRes.status === "fulfilled") {
-          const d = (cRes.value as any)?.data;
-          loadedContracts = Array.isArray(d) ? d : (Array.isArray(cRes.value) ? cRes.value as any : []);
-          setContracts(loadedContracts);
-        }
-        if (aRes.status === "fulfilled") {
-          const d = (aRes.value as any)?.data;
-          setAppointments(Array.isArray(d) ? d : []);
-        }
-
-        // Lấy hóa đơn từ hợp đồng active
-        const active = loadedContracts.find(c => c.status === "ACTIVE");
-        if (active) {
-          const bRes = await billApi.getBillsByContract(active.id);
-          const bd = (bRes as any)?.data;
-          setBills(Array.isArray(bd) ? bd : []);
-        }
-      } catch (e) {
-        console.error(e);
-        toast.error("Có lỗi khi tải dữ liệu.");
-      } finally {
-        setIsLoading(false);
+      let loadedContracts: Contract[] = [];
+      if (cRes.status === "fulfilled") {
+        const d = (cRes.value as any)?.data;
+        loadedContracts = Array.isArray(d) ? d : (Array.isArray(cRes.value) ? cRes.value as any : []);
+        setContracts(loadedContracts);
       }
-    };
+      if (aRes.status === "fulfilled") {
+        const d = (aRes.value as any)?.data;
+        setAppointments(Array.isArray(d) ? d : []);
+      }
+
+      // Lấy hóa đơn từ hợp đồng active
+      const active = loadedContracts.find(c => c.status === "ACTIVE");
+      if (active) {
+        const bRes = await billApi.getBillsByContract(active.id);
+        const bd = (bRes as any)?.data;
+        setBills(Array.isArray(bd) ? bd : []);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Có lỗi khi tải dữ liệu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     load();
+
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] Refreshing Tenant Dashboard...", e.detail);
+      load();
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, []);
 
   const unpaidBills = bills.filter(b => b.status === "PENDING" || b.status === "LATE");

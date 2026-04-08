@@ -107,12 +107,22 @@ export default function DashboardPage() {
             console.error("Lỗi khi lấy dữ liệu doanh thu:", error);
         }
     };
-    fetchRevenueLast6Months();
+    const fetchAllStats = () => {
+      fetchRevenueLast6Months();
+      fetchOverdueStats();
+      fetchRevenue();
+      fetchOccupancy();
+    };
 
-    fetchOverdueStats();
+    fetchAllStats();
 
-    fetchRevenue();
-    fetchOccupancy();
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] Refreshing Dashboard Stats...", e.detail);
+      fetchAllStats();
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, []);
 
   const formatCurrency = (value: number) => {
