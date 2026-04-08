@@ -94,6 +94,16 @@ public class ContractService {
         contract.setStatus(ContractStatus.PENDING_SIGNATURE);
         contract.setDepositStatus(DepositStatus.UNPAID);
 
+        // ✅ CHỤP ẢNH SNAPSHOT DỮ LIỆU ĐỂ GIỮ TÍNH BẤT BIẾN KHI SO SÁNH BLOCKCHAIN (CHỐNG LỖI KHI PROPERTY THAY ĐỔI)
+        if (room.getProperty() != null) {
+            contract.setElecPriceSnapshot(room.getProperty().getElecPrice());
+            contract.setWaterPriceSnapshot(room.getProperty().getWaterPrice());
+            if (room.getProperty().getLandlord() != null) {
+                contract.setLandlordWalletSnapshot(room.getProperty().getLandlord().getWalletAddress());
+            }
+        }
+        contract.setTenantWalletSnapshot(tenant.getWalletAddress());
+
         // ✅ LOGIC MỚI XỬ LÝ ĐIỀU KHOẢN
         String defaultTerms = room.getDefaultTerms() != null ? room.getDefaultTerms() : "";
         if (isTenantCreating) {
@@ -209,6 +219,35 @@ public class ContractService {
                 String dbRoom = contract.getRoom() != null ? contract.getRoom().getName() : "";
                 comparisons.add(createComparison("roomName", dbRoom, onChainRoom));
 
+                // So sánh elecPrice
+                java.math.BigInteger onChainElec = (java.math.BigInteger) onChain.get("elecPrice");
+                long dbElec = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot().longValue() : 
+                              (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getElecPrice() != null 
+                              ? contract.getRoom().getProperty().getElecPrice().longValue() : 0L);
+                comparisons.add(createComparison("elecPrice", String.valueOf(dbElec), onChainElec.toString()));
+
+                // So sánh waterPrice
+                java.math.BigInteger onChainWater = (java.math.BigInteger) onChain.get("waterPrice");
+                long dbWater = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot().longValue() : 
+                               (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getWaterPrice() != null 
+                               ? contract.getRoom().getProperty().getWaterPrice().longValue() : 0L);
+                comparisons.add(createComparison("waterPrice", String.valueOf(dbWater), onChainWater.toString()));
+
+                // So sánh landlordAddress
+                String onChainLandlord = (String) onChain.get("landlordAddress");
+                String realLandlord = contract.getLandlordWalletSnapshot() != null && !contract.getLandlordWalletSnapshot().isEmpty() ? contract.getLandlordWalletSnapshot().toLowerCase() : 
+                        (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null
+                        && contract.getRoom().getProperty().getLandlord().getWalletAddress() != null && !contract.getRoom().getProperty().getLandlord().getWalletAddress().isEmpty()
+                        ? contract.getRoom().getProperty().getLandlord().getWalletAddress().toLowerCase() : "0x5b38da6a701c568545dcfcb03fcb875f56beddc4".toLowerCase());
+                comparisons.add(createComparison("landlordAddress", realLandlord, onChainLandlord));
+
+                // So sánh tenantAddress
+                String onChainTenant = (String) onChain.get("tenantAddress");
+                String realTenant = contract.getTenantWalletSnapshot() != null && !contract.getTenantWalletSnapshot().isEmpty() ? contract.getTenantWalletSnapshot().toLowerCase() : 
+                        (contract.getTenant() != null && contract.getTenant().getWalletAddress() != null && !contract.getTenant().getWalletAddress().isEmpty()
+                        ? contract.getTenant().getWalletAddress().toLowerCase() : "0xab8483f64d9c6d1ecf9b849ae677dd3315835cb2".toLowerCase());
+                comparisons.add(createComparison("tenantAddress", realTenant, onChainTenant));
+
                 boolean allMatch = comparisons.stream()
                         .allMatch(c -> Boolean.TRUE.equals(c.get("match")));
 
@@ -319,25 +358,31 @@ public class ContractService {
                 try {
                     String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
                     
-                    String tenantWallet = contract.getTenant().getWalletAddress();
+                    String tenantWallet = contract.getTenantWalletSnapshot() != null ? contract.getTenantWalletSnapshot() : contract.getTenant().getWalletAddress();
                     if (tenantWallet == null || tenantWallet.isEmpty()) {
                         tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"; // fallback
                     }
 
-                    String landlordWallet = contract.getRoom().getProperty().getLandlord().getWalletAddress();
+                    String landlordWallet = contract.getLandlordWalletSnapshot() != null ? contract.getLandlordWalletSnapshot() : contract.getRoom().getProperty().getLandlord().getWalletAddress();
                     if (landlordWallet == null || landlordWallet.isEmpty()) {
                         landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"; // fallback
                     }
 
                     long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
                     long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
+                    long elecVal = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot().longValue() : 
+                                   (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getElecPrice() != null ? contract.getRoom().getProperty().getElecPrice().longValue() : 0L);
+                    long waterVal = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot().longValue() : 
+                                    (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getWaterPrice() != null ? contract.getRoom().getProperty().getWaterPrice().longValue() : 0L);
 
                     BigInteger rentWei = BigInteger.valueOf(priceVal);
                     BigInteger depositWei = BigInteger.valueOf(depositVal);
+                    BigInteger elecWei = BigInteger.valueOf(elecVal);
+                    BigInteger waterWei = BigInteger.valueOf(waterVal);
 
                     String deployedAddress = blockchainService.deployRentalContract(
                             landlordWallet, tenantWallet, (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
-                            contractHashData, rentWei, depositWei
+                            contractHashData, rentWei, depositWei, elecWei, waterWei
                     );
 
                     contract.setSmartContractAddress(deployedAddress);

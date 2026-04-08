@@ -51,6 +51,10 @@ const FIELD_LABELS: Record<string, string> = {
   depositAmount: 'Tiền cọc (VNĐ)',
   contractHash: 'Contract Hash',
   roomName: 'Tên phòng',
+  elecPrice: 'Tiền điện (VNĐ/kWh)',
+  waterPrice: 'Tiền nước (VNĐ/khối)',
+  landlordAddress: 'Ví Web3 (Chủ trọ)',
+  tenantAddress: 'Ví Web3 (Khách thuê)',
 };
 
 export default function BlockchainLogsPage() {
@@ -463,12 +467,12 @@ export default function BlockchainLogsPage() {
                             <td className="px-4 py-3 font-semibold text-gray-800">{FIELD_LABELS[comp.field] || comp.field}</td>
                             <td className="px-4 py-3">
                               <code className={`text-xs px-2 py-0.5 rounded font-mono break-all ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700 line-through'}`}>
-                                {comp.field.includes('Amount') ? Number(comp.database).toLocaleString('vi-VN') : (comp.database.length > 30 ? comp.database.slice(0, 15) + '...' + comp.database.slice(-10) : comp.database)}
+                                {comp.field.includes('Amount') || comp.field.includes('Price') ? Number(comp.database).toLocaleString('vi-VN') : (comp.database.length > 30 ? comp.database.slice(0, 15) + '...' + comp.database.slice(-10) : comp.database)}
                               </code>
                             </td>
                             <td className="px-4 py-3">
                               <code className={`text-xs px-2 py-0.5 rounded font-mono break-all ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-emerald-100 text-emerald-700 font-bold'}`}>
-                                {comp.field.includes('Amount') ? Number(comp.onChain).toLocaleString('vi-VN') : (comp.onChain.length > 30 ? comp.onChain.slice(0, 15) + '...' + comp.onChain.slice(-10) : comp.onChain)}
+                                {comp.field.includes('Amount') || comp.field.includes('Price') ? Number(comp.onChain).toLocaleString('vi-VN') : (comp.onChain.length > 30 ? comp.onChain.slice(0, 15) + '...' + comp.onChain.slice(-10) : comp.onChain)}
                               </code>
                             </td>
                             <td className="px-4 py-3 text-center">

@@ -50,7 +50,9 @@ public class BlockchainService {
             String roomName,
             String contractHash,
             BigInteger rentAmount,
-            BigInteger depositAmount) throws Exception {
+            BigInteger depositAmount,
+            BigInteger elecPrice,
+            BigInteger waterPrice) throws Exception {
 
         // Cấu hình Timeout 120 giây
         OkHttpClient httpClient = new OkHttpClient.Builder()
@@ -69,8 +71,8 @@ public class BlockchainService {
                 new Utf8String(contractHash),
                 new Uint256(rentAmount),
                 new Uint256(depositAmount),
-                new Uint256(BigInteger.valueOf(3500)),
-                new Uint256(BigInteger.valueOf(20000))));
+                new Uint256(elecPrice),
+                new Uint256(waterPrice)));
 
         String data = CONTRACT_BINARY + encodedConstructor;
 
@@ -141,6 +143,22 @@ public class BlockchainService {
         String onChainHash = readString(web3j, contractAddress, "contractHash");
         result.put("contractHash", onChainHash);
 
+        // 5. Đọc elecPrice() -> uint256
+        BigInteger onChainElec = readUint256(web3j, contractAddress, "elecPrice");
+        result.put("elecPrice", onChainElec);
+
+        // 6. Đọc waterPrice() -> uint256
+        BigInteger onChainWater = readUint256(web3j, contractAddress, "waterPrice");
+        result.put("waterPrice", onChainWater);
+
+        // 7. Đọc landlord() -> address
+        String onChainLandlord = readAddress(web3j, contractAddress, "landlord");
+        if (onChainLandlord != null) result.put("landlordAddress", onChainLandlord.toLowerCase());
+
+        // 8. Đọc tenant() -> address
+        String onChainTenant = readAddress(web3j, contractAddress, "tenant");
+        if (onChainTenant != null) result.put("tenantAddress", onChainTenant.toLowerCase());
+
         web3j.shutdown();
         return result;
     }
@@ -167,6 +185,23 @@ public class BlockchainService {
         Function function = new Function(functionName,
                 Collections.emptyList(),
                 Arrays.asList(new TypeReference<Utf8String>() {}));
+
+        String encodedFunction = FunctionEncoder.encode(function);
+        EthCall response = web3j.ethCall(
+                Transaction.createEthCallTransaction(null, contractAddress, encodedFunction),
+                DefaultBlockParameterName.LATEST
+        ).send();
+
+        List<Type> decoded = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+        if (decoded.isEmpty()) return "";
+        return decoded.get(0).getValue().toString();
+    }
+
+    // --- Helper: đọc address ---
+    private String readAddress(Web3j web3j, String contractAddress, String functionName) throws Exception {
+        Function function = new Function(functionName,
+                Collections.emptyList(),
+                Arrays.asList(new TypeReference<Address>() {}));
 
         String encodedFunction = FunctionEncoder.encode(function);
         EthCall response = web3j.ethCall(

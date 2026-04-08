@@ -1,5 +1,5 @@
 // src/components/shared/PropertyCard.tsx
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MapPin, Zap, Droplets, Wifi, Home } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Property } from "@/types/index";
@@ -9,6 +9,8 @@ interface PropertyCardProps {
 }
 
 export default function PropertyCard({ data }: PropertyCardProps) {
+  const navigate = useNavigate();
+
   // Hàm format tiền Việt
   const formatPrice = (price: number) => {
     if (!price) return "Liên hệ";
@@ -21,12 +23,16 @@ export default function PropertyCard({ data }: PropertyCardProps) {
     : "https://placehold.co/600x400?text=No+Image";
 
   return (
-    <div className="group bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full">
+    <div 
+      onClick={() => navigate(`/properties/${data.id}`)}
+      className="group bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer relative"
+    >
       {/* 1. Hình ảnh & Badge giá */}
-      <div className="relative h-52 overflow-hidden">
+      <div className="relative h-52 overflow-hidden bg-gray-100">
         <img 
           src={thumbnail} 
           alt={data.name} 
+          loading="lazy"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
@@ -73,9 +79,15 @@ export default function PropertyCard({ data }: PropertyCardProps) {
         </div>
 
         <div className="mt-auto pt-3 border-t">
-          <Link to={`/properties/${data.id}`}>
-            <Button className="w-full">Xem danh sách phòng</Button>
-          </Link>
+          <Button 
+            className="w-full transition-transform group-hover:scale-[1.02] flex items-center justify-center bg-white text-primary border border-primary/20 hover:bg-primary hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/properties/${data.id}`);
+            }}
+          >
+            Xem danh sách phòng
+          </Button>
         </div>
       </div>
     </div>
