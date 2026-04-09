@@ -13,6 +13,8 @@ import {
   Database,       // Thêm icon phù hợp cho Logs Blockchain
   CheckSquare,    // Thêm icon cho Duyệt tin
   BrainCircuit,   // Thêm icon cho AI Analytics
+  DoorOpen,       // Thêm icon cho Phòng của tôi
+  History,        // Thêm icon cho Lịch sử thuê phòng
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
@@ -72,6 +74,16 @@ const Sidebar = () => {
       title: 'Hợp đồng của tôi',
       path: '/contracts',
       icon: FileText,
+    },
+    {
+      title: 'Phòng của tôi',
+      path: '/my-room',
+      icon: DoorOpen,
+    },
+    {
+      title: 'Lịch sử thuê phòng',
+      path: '/rental-history',
+      icon: History,
     },
     {
       title: 'Lịch hẹn xem phòng',

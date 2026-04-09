@@ -224,10 +224,16 @@ export interface Contract {
   landlordName?: string;
   isTenantSigned?: boolean;
   isLandlordSigned?: boolean;
+  // Utility prices (from Property via ContractResponse)
+  elecPrice?: number;
+  waterPrice?: number;
+  internetPrice?: number;
+  maxOccupants?: number;
   // Blockchain fields
   smartContractAddress?: string;
   deployTxHash?: string;
   contractHash?: string;
+  userRole?: string; // Vai trò của người xem: "CHỦ PHÒNG" hoặc "THÀNH VIÊN"
 }
 
 // Payload để tạo hợp đồng
@@ -417,3 +423,38 @@ export interface ChangeRequestDTO {
   newValue: string;
   reason: string;
 }
+
+// ✅ NEW: Roommate / Resident Types
+export interface ResidentRequestResponse {
+  id: number;
+  contractId: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  type: "ADD" | "REMOVE";
+  message?: string;
+  createdAt: string;
+
+  inviteeId: number;
+  inviteeName: string;
+  inviteeEmail: string;
+  inviteePhone?: string;
+  inviteeZaloPhone?: string;
+  inviteeAvatar?: string;
+  inviteeReputationScore: number;
+  inviteeKycStatus?: string;
+  inviteeCurrentAddress?: string;
+  inviteeDateOfBirth?: string;
+
+  requesterId: number;
+  requesterName: string;
+}
+
+export interface ContractMemberResponse {
+  id: number;
+  userId: number;
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+  reputationScore: number;
+  joinedDate: string;
+}
+

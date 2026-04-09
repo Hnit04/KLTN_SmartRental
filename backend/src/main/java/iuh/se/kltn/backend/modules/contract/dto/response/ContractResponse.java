@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
 @Data
 public class ContractResponse {
     private Long id;
+    private Long roomId;
+    private Long tenantId;
+    private Long landlordId;
     private String roomName;
+    private Integer maxOccupants;
     private String propertyAddress;
     private String tenantName;
     private String landlordName;
@@ -51,4 +55,7 @@ public class ContractResponse {
     private String landlordBankAccountNumber;
     private String landlordBankAccountHolder;
     private String landlordBankQrUrl;
+
+    // 🏷️ Vai trò của người đang xem trong hợp đồng này (Dùng cho Lịch sử thuê)
+    private String userRole;
 }
