@@ -52,6 +52,14 @@ export default function PropertyRoomDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
+  // === State cho Modal Xác nhận Ẩn/Hiện Phòng ===
+  const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
+  const [pendingVisibilityAction, setPendingVisibilityAction] = useState<{
+    targetStatus: 'AVAILABLE' | 'HIDDEN';
+    actionText: string;
+    message: string;
+  } | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -261,45 +269,43 @@ export default function PropertyRoomDetailPage() {
     }
   };
 
-  // ==================== ẨN / HIỆN PHÒNG ====================
-  const handleToggleVisibility = async () => {
+  // ==================== MỞ MODAL XÁC NHẬN ẨN / HIỆN PHÒNG ====================
+  const openVisibilityConfirm = () => {
     if (!room) return;
 
     const isCurrentlyHidden = room.status === 'HIDDEN';
-    const actionText = isCurrentlyHidden ? 'hiện' : 'ẩn';
     const targetStatus = isCurrentlyHidden ? 'AVAILABLE' : 'HIDDEN';
+    const actionText = isCurrentlyHidden ? 'Hiện' : 'Ẩn';
 
-    const confirmed = window.confirm(
-      `Bạn chắc chắn muốn ${actionText} phòng "${room.name}"?\n\n` +
-      (isCurrentlyHidden 
+    setPendingVisibilityAction({
+      targetStatus,
+      actionText,
+      message: isCurrentlyHidden 
         ? "Phòng sẽ hiển thị lại công khai cho người thuê." 
-        : "Phòng sẽ không còn hiển thị công khai.")
-    );
+        : "Phòng sẽ không còn hiển thị công khai cho khách thuê."
+    });
+    setShowVisibilityConfirm(true);
+  };
 
-    if (!confirmed) return;
+  // ==================== THỰC HIỆN ẨN / HIỆN PHÒNG ====================
+  const executeVisibilityChange = async () => {
+    if (!room || !pendingVisibilityAction) return;
 
+    setShowVisibilityConfirm(false);
     setTogglingVisibility(true);
-    try {
-      if (isCurrentlyHidden) {
-        // Hiện phòng
-        await roomApi.updateRoomVisibility(room.id, 'AVAILABLE');
-        toast.success(`Đã hiện phòng "${room.name}" thành công!`);
-      } else {
-        // Ẩn phòng
-        await roomApi.updateRoomVisibility(room.id, 'HIDDEN');
-        toast.success(`Đã ẩn phòng "${room.name}" thành công!`);
-      }
 
-      // Refresh dữ liệu
+    try {
+      await roomApi.updateRoomVisibility(room.id, pendingVisibilityAction.targetStatus);
+      
+      toast.success(`${pendingVisibilityAction.actionText} phòng "${room.name}" thành công!`);
       await fetchRoomDetail();
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message 
-                    || error?.response?.data 
-                    || `${actionText} phòng thất bại`;
+      const errorMsg = error?.response?.data?.message || `${pendingVisibilityAction.actionText} phòng thất bại`;
       toast.error(errorMsg);
       console.error(error);
     } finally {
       setTogglingVisibility(false);
+      setPendingVisibilityAction(null);
     }
   };
 
@@ -351,7 +357,7 @@ export default function PropertyRoomDetailPage() {
             
             <Button 
               variant={isHidden ? "default" : "destructive"} 
-              onClick={handleToggleVisibility} 
+              onClick={openVisibilityConfirm} 
               disabled={togglingVisibility}
             >
               {togglingVisibility ? (
@@ -359,7 +365,7 @@ export default function PropertyRoomDetailPage() {
               ) : isHidden ? (
                 <Eye className="h-4 w-4 mr-2" />
               ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
+                <EyeOff className="h-4 w-4 mr-2" />
               )}
               {isHidden ? 'Hiện phòng' : 'Ẩn phòng'}
             </Button>
@@ -623,7 +629,7 @@ export default function PropertyRoomDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                      <span className="text-gray-500">Loại phòng</span>
+                      Loại phòng
                     </label>
                     <select
                       value={formData.type}
@@ -821,6 +827,57 @@ export default function PropertyRoomDetailPage() {
               </Button>
               <Button type="submit" form="edit-room-form" disabled={isSubmitting} className="min-w-[140px]">
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lưu thay đổi'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================== MODAL XÁC NHẬN ẨN / HIỆN PHÒNG ====================== */}
+      {showVisibilityConfirm && pendingVisibilityAction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-amber-50 rounded-full mb-4">
+                {pendingVisibilityAction.targetStatus === 'HIDDEN' ? (
+                  <EyeOff className="h-8 w-8 text-amber-500" />
+                ) : (
+                  <Eye className="h-8 w-8 text-emerald-500" />
+                )}
+              </div>
+
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                {pendingVisibilityAction.actionText} phòng?
+              </h3>
+              
+              <p className="text-sm text-gray-600 mb-4">
+                Phòng: <span className="font-semibold">"{room.name}"</span>
+              </p>
+
+              <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border">
+                {pendingVisibilityAction.message}
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setShowVisibilityConfirm(false)}
+                disabled={togglingVisibility}
+              >
+                Hủy
+              </Button>
+              <Button 
+                className={`flex-1 ${pendingVisibilityAction.targetStatus === 'HIDDEN' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
+                onClick={executeVisibilityChange}
+                disabled={togglingVisibility}
+              >
+                {togglingVisibility ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  `${pendingVisibilityAction.actionText} phòng`
+                )}
               </Button>
             </div>
           </div>

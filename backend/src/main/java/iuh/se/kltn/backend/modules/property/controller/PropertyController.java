@@ -4,6 +4,7 @@ import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.common.service.CloudinaryService;
 import iuh.se.kltn.backend.modules.property.dto.request.PropertyRequest;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
+import iuh.se.kltn.backend.modules.property.dto.response.PropertyResponse;
 import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.service.PropertyService;
 import jakarta.validation.Valid;
@@ -139,6 +140,24 @@ public class PropertyController {
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi khi gọi API bản đồ: " + e.getMessage());
+        }
+    }
+    @PatchMapping("/{id}/status")
+
+    public ResponseEntity<?> updatePropertyStatus(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestParam PropertyStatus status) {
+
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Bạn cần đăng nhập để thực hiện thao tác này");
+        }
+
+        try {
+            PropertyResponse updated = propertyService.updatePropertyStatus(currentUser.getId(), id, status);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }

@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
   Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
-  Trash2, AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users
+  Trash2, AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users,
+  Wrench, CheckCircle
 } from 'lucide-react';
 import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
+import { roomApi } from '@/api/roomApi';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
@@ -54,9 +56,24 @@ export default function PropertyManageDetailPage() {
   // --- STATE XÓA PHÒNG ---
   const [deleteRoomConfirm, setDeleteRoomConfirm] = useState<Room | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
+  // --- STATE BẢO TRÌ PHÒNG ---
+  const [isMaintenanceLoading, setIsMaintenanceLoading] = useState(false);
+  const [maintenanceRoomId, setMaintenanceRoomId] = useState<number | string | null>(null);
+
+  // --- MODAL XÁC NHẬN BẢO TRÌ ---
+  const [showMaintenanceConfirm, setShowMaintenanceConfirm] = useState(false);
+  const [pendingMaintenanceAction, setPendingMaintenanceAction] = useState<{
+    roomId: number | string;
+    roomName: string;
+    type: 'start' | 'complete';
+  } | null>(null);
+
   const [formData, setFormData] = useState({
-    name: '', price: '', area: '', description: '',
+    name: '', 
+    price: '', 
+    area: '', 
+    description: '',
     type: 'STUDIO' as RoomType,
     hasMezzanine: false,
     hasBalcony: false,
@@ -64,7 +81,7 @@ export default function PropertyManageDetailPage() {
     amenities: [] as string[], 
     customAmenitiesInput: '', 
     images: [] as string[],
-    defaultTerms: '' // ✅ TRƯỜNG ĐIỀU KHOẢN MẪU
+    defaultTerms: ''
   });
 
   // --- STATE UPLOAD ẢNH ---
@@ -92,7 +109,7 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  // Hàm xóa phòng sau khi xác nhận
+  // Hàm xóa phòng
   const handleDeleteRoom = async () => {
     if (!deleteRoomConfirm) return;
     setIsDeleting(true);
@@ -108,80 +125,110 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  // --- MỞ MODAL THÊM / SỬA ---
+  // Mở modal xác nhận bảo trì
+  const openMaintenanceConfirm = (roomId: number | string, roomName: string, type: 'start' | 'complete') => {
+    setPendingMaintenanceAction({ roomId, roomName, type });
+    setShowMaintenanceConfirm(true);
+  };
+
+  // Thực hiện hành động sau khi xác nhận
+  const executeMaintenanceAction = async () => {
+    if (!pendingMaintenanceAction) return;
+
+    const { roomId, roomName, type } = pendingMaintenanceAction;
+    
+    setShowMaintenanceConfirm(false);
+    setMaintenanceRoomId(roomId);
+    setIsMaintenanceLoading(true);
+
+    try {
+      if (type === 'start') {
+        await roomApi.updateRoomVisibility(roomId, 'MAINTENANCE');
+        toast.success(`Phòng "${roomName}" đã chuyển sang chế độ bảo trì!`);
+      } else {
+        await roomApi.updateRoomVisibility(roomId, 'AVAILABLE');
+        toast.success(`Đã hoàn thành bảo trì phòng "${roomName}"! Phòng đã sẵn sàng cho thuê.`);
+      }
+      fetchData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Không thể cập nhật trạng thái bảo trì');
+    } finally {
+      setIsMaintenanceLoading(false);
+      setMaintenanceRoomId(null);
+      setPendingMaintenanceAction(null);
+    }
+  };
+
+  // --- MỞ MODAL THÊM PHÒNG ---
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormData({ 
       name: '', price: '', area: '', description: '', 
-      type: 'STUDIO' as RoomType, hasMezzanine: false, hasBalcony: false,
+      type: 'STUDIO' as RoomType,
+      hasMezzanine: false, hasBalcony: false,
       maxOccupants: '',
       amenities: [], customAmenitiesInput: '', images: [],
       defaultTerms: '' 
     });
-    setSelectedFiles([]); setPreviewUrls([]);
+    setSelectedFiles([]); 
+    setPreviewUrls([]);
     setShowModal(true);
   };
 
   // --- NHÂN BẢN PHÒNG ---
-const handleDuplicate = async (room: any) => {
-  console.log("Dữ liệu phòng gốc:", room); 
-  // 1. Kiểm tra an toàn nếu không tìm thấy phòng
-  if (!room) {
-    toast.error('Không tìm thấy dữ liệu phòng để sao chép');
-    return;
-  }
-
-  setEditingId(null);
-
-  // 2. Xử lý Amenities (Hỗ trợ cả Array hoặc chuỗi JSON từ Backend)
-  let rawAmenities: string[] = [];
-  try {
-    rawAmenities = Array.isArray(room.amenities) 
-      ? room.amenities 
-      : JSON.parse(room.amenities || '[]');
-  } catch (e) {
-    rawAmenities = [];
-  }
-
-  const standardAmenities: string[] = [];
-  const customAmenities: string[] = [];
-
-  rawAmenities.forEach((item: string) => {
-    if (COMMON_AMENITIES.includes(item)) {
-      standardAmenities.push(item);
-    } else {
-      customAmenities.push(item);
+  const handleDuplicate = async (room: any) => {
+    if (!room) {
+      toast.error('Không tìm thấy dữ liệu phòng để sao chép');
+      return;
     }
-  });
 
-  // 3. Map dữ liệu vào Form
-  setFormData({
-    name: '', // Bắt buộc nhập mới
-    price: room.price?.toString() || '', 
-    area: room.area?.toString() || '',
-    description: room.description || '', 
-    type: room.type || 'STUDIO',
-    hasMezzanine: room.hasMezzanine ?? false,
-    hasBalcony: room.hasBalcony ?? false,
-    maxOccupants: room.maxOccupants?.toString() || '',
-    amenities: standardAmenities,
-    customAmenitiesInput: customAmenities.join(', '), 
-    images: [], // Không sao chép ảnh cũ để tránh rác dữ liệu Cloudinary
-    defaultTerms: room.defaultTerms || '' 
-  });
+    setEditingId(null);
 
-  // 4. Reset trạng thái file và hiển thị modal
-  setSelectedFiles([]); 
-  setPreviewUrls([]);
-  setShowModal(true);
-  
-  toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
-};
+    let rawAmenities: string[] = [];
+    try {
+      rawAmenities = Array.isArray(room.amenities) 
+        ? room.amenities 
+        : JSON.parse(room.amenities || '[]');
+    } catch (e) {
+      rawAmenities = [];
+    }
+
+    const standardAmenities: string[] = [];
+    const customAmenities: string[] = [];
+
+    rawAmenities.forEach((item: string) => {
+      if (COMMON_AMENITIES.includes(item)) {
+        standardAmenities.push(item);
+      } else {
+        customAmenities.push(item);
+      }
+    });
+
+    setFormData({
+      name: '', 
+      price: room.price?.toString() || '', 
+      area: room.area?.toString() || '',
+      description: room.description || '', 
+      type: room.type || 'STUDIO',
+      hasMezzanine: room.hasMezzanine ?? false,
+      hasBalcony: room.hasBalcony ?? false,
+      maxOccupants: room.maxOccupants?.toString() || '',
+      amenities: standardAmenities,
+      customAmenitiesInput: customAmenities.join(', '), 
+      images: [],
+      defaultTerms: room.defaultTerms || '' 
+    });
+
+    setSelectedFiles([]); 
+    setPreviewUrls([]);
+    setShowModal(true);
+    
+    toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
+  };
 
   const handleOpenEdit = (room: any) => { 
     setEditingId(room.id);
     
-    // Phân loại tiện ích
     const standardAmenities: string[] = [];
     const customAmenities: string[] = [];
     
@@ -207,7 +254,8 @@ const handleDuplicate = async (room: any) => {
       images: room.images || [],
       defaultTerms: room.defaultTerms || '' 
     });
-    setSelectedFiles([]); setPreviewUrls([]);
+    setSelectedFiles([]); 
+    setPreviewUrls([]);
     setShowModal(true);
   };
 
@@ -247,10 +295,12 @@ const handleDuplicate = async (room: any) => {
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
   const removeSelectedFile = (idx: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
     setPreviewUrls(prev => prev.filter((_, i) => i !== idx));
   };
+
   const removeOldImage = (idx: number) => {
     setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
   };
@@ -349,154 +399,206 @@ const handleDuplicate = async (room: any) => {
             <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
             <p className="flex items-center text-gray-500 mt-1"><MapPin className="h-4 w-4 mr-1" /> {property.address}</p>
           </div>
-          <Button onClick={handleOpenCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Thêm phòng mới</Button>
+          <Button onClick={handleOpenCreate} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Thêm phòng mới
+          </Button>
         </div>
       </div>
 
       {/* --- DANH SÁCH PHÒNG --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
-      {rooms.length === 0 ? (
-        <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
-          <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
-          <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
-          <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
-        </div>
-      ) : (
-        rooms.map(room => (
-          <div 
-            key={room.id} 
-            className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
-            onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`} // ← Click vào phòng chuyển trang
-          >
-            {/* Ảnh phòng */}
-            <div className="h-40 bg-gray-200 relative">
-              {room.images && room.images.length > 0 ? (
-                <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
-              )}
-              
-              <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${
-                room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
-                room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
-                'bg-red-500 text-white'
-              }`}>
-                {room.status === 'AVAILABLE' ? 'Trống' : 
-                room.status === 'RESERVED' ? 'Giữ chỗ' :
-                room.status === 'HIDDEN' ? 'Đang ẩn' : 'Đã thuê'}
-              </span>
-
-              {/* Nhãn trạng thái duyệt */}
-              <div className="absolute top-2 left-2 flex flex-col gap-1">
-                {room.approvalStatus === 'PENDING' && (
-                  <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
-                    CHỜ DUYỆT
-                  </span>
+        {rooms.length === 0 ? (
+          <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
+            <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
+            <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
+          </div>
+        ) : (
+          rooms.map(room => (
+            <div 
+              key={room.id} 
+              className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
+              onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`}
+            >
+              {/* Ảnh phòng */}
+              <div className="h-40 bg-gray-200 relative">
+                {room.images && room.images.length > 0 ? (
+                  <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">Chưa có ảnh</div>
                 )}
-                {room.approvalStatus === 'REJECTED' && (
-                  <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
-                    BỊ TỪ CHỐI
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Thông tin phòng */}
-            <div className="p-4 flex-1 flex flex-col">
-              <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary transition-colors">
-                Phòng {room.name}
-              </h3>
-
-              <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                <span className="text-xs font-medium text-gray-500">
-                  {ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}
+                
+                {/* Trạng thái phòng */}
+                <span className={`absolute top-2 right-2 px-3 py-1 rounded-md text-xs font-bold shadow-sm flex items-center gap-1 ${
+                  room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
+                  room.status === 'RENTED' ? 'bg-blue-600 text-white' :
+                  room.status === 'MAINTENANCE' ? 'bg-orange-500 text-white' :
+                  room.status === 'RESERVED' ? 'bg-amber-500 text-white' : 
+                  'bg-gray-500 text-white'
+                }`}>
+                  {room.status === 'AVAILABLE' && '🟢 Trống'}
+                  {room.status === 'RENTED' && '🔵 Đã thuê'}
+                  {room.status === 'MAINTENANCE' && (
+                    <>
+                      <Wrench className="h-3.5 w-3.5" /> Đang bảo trì
+                    </>
+                  )}
+                  {room.status === 'RESERVED' && '🟠 Giữ chỗ'}
+                  {room.status === 'HIDDEN' && 'Ẩn'}
                 </span>
-                {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
-                {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
-              </div>
 
-              <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
-                <p className="flex justify-between">
-                  <span>Giá thuê:</span> 
-                  <strong className="text-primary">{room.price?.toLocaleString()}đ</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Diện tích:</span> 
-                  <strong className="text-gray-900">{room.area} m²</strong>
-                </p>
-                <p className="text-xs text-gray-500 mt-2 line-clamp-2" title={room.amenities?.join(', ')}>
-                  Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
-                </p>
-              </div>
-
-              {/* AI Safety Score */}
-              {(room as any).safetyScore != null && (
-                <div className="mb-3 flex items-center gap-2 text-xs">
-                  {(room as any).safetyScore >= 80 ? (
-                    <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
-                      <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                {/* Nhãn trạng thái duyệt */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  {room.approvalStatus === 'PENDING' && (
+                    <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                      CHỜ DUYỆT
                     </span>
-                  ) : (room as any).safetyScore >= 50 ? (
-                    <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
-                      <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
-                      <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                  )}
+                  {room.approvalStatus === 'REJECTED' && (
+                    <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm">
+                      BỊ TỪ CHỐI
                     </span>
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* NÚT THAO TÁC - Ngăn chặn sự kiện click lan ra card */}
-              <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap" onClick={e => e.stopPropagation()}>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
-                  onClick={(e) => { e.stopPropagation(); handleOpenEdit(room); }}
-                >
-                  <Edit className="h-4 w-4 mr-1.5" /> Sửa
-                </Button>
+              {/* Thông tin phòng */}
+              <div className="p-4 flex-1 flex flex-col">
+                <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary transition-colors">
+                  Phòng {room.name}
+                </h3>
 
-                {room.status === 'AVAILABLE' ? (
-                  <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
-                    <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
-                      <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link to={`/contracts?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
-                    <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
-                      <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
-                    </Button>
-                  </Link>
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                  <span className="text-xs font-medium text-gray-500">
+                    {ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}
+                  </span>
+                  {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
+                  {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
+                </div>
+
+                <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
+                  <p className="flex justify-between">
+                    <span>Giá thuê:</span> 
+                    <strong className="text-primary">{room.price?.toLocaleString()}đ</strong>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Diện tích:</span> 
+                    <strong className="text-gray-900">{room.area} m²</strong>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2 line-clamp-2" title={room.amenities?.join(', ')}>
+                    Tiện ích: {room.amenities?.length ? room.amenities.join(', ') : 'Chưa cập nhật'}
+                  </p>
+                </div>
+
+                {/* AI Safety Score */}
+                {(room as any).safetyScore != null && (
+                  <div className="mb-3 flex items-center gap-2 text-xs">
+                    {(room as any).safetyScore >= 80 ? (
+                      <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
+                        <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    ) : (room as any).safetyScore >= 50 ? (
+                      <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                        <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                        <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                      </span>
+                    )}
+                  </div>
                 )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-violet-500 border-violet-200 hover:bg-violet-50 px-2"
-                  onClick={(e) => { e.stopPropagation(); handleDuplicate(room); }}
-                  title="Nhân bản phòng này"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                {/* NÚT THAO TÁC */}
+                <div className="flex gap-2 border-t pt-4 mt-auto flex-wrap" onClick={e => e.stopPropagation()}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                    onClick={(e) => { e.stopPropagation(); handleOpenEdit(room); }}
+                  >
+                    <Edit className="h-4 w-4 mr-1.5" /> Sửa
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-500 border-red-200 hover:bg-red-50 px-2"
-                  onClick={(e) => { e.stopPropagation(); setDeleteRoomConfirm(room); }}
-                  title="Xóa phòng này"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  {/* NÚT BẢO TRÌ / HOÀN THÀNH BẢO TRÌ */}
+                  {room.status === 'MAINTENANCE' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        openMaintenanceConfirm(room.id, room.name, 'complete');
+                      }}
+                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
+                    >
+                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-1.5" /> Hoàn thành
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        openMaintenanceConfirm(room.id, room.name, 'start');
+                      }}
+                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
+                    >
+                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Wrench className="h-4 w-4 mr-1.5" /> Bảo trì
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {room.status === 'AVAILABLE' ? (
+                    <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
+                        <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to={`/contracts/${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
+                        <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
+                      </Button>
+                    </Link>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-violet-500 border-violet-200 hover:bg-violet-50 px-2"
+                    onClick={(e) => { e.stopPropagation(); handleDuplicate(room); }}
+                    title="Nhân bản phòng này"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-500 border-red-200 hover:bg-red-50 px-2"
+                    onClick={(e) => { e.stopPropagation(); setDeleteRoomConfirm(room); }}
+                    title="Xóa phòng này"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ))
-      )}
+          ))
+        )}
       </div>
 
       {/* --- MODAL THÊM/SỬA PHÒNG --- */}
@@ -621,7 +723,7 @@ const handleDuplicate = async (room: any) => {
                     <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">Mẹo: Bạn có thể nhập Tên, Giá, Diện tích rồi bấm "Tạo bằng AI" để được viết tự động chuẩn SEO.</p>
                   </div>
 
-                  {/* ✅ KHU VỰC CẤU HÌNH ĐIỀU KHOẢN MẪU CÓ GIAO DIỆN CHIPS */}
+                  {/* Điều khoản & Nội quy mẫu */}
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
                     <div className="flex justify-between items-end mb-2">
                       <label className="block text-sm font-bold text-blue-900 flex items-center gap-1">
@@ -629,27 +731,26 @@ const handleDuplicate = async (room: any) => {
                       </label>
                     </div>
                     
-                    {/* Tags gợi ý click là thêm */}
                     <div className="flex flex-wrap gap-2 mb-3">
-                        {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
-                            const isAdded = formData.defaultTerms.includes(term);
-                            return (
-                                <span
-                                    key={idx}
-                                    onClick={() => !isAdded && handleAddTerm(term)}
-                                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
-                                        isAdded 
-                                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                            : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
-                                    }`}
-                                >
-                                    <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
-                                        {isAdded ? '✓' : '+'}
-                                    </span> 
-                                    {term.substring(0, 30)}...
-                                </span>
-                            );
-                        })}
+                      {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
+                        const isAdded = formData.defaultTerms.includes(term);
+                        return (
+                          <span
+                            key={idx}
+                            onClick={() => !isAdded && handleAddTerm(term)}
+                            className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
+                              isAdded 
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
+                            }`}
+                          >
+                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
+                              {isAdded ? '✓' : '+'}
+                            </span> 
+                            {term.substring(0, 30)}...
+                          </span>
+                        );
+                      })}
                     </div>
 
                     <textarea 
@@ -722,6 +823,56 @@ const handleDuplicate = async (room: any) => {
               <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteRoom} disabled={isDeleting}>
                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
                 Xóa phòng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL XÁC NHẬN BẢO TRÌ ==================== */}
+      {showMaintenanceConfirm && pendingMaintenanceAction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className={`p-3 rounded-full mb-4 ${pendingMaintenanceAction.type === 'start' ? 'bg-orange-50' : 'bg-emerald-50'}`}>
+                {pendingMaintenanceAction.type === 'start' ? 
+                  <Wrench className="h-8 w-8 text-orange-500" /> : 
+                  <CheckCircle className="h-8 w-8 text-emerald-500" />
+                }
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-1">
+                {pendingMaintenanceAction.type === 'start' ? 'Bắt đầu bảo trì phòng?' : 'Hoàn thành bảo trì phòng?'}
+              </h3>
+              
+              <p className="text-sm text-gray-600 mb-1">Phòng: <span className="font-semibold">"{pendingMaintenanceAction.roomName}"</span></p>
+
+              <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                {pendingMaintenanceAction.type === 'start' 
+                  ? 'Phòng sẽ không hiển thị cho khách thuê trong thời gian bảo trì.' 
+                  : 'Phòng sẽ trở về trạng thái Trống và có thể cho thuê lại.'}
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setShowMaintenanceConfirm(false)}
+                disabled={isMaintenanceLoading}
+              >
+                Hủy
+              </Button>
+              <Button 
+                className={`flex-1 ${pendingMaintenanceAction.type === 'start' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
+                onClick={executeMaintenanceAction}
+                disabled={isMaintenanceLoading}
+              >
+                {isMaintenanceLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  pendingMaintenanceAction.type === 'start' ? 'Xác nhận Bảo trì' : 'Xác nhận Hoàn thành'
+                )}
               </Button>
             </div>
           </div>
