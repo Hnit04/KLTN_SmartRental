@@ -35,6 +35,8 @@ import CreateContractPage from "./pages/contract/CreateContractPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import TenantDashboardPage from "./pages/dashboard/TenantDashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
+import MyRoomPage from "./pages/tenant/MyRoomPage";
+import RentalHistoryPage from "./pages/tenant/RentalHistoryPage";
 
 // --- ADMIN PAGES ---
 import AdminDashboardPage from "./pages/admin/AdminPage";
@@ -147,6 +149,8 @@ function App() {
               {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}
               <Route element={<RoleRoute allowedRoles={['TENANT']} />}>
                 <Route path="/tenant-dashboard" element={<TenantDashboardPage />} />
+                <Route path="/my-room" element={<MyRoomPage />} />
+                <Route path="/rental-history" element={<RentalHistoryPage />} />
               </Route>
               
               {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}

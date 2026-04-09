@@ -23,14 +23,21 @@ public class ResidentRequest {
     @JoinColumn(name = "contract_id", nullable = false)
     private Contract contract;
 
-    private String fullName;
-    private String cccdNumber;
-    private String phoneNumber;
-    private String dateOfBirth;
-    private String cccdIssueDate;
-    private String cccdIssuePlace;
-    private String permanentAddress;
+    @ManyToOne
+    @JoinColumn(name = "requester_id", nullable = false)
+    private iuh.se.kltn.backend.modules.user.entity.User requester; // Người gửi yêu cầu (thường là chủ hợp đồng)
 
+    @ManyToOne
+    @JoinColumn(name = "invitee_id", nullable = false)
+    private iuh.se.kltn.backend.modules.user.entity.User invitee;   // Người được mời vào ở cùng
+
+    private String message; // Lời nhắn gửi cho chủ nhà (tùy chọn)
+
+    @Column(name = "request_type", length = 20)
+    @Enumerated(EnumType.STRING)
+    private iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType requestType = iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD;
+
+    @Column(length = 20)
     @Enumerated(EnumType.STRING)
     private RequestStatus status = RequestStatus.PENDING;
 

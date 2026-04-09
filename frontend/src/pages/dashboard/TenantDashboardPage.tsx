@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import {
   Home, FileText, CalendarClock, Receipt, CheckCircle,
   Clock, XCircle, AlertCircle, MapPin, Loader2,
-  ChevronRight, Search, CalendarDays, Banknote, Star, Bot
+  ChevronRight, Search, CalendarDays, Banknote, Star, Bot,
+  DoorOpen, Zap, Droplets, Wifi, ShieldCheck, ExternalLink
 } from "lucide-react";
 import { contractApi } from "@/api/contractApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -210,6 +211,94 @@ export default function TenantDashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* ── PHÒNG HIỆN TẠI CỦA TÔI ── */}
+      {activeContract && (
+        <div className="bg-gradient-to-br from-primary/5 via-blue-50/50 to-indigo-50/30 rounded-2xl border border-primary/15 p-6 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <DoorOpen className="h-5 w-5 text-primary" />
+              </div>
+              Phòng hiện tại của tôi
+            </h2>
+            <Link to={`/contracts/${activeContract.id}`}
+              className="text-sm text-primary hover:underline flex items-center gap-1 font-medium">
+              Xem hợp đồng <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5">
+            {/* Thông tin phòng */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-extrabold text-gray-900">
+                  {activeContract.roomName || `Phòng #${activeContract.roomId}`}
+                </h3>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full border bg-green-100 text-green-700 border-green-200 animate-pulse">
+                  ● Đang thuê
+                </span>
+              </div>
+              {activeContract.propertyAddress && (
+                <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  {activeContract.propertyAddress}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3 mt-2">
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm">
+                  <Banknote className="h-4 w-4 text-green-600" />
+                  <span className="text-gray-500">Giá thuê:</span>
+                  <span className="font-bold text-gray-900">{fmt(activeContract.actualPrice)}/tháng</span>
+                </div>
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm">
+                  <CalendarDays className="h-4 w-4 text-blue-600" />
+                  <span className="text-gray-500">Thời hạn:</span>
+                  <span className="font-bold text-gray-900">{fmtDate(activeContract.startDate)} → {fmtDate(activeContract.endDate)}</span>
+                </div>
+              </div>
+
+              {/* Utility prices */}
+              <div className="flex flex-wrap gap-2 mt-1">
+                {activeContract.elecPrice != null && (
+                  <span className="flex items-center gap-1.5 text-xs bg-yellow-50 text-yellow-700 px-2.5 py-1.5 rounded-lg border border-yellow-200">
+                    <Zap className="h-3.5 w-3.5" /> Điện: {new Intl.NumberFormat('vi-VN').format(activeContract.elecPrice)}đ/kWh
+                  </span>
+                )}
+                {activeContract.waterPrice != null && (
+                  <span className="flex items-center gap-1.5 text-xs bg-cyan-50 text-cyan-700 px-2.5 py-1.5 rounded-lg border border-cyan-200">
+                    <Droplets className="h-3.5 w-3.5" /> Nước: {new Intl.NumberFormat('vi-VN').format(activeContract.waterPrice)}đ/m³
+                  </span>
+                )}
+                {activeContract.internetPrice != null && activeContract.internetPrice > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200">
+                    <Wifi className="h-3.5 w-3.5" /> Internet: {new Intl.NumberFormat('vi-VN').format(activeContract.internetPrice)}đ/tháng
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Chủ nhà */}
+            <div className="flex flex-col items-end justify-center bg-white px-5 py-4 rounded-xl border min-w-[180px]">
+              <p className="text-xs text-gray-400 uppercase font-bold mb-1">Chủ nhà</p>
+              <p className="font-bold text-gray-900">{activeContract.landlordName || '—'}</p>
+              <div className="flex items-center gap-1 mt-2">
+                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-green-600 font-medium">Đã xác minh</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cảnh báo hóa đơn chưa trả */}
+          {unpaidBills.length > 0 && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-red-700 bg-red-50 px-4 py-3 rounded-xl border border-red-200">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Bạn có <strong>{unpaidBills.length} hóa đơn</strong> chưa thanh toán ({fmt(unpaidBills.reduce((a, b) => a + b.totalAmount, 0))})</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── MAIN GRID ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

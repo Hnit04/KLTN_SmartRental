@@ -26,4 +26,24 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     
     // Tìm hợp đồng ACTIVE đã hết hạn
     List<Contract> findByStatusAndEndDateBefore(ContractStatus status, java.time.LocalDate endDate);
+
+    // ✅ Kiểm tra tenant đã có hợp đồng ACTIVE hoặc PENDING_SIGNATURE chưa
+    List<Contract> findByTenantIdAndStatusIn(Long tenantId, java.util.Collection<ContractStatus> statuses);
+
+    // ✅ Lấy hợp đồng ACTIVE hiện tại của tenant
+    java.util.Optional<Contract> findFirstByTenantIdAndStatus(Long tenantId, ContractStatus status);
+
+    // ✅ Tìm hợp đồng hiện tại (Tenant HOẶC Member)
+    @Query("SELECT c FROM Contract c " +
+           "LEFT JOIN c.members m " +
+           "WHERE (c.tenant.id = :userId OR m.user.id = :userId) " +
+           "AND c.status IN :statuses")
+    List<Contract> findCurrentContractsByUserId(@Param("userId") Long userId, @Param("statuses") java.util.Collection<ContractStatus> statuses);
+
+    // ✅ Tìm TẤT CẢ hợp đồng từng tham gia (Lịch sử thuê)
+    @Query("SELECT DISTINCT c FROM Contract c " +
+           "LEFT JOIN c.members m " +
+           "WHERE c.tenant.id = :userId OR m.user.id = :userId " +
+           "ORDER BY c.startDate DESC")
+    List<Contract> findAllRentalHistoryByUserId(@Param("userId") Long userId);
 }

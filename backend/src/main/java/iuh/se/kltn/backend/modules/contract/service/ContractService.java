@@ -11,7 +11,6 @@ import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestType; // ✅ BỔ SUNG IMPORT
-import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
@@ -62,6 +61,28 @@ public class ContractService {
 
         if (room.getStatus() != RoomStatus.AVAILABLE) {
             throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
+        }
+
+        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm
+        Long tenantIdToCheck = null;
+        if (currentUser.getRole() == Role.TENANT) {
+            tenantIdToCheck = currentUserId;
+        } else if (currentUser.getRole() == Role.LANDLORD && request.getTenantEmail() != null && !request.getTenantEmail().isEmpty()) {
+            User foundTenantForCheck = userRepository.findByEmail(request.getTenantEmail()).orElse(null);
+            if (foundTenantForCheck != null) {
+                tenantIdToCheck = foundTenantForCheck.getId();
+            }
+        }
+        if (tenantIdToCheck != null) {
+            List<Contract> existingContracts = contractRepository.findByTenantIdAndStatusIn(
+                tenantIdToCheck, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+            );
+            if (!existingContracts.isEmpty()) {
+                Contract existing = existingContracts.get(0);
+                String roomName = existing.getRoom() != null ? existing.getRoom().getName() : "#" + existing.getId();
+                String statusLabel = existing.getStatus() == ContractStatus.ACTIVE ? "đang thuê" : "đang chờ ký";
+                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + ". Mỗi người chỉ được thuê 1 phòng tại một thời điểm!");
+            }
         }
 
         Tenant tenant;
@@ -159,7 +180,7 @@ public class ContractService {
             }
         }
 
-        return mapToResponse(saved);
+        return mapToResponse(saved, currentUserId);
     }
 
     // --- 2. Lấy danh sách ---
@@ -173,12 +194,41 @@ public class ContractService {
         } else {
             contracts = contractRepository.findByTenantId(userId);
         }
-        return contracts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return contracts.stream().map(c -> mapToResponse(c, userId)).collect(Collectors.toList());
+    }
+
+    // --- 2b. Lấy phòng hiện tại của người dùng (Chủ phòng HOẶC Thành viên) ---
+    public ContractResponse getMyCurrentRoom(Long userId) {
+        // Tìm các hợp đồng ACTIVE hoặc PENDING_SIGNATURE mà user là Tenant hoặc Member
+        List<Contract> contracts = contractRepository.findCurrentContractsByUserId(
+            userId, 
+            java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+        );
+
+        if (contracts.isEmpty()) {
+            return null;
+        }
+
+        // Ưu tiên trả về hợp đồng ACTIVE nếu có nhiều hơn 1 (thực tế ràng buộc là 1 người 1 phòng)
+        Contract contract = contracts.stream()
+                .filter(c -> c.getStatus() == ContractStatus.ACTIVE)
+                .findFirst()
+                .orElse(contracts.get(0));
+
+        return mapToResponse(contract, userId);
+    }
+
+    // --- 2c. Lấy TẤT CẢ lịch sử thuê của người dùng ---
+    public List<ContractResponse> getRentalHistory(Long userId) {
+        List<Contract> contracts = contractRepository.findAllRentalHistoryByUserId(userId);
+        return contracts.stream()
+                .map(c -> mapToResponse(c, userId))
+                .collect(Collectors.toList());
     }
 
     // --- Admin: Lấy tất cả hợp đồng ---
     public List<ContractResponse> getAllContracts() {
-        return contractRepository.findAll().stream().map(this::mapToResponse).collect(Collectors.toList());
+        return contractRepository.findAll().stream().map(c -> mapToResponse(c, null)).collect(Collectors.toList());
     }
 
     // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---
@@ -322,7 +372,7 @@ public class ContractService {
     public ContractResponse getContractById(Long id) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));
-        return mapToResponse(contract);
+        return mapToResponse(contract, null);
     }
     
     @Transactional
@@ -330,7 +380,7 @@ public class ContractService {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
                 
         // Chỉ cho phép sửa khi hợp đồng CHƯA CÓ HIỆU LỰC
@@ -362,7 +412,7 @@ public class ContractService {
             contract.getId()
         );
 
-        return mapToResponse(saved);
+        return mapToResponse(saved, userId);
     }
 
     // --- 3. Hàm ký hợp đồng ---
@@ -474,14 +524,32 @@ public class ContractService {
             contract.getId()
         );
 
-        return mapToResponse(savedContract);
+        return mapToResponse(savedContract, currentUserId);
     }
 
     // --- Helper Functions ---
-    private ContractResponse mapToResponse(Contract contract) {
+    private ContractResponse mapToResponse(Contract contract, Long currentUserId) {
         ContractResponse res = modelMapper.map(contract, ContractResponse.class);
+        
+        if (contract.getTenant() != null) {
+            res.setTenantId(contract.getTenant().getId());
+        }
+        if (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null) {
+            res.setLandlordId(contract.getRoom().getProperty().getLandlord().getId());
+        }
+        
+        // Xác định vai trò
+        if (currentUserId != null) {
+            if (contract.getTenant() != null && contract.getTenant().getId().equals(currentUserId)) {
+                res.setUserRole("CHỦ PHÒNG");
+            } else {
+                res.setUserRole("THÀNH VIÊN");
+            }
+        }
         if (contract.getRoom() != null) {
+            res.setRoomId(contract.getRoom().getId());
             res.setRoomName(contract.getRoom().getName());
+            res.setMaxOccupants(contract.getRoom().getMaxOccupants());
             if (contract.getRoom().getProperty() != null) {
                 res.setPropertyAddress(contract.getRoom().getProperty().getAddress());
                 if (contract.getRoom().getProperty().getLandlord() != null) {
@@ -544,7 +612,7 @@ public class ContractService {
         }
 
         Contract saved = contractRepository.save(contract);
-        return mapToResponse(saved);
+        return mapToResponse(saved, currentUserId);
     }
 
     private String calculateSHA256(String data) {

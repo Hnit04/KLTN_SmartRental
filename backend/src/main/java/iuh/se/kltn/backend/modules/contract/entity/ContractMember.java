@@ -20,11 +20,9 @@ public class ContractMember {
     @JoinColumn(name = "contract_id", nullable = false)
     private Contract contract;
 
-    private String fullName;
-    private String cccdNumber;
-    private String phoneNumber;
-    private LocalDate dateOfBirth;
-    private String hometown;
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private iuh.se.kltn.backend.modules.user.entity.User user;
 
     private LocalDate joinedDate;
     private LocalDate leftDate;

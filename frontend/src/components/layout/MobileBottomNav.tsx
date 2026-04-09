@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, FileText, CalendarClock, LayoutDashboard } from "lucide-react";
+import { Home, Search, FileText, CalendarClock, LayoutDashboard, DoorOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/utils/cn";
 
@@ -16,6 +16,7 @@ export default function MobileBottomNav() {
   const tenantNav = [
     { to: "/tenant-dashboard", icon: Home,           label: "Trang chủ" },
     { to: "/properties",      icon: Search,          label: "Tìm phòng" },
+    { to: "/my-room",         icon: DoorOpen,        label: "Phòng trọ" },
     { to: "/contracts",       icon: FileText,        label: "Hợp đồng" },
     { to: "/appointments",    icon: CalendarClock,   label: "Lịch hẹn" },
   ];
