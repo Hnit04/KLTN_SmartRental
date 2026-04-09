@@ -10,6 +10,7 @@ import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
+import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,14 @@ public class AiOrchestratorService {
 
     @Autowired
     private EmbeddingStore<TextSegment> embeddingStore;
+
+    @Autowired
+    private GeocodingService geocodingService;
+
+    @Autowired
+    private PropertyRepository propertyRepository;
+
+    private static final double DEFAULT_RADIUS_KM = 3.0;
 
     /**
      * Tự động chạy khi Spring Boot khởi động.
@@ -107,6 +116,40 @@ public class AiOrchestratorService {
             System.err.println("⚠️ Lỗi gọi semantic search cho FAQ: " + e.getMessage());
         }
         return null; // Không tìm thấy FAQ tương tự
+    }
+
+    // ====================================================================
+    // 📍 LOCATION-AWARE SEARCH: Tìm phòng theo vị trí / landmark
+    // ====================================================================
+
+    /**
+     * Kiểm tra câu hỏi có phải đang hỏi về vị trí/khoảng cách không.
+     * Ví dụ: "Tìm phòng gần Landmark 81", "Phòng trọ khu vực ĐH Bách Khoa"
+     */
+    public boolean isLocationQuery(String question) {
+        if (question == null) return false;
+        String lower = question.toLowerCase();
+        return (lower.contains("gần") || lower.contains("gan ") || lower.contains("nearby")
+                || lower.contains("khu vực") || lower.contains("quanh "))
+                && (lower.contains("phòng") || lower.contains("trọ") || lower.contains("thuê")
+                    || lower.contains("tìm") || lower.contains("room"));
+    }
+
+    @Autowired
+    private LocationAgentAi locationAgentAi;
+
+    /**
+     * Xử lý câu hỏi tìm phòng theo vị trí.
+     * Sử dụng Agentic Tool Calling (LocationAgentAi + LocationTools)
+     */
+    public Object processLocationQuery(String question, String role, Long userId) {
+        System.out.println("📍 [AGENT ROUTER] Chuyển tiếp câu hỏi cho LocationAgentAi: " + question);
+        try {
+            return locationAgentAi.processLocationQuery(question, role);
+        } catch (Exception e) {
+            System.err.println("❌ Lỗi thực thi LocationAgentAi: " + e.getMessage());
+            return "Dạ, máy chủ AI đang gặp sự cố khi tải dữ liệu định vị bản đồ. Bạn vui lòng thử lại sau nhé!";
+        }
     }
 
     // 1. Thêm 2 tham số role và userId vào hàm

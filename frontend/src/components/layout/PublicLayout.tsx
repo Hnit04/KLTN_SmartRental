@@ -9,7 +9,7 @@ export default function PublicLayout() {
   const { isAuthenticated, user } = useAuth();
 
   // Hàm tạo class để xử lý focus khi link active
-  const navLinkClass = ({ isActive }) => 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) => 
     `text-sm font-medium transition-colors hover:text-primary ${
       isActive ? "text-primary border-b-2 border-primary pb-1" : "text-muted-foreground"
     }`;

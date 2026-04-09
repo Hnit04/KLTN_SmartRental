@@ -45,6 +45,15 @@ public class Contract {
     private String smartContractAddress;
     private String deployTxHash;
 
+    // Các trường Snapshot bảo tồn tính bất biến của hợp đồng
+    private Double elecPriceSnapshot;
+    private Double waterPriceSnapshot;
+    private Double internetPriceSnapshot;
+    private Integer latePenaltyPercent;
+    
+    private String landlordWalletSnapshot;
+    private String tenantWalletSnapshot;
+
     @Enumerated(EnumType.STRING)
     private ContractStatus status;
     private Boolean isTenantSigned = false;
@@ -55,6 +64,11 @@ public class Contract {
     private String additionalTerms;
     @OneToMany(mappedBy = "contract")
     private List<Bill> bills;
+
+    @OneToMany(mappedBy = "contract")
+    private List<ContractMember> members;
+
+
 
     @org.hibernate.annotations.CreationTimestamp
     private LocalDateTime createdAt;

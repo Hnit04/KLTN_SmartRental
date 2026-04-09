@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import {
   Home, FileText, CalendarClock, Receipt, CheckCircle,
   Clock, XCircle, AlertCircle, MapPin, Loader2,
-  ChevronRight, Search, CalendarDays, Banknote, Star, Bot
+  ChevronRight, Search, CalendarDays, Banknote, Star, Bot,
+  DoorOpen, Zap, Droplets, Wifi, ShieldCheck, ExternalLink
 } from "lucide-react";
 import { contractApi } from "@/api/contractApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -65,49 +66,86 @@ export default function TenantDashboardPage() {
   const activeContract = contracts.find(c => c.status === "ACTIVE");
   const pendingContracts = contracts.filter(c => c.status === "PENDING_SIGNATURE");
 
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const [cRes, aRes] = await Promise.allSettled([
-          contractApi.getMyContracts(),
-          appointmentApi.getMyAppointments(),
-        ]);
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      const [cRes, aRes] = await Promise.allSettled([
+        contractApi.getMyContracts(),
+        appointmentApi.getMyAppointments(),
+      ]);
 
-        let loadedContracts: Contract[] = [];
-        if (cRes.status === "fulfilled") {
-          const d = (cRes.value as any)?.data;
-          loadedContracts = Array.isArray(d) ? d : (Array.isArray(cRes.value) ? cRes.value as any : []);
-          setContracts(loadedContracts);
-        }
-        if (aRes.status === "fulfilled") {
-          const d = (aRes.value as any)?.data;
-          setAppointments(Array.isArray(d) ? d : []);
-        }
-
-        // Lấy hóa đơn từ hợp đồng active
-        const active = loadedContracts.find(c => c.status === "ACTIVE");
-        if (active) {
-          const bRes = await billApi.getBillsByContract(active.id);
-          const bd = (bRes as any)?.data;
-          setBills(Array.isArray(bd) ? bd : []);
-        }
-      } catch (e) {
-        console.error(e);
-        toast.error("Có lỗi khi tải dữ liệu.");
-      } finally {
-        setIsLoading(false);
+      let loadedContracts: Contract[] = [];
+      if (cRes.status === "fulfilled") {
+        const d = (cRes.value as any)?.data;
+        loadedContracts = Array.isArray(d) ? d : (Array.isArray(cRes.value) ? cRes.value as any : []);
+        setContracts(loadedContracts);
       }
-    };
+      if (aRes.status === "fulfilled") {
+        const d = (aRes.value as any)?.data;
+        setAppointments(Array.isArray(d) ? d : []);
+      }
+
+      // Lấy hóa đơn từ hợp đồng active
+      const active = loadedContracts.find(c => c.status === "ACTIVE");
+      if (active) {
+        const bRes = await billApi.getBillsByContract(active.id);
+        const bd = (bRes as any)?.data;
+        setBills(Array.isArray(bd) ? bd : []);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Có lỗi khi tải dữ liệu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     load();
+
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] Refreshing Tenant Dashboard...", e.detail);
+      load();
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, []);
 
   const unpaidBills = bills.filter(b => b.status === "PENDING" || b.status === "LATE");
   const recentAppts = appointments.slice(0, 3);
 
   if (isLoading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="space-y-6 pb-10">
+      {/* Skeleton Header */}
+      <div className="flex justify-between items-center animate-pulse">
+         <div className="space-y-2">
+            <div className="h-8 w-64 bg-gray-200 rounded" />
+            <div className="h-4 w-48 bg-gray-200 rounded" />
+         </div>
+         <div className="h-10 w-32 bg-gray-200 rounded-md block hidden sm:block" />
+      </div>
+      {/* Skeleton Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-[120px] bg-white rounded-2xl border p-5 shadow-sm animate-pulse">
+            <div className="w-10 h-10 bg-gray-200 rounded-xl mb-3" />
+            <div className="h-3 w-20 bg-gray-200 rounded mb-3" />
+            <div className="h-6 w-16 bg-gray-200 rounded" />
+          </div>
+        ))}
+      </div>
+      {/* Skeleton Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <div className="lg:col-span-2 space-y-4">
+             <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
+             {[1, 2].map(i => <div key={i} className="h-32 w-full bg-white rounded-2xl border animate-pulse" />)}
+         </div>
+         <div className="space-y-4">
+             <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
+             {[1, 2, 3].map(i => <div key={i} className="h-20 w-full bg-white rounded-xl border animate-pulse" />)}
+         </div>
+      </div>
     </div>
   );
 
@@ -174,6 +212,94 @@ export default function TenantDashboardPage() {
         ))}
       </div>
 
+      {/* ── PHÒNG HIỆN TẠI CỦA TÔI ── */}
+      {activeContract && (
+        <div className="bg-gradient-to-br from-primary/5 via-blue-50/50 to-indigo-50/30 rounded-2xl border border-primary/15 p-6 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <DoorOpen className="h-5 w-5 text-primary" />
+              </div>
+              Phòng hiện tại của tôi
+            </h2>
+            <Link to={`/contracts/${activeContract.id}`}
+              className="text-sm text-primary hover:underline flex items-center gap-1 font-medium">
+              Xem hợp đồng <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5">
+            {/* Thông tin phòng */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-extrabold text-gray-900">
+                  {activeContract.roomName || `Phòng #${activeContract.roomId}`}
+                </h3>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full border bg-green-100 text-green-700 border-green-200 animate-pulse">
+                  ● Đang thuê
+                </span>
+              </div>
+              {activeContract.propertyAddress && (
+                <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  {activeContract.propertyAddress}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3 mt-2">
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm">
+                  <Banknote className="h-4 w-4 text-green-600" />
+                  <span className="text-gray-500">Giá thuê:</span>
+                  <span className="font-bold text-gray-900">{fmt(activeContract.actualPrice)}/tháng</span>
+                </div>
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm">
+                  <CalendarDays className="h-4 w-4 text-blue-600" />
+                  <span className="text-gray-500">Thời hạn:</span>
+                  <span className="font-bold text-gray-900">{fmtDate(activeContract.startDate)} → {fmtDate(activeContract.endDate)}</span>
+                </div>
+              </div>
+
+              {/* Utility prices */}
+              <div className="flex flex-wrap gap-2 mt-1">
+                {activeContract.elecPrice != null && (
+                  <span className="flex items-center gap-1.5 text-xs bg-yellow-50 text-yellow-700 px-2.5 py-1.5 rounded-lg border border-yellow-200">
+                    <Zap className="h-3.5 w-3.5" /> Điện: {new Intl.NumberFormat('vi-VN').format(activeContract.elecPrice)}đ/kWh
+                  </span>
+                )}
+                {activeContract.waterPrice != null && (
+                  <span className="flex items-center gap-1.5 text-xs bg-cyan-50 text-cyan-700 px-2.5 py-1.5 rounded-lg border border-cyan-200">
+                    <Droplets className="h-3.5 w-3.5" /> Nước: {new Intl.NumberFormat('vi-VN').format(activeContract.waterPrice)}đ/m³
+                  </span>
+                )}
+                {activeContract.internetPrice != null && activeContract.internetPrice > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200">
+                    <Wifi className="h-3.5 w-3.5" /> Internet: {new Intl.NumberFormat('vi-VN').format(activeContract.internetPrice)}đ/tháng
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Chủ nhà */}
+            <div className="flex flex-col items-end justify-center bg-white px-5 py-4 rounded-xl border min-w-[180px]">
+              <p className="text-xs text-gray-400 uppercase font-bold mb-1">Chủ nhà</p>
+              <p className="font-bold text-gray-900">{activeContract.landlordName || '—'}</p>
+              <div className="flex items-center gap-1 mt-2">
+                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-green-600 font-medium">Đã xác minh</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cảnh báo hóa đơn chưa trả */}
+          {unpaidBills.length > 0 && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-red-700 bg-red-50 px-4 py-3 rounded-xl border border-red-200">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Bạn có <strong>{unpaidBills.length} hóa đơn</strong> chưa thanh toán ({fmt(unpaidBills.reduce((a, b) => a + b.totalAmount, 0))})</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── MAIN GRID ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -199,7 +325,7 @@ export default function TenantDashboardPage() {
             <div className="space-y-3">
               {contracts.slice(0, 4).map(c => (
                 <Link key={c.id} to={`/contracts/${c.id}`}
-                  className="block bg-white rounded-2xl border p-5 hover:shadow-md transition-shadow hover:border-primary/30 group">
+                  className="block bg-white rounded-2xl border p-5 hover:shadow-lg transition-all hover:border-primary/50 hover:-translate-y-1 active:scale-[0.98] group">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -224,14 +350,15 @@ export default function TenantDashboardPage() {
                         </span>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-primary group-hover:translate-x-1.5 transition-all shrink-0 mt-1" />
                   </div>
 
                   {/* Cảnh báo chờ ký */}
                   {c.status === "PENDING_SIGNATURE" && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      Hợp đồng đang chờ chữ ký của bạn — nhấn để ký ngay.
+                    <div className="mt-3 flex items-center gap-2 text-xs text-yellow-800 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-300 shadow-sm animate-pulse relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/0 via-yellow-200/40 to-yellow-200/0 animate-[shimmer_2s_infinite] -translate-x-[100%]" />
+                      <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600" />
+                      Hợp đồng đang chờ chữ ký của bạn — nhấn vào đây để xem và ký ngay!
                     </div>
                   )}
                 </Link>
@@ -298,7 +425,7 @@ export default function TenantDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {recentAppts.map(a => (
-                  <div key={a.id} className="bg-white rounded-xl border p-4 hover:shadow-sm transition-shadow">
+                  <div key={a.id} className="bg-white rounded-xl border p-4 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 active:scale-[0.98] transition-all cursor-pointer">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <p className="font-semibold text-gray-800 text-sm">{a.roomName}</p>
                       <AppointmentStatusBadge status={a.status} />
@@ -325,10 +452,10 @@ export default function TenantDashboardPage() {
               { to: "/appointments", icon: <CalendarClock className="h-4 w-4" />, label: "Lịch hẹn xem phòng" },
             ].map(item => (
               <Link key={item.to} to={item.to}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-gray-600 hover:text-primary group">
-                <span className="text-gray-400 group-hover:text-primary transition-colors">{item.icon}</span>
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-all text-gray-600 hover:text-primary hover:shadow-sm hover:border-gray-100 border border-transparent active:scale-[0.98] group">
+                <span className="text-gray-400 group-hover:text-primary group-hover:scale-110 transition-all">{item.icon}</span>
                 <span className="text-sm font-medium">{item.label}</span>
-                <ChevronRight className="h-4 w-4 ml-auto text-gray-300 group-hover:text-primary transition-colors" />
+                <ChevronRight className="h-4 w-4 ml-auto text-gray-300 group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </Link>
             ))}
           </div>

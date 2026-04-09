@@ -33,6 +33,22 @@ public class ContractController {
         return ResponseEntity.ok(contractService.getMyContracts(currentUser.getId()));
     }
 
+    // 2b. Lấy phòng hiện tại của tenant (hợp đồng ACTIVE hoặc PENDING_SIGNATURE)
+    @GetMapping("/my-current-room")
+    public ResponseEntity<?> getMyCurrentRoom(@AuthenticationPrincipal UserPrincipal currentUser) {
+        var result = contractService.getMyCurrentRoom(currentUser.getId());
+        if (result == null) {
+            return ResponseEntity.ok(java.util.Collections.singletonMap("message", "Bạn chưa có phòng nào đang thuê."));
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    // 2c. Lấy TẤT CẢ lịch sử thuê của người dùng
+    @GetMapping("/history")
+    public ResponseEntity<?> getRentalHistory(@AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(contractService.getRentalHistory(currentUser.getId()));
+    }
+
     // 3. Lấy chi tiết
     @GetMapping("/{id}")
     public ResponseEntity<?> getContractById(@PathVariable Long id) {

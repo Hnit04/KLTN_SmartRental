@@ -11,7 +11,6 @@ import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestType; // ✅ BỔ SUNG IMPORT
-import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
@@ -42,8 +41,9 @@ public class ContractService {
     private final ModelMapper modelMapper;
     
     @Autowired private BlockchainService blockchainService;
-    @Autowired private ContractChangeRequestRepository changeRequestRepository;
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
+    @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+    @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
 
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -61,6 +61,28 @@ public class ContractService {
 
         if (room.getStatus() != RoomStatus.AVAILABLE) {
             throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
+        }
+
+        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm
+        Long tenantIdToCheck = null;
+        if (currentUser.getRole() == Role.TENANT) {
+            tenantIdToCheck = currentUserId;
+        } else if (currentUser.getRole() == Role.LANDLORD && request.getTenantEmail() != null && !request.getTenantEmail().isEmpty()) {
+            User foundTenantForCheck = userRepository.findByEmail(request.getTenantEmail()).orElse(null);
+            if (foundTenantForCheck != null) {
+                tenantIdToCheck = foundTenantForCheck.getId();
+            }
+        }
+        if (tenantIdToCheck != null) {
+            List<Contract> existingContracts = contractRepository.findByTenantIdAndStatusIn(
+                tenantIdToCheck, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+            );
+            if (!existingContracts.isEmpty()) {
+                Contract existing = existingContracts.get(0);
+                String roomName = existing.getRoom() != null ? existing.getRoom().getName() : "#" + existing.getId();
+                String statusLabel = existing.getStatus() == ContractStatus.ACTIVE ? "đang thuê" : "đang chờ ký";
+                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + ". Mỗi người chỉ được thuê 1 phòng tại một thời điểm!");
+            }
         }
 
         Tenant tenant;
@@ -94,6 +116,18 @@ public class ContractService {
         contract.setStatus(ContractStatus.PENDING_SIGNATURE);
         contract.setDepositStatus(DepositStatus.UNPAID);
 
+        // ✅ CHỤP ẢNH SNAPSHOT DỮ LIỆU ĐỂ GIỮ TÍNH BẤT BIẾN KHI SO SÁNH BLOCKCHAIN (CHỐNG LỖI KHI PROPERTY THAY ĐỔI)
+        if (room.getProperty() != null) {
+            contract.setElecPriceSnapshot(room.getProperty().getElecPrice());
+            contract.setWaterPriceSnapshot(room.getProperty().getWaterPrice());
+            contract.setInternetPriceSnapshot(room.getProperty().getInternetPrice());
+            if (room.getProperty().getLandlord() != null) {
+                contract.setLandlordWalletSnapshot(room.getProperty().getLandlord().getWalletAddress());
+            }
+        }
+        contract.setTenantWalletSnapshot(tenant.getWalletAddress());
+        contract.setLatePenaltyPercent(5); // Default 5%
+
         // ✅ LOGIC MỚI XỬ LÝ ĐIỀU KHOẢN
         String defaultTerms = room.getDefaultTerms() != null ? room.getDefaultTerms() : "";
         if (isTenantCreating) {
@@ -110,6 +144,18 @@ public class ContractService {
         contract.setContentUrl("https://smart-rental-storage.com/contracts/sample.pdf");
 
         Contract saved = contractRepository.save(contract);
+
+        // ✅ THÔNG BÁO CHO CHỦ NHÀ / KHÁCH THUÊ
+        User notifyUser = isTenantCreating ? room.getProperty().getLandlord() : tenant;
+        if (notifyUser != null) {
+            notificationService.createNotification(
+                notifyUser,
+                isTenantCreating ? "Đề xuất thuê phòng" : "Hợp đồng mới được soạn",
+                isTenantCreating ? ("Khách " + tenant.getFullName() + " muốn thuê phòng " + room.getName()) : ("Chủ trọ đã soạn hợp đồng cho phòng " + room.getName()),
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                saved.getId()
+            );
+        }
 
         // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ
         if (room != null) {
@@ -134,7 +180,7 @@ public class ContractService {
             }
         }
 
-        return mapToResponse(saved);
+        return mapToResponse(saved, currentUserId);
     }
 
     // --- 2. Lấy danh sách ---
@@ -148,12 +194,41 @@ public class ContractService {
         } else {
             contracts = contractRepository.findByTenantId(userId);
         }
-        return contracts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return contracts.stream().map(c -> mapToResponse(c, userId)).collect(Collectors.toList());
+    }
+
+    // --- 2b. Lấy phòng hiện tại của người dùng (Chủ phòng HOẶC Thành viên) ---
+    public ContractResponse getMyCurrentRoom(Long userId) {
+        // Tìm các hợp đồng ACTIVE hoặc PENDING_SIGNATURE mà user là Tenant hoặc Member
+        List<Contract> contracts = contractRepository.findCurrentContractsByUserId(
+            userId, 
+            java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+        );
+
+        if (contracts.isEmpty()) {
+            return null;
+        }
+
+        // Ưu tiên trả về hợp đồng ACTIVE nếu có nhiều hơn 1 (thực tế ràng buộc là 1 người 1 phòng)
+        Contract contract = contracts.stream()
+                .filter(c -> c.getStatus() == ContractStatus.ACTIVE)
+                .findFirst()
+                .orElse(contracts.get(0));
+
+        return mapToResponse(contract, userId);
+    }
+
+    // --- 2c. Lấy TẤT CẢ lịch sử thuê của người dùng ---
+    public List<ContractResponse> getRentalHistory(Long userId) {
+        List<Contract> contracts = contractRepository.findAllRentalHistoryByUserId(userId);
+        return contracts.stream()
+                .map(c -> mapToResponse(c, userId))
+                .collect(Collectors.toList());
     }
 
     // --- Admin: Lấy tất cả hợp đồng ---
     public List<ContractResponse> getAllContracts() {
-        return contractRepository.findAll().stream().map(this::mapToResponse).collect(Collectors.toList());
+        return contractRepository.findAll().stream().map(c -> mapToResponse(c, null)).collect(Collectors.toList());
     }
 
     // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---
@@ -209,6 +284,57 @@ public class ContractService {
                 String dbRoom = contract.getRoom() != null ? contract.getRoom().getName() : "";
                 comparisons.add(createComparison("roomName", dbRoom, onChainRoom));
 
+                // So sánh elecPrice
+                java.math.BigInteger onChainElec = (java.math.BigInteger) onChain.get("elecPrice");
+                long dbElec = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot().longValue() : 
+                              (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getElecPrice() != null 
+                              ? contract.getRoom().getProperty().getElecPrice().longValue() : 0L);
+                comparisons.add(createComparison("elecPrice", String.valueOf(dbElec), onChainElec.toString()));
+
+                // So sánh waterPrice
+                java.math.BigInteger onChainWater = (java.math.BigInteger) onChain.get("waterPrice");
+                long dbWater = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot().longValue() : 
+                               (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getWaterPrice() != null 
+                               ? contract.getRoom().getProperty().getWaterPrice().longValue() : 0L);
+                comparisons.add(createComparison("waterPrice", String.valueOf(dbWater), onChainWater.toString()));
+
+                // So sánh internetPrice
+                java.math.BigInteger onChainInternet = (java.math.BigInteger) onChain.get("internetPrice");
+                long dbInternet = contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot().longValue() : 
+                               (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getInternetPrice() != null 
+                               ? contract.getRoom().getProperty().getInternetPrice().longValue() : 0L);
+                comparisons.add(createComparison("internetPrice", String.valueOf(dbInternet), onChainInternet.toString()));
+
+                // So sánh startDate
+                java.math.BigInteger onChainStartDate = (java.math.BigInteger) onChain.get("startDate");
+                long dbStartDate = contract.getStartDate() != null ? contract.getStartDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
+                comparisons.add(createComparison("startDate", String.valueOf(dbStartDate), onChainStartDate.toString()));
+
+                // So sánh endDate
+                java.math.BigInteger onChainEndDate = (java.math.BigInteger) onChain.get("endDate");
+                long dbEndDate = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
+                comparisons.add(createComparison("endDate", String.valueOf(dbEndDate), onChainEndDate.toString()));
+
+                // So sánh latePenaltyPercent
+                java.math.BigInteger onChainLatePenaltyPercent = (java.math.BigInteger) onChain.get("latePenaltyPercent");
+                long dbLatePenaltyPercent = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
+                comparisons.add(createComparison("latePenaltyPercent", String.valueOf(dbLatePenaltyPercent), onChainLatePenaltyPercent.toString()));
+
+                // So sánh landlordAddress
+                String onChainLandlord = (String) onChain.get("landlordAddress");
+                String realLandlord = contract.getLandlordWalletSnapshot() != null && !contract.getLandlordWalletSnapshot().isEmpty() ? contract.getLandlordWalletSnapshot().toLowerCase() : 
+                        (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null
+                        && contract.getRoom().getProperty().getLandlord().getWalletAddress() != null && !contract.getRoom().getProperty().getLandlord().getWalletAddress().isEmpty()
+                        ? contract.getRoom().getProperty().getLandlord().getWalletAddress().toLowerCase() : "0x5b38da6a701c568545dcfcb03fcb875f56beddc4".toLowerCase());
+                comparisons.add(createComparison("landlordAddress", realLandlord, onChainLandlord));
+
+                // So sánh tenantAddress
+                String onChainTenant = (String) onChain.get("tenantAddress");
+                String realTenant = contract.getTenantWalletSnapshot() != null && !contract.getTenantWalletSnapshot().isEmpty() ? contract.getTenantWalletSnapshot().toLowerCase() : 
+                        (contract.getTenant() != null && contract.getTenant().getWalletAddress() != null && !contract.getTenant().getWalletAddress().isEmpty()
+                        ? contract.getTenant().getWalletAddress().toLowerCase() : "0xab8483f64d9c6d1ecf9b849ae677dd3315835cb2".toLowerCase());
+                comparisons.add(createComparison("tenantAddress", realTenant, onChainTenant));
+
                 boolean allMatch = comparisons.stream()
                         .allMatch(c -> Boolean.TRUE.equals(c.get("match")));
 
@@ -216,6 +342,7 @@ public class ContractService {
                 result.put("verifyLevel", "BLOCKCHAIN");
                 result.put("comparisons", comparisons);
                 result.put("smartContractAddress", contract.getSmartContractAddress());
+                result.put("unpaidBillCount", onChain.get("unpaidBillCount"));
 
             } catch (Exception e) {
                 result.put("valid", false);
@@ -245,7 +372,7 @@ public class ContractService {
     public ContractResponse getContractById(Long id) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));
-        return mapToResponse(contract);
+        return mapToResponse(contract, null);
     }
     
     @Transactional
@@ -253,7 +380,7 @@ public class ContractService {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
                 
         // Chỉ cho phép sửa khi hợp đồng CHƯA CÓ HIỆU LỰC
@@ -273,7 +400,19 @@ public class ContractService {
         contract.setContractHash(calculateSHA256(rawData));
         
         Contract saved = contractRepository.save(contract);
-        return mapToResponse(saved);
+        
+        // ✅ THÔNG BÁO CHO BÊN CÒN LẠI
+        User notifyUser = (userId.equals(contract.getTenant().getId())) 
+                ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+            notifyUser,
+            "Hợp đồng bị sửa đổi điều khoản",
+            "Nội dung hợp đồng phòng " + contract.getRoom().getName() + " vừa bị thay đổi. Vui lòng kiểm tra và ký lại.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        return mapToResponse(saved, userId);
     }
 
     // --- 3. Hàm ký hợp đồng ---
@@ -319,25 +458,41 @@ public class ContractService {
                 try {
                     String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
                     
-                    String tenantWallet = contract.getTenant().getWalletAddress();
+                    String tenantWallet = contract.getTenantWalletSnapshot() != null ? contract.getTenantWalletSnapshot() : contract.getTenant().getWalletAddress();
                     if (tenantWallet == null || tenantWallet.isEmpty()) {
                         tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"; // fallback
                     }
 
-                    String landlordWallet = contract.getRoom().getProperty().getLandlord().getWalletAddress();
+                    String landlordWallet = contract.getLandlordWalletSnapshot() != null ? contract.getLandlordWalletSnapshot() : contract.getRoom().getProperty().getLandlord().getWalletAddress();
                     if (landlordWallet == null || landlordWallet.isEmpty()) {
                         landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"; // fallback
                     }
 
                     long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
                     long depositVal = (contract.getDepositAmount() != null) ? contract.getDepositAmount().longValue() : 0L;
+                    long elecVal = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot().longValue() : 
+                                   (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getElecPrice() != null ? contract.getRoom().getProperty().getElecPrice().longValue() : 0L);
+                    long waterVal = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot().longValue() : 
+                                    (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getWaterPrice() != null ? contract.getRoom().getProperty().getWaterPrice().longValue() : 0L);
+                    
+                    long internetVal = contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot().longValue() : 
+                                    (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getInternetPrice() != null ? contract.getRoom().getProperty().getInternetPrice().longValue() : 0L);
+                    long startDateVal = contract.getStartDate() != null ? contract.getStartDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
+                    long endDateVal = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
+                    long penaltyVal = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
 
                     BigInteger rentWei = BigInteger.valueOf(priceVal);
                     BigInteger depositWei = BigInteger.valueOf(depositVal);
+                    BigInteger elecWei = BigInteger.valueOf(elecVal);
+                    BigInteger waterWei = BigInteger.valueOf(waterVal);
+                    BigInteger internetWei = BigInteger.valueOf(internetVal);
+                    BigInteger startWei = BigInteger.valueOf(startDateVal);
+                    BigInteger endWei = BigInteger.valueOf(endDateVal);
+                    BigInteger penaltyWei = BigInteger.valueOf(penaltyVal);
 
                     String deployedAddress = blockchainService.deployRentalContract(
                             landlordWallet, tenantWallet, (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
-                            contractHashData, rentWei, depositWei
+                            contractHashData, rentWei, depositWei, elecWei, waterWei, internetWei, startWei, endWei, penaltyWei
                     );
 
                     contract.setSmartContractAddress(deployedAddress);
@@ -357,14 +512,44 @@ public class ContractService {
         }
 
         Contract savedContract = contractRepository.save(contract);
-        return mapToResponse(savedContract);
+
+        // ✅ THÔNG BÁO KHI CÓ NGƯỜI KÝ
+        User notifyUser = (currentUserId.equals(contract.getTenant().getId()))
+                ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+            notifyUser,
+            "Bên kia đã ký hợp đồng",
+            currentUser.getFullName() + " đã thực hiện ký hợp đồng cho phòng " + contract.getRoom().getName(),
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        return mapToResponse(savedContract, currentUserId);
     }
 
     // --- Helper Functions ---
-    private ContractResponse mapToResponse(Contract contract) {
+    private ContractResponse mapToResponse(Contract contract, Long currentUserId) {
         ContractResponse res = modelMapper.map(contract, ContractResponse.class);
+        
+        if (contract.getTenant() != null) {
+            res.setTenantId(contract.getTenant().getId());
+        }
+        if (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null) {
+            res.setLandlordId(contract.getRoom().getProperty().getLandlord().getId());
+        }
+        
+        // Xác định vai trò
+        if (currentUserId != null) {
+            if (contract.getTenant() != null && contract.getTenant().getId().equals(currentUserId)) {
+                res.setUserRole("CHỦ PHÒNG");
+            } else {
+                res.setUserRole("THÀNH VIÊN");
+            }
+        }
         if (contract.getRoom() != null) {
+            res.setRoomId(contract.getRoom().getId());
             res.setRoomName(contract.getRoom().getName());
+            res.setMaxOccupants(contract.getRoom().getMaxOccupants());
             if (contract.getRoom().getProperty() != null) {
                 res.setPropertyAddress(contract.getRoom().getProperty().getAddress());
                 if (contract.getRoom().getProperty().getLandlord() != null) {
@@ -415,8 +600,19 @@ public class ContractService {
         }
 
         contract.setDepositStatus(DepositStatus.REFUNDED);
+
+        // 🔗 Kết thúc hợp đồng trên Blockchain (hoàn cọc full, deduction = 0)
+        try {
+            if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
+                blockchainService.endContractOnChain(contract.getSmartContractAddress(), 0L);
+                System.out.println("✅ Đã kết thúc hợp đồng trên Blockchain (hoàn cọc full)");
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi kết thúc hợp đồng trên Blockchain: " + e.getMessage());
+        }
+
         Contract saved = contractRepository.save(contract);
-        return mapToResponse(saved);
+        return mapToResponse(saved, currentUserId);
     }
 
     private String calculateSHA256(String data) {

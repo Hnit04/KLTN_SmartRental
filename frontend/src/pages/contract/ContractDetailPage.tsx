@@ -1,26 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   FileText, Download, PenTool, CheckCircle, Calendar, 
   MapPin,  ArrowLeft, Blocks, Receipt,
-  AlertCircle, Clock, CheckCircle2, Loader2, Star,
-  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp, QrCode
+  AlertCircle, Clock, CheckCircle2, Loader2, Star, Users,
+  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp, QrCode, ShieldCheck, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import { toast } from "sonner";
+import { cn } from "@/utils/cn";
 import { contractApi } from "@/api/contractApi"; 
 import { billApi } from "@/api/billApi"; 
-import { ethers } from "ethers";
+import { residentRequestApi } from "@/api/residentRequestApi";
 import { getSmartContract } from "@/utils/contractHelper";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { toast } from "sonner";
 import { Bot } from "lucide-react";
 import type { 
   Contract, 
-  ContractSignMethod, 
   ContractChangeRequest, 
-  RequestType 
+  RequestType,
+  ContractMemberResponse,
+  ResidentRequestResponse
 } from "@/types";
 import { useAuth } from "@/context/AuthContext"; 
 import ReviewModal from "@/features/interaction/components/ReviewModal";
@@ -65,7 +67,7 @@ export default function ContractDetailPage() {
   const [selectedBillToPay, setSelectedBillToPay] = useState<any>(null);
   const [isNotifyingPayment, setIsNotifyingPayment] = useState(false);
 
-  const [signMethod, setSignMethod] = useState<ContractSignMethod>('TRADITIONAL');
+
 
   const [activeTab, setActiveTab] = useState<'INFO' | 'BILLS'>('INFO');
   const [bills, setBills] = useState<any[]>([]);
@@ -84,10 +86,16 @@ export default function ContractDetailPage() {
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [isAnalyzingRequest, setIsAnalyzingRequest] = useState(false);
   const [requestAnalysisResult, setRequestAnalysisResult] = useState<string | null>(null);
-  // Tự chỉnh sửa Điều khoản State
-  const [isEditTermsModalOpen, setIsEditTermsModalOpen] = useState(false);
-  const [editTermsContent, setEditTermsContent] = useState("");
-  const [isUpdatingTerms, setIsUpdatingTerms] = useState(false);
+  
+  // Roommate / Resident requests
+  const [members, setMembers] = useState<ContractMemberResponse[]>([]);
+  const [residentRequests, setResidentRequests] = useState<ResidentRequestResponse[]>([]);
+  const [isUpdatingResident, setIsUpdatingResident] = useState(false);
+
+  // Removal Modal state
+  const [isRemovalOpen, setIsRemovalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<ContractMemberResponse | null>(null);
+  const [removalReason, setRemovalReason] = useState("");
 
   // Xác nhận thanh toán Cọc
   const [isDepositPaid, setIsDepositPaid] = useState(false);
@@ -127,8 +135,8 @@ export default function ContractDetailPage() {
     }));
   };
 
-  const fetchContractData = async () => {
-    setIsLoading(true);
+  const fetchContractData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const contractRes = await contractApi.getDetail(Number(id));
       setContract(contractRes.data);
@@ -139,16 +147,84 @@ export default function ContractDetailPage() {
       } catch (err) {
         console.log("Chưa có đề xuất nào hoặc lỗi tải lịch sử");
       }
+
+      // Parallel fetch Roommate data
+      try {
+        const [memRes, resReqRes] = await Promise.all([
+          residentRequestApi.getMembersByContract(Number(id)),
+          residentRequestApi.getRequestsByContract(Number(id))
+        ]);
+        setMembers((memRes as any).data || memRes);
+        setResidentRequests((resReqRes as any).data || resReqRes);
+      } catch (err) {
+        console.log("Không thể tải thông tin thành viên cùng phòng");
+      }
+      
+      
+      if (isSilent) toast.success("Dữ liệu hợp đồng đã được cập nhật mới nhất! ✨", { duration: 2000 });
     } catch (error) {
-      toast.error("Không thể tải thông tin hợp đồng.");
+      if (!isSilent) toast.error("Không thể tải thông tin hợp đồng.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
+  // ── Load dữ liệu lần đầu + Lắng nghe sự kiện refresh từ WebSocket
   useEffect(() => {
     if (id) fetchContractData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const handleRefresh = (e: any) => {
+      console.log("🔄 [Realtime] RECEIVED EVENT in ContractDetailPage:", e.detail);
+      fetchContractData(true);
+      if (activeTab === 'BILLS') {
+        billApi.getBillsByContract(Number(id)).then(res => setBills(res.data));
+      }
+    };
+
+    window.addEventListener('app:refresh-data', handleRefresh);
+    return () => window.removeEventListener('app:refresh-data', handleRefresh);
+  }, [id, activeTab, fetchContractData]);
+
+  // ── POLLING FALLBACK: kiểm tra thay đổi hợp đồng mỗi 10 giây (đề phòng WebSocket không hoạt động)
+  const lastDataHash = useRef<string>('');
+  useEffect(() => {
+    if (!id) return;
+
+    const pollForChanges = async () => {
+      try {
+        const contractRes = await contractApi.getDetail(Number(id));
+        let reqData: any[] = [];
+        try {
+          const reqRes = await contractApi.getChangeRequests(Number(id));
+          reqData = (reqRes as any).data || reqRes;
+        } catch { /* no change requests */ }
+
+        // Tạo fingerprint đơn giản từ dữ liệu quan trọng
+        const newHash = JSON.stringify({
+          status: contractRes.data?.status,
+          isTenantSigned: contractRes.data?.isTenantSigned,
+          isLandlordSigned: contractRes.data?.isLandlordSigned,
+          signMethod: contractRes.data?.signMethod,
+          additionalTerms: contractRes.data?.additionalTerms,
+          changeCount: reqData.length,
+          latestChangeStatus: reqData[0]?.status,
+          latestChangeId: reqData[0]?.id,
+        });
+
+        if (lastDataHash.current && lastDataHash.current !== newHash) {
+          console.log("🔄 [Polling] Detected contract change! Updating UI...");
+          setContract(contractRes.data);
+          setChangeRequests(reqData);
+          toast.success("Dữ liệu hợp đồng đã được cập nhật! ✨", { duration: 2000 });
+        }
+        lastDataHash.current = newHash;
+      } catch { /* silent */ }
+    };
+
+    // Chạy 1 lần ngay để thiết lập hash ban đầu
+    pollForChanges();
+    const interval = setInterval(pollForChanges, 10_000); // Mỗi 10 giây
+    return () => clearInterval(interval);
   }, [id]);
 
   useEffect(() => {
@@ -206,36 +282,49 @@ export default function ContractDetailPage() {
           setIsSigning(false);
           return;
         }
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        
-        if (user?.role === 'TENANT') {
-          if (!contract?.landlordWalletAddress) {
-            toast.error("Không tìm thấy địa chỉ ví của Chủ trọ để chuyển cọc!");
-            setIsSigning(false);
-            return;
-          }
-          toast.info("Đang tạo giao dịch chuyển tiền cọc qua Web3...");
-          const provider = new ethers.BrowserProvider(window.ethereum as any);
-          const signer = await provider.getSigner();
-          
-          const exchangeRate = 80000000; // VND/ETH
-          const ethAmount = ((contract?.depositAmount || 0) / exchangeRate).toFixed(18);
-          const weiAmount = ethers.parseEther(ethAmount);
-
-          const tx = await signer.sendTransaction({
-            to: contract.landlordWalletAddress,
-            value: weiAmount
+        // Chuyển sang mạng Sepolia
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0xaa36a7' }],
           });
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Test Network',
+                nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
+                rpcUrls: ['https://rpc.sepolia.org'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              }],
+            });
+          } else { throw switchError; }
+        }
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        toast.info("Đang ký hợp đồng trên Blockchain...");
+      }
 
-          toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
+      // Gọi API ký hợp đồng (Backend sẽ deploy Smart Contract nếu cả 2 bên đã ký)
+      const signResult = await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
+
+      // Sau khi deploy thành công → Tenant đặt cọc on-chain qua hàm deposit()
+      if (signResult.data?.smartContractAddress && user?.role === 'TENANT' && contract?.signMethod === 'BLOCKCHAIN') {
+        try {
+          toast.info("Smart Contract đã triển khai! Đang đặt cọc on-chain...");
+          const smartContract = await getSmartContract(signResult.data.smartContractAddress);
+          const depositAmount = BigInt(Math.round(signResult.data.depositAmount || contract?.depositAmount || 0));
+          const tx = await smartContract.deposit({ value: depositAmount });
+          toast.info(`Đang chờ xác nhận đặt cọc... (Hash: ${tx.hash.substring(0, 10)}...)`);
           await tx.wait();
-          toast.success("Thanh toán tiền cọc qua Web3 thành công!");
-        } else {
-          toast.info("Đang gọi Web3 Provider...");
+          toast.success("Đặt cọc thành công trên Smart Contract!");
+        } catch (depositError: any) {
+          console.error("Lỗi đặt cọc on-chain:", depositError);
+          toast.warning("Hợp đồng đã ký thành công nhưng đặt cọc on-chain thất bại. Vui lòng thử lại sau.");
         }
       }
 
-      await contractApi.signContract(Number(id), { signMethod: contract?.signMethod || 'TRADITIONAL' });
       toast.success("Ký hợp đồng thành công!");
       setIsSignModalOpen(false);
       fetchContractData(); 
@@ -285,17 +374,27 @@ export default function ContractDetailPage() {
       // Kết nối MetaMask
       await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-      // Tính số ETH cần chuyển từ tỷ giá trong hóa đơn
-      const exchangeRate = bill.exchangeRate || 80000000; // VND/ETH
-      const ethAmount = (bill.totalAmount / exchangeRate).toFixed(18);
-      const weiAmount = ethers.parseEther(ethAmount).toString();
+      // Dùng VND amount trực tiếp làm Wei (khớp với giá trị lưu trên Blockchain)
+      const billAmountOnChain = BigInt(Math.round(bill.totalAmount));
+
+      // Đồng bộ hóa đơn lên Blockchain (nếu chưa có trên chain)
+      try {
+        toast.info("Đang đồng bộ hóa đơn lên Blockchain...");
+        await billApi.syncToBlockchain(bill.id);
+      } catch (syncError: any) {
+        // Nếu bill đã tồn tại trên chain → bỏ qua lỗi "Exists" / "Already registered"
+        const syncMsg = syncError.response?.data?.message || syncError.message || "";
+        if (!syncMsg.includes("Exists") && !syncMsg.includes("Already") && !syncMsg.includes("already")) {
+          console.warn("Sync warning:", syncMsg);
+        }
+      }
 
       toast.info("Đang gọi Smart Contract...");
 
       // Kết nối Smart Contract và gọi hàm payExternalBill
       // Hàm này: Nhận tiền -> Chuyển thẳng cho chủ trọ -> Ghi log on-chain
       const smartContract = await getSmartContract(contract.smartContractAddress);
-      const tx = await smartContract.payExternalBill(bill.id, { value: weiAmount });
+      const tx = await smartContract.payExternalBill(bill.id, { value: billAmountOnChain });
 
       toast.info(`Giao dịch đã gửi! Đang chờ xác nhận... (Hash: ${tx.hash.substring(0, 10)}...)`);
 
@@ -420,6 +519,45 @@ export default function ContractDetailPage() {
       }
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleUpdateResidentStatus = async (requestId: number, status: 'APPROVED' | 'REJECTED') => {
+    setIsUpdatingResident(true);
+    try {
+      await residentRequestApi.updateStatus(requestId, status);
+      toast.success(status === 'APPROVED' ? "Đã duyệt thành công!" : "Đã từ chối yêu cầu.");
+      fetchContractData(true);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi khi xử lý yêu cầu.");
+    } finally {
+      setIsUpdatingResident(false);
+    }
+  };
+
+  const handleRequestRemoval = async (member: ContractMemberResponse) => {
+    setSelectedMember(member);
+    setRemovalReason("");
+    setIsRemovalOpen(true);
+  };
+
+  const confirmRemoval = async () => {
+    if (!selectedMember || !contract) return;
+    
+    setIsUpdatingResident(true);
+    try {
+      await residentRequestApi.requestRemoval({
+        contractId: Number(id),
+        userId: selectedMember.userId,
+        message: removalReason || "Yêu cầu xóa thành viên"
+      });
+      toast.success(`Đã gửi yêu cầu xóa ${selectedMember.fullName} đến Chủ trọ!`);
+      setIsRemovalOpen(false);
+      fetchContractData(true);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi khi gửi yêu cầu xóa.");
+    } finally {
+      setIsUpdatingResident(false);
     }
   };
 
@@ -628,6 +766,163 @@ export default function ContractDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* ────── QUẢN LÝ THÀNH VIÊN (DÀNH CHO CHỦ NHÀ / LANDLORD ONLY) ────── */}
+            {user?.role === 'LANDLORD' && (
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6">
+                <div className="bg-gray-50/50 px-6 py-4 border-b flex items-center justify-between">
+                  <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+                    <Users className="h-5 w-5 text-primary" /> Thành viên cùng phòng
+                  </h3>
+                  <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold">
+                    {members.length + 1} thành viên
+                  </span>
+                </div>
+                
+                <div className="divide-y divide-gray-100">
+                   {/* Đại diện: Tenant đứng tên hợp đồng */}
+                   <div className="p-5 flex items-center justify-between bg-blue-50/20">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center border border-blue-200 shadow-sm">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900">{contract.tenantName}</p>
+                          <p className="text-[11px] text-gray-500 font-medium">Người đứng tên hợp đồng (Đại diện)</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">Chủ phòng</span>
+                   </div>
+
+                   {/* Các thành viên khác đã được duyệt */}
+                   {members.map(member => (
+                     <div key={member.id} className="p-5 flex items-center justify-between hover:bg-gray-50/30 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <img 
+                            src={member.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`} 
+                            className="w-10 h-10 rounded-full border border-gray-200 bg-white p-0.5 shadow-sm" 
+                            alt="" 
+                          />
+                          <div>
+                            <p className="font-bold text-gray-900">{member.fullName}</p>
+                            <p className="text-[11px] text-gray-400">Tham gia: {new Date(member.joinedDate).toLocaleDateString('vi-VN')}</p>
+                          </div>
+                        </div>
+                         <div className="flex flex-col items-end gap-2">
+                           <div className="flex flex-col items-end">
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Uy tín</p>
+                            <span className="text-xs font-black text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                                {member.reputationScore}
+                            </span>
+                           </div>
+                           {user?.role === 'TENANT' && user?.id === contract.tenantId && contract.status === 'ACTIVE' && (
+                             <Button 
+                               variant="outline" 
+                               size="sm" 
+                               className="h-7 text-[10px] text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 font-bold"
+                               onClick={() => handleRequestRemoval(member)}
+                               disabled={isUpdatingResident}
+                             >
+                               <Trash2 className="w-3 h-3 mr-1" /> Yêu cầu xóa
+                             </Button>
+                           )}
+                        </div>
+                     </div>
+                   ))}
+
+                   {/* YÊU CẦU ĐANG CHỜ PHÊ DUYỆT */}
+                   {residentRequests.filter(r => r.status === 'PENDING').map(req => (
+                     <div key={req.id} className="p-5 bg-amber-50/40 border-l-4 border-l-amber-500 relative">
+                        <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                           <div className="flex items-center gap-4">
+                              <div className="relative">
+                                <img 
+                                  src={req.inviteeAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=invitee-${req.id}`} 
+                                  className="w-12 h-12 rounded-full border-2 border-amber-200 shadow-sm p-0.5 bg-white" 
+                                  alt="" 
+                                />
+                                <div className="absolute -bottom-1 -right-1 bg-amber-500 text-white rounded-full p-1 border border-white shadow-sm">
+                                  <Clock className="w-2 h-2" />
+                                </div>
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 flex items-center gap-2">
+                                  {req.inviteeName}
+                                  <span className={cn(
+                                    "text-[10px] px-2 py-0.5 rounded-full border font-black uppercase tracking-tighter",
+                                    req.type === 'REMOVE' ? "bg-red-50 text-red-700 border-red-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                                  )}>
+                                     {req.type === 'REMOVE' ? 'Xóa bỏ' : 'Thêm mới'}
+                                  </span>
+                                  <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full border border-red-200 font-black">
+                                     Uy tín: {req.inviteeReputationScore} 
+                                  </span>
+                                  {req.inviteeKycStatus === 'VERIFIED' ? (
+                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200 font-black flex items-center gap-1">
+                                      <ShieldCheck className="w-3 h-3" /> ĐÃ XÁC MINH
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200 font-black">
+                                      CHƯA XÁC MINH
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-blue-600 font-medium flex items-center gap-1">
+                                    <span className="text-gray-400 font-normal">Email:</span> {req.inviteeEmail}
+                                  </p>
+                                  {req.inviteePhone && (
+                                    <p className="text-xs text-gray-600 font-medium flex items-center gap-1">
+                                      <span className="text-gray-400 font-normal">SĐT:</span> {req.inviteePhone}
+                                    </p>
+                                  )}
+                                  {req.inviteeCurrentAddress && (
+                                    <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-gray-300" /> {req.inviteeCurrentAddress}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-2 ml-auto">
+                             <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-8 text-red-500 border-red-200 hover:bg-red-50 text-xs font-bold"
+                                onClick={() => handleUpdateResidentStatus(req.id, 'REJECTED')}
+                                disabled={isUpdatingResident}
+                             >Từ chối</Button>
+                             <Button 
+                                size="sm" 
+                                className="h-8 bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-sm"
+                                onClick={() => handleUpdateResidentStatus(req.id, 'APPROVED')}
+                                isLoading={isUpdatingResident}
+                             >Phê duyệt</Button>
+                           </div>
+                        </div>
+                        {req.message && (
+                          <div className="bg-white/80 p-3 rounded-xl border border-amber-200/50 italic text-xs text-gray-600 shadow-inner mb-3">
+                             “{req.message}”
+                          </div>
+                        )}
+                        <p className="text-[10px] text-gray-400 font-medium">
+                          Người mời: <span className="font-bold text-gray-600">{req.requesterName}</span>
+                          <span className="mx-2">•</span>
+                          {new Date(req.createdAt).toLocaleDateString('vi-VN')}
+                        </p>
+                     </div>
+                   ))}
+
+                   {members.length === 0 && residentRequests.filter(r => r.status === 'PENDING').length === 0 && (
+                      <div className="p-8 text-center bg-gray-50/30">
+                         <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                         <p className="text-xs text-gray-400 italic">Hiện tại chưa có thành viên nào khác trong phòng.</p>
+                      </div>
+                   )}
+                </div>
+              </div>
+            )}
+
 
             {contract.additionalTerms && (() => {
               const terms = contract.additionalTerms;
@@ -1426,6 +1721,72 @@ export default function ContractDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ────── MODAL XÓA THÀNH VIÊN (PREMIUM) ────── */}
+      {isRemovalOpen && selectedMember && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div 
+                className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" 
+                onClick={() => !isUpdatingResident && setIsRemovalOpen(false)}
+              />
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="bg-red-600 p-6 text-white text-center">
+                      <div className="flex items-center justify-between mb-2">
+                          <LogOut className="h-6 w-6" />
+                          <button onClick={() => setIsRemovalOpen(false)} disabled={isUpdatingResident}>
+                              <XCircle className="h-6 w-6 opacity-70 hover:opacity-100" />
+                          </button>
+                      </div>
+                      <h2 className="text-xl font-bold">Xóa thành viên</h2>
+                      <p className="text-red-100 text-xs mt-1">Hành động này cần được chủ trọ phê duyệt.</p>
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <img 
+                            src={selectedMember.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedMember.id}`} 
+                            className="w-12 h-12 rounded-full border-2 border-white shadow-sm" 
+                            alt="" 
+                          />
+                          <div>
+                            <p className="font-bold text-gray-900">{selectedMember.fullName}</p>
+                            <p className="text-xs text-gray-500">Uy tín: {selectedMember.reputationScore}</p>
+                          </div>
+                      </div>
+
+                      <div className="space-y-2">
+                          <Label htmlFor="det-rem-reason" className="text-xs font-bold uppercase text-gray-500">Lý do xóa thành viên</Label>
+                          <textarea 
+                            id="det-rem-reason"
+                            placeholder="Nhập lý do chi tiết để chủ trọ dễ dàng phê duyệt..." 
+                            className="w-full min-h-[100px] p-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 focus:outline-none text-sm transition-all"
+                            value={removalReason}
+                            onChange={(e) => setRemovalReason(e.target.value)}
+                            disabled={isUpdatingResident}
+                          />
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1 h-12 rounded-xl font-bold"
+                            onClick={() => setIsRemovalOpen(false)}
+                            disabled={isUpdatingResident}
+                          >
+                              Hủy
+                          </Button>
+                          <Button 
+                            className="flex-1 h-12 rounded-xl gap-2 bg-red-600 hover:bg-red-700 text-white font-bold"
+                            onClick={confirmRemoval}
+                            isLoading={isUpdatingResident}
+                          >
+                              Xác nhận xóa
+                          </Button>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
 
     </div>

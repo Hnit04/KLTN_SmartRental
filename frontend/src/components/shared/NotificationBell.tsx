@@ -108,20 +108,39 @@ export default function NotificationBell() {
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
         onConnect: () => {
+          console.log("🔔 [WebSocket] Connected successfully!");
           stompClient?.subscribe('/user/queue/notifications', (frame) => {
             try {
               const newNoti: Notification = JSON.parse(frame.body);
+              console.log("🔔 [WebSocket] Received Notification:", newNoti);
               setNotifications(prev => [newNoti, ...prev]);
               prevUnread.current += 1;
+              
+              // ✅ Phát sự kiện Refresh cho toàn App (Delay 300ms để đợi Backend commit xong DB)
+              console.log("🔄 [Realtime] Dispatching refresh event in 300ms for type:", newNoti.type);
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('app:refresh-data', { 
+                  detail: { type: newNoti.type, referenceId: newNoti.referenceId } 
+                }));
+              }, 300);
+
               toast.info(`🔔 ${newNoti.title}`, {
                 description: newNoti.message,
                 action: { label: 'Xem', onClick: () => setIsOpen(true) },
                 duration: 6000,
               });
-            } catch { /* parse error */ }
+            } catch (err) { 
+              console.error("🔔 [WebSocket] Parse error:", err);
+            }
           });
         },
-        onStompError: () => { /* silent — fallback về polling */ },
+        onStompError: (frame) => { 
+          console.error("❌ [WebSocket] STOMP Error:", frame.headers['message']);
+          console.log("❌ [WebSocket] Full frame:", frame);
+        },
+        onWebSocketClose: () => {
+          console.warn("⚠️ [WebSocket] Connection closed");
+        }
       });
       stompClient.activate();
     }

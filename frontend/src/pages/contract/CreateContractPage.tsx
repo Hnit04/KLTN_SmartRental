@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature } from "lucide-react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -19,6 +19,7 @@ export default function CreateContractPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [room, setRoom] = useState<any>(null);
+  const [existingContract, setExistingContract] = useState<any>(null);
 
   // --- THÊM STATE CHO MODAL PREVIEW ---
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -68,6 +69,17 @@ export default function CreateContractPage() {
     
     const fetchRoomInfo = async () => {
         try {
+            // ✅ Kiểm tra tenant đã có hợp đồng chưa
+            if (user?.role === 'TENANT') {
+              try {
+                const currentRes = await contractApi.getMyCurrentRoom();
+                const currentData = (currentRes as any)?.data || currentRes;
+                if (currentData && currentData.id && !currentData.message) {
+                  setExistingContract(currentData);
+                }
+              } catch { /* ignore */ }
+            }
+
             const res = await propertyApi.getRoomDetail(roomId); 
             const roomData = (res as any).data || res;
             setRoom(roomData);
@@ -139,7 +151,35 @@ export default function CreateContractPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-10">
       <div className="container mx-auto max-w-3xl">
-        <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
+
+        {/* ❌ CẢNH BÁO NẾU ĐÃ CÓ HỢP ĐỒNG */}
+        {existingContract && user?.role === 'TENANT' && (
+          <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-bold text-red-800 text-lg">Bạn đã có phòng đang thuê!</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  Bạn đang có hợp đồng <strong>{existingContract.status === 'ACTIVE' ? 'đang thuê' : 'chờ ký'}</strong> tại phòng{' '}
+                  <strong>{existingContract.roomName || `#${existingContract.roomId}`}</strong>.
+                  Mỗi người chỉ được thuê 1 phòng tại một thời điểm.
+                </p>
+                <div className="mt-4 flex gap-3">
+                  <Link to={`/contracts/${existingContract.id}`}>
+                    <Button size="sm" className="gap-1 bg-red-600 hover:bg-red-700">
+                      Xem hợp đồng hiện tại
+                    </Button>
+                  </Link>
+                  <Button size="sm" variant="outline" onClick={() => navigate(-1)} className="text-red-700 border-red-300 hover:bg-red-100">
+                    Quay lại
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={`bg-white rounded-xl shadow-lg border overflow-hidden ${existingContract && user?.role === 'TENANT' ? 'opacity-50 pointer-events-none select-none' : ''}`}>
           
           <div className="bg-primary/5 p-6 border-b border-primary/10">
             <h1 className="text-2xl font-bold text-gray-900">

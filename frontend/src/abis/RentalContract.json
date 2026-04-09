@@ -22,48 +22,43 @@
 				"type": "string"
 			},
 			{
-				"internalType": "uint256",
-				"name": "_rentAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_depositAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_elecPrice",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_waterPrice",
-				"type": "uint256"
+				"internalType": "uint256[]",
+				"name": "p",
+				"type": "uint256[]"
 			}
 		],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
 	{
-		"inputs": [],
-		"name": "FailedCall",
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "AddressInsufficientBalance",
 		"type": "error"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "balance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "needed",
-				"type": "uint256"
-			}
-		],
-		"name": "InsufficientBalance",
+		"inputs": [],
+		"name": "EnforcedPause",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ExpectedPause",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FailedInnerCall",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ReentrancyGuardReentrantCall",
 		"type": "error"
 	},
 	{
@@ -134,7 +129,7 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "depositAmount",
+				"name": "amount",
 				"type": "uint256"
 			}
 		],
@@ -147,17 +142,36 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "refundAmount",
+				"name": "refund",
 				"type": "uint256"
 			},
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "deductionAmount",
+				"name": "deduction",
 				"type": "uint256"
 			}
 		],
 		"name": "ContractEnded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "ExternalBillCreated",
 		"type": "event"
 	},
 	{
@@ -178,32 +192,6 @@
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "newAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "RentChangeAccepted",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "RentChangeProposed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "address",
 				"name": "account",
 				"type": "address"
@@ -214,12 +202,25 @@
 	},
 	{
 		"inputs": [],
-		"name": "LATE_PENALTY_PERCENT",
+		"name": "MAX_PENALTY_PERCENT",
 		"outputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "backend",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -233,6 +234,30 @@
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "billExists",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
@@ -309,27 +334,27 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_month",
+				"name": "m",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "_year",
+				"name": "y",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "_elecUsage",
+				"name": "e",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "_waterUsage",
+				"name": "w",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "_gracePeriodInSeconds",
+				"name": "grace",
 				"type": "uint256"
 			}
 		],
@@ -348,6 +373,19 @@
 	{
 		"inputs": [],
 		"name": "depositAmount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "depositedAmount",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -385,6 +423,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "endDate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -392,11 +443,21 @@
 				"type": "uint256"
 			}
 		],
-		"name": "externalBillPaid",
+		"name": "externalBills",
 		"outputs": [
 			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
 				"internalType": "bool",
-				"name": "",
+				"name": "isPaid",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
 				"type": "bool"
 			}
 		],
@@ -405,12 +466,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "isRentChangePending",
+		"name": "internetPrice",
 		"outputs": [
 			{
-				"internalType": "bool",
+				"internalType": "uint256",
 				"name": "",
-				"type": "bool"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -424,6 +485,19 @@
 				"internalType": "address payable",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "latePenaltyPercent",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -446,7 +520,7 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_billId",
+				"name": "id",
 				"type": "uint256"
 			}
 		],
@@ -459,7 +533,7 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_backendBillId",
+				"name": "id",
 				"type": "uint256"
 			}
 		],
@@ -469,16 +543,21 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "pendingRentAmount",
-		"outputs": [
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_backendBillId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_amount",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "registerExternalBill",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -502,6 +581,19 @@
 				"internalType": "string",
 				"name": "",
 				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "startDate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -535,7 +627,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "waterPrice",
+		"name": "unpaidBillCount",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -547,7 +639,16 @@
 		"type": "function"
 	},
 	{
-		"stateMutability": "payable",
-		"type": "receive"
+		"inputs": [],
+		"name": "waterPrice",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	}
 ]

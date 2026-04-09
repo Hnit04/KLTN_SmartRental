@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
-import { MessageCircle, X, Send, Bot, User, Loader2, Home, DollarSign, ExternalLink } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { aiApi } from "../../api/aiApi";
@@ -58,8 +58,8 @@ export default function AiChatBot() {
   };
 
   const renderMessageWithCards = (text: string): ReactNode => {
-    // Regex tìm chuỗi [ROOM_CARD: id | name | price | imageUrl]
-    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]*)\]/g;
+    // Regex tìm chuỗi [ROOM_CARD: id | name | price | imageUrl | distance(optional)]
+    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|\]]*?)(?:\s*\|\s*([^\]]*))?\]/g;
     const parts = [];
     let lastIndex = 0;
     let match;
@@ -69,9 +69,10 @@ export default function AiChatBot() {
         parts.push(<span key={`text-${lastIndex}`}>{formatText(text.substring(lastIndex, match.index))}</span>);
       }
 
-      const [_, roomId, roomName, priceStr, imageUrl] = match;
+      const [_, roomId, roomName, priceStr, imageUrl, distanceStr] = match;
       const cleanImgUrl = imageUrl.trim();
       const cleanPrice = parseInt(priceStr.trim().replace(/\D/g, '')) || 0;
+      const distance = distanceStr ? distanceStr.trim() : null;
       
       parts.push(
         <div key={`card-${match.index}`} className="w-full bg-card border border-border/50 rounded-2xl shadow-lg mt-4 mb-3 overflow-hidden group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
@@ -94,6 +95,15 @@ export default function AiChatBot() {
                 {cleanPrice.toLocaleString()}đ
               </div>
             </div>
+            {/* Badge khoảng cách - chỉ hiển thị khi có data location */}
+            {distance && (
+              <div className="absolute top-3 left-3">
+                <div className="bg-teal-500/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow-sm flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {distance}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Nội dung chi tiết */}
@@ -177,7 +187,12 @@ export default function AiChatBot() {
         userMsg.toLowerCase().includes("tiền") ||
         userMsg.toLowerCase().includes("nợ") ||
         userMsg.toLowerCase().includes("phòng") ||
-        userMsg.toLowerCase().includes("hợp đồng");
+        userMsg.toLowerCase().includes("hợp đồng") ||
+        userMsg.toLowerCase().includes("gần") ||
+        userMsg.toLowerCase().includes("khu vực") ||
+        userMsg.toLowerCase().includes("quanh") ||
+        userMsg.toLowerCase().includes("nearby") ||
+        userMsg.toLowerCase().includes("landmark");
 
     // Thêm tin nhắn của User vào UI
     const newMessage: Message = {
