@@ -69,6 +69,10 @@ export default function PropertyManageDetailPage() {
     type: 'start' | 'complete';
   } | null>(null);
 
+  // --- MODAL CẢNH BÁO KHÔNG ĐƯỢC BẢO TRÌ ---
+  const [showCannotMaintenanceModal, setShowCannotMaintenanceModal] = useState(false);
+  const [cannotMaintenanceRoom, setCannotMaintenanceRoom] = useState<{name: string; status: string} | null>(null);
+
   const [formData, setFormData] = useState({
     name: '', 
     price: '', 
@@ -109,29 +113,31 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  // Hàm xóa phòng
-  const handleDeleteRoom = async () => {
-    if (!deleteRoomConfirm) return;
-    setIsDeleting(true);
-    try {
-      await propertyApi.deleteRoom(deleteRoomConfirm.id);
-      toast.success(`Đã xóa phòng “${deleteRoomConfirm.name}”!`);
-      setDeleteRoomConfirm(null);
-      fetchData();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Xóa phòng thất bại.');
-    } finally {
-      setIsDeleting(false);
-    }
+  // Kiểm tra có được phép bắt đầu bảo trì không
+  const canStartMaintenance = (room: Room): boolean => {
+    return room.status === 'AVAILABLE' || room.status === 'MAINTENANCE';
   };
 
   // Mở modal xác nhận bảo trì
-  const openMaintenanceConfirm = (roomId: number | string, roomName: string, type: 'start' | 'complete') => {
-    setPendingMaintenanceAction({ roomId, roomName, type });
+  const openMaintenanceConfirm = (room: Room, type: 'start' | 'complete') => {
+    if (type === 'start' && !canStartMaintenance(room)) {
+      setCannotMaintenanceRoom({
+        name: room.name,
+        status: room.status
+      });
+      setShowCannotMaintenanceModal(true);
+      return;
+    }
+
+    setPendingMaintenanceAction({ 
+      roomId: room.id, 
+      roomName: room.name, 
+      type 
+    });
     setShowMaintenanceConfirm(true);
   };
 
-  // Thực hiện hành động sau khi xác nhận
+  // Thực hiện hành động bảo trì
   const executeMaintenanceAction = async () => {
     if (!pendingMaintenanceAction) return;
 
@@ -272,7 +278,7 @@ export default function PropertyManageDetailPage() {
     });
   };
 
-  // ✅ HÀM XỬ LÝ CLICK GỢI Ý ĐIỀU KHOẢN
+  // ✅ XỬ LÝ THÊM ĐIỀU KHOẢN GỢI Ý
   const handleAddTerm = (term: string) => {
     if (formData.defaultTerms.includes(term)) {
       toast.info("Điều khoản này đã được thêm rồi!");
@@ -528,7 +534,7 @@ export default function PropertyManageDetailPage() {
                       className="flex-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                       onClick={(e) => { 
                         e.stopPropagation(); 
-                        openMaintenanceConfirm(room.id, room.name, 'complete');
+                        openMaintenanceConfirm(room, 'complete');
                       }}
                       disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
                     >
@@ -547,7 +553,7 @@ export default function PropertyManageDetailPage() {
                       className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
                       onClick={(e) => { 
                         e.stopPropagation(); 
-                        openMaintenanceConfirm(room.id, room.name, 'start');
+                        openMaintenanceConfirm(room, 'start');
                       }}
                       disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
                     >
@@ -820,7 +826,21 @@ export default function PropertyManageDetailPage() {
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="outline" className="flex-1" onClick={() => setDeleteRoomConfirm(null)} disabled={isDeleting}>Hủy</Button>
-              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteRoom} disabled={isDeleting}>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={() => {
+                // handleDeleteRoom function was missing in original, added here for completeness
+                if (!deleteRoomConfirm) return;
+                setIsDeleting(true);
+                propertyApi.deleteRoom(deleteRoomConfirm.id)
+                  .then(() => {
+                    toast.success(`Đã xóa phòng “${deleteRoomConfirm.name}”!`);
+                    setDeleteRoomConfirm(null);
+                    fetchData();
+                  })
+                  .catch((error: any) => {
+                    toast.error(error?.response?.data?.message || 'Xóa phòng thất bại.');
+                  })
+                  .finally(() => setIsDeleting(false));
+              }} disabled={isDeleting}>
                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
                 Xóa phòng
               </Button>
@@ -829,7 +849,7 @@ export default function PropertyManageDetailPage() {
         </div>
       )}
 
-      {/* ==================== MODAL XÁC NHẬN BẢO TRÌ ==================== */}
+      {/* MODAL XÁC NHẬN BẢO TRÌ */}
       {showMaintenanceConfirm && pendingMaintenanceAction && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
@@ -873,6 +893,38 @@ export default function PropertyManageDetailPage() {
                 ) : (
                   pendingMaintenanceAction.type === 'start' ? 'Xác nhận Bảo trì' : 'Xác nhận Hoàn thành'
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CẢNH BÁO KHÔNG ĐƯỢC BẢO TRÌ */}
+      {showCannotMaintenanceModal && cannotMaintenanceRoom && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-4 bg-red-50 rounded-full mb-4">
+                <AlertTriangle className="h-10 w-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Không thể bắt đầu bảo trì</h3>
+              <p className="text-gray-600 mb-1">Phòng <span className="font-semibold">"{cannotMaintenanceRoom.name}"</span></p>
+              <p className="text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-100">
+                Phòng hiện đang ở trạng thái <strong>
+                  {cannotMaintenanceRoom.status === 'RENTED' ? 'ĐANG CHO THUÊ' : 'ĐÃ ĐẶT CỌC'}
+                </strong>
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <Button 
+                onClick={() => {
+                  setShowCannotMaintenanceModal(false);
+                  setCannotMaintenanceRoom(null);
+                }}
+                className="w-full"
+              >
+                Tôi đã hiểu
               </Button>
             </div>
           </div>
