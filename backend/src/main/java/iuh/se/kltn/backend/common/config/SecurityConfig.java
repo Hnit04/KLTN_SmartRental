@@ -101,7 +101,9 @@ public class SecurityConfig {
                             "/api/properties/landlord/**",
                             "/api/rooms/{id:[0-9]+}",
                             "/api/users/top-landlords",
-                            "/api/users/username"
+                            "/api/users/username",
+                            "/api/reviews/property/**",
+                            "/api/reviews/landlord/**"
                         ).permitAll()
                         .requestMatchers("/ws/**").permitAll() // ✅ Cho phép WebSocket handshake
                         .requestMatchers(HttpMethod.POST, "/api/appointments/**").authenticated()

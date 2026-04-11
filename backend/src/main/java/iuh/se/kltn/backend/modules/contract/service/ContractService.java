@@ -69,7 +69,7 @@ public class ContractService {
             throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
         }
 
-        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm
+        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm (Cho phép thuê gối đầu nếu HĐ cũ sắp hết)
         Long tenantIdToCheck = null;
         if (currentUser.getRole() == Role.TENANT) {
             tenantIdToCheck = currentUserId;
@@ -83,11 +83,19 @@ public class ContractService {
             List<Contract> existingContracts = contractRepository.findByTenantIdAndStatusIn(
                 tenantIdToCheck, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
             );
+            
+            // Lọc các hợp đồng thực sự bị xung đột thời gian (Ngày bắt đầu mới phải sau hoặc bằng ngày kết thúc của HĐ cũ)
+            java.time.LocalDate requestedStart = request.getStartDate();
+            existingContracts = existingContracts.stream().filter(c -> 
+                c.getEndDate() == null || c.getEndDate().isAfter(requestedStart) || c.getEndDate().isEqual(requestedStart)
+            ).collect(Collectors.toList());
+
             if (!existingContracts.isEmpty()) {
                 Contract existing = existingContracts.get(0);
                 String roomName = existing.getRoom() != null ? existing.getRoom().getName() : "#" + existing.getId();
                 String statusLabel = existing.getStatus() == ContractStatus.ACTIVE ? "đang thuê" : "đang chờ ký";
-                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + ". Mỗi người chỉ được thuê 1 phòng tại một thời điểm!");
+                String endDateStr = existing.getEndDate() != null ? "ngày " + existing.getEndDate() : "vô thời hạn (chưa xác định ngày kết thúc)";
+                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + " đến " + endDateStr + ". Hãy chọn ngày bắt đầu hợp đồng mới sau thời điểm này (nếu có)!");
             }
         }
 

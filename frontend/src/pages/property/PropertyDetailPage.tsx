@@ -104,8 +104,28 @@ export default function PropertyDetailPage() {
 
   const handleAskAI = () => {
     if (!property) return;
-    const question = `Nhờ AI tư vấn thêm về ưu nhược điểm của khu trọ "${property.name}" (Địa chỉ: ${property.address}, ${property.district}, ${property.city}).`;
-    window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question } }));
+    
+    // Tính giá phòng min-max từ danh sách rooms
+    const availableRooms = rooms.filter(r => r.status === "AVAILABLE");
+    const prices = rooms.map(r => r.price).filter(Boolean);
+    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+    const details = [
+      `Tên khu trọ: "${property.name}"`,
+      `Địa chỉ: ${property.address}, ${property.district}, ${property.city}`,
+      `Tổng số phòng: ${rooms.length} (Còn trống: ${availableRooms.length})`,
+      prices.length > 0 ? `Khoảng giá: ${minPrice.toLocaleString('vi-VN')}đ - ${maxPrice.toLocaleString('vi-VN')}đ/tháng` : '',
+      property.elecPrice ? `Giá điện: ${property.elecPrice.toLocaleString()}đ/kWh` : '',
+      property.waterPrice ? `Giá nước: ${property.waterPrice.toLocaleString()}đ/khối` : '',
+      property.internetPrice ? `Internet: ${property.internetPrice.toLocaleString()}đ/tháng` : '',
+      property.description ? `Mô tả: ${property.description.substring(0, 300)}` : '',
+      reviews.length > 0 ? `Đánh giá: ${avgRating.toFixed(1)}/5 sao (${reviews.length} lượt)` : 'Chưa có đánh giá',
+    ].filter(Boolean).join('. ');
+
+    const question = `Hãy phân tích chi tiết ưu điểm và nhược điểm của khu trọ sau đây, đánh giá giá dịch vụ có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
+    const shortText = `Tư vấn về khu trọ "${property.name}" giúp mình nhé! 🏠`;
+    window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question, autoSend: true, displayText: shortText } }));
   };
 
   const handleOpenBookingModal = (room: Room) => {

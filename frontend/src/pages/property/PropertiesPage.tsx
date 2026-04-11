@@ -257,7 +257,7 @@ export default function PropertiesPage() {
 
       {/* --- AI RECOMMENDATIONS --- */}
       {recommendedRooms.length > 0 && (
-        <div className="container mx-auto max-w-7xl px-4 py-8">
+        <div className="container mx-auto max-w-7xl px-4 py-8 relative z-20">
           <div className="flex items-center gap-3 border-b pb-4 mb-6">
             <div className="p-2 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-lg text-amber-600">
               <Sparkles className="h-6 w-6" />
@@ -281,9 +281,24 @@ export default function PropertiesPage() {
                  <Button 
                    variant="outline" 
                    className="w-full gap-2 border-primary/40 text-primary font-medium hover:bg-primary/5 shadow-sm h-10"
-                   onClick={() => window.dispatchEvent(new CustomEvent('openAiChat', { 
-                     detail: { question: `Bạn hãy phân tích ưu điểm và nhược điểm của phòng "${room.name}" này so với nhu cầu của mình nhé.` } 
-                   }))}
+                   onClick={() => {
+                     const amenitiesList = Array.isArray(room.amenities) ? room.amenities.join(', ') : '';
+                     const details = [
+                       `Tên phòng: "${room.name}"`,
+                       room.propertyName ? `Khu trọ: "${room.propertyName}"` : '',
+                       (room as any).propertyAddress || (room as any).address ? `Địa chỉ: ${(room as any).propertyAddress || (room as any).address}` : '',
+                       `Diện tích: ${room.area}m²`,
+                       `Giá thuê: ${room.price?.toLocaleString('vi-VN')}đ/tháng`,
+                       room.type ? `Loại: ${room.type}` : '',
+                       room.hasMezzanine ? 'Có gác lửng' : '',
+                       room.hasBalcony ? 'Có ban công' : '',
+                       amenitiesList ? `Tiện nghi: ${amenitiesList}` : '',
+                       room.description ? `Mô tả: ${room.description.substring(0, 200)}` : '',
+                     ].filter(Boolean).join('. ');
+                     const q = `Hãy phân tích chi tiết ưu điểm và nhược điểm của phòng trọ sau đây, đánh giá mức giá có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
+                     const shortText = `Phân tích phòng "${room.name}" tại "${room.propertyName || 'khu trọ này'}" giúp mình nhé! 🏠`;
+                     window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question: q, autoSend: true, displayText: shortText } }));
+                   }}
                  >
                    <Bot className="h-4 w-4" /> Hỏi AI về phòng này
                  </Button>

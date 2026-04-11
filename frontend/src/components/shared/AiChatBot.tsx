@@ -29,30 +29,69 @@ export default function AiChatBot() {
 
   // --- HÀM RENDER TIN NHẮN CHỨA CARD UI VÀ MARKDOWN ---
   const formatText = (t: string): ReactNode => {
-    return t.split('\n').map((line, i) => {
+    // 1. Loại bỏ các dòng bị đứt khúc chỉ chứa dấu chấm tròn (do AI Gen lỗi format)
+    const lines = t.split('\n').filter(line => {
+      const trimmed = line.trim();
+      return trimmed !== '•' && trimmed !== '*' && trimmed !== '-';
+    });
+
+    return lines.map((line, i) => {
       let parsedLine = line.trim();
-      let isList = false;
-      
-      if (/^[-*]\s*/.test(parsedLine)) {
-        isList = true;
-        parsedLine = parsedLine.replace(/^[-*]\s*/, '');
+      if (!parsedLine) return <div key={i} className="h-1.5" />;
+
+      // Xử lý Headers (### Tiêu đề)
+      let isHeader = false;
+      if (/^#{1,3}\s+/.test(parsedLine)) {
+        isHeader = true;
+        parsedLine = parsedLine.replace(/^#{1,3}\s+/, '');
       }
 
+      // Xử lý Lists (- hoặc * hoặc •)
+      let isList = false;
+      if (/^[-*•]\s*/.test(parsedLine)) {
+        isList = true;
+        parsedLine = parsedLine.replace(/^[-*•]\s*/, '');
+      }
+
+      // Nếu cụm từ là tiêu đề dạng "**Khuyết điểm:**" 
+      if (parsedLine.startsWith('**') && parsedLine.includes('**:') && !isList) {
+        isHeader = true;
+      }
+
+      // Xử lý In Đậm (**bold**)
       const boldParts = parsedLine.split(/(\*\*.*?\*\*)/g);
       const lineContent = boldParts.map((part, j) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={j} className="font-semibold text-primary/90">{part.slice(2, -2)}</strong>;
+          return <strong key={j} className="font-bold text-primary">{part.slice(2, -2)}</strong>;
         }
         return part;
       });
 
-      if (!line.trim() && !isList) return <br key={i} />;
+      // RENDER HEADER
+      if (isHeader) {
+        return (
+          <div key={i} className="font-bold text-primary text-[14px] mt-4 mb-2 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary/80 inline-block shadow-sm" />
+            <span className="uppercase tracking-wide">{lineContent}</span>
+          </div>
+        );
+      }
 
+      // RENDER LIST ITEM
+      if (isList) {
+        return (
+          <div key={i} className="flex items-start gap-2.5 ml-2 mb-2 text-[14px] group">
+            <span className="text-primary mt-[5px] text-[10px] opacity-70 group-hover:opacity-100 transition-opacity">✦</span>
+            <span className="flex-1 text-foreground/90 leading-relaxed">{lineContent}</span>
+          </div>
+        );
+      }
+
+      // RENDER NORMAL TEXT
       return (
-        <div key={i} className={`mb-1 ${isList ? "flex items-start gap-1.5 ml-1" : ""}`}>
-          {isList && <span className="text-[14px] mt-0.5">•</span>}
-          <span className="leading-relaxed whitespace-pre-wrap flex-1">{lineContent}</span>
-        </div>
+         <div key={i} className="mb-2.5 text-[14px] text-foreground/90 leading-relaxed">
+            {lineContent}
+         </div>
       );
     });
   };
@@ -163,47 +202,56 @@ export default function AiChatBot() {
     const handleOpenAiChat = ((e: CustomEvent) => {
       setIsOpen(true);
       if (e.detail?.question) {
-        setInput(e.detail.question);
-        // Tùy chọn: tự động submit luôn hoặc để user tự bấm
-        // handleSend();
+        if (e.detail?.autoSend) {
+          // Tự động gửi luôn — không cần user bấm nút
+          // displayText: tin nhắn ngắn hiển thị trong chat UI
+          setTimeout(() => sendMessage(e.detail.question, e.detail.displayText), 300);
+        } else {
+          setInput(e.detail.question);
+        }
       }
     }) as EventListener;
 
     window.addEventListener('openAiChat', handleOpenAiChat);
     return () => window.removeEventListener('openAiChat', handleOpenAiChat);
-  }, []);
+  }, [isAuthenticated]); // cần isAuthenticated vì sendMessage dùng nó
 
-  const handleSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim()) return;
+  // Core logic gửi tin nhắn — nhận trực tiếp chuỗi message
+  // displayText: (tùy chọn) tin nhắn ngắn hiển thị trong chat, thay vì hiển thị toàn bộ fullMsg
+  const sendMessage = async (fullMsg: string, displayText?: string) => {
+    if (!fullMsg.trim()) return;
 
-    const userMsg = input.trim();
-    setInput("");
+    const lowerMsg = fullMsg.toLowerCase();
+    const isGeneralAnalysis = lowerMsg.includes("phân tích") || lowerMsg.includes("tư vấn") || lowerMsg.includes("ưu điểm") || lowerMsg.includes("nhược điểm") || lowerMsg.includes("lời khuyên");
     
     // Kiểm tra xem câu hỏi có mang tính truy vấn dữ liệu không (hỏi giá, hỏi nợ, hoá đơn)
-    const isDataQuery = 
-        userMsg.toLowerCase().includes("hoá đơn") || 
-        userMsg.toLowerCase().includes("hóa đơn") ||
-        userMsg.toLowerCase().includes("tiền") ||
-        userMsg.toLowerCase().includes("nợ") ||
-        userMsg.toLowerCase().includes("phòng") ||
-        userMsg.toLowerCase().includes("hợp đồng") ||
-        userMsg.toLowerCase().includes("gần") ||
-        userMsg.toLowerCase().includes("khu vực") ||
-        userMsg.toLowerCase().includes("quanh") ||
-        userMsg.toLowerCase().includes("nearby") ||
-        userMsg.toLowerCase().includes("landmark");
+    const isDataQuery = !isGeneralAnalysis && (
+        lowerMsg.includes("hoá đơn") || 
+        lowerMsg.includes("hóa đơn") ||
+        lowerMsg.includes("tiền") ||
+        lowerMsg.includes("nợ") ||
+        lowerMsg.includes("phòng") ||
+        lowerMsg.includes("hợp đồng") ||
+        lowerMsg.includes("gần") ||
+        lowerMsg.includes("khu vực") ||
+        lowerMsg.includes("quanh") ||
+        lowerMsg.includes("nearby") ||
+        lowerMsg.includes("landmark")
+    );
 
-    // Thêm tin nhắn của User vào UI
+    // Hiển thị tin nhắn ngắn trong UI (nếu có displayText), nhưng gửi fullMsg cho AI
     const newMessage: Message = {
       id: Date.now().toString(),
-      text: userMsg,
+      text: displayText || fullMsg,
       sender: "user",
       isDataQuery
     };
     
     setMessages((prev) => [...prev, newMessage]);
     setIsLoading(true);
+
+    // Biến chứa nội dung thực sự gửi đi cho AI (luôn là fullMsg đầy đủ)
+    const userMsg = fullMsg.trim();
 
     try {
       let replyText = "";
@@ -221,7 +269,7 @@ export default function AiChatBot() {
           }
         }
       } else {
-        // Chat thông thường (hỏi linh tinh, hỏi luật)
+        // Chat thông thường (hỏi linh tinh, hỏi luật, phân tích phòng)
         try {
           const chatRes = await aiApi.chat(userMsg, "web-session");
           replyText = chatRes.reply;
@@ -247,6 +295,14 @@ export default function AiChatBot() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!input.trim()) return;
+    const msg = input.trim();
+    setInput("");
+    await sendMessage(msg);
   };
 
   return (
