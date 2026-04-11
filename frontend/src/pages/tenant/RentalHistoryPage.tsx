@@ -312,7 +312,7 @@ export default function RentalHistoryPage() {
                         </div>
 
                         <Link 
-                            to={`/contracts/${item.id}`}
+                            to={`/tenant/contracts/${item.id}`}
                             className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold text-sm shadow-sm hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 transform group-hover:translate-x-1"
                         >
                             Xem chi tiết <ArrowRight className="h-4 w-4" />

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
   Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight,
-  Wrench      
+  Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";
@@ -54,6 +54,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   // ✅ KHÔI PHỤC HÀM "THUÊ NGAY"
   const handleRentNow = () => {
     if (!isAvailable) return;
+    // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
     navigate(`/contracts/create?roomId=${data.id}`);
   };
 
@@ -239,24 +240,24 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
       {isDetailOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
           <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
-            
+
             <div className="h-56 bg-gray-100 relative shrink-0">
               {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
-              <button 
-                onClick={() => setIsDetailOpen(false)} 
+              <button
+                onClick={() => setIsDetailOpen(false)}
                 className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
               >
                 <XCircle className="h-6 w-6" />
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto">
               <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
               <p className="text-2xl text-primary font-bold mb-4">
-                {formatPrice(data.price)} 
+                {formatPrice(data.price)}
                 <span className="text-sm font-normal text-gray-500">/tháng</span>
               </p>
-              
+
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <span className="text-xs text-gray-500 uppercase font-bold">Diện tích & Không gian</span>
@@ -278,12 +279,12 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                     isMaintenance ? 'text-amber-600' : 
                     'text-gray-500'
                   }`}>
-                    {isAvailable 
-                      ? "Sẵn sàng đón khách" 
-                      : isReserved 
-                        ? "Đang có người đợi ký HĐ" 
-                        : isMaintenance 
-                          ? "Đang bảo trì / Sửa chữa" 
+                    {isAvailable
+                      ? "Sẵn sàng đón khách"
+                      : isReserved
+                        ? "Đang có người đợi ký HĐ"
+                        : isMaintenance
+                          ? "Đang bảo trì / Sửa chữa"
                           : "Đang có người thuê"}
                   </p>
                 </div>
@@ -305,23 +306,23 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                 <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsDetailOpen(false)}>
                   Đóng
                 </Button>
-                
+
                 <div className="flex flex-1 gap-3">
-                  <Button 
+                  <Button
                     variant="outline"
-                    className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50" 
-                    disabled={!isAvailable || isMaintenance} 
+                    className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50"
+                    disabled={!isAvailable || isMaintenance}
                     onClick={() => {
-                      setIsDetailOpen(false); 
-                      if (onBookAppointment) onBookAppointment(); 
+                      setIsDetailOpen(false);
+                      if (onBookAppointment) onBookAppointment();
                     }}
                   >
                     <CalendarClock className="h-4 w-4 mr-2" /> Đặt lịch
                   </Button>
 
-                  <Button 
-                    className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md" 
-                    disabled={!isAvailable || isMaintenance} 
+                  <Button
+                    className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md"
+                    disabled={!isAvailable || isMaintenance}
                     onClick={handleRentNow}
                   >
                     <FileSignature className="h-4 w-4 mr-2" /> Thuê ngay
