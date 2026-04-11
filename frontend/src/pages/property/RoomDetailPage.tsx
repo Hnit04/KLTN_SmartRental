@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Maximize, Zap, Droplets, Wifi, CalendarClock,
   CheckCircle, XCircle, Bot, Loader2, X, Phone, MessageSquare,
-  MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn
+  MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn,
+  Wrench
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -48,7 +49,11 @@ export default function RoomDetailPage() {
     };
     load();
   }, [id]);
-  console.log("Loaded room detail:", room);
+
+  // Kiểm tra trạng thái phòng
+  const isAvailable = room?.status === "AVAILABLE";
+  const isReserved = room?.status === "RESERVED";
+  const isMaintenance = room?.status === "MAINTENANCE";
 
   const handleBooking = async () => {
     if (!isAuthenticated) {
@@ -60,7 +65,23 @@ export default function RoomDetailPage() {
       toast.error("Tài khoản Chủ trọ không thể đặt lịch xem phòng.");
       return;
     }
-    setMeetDate(""); setMeetTime(""); setNote("");
+
+    if (isMaintenance) {
+      toast.error("Phòng đang trong quá trình bảo trì. Không thể đặt lịch lúc này.");
+      return;
+    }
+    if (isReserved) {
+      toast.error("Phòng đã có người đặt cọc. Không thể đặt lịch xem.");
+      return;
+    }
+    if (!isAvailable) {
+      toast.error("Phòng hiện không còn trống.");
+      return;
+    }
+
+    setMeetDate("");
+    setMeetTime("");
+    setNote("");
     setIsBookingOpen(true);
   };
 
@@ -91,6 +112,17 @@ export default function RoomDetailPage() {
     window.dispatchEvent(new CustomEvent("openAiChat", { detail: { question: q } }));
   };
 
+  const formatPrice = (n: number) => 
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+
+  // Text cho nút Đặt lịch
+  const getBookingButtonText = () => {
+    if (isMaintenance) return "Phòng đang bảo trì";
+    if (isReserved) return "Đã có người đặt cọc";
+    if (!isAvailable) return "Phòng đã có người thuê";
+    return "Đặt lịch xem phòng";
+  };
+
   if (isLoading) return <LoadingSpinner />;
   if (!room) return (
     <div className="flex flex-col items-center justify-center py-32 text-gray-500">
@@ -106,11 +138,10 @@ export default function RoomDetailPage() {
   try {
     images = room.images ? (typeof room.images === "string" ? JSON.parse(room.images) : room.images) : [];
     amenities = room.amenities ? (typeof room.amenities === "string" ? JSON.parse(room.amenities) : room.amenities) : [];
-  } catch { images = []; amenities = []; }
-
-  const isAvailable = room.status === "AVAILABLE";
-  const isReserved = room.status === "RESERVED";
-  const formatPrice = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+  } catch {
+    images = [];
+    amenities = [];
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -119,25 +150,42 @@ export default function RoomDetailPage() {
       {lightboxOpen && images.length > 0 && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
           onClick={() => setLightboxOpen(false)}>
-          <button className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 transition"
-            onClick={() => setLightboxOpen(false)}><X className="h-6 w-6" /></button>
-          <button className="absolute left-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + images.length) % images.length); }}>
+          <button 
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 transition"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <button 
+            className="absolute left-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + images.length) % images.length); }}
+          >
             <ChevronLeft className="h-7 w-7" />
           </button>
-          <img src={images[lightboxIndex]} alt="" className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
-            onClick={e => e.stopPropagation()} />
-          <button className="absolute right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % images.length); }}>
+          <img 
+            src={images[lightboxIndex]} 
+            alt="" 
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+            onClick={e => e.stopPropagation()} 
+          />
+          <button 
+            className="absolute right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % images.length); }}
+          >
             <ChevronRight className="h-7 w-7" />
           </button>
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
             {images.map((_, i) => (
-              <button key={i} onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
-                className={`w-2 h-2 rounded-full transition ${i === lightboxIndex ? "bg-white scale-125" : "bg-white/40"}`} />
+              <button 
+                key={i} 
+                onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
+                className={`w-2 h-2 rounded-full transition ${i === lightboxIndex ? "bg-white scale-125" : "bg-white/40"}`} 
+              />
             ))}
           </div>
-          <span className="absolute bottom-4 right-4 text-white/60 text-sm">{lightboxIndex + 1} / {images.length}</span>
+          <span className="absolute bottom-4 right-4 text-white/60 text-sm">
+            {lightboxIndex + 1} / {images.length}
+          </span>
         </div>
       )}
 
@@ -166,10 +214,16 @@ export default function RoomDetailPage() {
             {images.length > 0 ? (
               <div className={`grid gap-2 rounded-2xl overflow-hidden h-72 md:h-96 ${images.length >= 3 ? "grid-cols-3" : images.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
                 {images.slice(0, 3).map((img, i) => (
-                  <div key={i}
+                  <div 
+                    key={i}
                     className={`relative group cursor-pointer overflow-hidden ${i === 0 && images.length >= 3 ? "col-span-2 row-span-2" : ""}`}
-                    onClick={() => { setLightboxIndex(i); setLightboxOpen(true); }}>
-                    <img src={img} alt={`Ảnh ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    onClick={() => { setLightboxIndex(i); setLightboxOpen(true); }}
+                  >
+                    <img 
+                      src={img} 
+                      alt={`Ảnh ${i + 1}`} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                    />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
                       <ZoomIn className="h-7 w-7 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
@@ -189,18 +243,18 @@ export default function RoomDetailPage() {
 
             {/* THÔNG TIN CHÍNH */}
             <div className="bg-white rounded-2xl border p-6 space-y-5 shadow-sm">
-              {/* Tên + Badge */}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Phòng {room.name}</h1>
                   {room.propertyName && (
-                    <Link to={`/properties/${room.propertyId}`}
-                      className="flex items-center gap-1 text-sm text-primary mt-1 hover:underline">
+                    <Link 
+                      to={`/properties/${room.propertyId}`}
+                      className="flex items-center gap-1 text-sm text-primary mt-1 hover:underline"
+                    >
                       <MapPin className="h-3.5 w-3.5" />
                       {room.propertyName} · {room.propertyAddress || room.address}
                     </Link>
                   )}
-                  {/* Loại phòng + badge không gian */}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     {room.type && (
                       <span className="text-xs font-medium text-primary bg-primary/5 border border-primary/20 px-2.5 py-1 rounded-full">
@@ -224,14 +278,23 @@ export default function RoomDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Badge trạng thái */}
                 <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                   isAvailable ? "bg-green-100 text-green-700" : 
                   isReserved ? "bg-orange-100 text-orange-700" : 
+                  isMaintenance ? "bg-amber-100 text-amber-700" : 
                   "bg-gray-100 text-gray-500"
                 }`}>
-                  {isAvailable ? <><CheckCircle className="h-3.5 w-3.5" /> Còn trống</> : 
-                   isReserved ? <><CalendarClock className="h-3.5 w-3.5" /> Chờ ký HĐ</> : 
-                   <><XCircle className="h-3.5 w-3.5" /> Đã thuê</>}
+                  {isAvailable ? (
+                    <><CheckCircle className="h-3.5 w-3.5" /> Còn trống</>
+                  ) : isReserved ? (
+                    <><CalendarClock className="h-3.5 w-3.5" /> Đã có người đặt cọc</>
+                  ) : isMaintenance ? (
+                    <><Wrench className="h-3.5 w-3.5" /> Đang bảo trì</>
+                  ) : (
+                    <><XCircle className="h-3.5 w-3.5" /> Đã thuê</>
+                  )}
                 </span>
               </div>
 
@@ -239,7 +302,10 @@ export default function RoomDetailPage() {
               <div className="flex flex-wrap gap-4">
                 <div className="bg-primary/5 border border-primary/20 rounded-xl px-5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">Giá thuê</p>
-                  <p className="text-2xl font-extrabold text-primary">{formatPrice(room.price)}<span className="text-sm font-normal text-gray-500">/tháng</span></p>
+                  <p className="text-2xl font-extrabold text-primary">
+                    {formatPrice(room.price)}
+                    <span className="text-sm font-normal text-gray-500">/tháng</span>
+                  </p>
                 </div>
                 <div className="bg-gray-50 border rounded-xl px-5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">Diện tích</p>
@@ -249,34 +315,44 @@ export default function RoomDetailPage() {
                 </div>
               </div>
 
-              {/* Phí dịch vụ */}
+              {/* Phí dịch vụ, Tiện ích, Mô tả, Điều khoản ... (giữ nguyên như file gốc) */}
+              {/* Bạn có thể copy phần này từ file cũ nếu cần, ở đây tôi giữ cấu trúc đầy đủ */}
+
               {(room.elecPrice || room.waterPrice || room.internetPrice) && (
                 <div className="border-t pt-4">
                   <p className="text-sm font-semibold text-gray-700 mb-3">Chi phí dịch vụ</p>
                   <div className="flex flex-wrap gap-3">
-                    {room.elecPrice ? (
+                    {room.elecPrice && (
                       <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-100">
                         <Zap className="h-4 w-4 text-yellow-500" />
-                        <div><p className="text-[10px] text-gray-400 font-bold uppercase">Điện</p><p className="text-sm font-bold">{room.elecPrice.toLocaleString()}đ/kWh</p></div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Điện</p>
+                          <p className="text-sm font-bold">{room.elecPrice.toLocaleString()}đ/kWh</p>
+                        </div>
                       </div>
-                    ) : null}
-                    {room.waterPrice ? (
+                    )}
+                    {room.waterPrice && (
                       <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
                         <Droplets className="h-4 w-4 text-blue-500" />
-                        <div><p className="text-[10px] text-gray-400 font-bold uppercase">Nước</p><p className="text-sm font-bold">{room.waterPrice.toLocaleString()}đ/khối</p></div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Nước</p>
+                          <p className="text-sm font-bold">{room.waterPrice.toLocaleString()}đ/khối</p>
+                        </div>
                       </div>
-                    ) : null}
-                    {room.internetPrice ? (
+                    )}
+                    {room.internetPrice && (
                       <div className="flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100">
                         <Wifi className="h-4 w-4 text-indigo-500" />
-                        <div><p className="text-[10px] text-gray-400 font-bold uppercase">Internet</p><p className="text-sm font-bold">{room.internetPrice.toLocaleString()}đ/tháng</p></div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Internet</p>
+                          <p className="text-sm font-bold">{room.internetPrice.toLocaleString()}đ/tháng</p>
+                        </div>
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Tiện ích */}
               {amenities.length > 0 && (
                 <div className="border-t pt-4">
                   <p className="text-sm font-semibold text-gray-700 mb-3">Tiện nghi phòng</p>
@@ -290,7 +366,6 @@ export default function RoomDetailPage() {
                 </div>
               )}
 
-              {/* Mô tả */}
               {room.description && (
                 <div className="border-t pt-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">Mô tả phòng</p>
@@ -300,7 +375,6 @@ export default function RoomDetailPage() {
                 </div>
               )}
 
-              {/* Điều khoản mẫu */}
               {room.defaultTerms && (
                 <div className="border-t pt-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">Nội quy & Điều khoản</p>
@@ -316,15 +390,13 @@ export default function RoomDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-4">
 
-              {/* Card CTA */}
               <div className="bg-white rounded-2xl border shadow-lg p-5 space-y-3">
                 <div className="text-center pb-3 border-b">
                   <p className="text-2xl font-extrabold text-primary">{formatPrice(room.price)}</p>
                   <p className="text-sm text-gray-400">/ tháng · {room.area} m²</p>
                 </div>
 
-                {/* AI Match Badge */}
-                {room.matchScore && room.matchScore > 0 ? (
+                {room.matchScore && room.matchScore > 0 && (
                   <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">
                     <Sparkles className="h-4 w-4 text-primary shrink-0" />
                     <div>
@@ -332,16 +404,15 @@ export default function RoomDetailPage() {
                       {room.matchReason && <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{room.matchReason}</p>}
                     </div>
                   </div>
-                ) : null}
+                )}
 
                 <Button
                   className="w-full h-11 gap-2"
-                  disabled={!isAvailable}
+                  disabled={!isAvailable || isReserved || isMaintenance}
                   onClick={handleBooking}
                 >
                   <CalendarClock className="h-4 w-4" />
-                  {isAvailable ? "Đặt lịch xem phòng" : 
-                   isReserved ? "Đang có người chờ ký" : "Phòng đã có người thuê"}
+                  {getBookingButtonText()}
                 </Button>
 
                 {isAvailable && isAuthenticated && user?.role !== "LANDLORD" && (
@@ -371,22 +442,31 @@ export default function RoomDetailPage() {
                   <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Liên hệ chủ nhà</p>
                   <p className="font-bold text-gray-900">{room.landlordName || "Chủ nhà"}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm" className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                      onClick={() => window.location.href = `tel:${(room as any).landlordPhone}`}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+                      onClick={() => window.location.href = `tel:${(room as any).landlordPhone}`}
+                    >
                       <Phone className="h-3.5 w-3.5" /> Gọi điện
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-                      onClick={() => window.open(`https://zalo.me/${(room as any).landlordPhone}`, "_blank")}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => window.open(`https://zalo.me/${(room as any).landlordPhone}`, "_blank")}
+                    >
                       <MessageSquare className="h-3.5 w-3.5" /> Zalo
                     </Button>
                   </div>
                 </div>
               )}
 
-              {/* Quay lại khu trọ */}
               {room.propertyId && (
-                <Link to={`/properties/${room.propertyId}`}
-                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary transition px-1">
+                <Link 
+                  to={`/properties/${room.propertyId}`}
+                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary transition px-1"
+                >
                   <ArrowLeft className="h-4 w-4" />
                   Xem tất cả phòng của khu trọ này
                 </Link>
@@ -416,11 +496,20 @@ export default function RoomDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700">Ngày xem <span className="text-red-500">*</span></label>
-                  <Input type="date" value={meetDate} onChange={e => setMeetDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+                  <Input 
+                    type="date" 
+                    value={meetDate} 
+                    onChange={e => setMeetDate(e.target.value)} 
+                    min={new Date().toISOString().split("T")[0]} 
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700">Giờ xem <span className="text-red-500">*</span></label>
-                  <Input type="time" value={meetTime} onChange={e => setMeetTime(e.target.value)} />
+                  <Input 
+                    type="time" 
+                    value={meetTime} 
+                    onChange={e => setMeetTime(e.target.value)} 
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -435,7 +524,10 @@ export default function RoomDetailPage() {
             </div>
             <div className="p-5 bg-gray-50 border-t flex justify-end gap-3">
               <Button variant="outline" onClick={() => setIsBookingOpen(false)}>Hủy</Button>
-              <Button onClick={handleSubmitBooking} disabled={isSubmitting || !meetDate || !meetTime}>
+              <Button 
+                onClick={handleSubmitBooking} 
+                disabled={isSubmitting || !meetDate || !meetTime}
+              >
                 {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Gửi yêu cầu
               </Button>
