@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { 
-  TrendingUp, Users, Home as HomeIcon, AlertCircle, 
-  Wallet, ArrowUpRight, ArrowDownRight, Clock 
+import {
+  TrendingUp, Users, Home as HomeIcon, AlertCircle,
+  Wallet, ArrowUpRight, ArrowDownRight, Clock
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { Button } from '@/components/ui/Button';
 import { Link } from 'react-router-dom';
-import { billApi } from '@/api/billApi'; 
+import { billApi } from '@/api/billApi';
 import { roomApi } from '@/api/roomApi';
 
 // Dữ liệu Mock cho Biểu đồ Doanh thu (Sẽ thay bằng API sau nếu cần)
@@ -42,7 +42,7 @@ export default function DashboardPage() {
         setLoading(true);
         const response = await billApi.getRevenueThisAndLastMonth();
         const data = response.data;
-        
+
         const thisRev = data.thisMonth?.totalRevenue || 0;
         const lastRev = data.lastMonth?.totalRevenue || 0;
 
@@ -54,7 +54,7 @@ export default function DashboardPage() {
           const change = ((thisRev - lastRev) / lastRev) * 100;
           setPercentageChange(change);
         } else if (thisRev > 0) {
-          setPercentageChange(100); 
+          setPercentageChange(100);
         } else {
           setPercentageChange(0);
         }
@@ -77,7 +77,7 @@ export default function DashboardPage() {
           data.totalRooms > 0
             ? Number(((data.rentedRooms / data.totalRooms) * 100).toFixed(2))
             : 0
-        );      
+        );
         setTotalTenants(data.totalTenants || 0);
       } catch (err: any) {
         console.error("Lỗi khi lấy thống kê phòng:", err);
@@ -100,12 +100,12 @@ export default function DashboardPage() {
 
     const fetchRevenueLast6Months = async () => {
       try {
-            const response = await billApi.getRevenueLast6Months();
-            setRevenueData(response.data);
-            console.log("Dữ liệu doanh thu 6 tháng:", response.data);
-        } catch (error) {
-            console.error("Lỗi khi lấy dữ liệu doanh thu:", error);
-        }
+        const response = await billApi.getRevenueLast6Months();
+        setRevenueData(response.data);
+        console.log("Dữ liệu doanh thu 6 tháng:", response.data);
+      } catch (error) {
+        console.error("Lỗi khi lấy dữ liệu doanh thu:", error);
+      }
     };
     const fetchAllStats = () => {
       fetchRevenueLast6Months();
@@ -133,7 +133,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      
+
       {/* --- HEADER --- */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Tổng quan kinh doanh</h1>
@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
       {/* --- 4 THẺ THỐNG KÊ (KPI CARDS) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
+
         {/* Doanh thu tháng này - Dùng dữ liệu từ API */}
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <div className="flex justify-between items-start">
@@ -167,10 +167,9 @@ export default function DashboardPage() {
               <span className="text-gray-400">—</span>
             ) : (
               <>
-                <span 
-                  className={`flex items-center font-medium ${
-                    isPositiveChange ? 'text-green-600' : 'text-red-600'
-                  }`}
+                <span
+                  className={`flex items-center font-medium ${isPositiveChange ? 'text-green-600' : 'text-red-600'
+                    }`}
                 >
                   {isPositiveChange ? (
                     <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -253,12 +252,12 @@ export default function DashboardPage() {
             </span>
             <span className="text-gray-400 ml-2">đang chờ thanh toán</span>
           </div>
-</div>
+        </div>
       </div>
 
       {/* Phần còn lại giữ nguyên (biểu đồ + to-do list) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* BIỂU ĐỒ DOANH THU */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border shadow-sm">
           <div className="flex justify-between items-center mb-6">
@@ -273,13 +272,13 @@ export default function DashboardPage() {
               <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#6b7280', fontSize: 12 }}
                   tickFormatter={(value) => `${value / 1000000}M`}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: '#f3f4f6' }}
                   formatter={(value: any) => [`${Number(value).toLocaleString()} đ`, 'Doanh thu']}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -295,7 +294,7 @@ export default function DashboardPage() {
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-orange-500" /> Cần xử lý ngay
           </h3>
-          
+
           <div className="space-y-4 flex-1">
             {/* ... giữ nguyên nội dung to-do list ... */}
           </div>

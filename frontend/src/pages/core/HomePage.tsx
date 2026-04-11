@@ -11,7 +11,31 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import React from "react";
+import React, { useEffect, useState } from "react";
+
+// Custom hook để animate số
+const useCountUp = (end: number, duration: number = 2000) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTime: number;
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = (timestamp - startTime) / duration;
+
+      if (progress < 1) {
+        setCount(Math.floor(end * progress));
+        requestAnimationFrame(animate);
+      } else {
+        setCount(end);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [end, duration]);
+
+  return count;
+};
 
 // 1. Định nghĩa Interface cho Button để fix lỗi "implicitly any"
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,15 +46,15 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 // 2. Áp dụng Interface vào Component
-const Button = ({ 
-  children, 
-  variant = "primary", 
-  size = "md", 
-  className = "", 
-  ...props 
+const Button = ({
+  children,
+  variant = "primary",
+  size = "md",
+  className = "",
+  ...props
 }: ButtonProps) => {
   const baseStyles = "inline-flex items-center justify-center rounded-full font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50";
-  
+
   const variants = {
     primary: "bg-[#8B5E3C] text-white hover:bg-[#724D31] shadow-lg shadow-[#8B5E3C]/20",
     secondary: "bg-white text-[#8B5E3C] hover:bg-[#FDF8F3] shadow-md",
@@ -45,13 +69,42 @@ const Button = ({
   };
 
   return (
-    <button 
+    <button
       // TypeScript giờ đã biết variant và size chắc chắn nằm trong danh sách key của variants/sizes
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {children}
     </button>
+  );
+};
+
+// Component để render stat với animation
+const CountUpStat = ({ stat }: { stat: typeof stats[0] }) => {
+  // Trích xuất số (giữ lại dấu chấm/phẩy nếu là số thập phân)
+  const isDecimal = stat.value.includes('.');
+  const numValue = isDecimal
+    ? parseFloat(stat.value.replace(/[^0-9.]/g, ''))
+    : parseInt(stat.value.replace(/\D/g, ''));
+
+  const count = useCountUp(numValue, 2000);
+
+  // Trích xuất hậu tố (ví dụ: "+", "/5")
+  // Xóa số và dấu phân cách hàng nghìn/thập phân để lấy hậu tố sạch
+  const suffix = stat.value.replace(/[0-9.,]/g, '');
+
+  return (
+    <div className={`group relative rounded-2xl ${stat.bgColor} backdrop-blur-sm p-8 text-center border border-current/10 hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer`}>
+      <div className="flex justify-center mb-4">
+        <div className={`${stat.bgColor.replace('50', '100')} p-3 rounded-xl group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300`}>
+          <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
+        </div>
+      </div>
+      <div className="text-4xl font-black text-[#8B5E3C] mb-2 group-hover:scale-110 transition-transform duration-300">
+        {isDecimal ? count.toFixed(1) : count.toLocaleString()}{suffix}
+      </div>
+      <div className="text-xs uppercase tracking-widest font-bold text-[#6D5D50]/70">{stat.label}</div>
+    </div>
   );
 };
 
@@ -79,14 +132,14 @@ const features = [
 ];
 
 const stats = [
-  { value: "10,000+", label: "Phòng trọ sẵn sàng" },
-  { value: "5,000+", label: "Chủ trọ tin dùng" },
-  { value: "50,000+", label: "Người thuê đã kết nối" },
-  { value: "4.9/5", label: "Đánh giá hài lòng" },
+  { value: "10,000+", label: "Phòng trọ sẵn sàng", icon: MapPin, color: "blue", bgColor: "bg-blue-50", iconColor: "text-blue-600" },
+  { value: "5,000+", label: "Chủ trọ tin dùng", icon: Building2, color: "green", bgColor: "bg-green-50", iconColor: "text-green-600" },
+  { value: "50,000+", label: "Người thuê đã kết nối", icon: Users, color: "orange", bgColor: "bg-orange-50", iconColor: "text-orange-600" },
+  { value: "4.8/5", label: "Đánh giá hài lòng", icon: Star, color: "gold", bgColor: "bg-yellow-50", iconColor: "text-yellow-600" },
 ];
 
 export default function App() {
-    const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#FDF8F3] font-sans text-[#4A3728]">
@@ -110,7 +163,7 @@ export default function App() {
                 <span className="text-[#8B5E3C]">thuê phòng trọ</span>
               </h1>
               <p className="mt-8 text-lg leading-relaxed text-[#6D5D50] max-w-xl mx-auto lg:mx-0">
-                Kết nối chủ trọ và người thuê thông qua công nghệ hiện đại. 
+                Kết nối chủ trọ và người thuê thông qua công nghệ hiện đại.
                 Đơn giản hóa mọi thủ tục giấy tờ, thanh toán minh bạch và an toàn tuyệt đối.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
@@ -125,7 +178,7 @@ export default function App() {
                 <Link to="/properties">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto">
                     Khám phá phòng trọ
-                  </Button> 
+                  </Button>
                 </Link>
               </div>
             </div>
@@ -133,9 +186,9 @@ export default function App() {
             {/* Hero Image / Mockup Decoration */}
             <div className="relative w-full max-w-lg lg:max-w-none lg:flex-1">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border-8 border-white">
-                <img 
-                  src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800" 
-                  alt="Modern Apartment" 
+                <img
+                  src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800"
+                  alt="Modern Apartment"
                   className="w-full h-[400px] object-cover"
                 />
                 <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-[#EBD9C8]">
@@ -164,10 +217,7 @@ export default function App() {
           {/* Stats Bar */}
           <div className="mt-24 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {stats.map((stat) => (
-              <div key={stat.label} className="group relative rounded-2xl bg-white/60 backdrop-blur-sm p-8 text-center border border-white/50 hover:bg-white transition-all shadow-sm">
-                <div className="text-4xl font-black text-[#8B5E3C] mb-2">{stat.value}</div>
-                <div className="text-xs uppercase tracking-widest font-bold text-[#6D5D50]/70">{stat.label}</div>
-              </div>
+              <CountUpStat key={stat.label} stat={stat} />
             ))}
           </div>
         </div>
@@ -214,7 +264,7 @@ export default function App() {
             <div className="absolute inset-0 opacity-10 pointer-events-none">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#8B5E3C_1px,transparent_1px)] [background-size:20px_20px]" />
             </div>
-            
+
             <div className="relative z-10 mx-auto max-w-3xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-white sm:text-5xl">
                 Tối ưu hóa nguồn thu <br className="hidden sm:block" /> từ căn hộ của bạn
@@ -229,7 +279,7 @@ export default function App() {
                     Đăng ký làm chủ trọ
                   </Button>
                 </Link>
-                
+
                 <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#DBC1AC]/60">
                   <span className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-[#8B5E3C]" />

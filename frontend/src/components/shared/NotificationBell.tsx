@@ -16,18 +16,18 @@ import type { Notification } from '@/types';
 type TabKey = 'ALL' | 'UNREAD' | 'APPOINTMENT' | 'CONTRACT';
 
 const APPOINTMENT_TYPES = ['APPOINTMENT_UPDATE'];
-const CONTRACT_TYPES    = ['CONTRACT_UPDATE', 'PAYMENT_REMINDER', 'BILL_CREATED'];
+const CONTRACT_TYPES = ['CONTRACT_UPDATE', 'PAYMENT_REMINDER', 'BILL_CREATED'];
 
 function groupByDate(items: Notification[]): Record<string, Notification[]> {
-  const today     = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
 
   return items.reduce<Record<string, Notification[]>>((acc, n) => {
     const d = new Date(n.createdAt); d.setHours(0, 0, 0, 0);
     const key =
-      d.getTime() === today.getTime()     ? 'Hôm nay' :
-      d.getTime() === yesterday.getTime() ? 'Hôm qua' :
-      new Date(n.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      d.getTime() === today.getTime() ? 'Hôm nay' :
+        d.getTime() === yesterday.getTime() ? 'Hôm qua' :
+          new Date(n.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     if (!acc[key]) acc[key] = [];
     acc[key].push(n);
     return acc;
@@ -37,11 +37,11 @@ function groupByDate(items: Notification[]): Record<string, Notification[]> {
 function NotiIcon({ type }: { type: string }) {
   const map: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
     APPOINTMENT_UPDATE: { icon: <CalendarClock className="h-4 w-4" />, bg: 'bg-orange-100', color: 'text-orange-600' },
-    CONTRACT_UPDATE:    { icon: <FileText className="h-4 w-4" />,      bg: 'bg-purple-100', color: 'text-purple-600' },
-    PAYMENT_REMINDER:   { icon: <CheckCircle2 className="h-4 w-4" />,  bg: 'bg-green-100',  color: 'text-green-600'  },
-    BILL_CREATED:       { icon: <Banknote className="h-4 w-4" />,      bg: 'bg-blue-100',   color: 'text-blue-600'   },
-    NEW_REVIEW:         { icon: <Star className="h-4 w-4" />,          bg: 'bg-yellow-100', color: 'text-yellow-600' },
-    SYSTEM:             { icon: <Info className="h-4 w-4" />,          bg: 'bg-gray-100',   color: 'text-gray-500'   },
+    CONTRACT_UPDATE: { icon: <FileText className="h-4 w-4" />, bg: 'bg-purple-100', color: 'text-purple-600' },
+    PAYMENT_REMINDER: { icon: <CheckCircle2 className="h-4 w-4" />, bg: 'bg-green-100', color: 'text-green-600' },
+    BILL_CREATED: { icon: <Banknote className="h-4 w-4" />, bg: 'bg-blue-100', color: 'text-blue-600' },
+    NEW_REVIEW: { icon: <Star className="h-4 w-4" />, bg: 'bg-yellow-100', color: 'text-yellow-600' },
+    SYSTEM: { icon: <Info className="h-4 w-4" />, bg: 'bg-gray-100', color: 'text-gray-500' },
   };
   const { icon, bg, color } = map[type] ?? map.SYSTEM;
   return <div className={`p-2 ${bg} ${color} rounded-full shrink-0`}>{icon}</div>;
@@ -54,12 +54,12 @@ export default function NotificationBell() {
   const { user } = useAuth();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isOpen, setIsOpen]               = useState(false);
-  const [activeTab, setActiveTab]         = useState<TabKey>('ALL');
-  const [isLoading, setIsLoading]         = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('ALL');
+  const [isLoading, setIsLoading] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const prevUnread  = useRef(0);
+  const prevUnread = useRef(0);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -117,12 +117,12 @@ export default function NotificationBell() {
               console.log("🔔 [WebSocket] Received Notification:", newNoti);
               setNotifications(prev => [newNoti, ...prev]);
               prevUnread.current += 1;
-              
+
               // ✅ Phát sự kiện Refresh cho toàn App (Delay 300ms để đợi Backend commit xong DB)
               console.log("🔄 [Realtime] Dispatching refresh event in 300ms for type:", newNoti.type);
               setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('app:refresh-data', { 
-                  detail: { type: newNoti.type, referenceId: newNoti.referenceId } 
+                window.dispatchEvent(new CustomEvent('app:refresh-data', {
+                  detail: { type: newNoti.type, referenceId: newNoti.referenceId }
                 }));
               }, 300);
 
@@ -131,12 +131,12 @@ export default function NotificationBell() {
                 action: { label: 'Xem', onClick: () => setIsOpen(true) },
                 duration: 6000,
               });
-            } catch (err) { 
+            } catch (err) {
               console.error("🔔 [WebSocket] Parse error:", err);
             }
           });
         },
-        onStompError: (frame) => { 
+        onStompError: (frame) => {
           console.error("❌ [WebSocket] STOMP Error:", frame.headers['message']);
           console.log("❌ [WebSocket] Full frame:", frame);
         },
@@ -188,7 +188,7 @@ export default function NotificationBell() {
     setIsOpen(false);
 
     if (!noti.referenceId) return;
-    
+
     const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
 
     switch (noti.type as string) {
@@ -210,9 +210,9 @@ export default function NotificationBell() {
 
   // ── Filter theo tab
   const filtered = notifications.filter(n => {
-    if (activeTab === 'UNREAD')      return !n.isRead;
+    if (activeTab === 'UNREAD') return !n.isRead;
     if (activeTab === 'APPOINTMENT') return APPOINTMENT_TYPES.includes(n.type);
-    if (activeTab === 'CONTRACT')    return CONTRACT_TYPES.includes(n.type);
+    if (activeTab === 'CONTRACT') return CONTRACT_TYPES.includes(n.type);
     return true;
   });
 
@@ -220,10 +220,10 @@ export default function NotificationBell() {
   const groupKeys = Object.keys(grouped);
 
   const tabs: { key: TabKey; label: string; count?: number }[] = [
-    { key: 'ALL',         label: 'Tất cả',    count: notifications.length },
-    { key: 'UNREAD',      label: 'Chưa đọc',  count: unreadCount },
-    { key: 'APPOINTMENT', label: 'Lịch hẹn',  count: notifications.filter(n => APPOINTMENT_TYPES.includes(n.type)).length },
-    { key: 'CONTRACT',    label: 'Hợp đồng',  count: notifications.filter(n => CONTRACT_TYPES.includes(n.type)).length },
+    { key: 'ALL', label: 'Tất cả', count: notifications.length },
+    { key: 'UNREAD', label: 'Chưa đọc', count: unreadCount },
+    { key: 'APPOINTMENT', label: 'Lịch hẹn', count: notifications.filter(n => APPOINTMENT_TYPES.includes(n.type)).length },
+    { key: 'CONTRACT', label: 'Hợp đồng', count: notifications.filter(n => CONTRACT_TYPES.includes(n.type)).length },
   ];
 
   return (
@@ -272,17 +272,15 @@ export default function NotificationBell() {
             {tabs.map(t => (
               <button key={t.key}
                 onClick={() => setActiveTab(t.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === t.key
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === t.key
                     ? 'bg-primary text-white shadow-sm'
                     : 'text-gray-500 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {t.label}
                 {t.count != null && t.count > 0 && (
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    activeTab === t.key ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'
-                  }`}>
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === t.key ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
                     {t.count}
                   </span>
                 )}

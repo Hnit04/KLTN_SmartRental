@@ -21,10 +21,10 @@ const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN", { day: "2
 
 const ContractStatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; cls: string }> = {
-    ACTIVE:            { label: "Đang thuê",      cls: "bg-green-100 text-green-700 border-green-200" },
-    PENDING_SIGNATURE: { label: "Chờ ký",          cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    EXPIRED:           { label: "Hết hạn",         cls: "bg-gray-100 text-gray-500 border-gray-200" },
-    CANCELLED:         { label: "Đã hủy",          cls: "bg-red-100 text-red-600 border-red-200" },
+    ACTIVE: { label: "Đang thuê", cls: "bg-green-100 text-green-700 border-green-200" },
+    PENDING_SIGNATURE: { label: "Chờ ký", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    EXPIRED: { label: "Hết hạn", cls: "bg-gray-100 text-gray-500 border-gray-200" },
+    CANCELLED: { label: "Đã hủy", cls: "bg-red-100 text-red-600 border-red-200" },
   };
   const { label, cls } = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-500 border-gray-200" };
   return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${cls}`}>{label}</span>;
@@ -32,11 +32,11 @@ const ContractStatusBadge = ({ status }: { status: string }) => {
 
 const AppointmentStatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; icon: ReactNode; cls: string }> = {
-    PENDING:   { label: "Chờ duyệt", icon: <Clock className="h-3 w-3" />,        cls: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-    CONFIRMED: { label: "Đã duyệt",  icon: <CheckCircle className="h-3 w-3" />,  cls: "text-green-700 bg-green-50 border-green-200" },
-    APPROVED:  { label: "Đã duyệt",  icon: <CheckCircle className="h-3 w-3" />,  cls: "text-green-700 bg-green-50 border-green-200" },
-    CANCELLED: { label: "Đã hủy",    icon: <XCircle className="h-3 w-3" />,      cls: "text-red-600 bg-red-50 border-red-200" },
-    COMPLETED: { label: "Hoàn thành",icon: <CheckCircle className="h-3 w-3" />,  cls: "text-blue-700 bg-blue-50 border-blue-200" },
+    PENDING: { label: "Chờ duyệt", icon: <Clock className="h-3 w-3" />, cls: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+    CONFIRMED: { label: "Đã duyệt", icon: <CheckCircle className="h-3 w-3" />, cls: "text-green-700 bg-green-50 border-green-200" },
+    APPROVED: { label: "Đã duyệt", icon: <CheckCircle className="h-3 w-3" />, cls: "text-green-700 bg-green-50 border-green-200" },
+    CANCELLED: { label: "Đã hủy", icon: <XCircle className="h-3 w-3" />, cls: "text-red-600 bg-red-50 border-red-200" },
+    COMPLETED: { label: "Hoàn thành", icon: <CheckCircle className="h-3 w-3" />, cls: "text-blue-700 bg-blue-50 border-blue-200" },
   };
   const { label, icon, cls } = map[status] ?? { label: status, icon: <Clock className="h-3 w-3" />, cls: "text-gray-500 bg-gray-50 border-gray-200" };
   return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 w-fit ${cls}`}>{icon}{label}</span>;
@@ -44,10 +44,10 @@ const AppointmentStatusBadge = ({ status }: { status: string }) => {
 
 const BillStatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; cls: string }> = {
-    PAID:    { label: "Đã thanh toán", cls: "text-green-700 bg-green-50 border-green-200" },
-    PENDING: { label: "Chờ thanh toán",cls: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-    LATE:    { label: "Quá hạn",       cls: "text-red-600 bg-red-50 border-red-200" },
-    UNBILLED:{ label: "Chưa xuất",     cls: "text-gray-500 bg-gray-50 border-gray-200" },
+    PAID: { label: "Đã thanh toán", cls: "text-green-700 bg-green-50 border-green-200" },
+    PENDING: { label: "Chờ thanh toán", cls: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+    LATE: { label: "Quá hạn", cls: "text-red-600 bg-red-50 border-red-200" },
+    UNBILLED: { label: "Chưa xuất", cls: "text-gray-500 bg-gray-50 border-gray-200" },
   };
   const { label, cls } = map[status] ?? { label: status, cls: "text-gray-500 bg-gray-50 border-gray-200" };
   return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${cls}`}>{label}</span>;
@@ -57,10 +57,10 @@ const BillStatusBadge = ({ status }: { status: string }) => {
 export default function TenantDashboardPage() {
   const { user } = useAuth();
 
-  const [contracts, setContracts]       = useState<Contract[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
-  const [bills, setBills]               = useState<Bill[]>([]);
-  const [isLoading, setIsLoading]       = useState(true);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Hợp đồng đang active để lấy bills
   const activeContract = contracts.find(c => c.status === "ACTIVE");
@@ -119,11 +119,11 @@ export default function TenantDashboardPage() {
     <div className="space-y-6 pb-10">
       {/* Skeleton Header */}
       <div className="flex justify-between items-center animate-pulse">
-         <div className="space-y-2">
-            <div className="h-8 w-64 bg-gray-200 rounded" />
-            <div className="h-4 w-48 bg-gray-200 rounded" />
-         </div>
-         <div className="h-10 w-32 bg-gray-200 rounded-md block hidden sm:block" />
+        <div className="space-y-2">
+          <div className="h-8 w-64 bg-gray-200 rounded" />
+          <div className="h-4 w-48 bg-gray-200 rounded" />
+        </div>
+        <div className="h-10 w-32 bg-gray-200 rounded-md block hidden sm:block" />
       </div>
       {/* Skeleton Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -137,14 +137,14 @@ export default function TenantDashboardPage() {
       </div>
       {/* Skeleton Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-         <div className="lg:col-span-2 space-y-4">
-             <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
-             {[1, 2].map(i => <div key={i} className="h-32 w-full bg-white rounded-2xl border animate-pulse" />)}
-         </div>
-         <div className="space-y-4">
-             <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
-             {[1, 2, 3].map(i => <div key={i} className="h-20 w-full bg-white rounded-xl border animate-pulse" />)}
-         </div>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
+          {[1, 2].map(i => <div key={i} className="h-32 w-full bg-white rounded-2xl border animate-pulse" />)}
+        </div>
+        <div className="space-y-4">
+          <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
+          {[1, 2, 3].map(i => <div key={i} className="h-20 w-full bg-white rounded-xl border animate-pulse" />)}
+        </div>
       </div>
     </div>
   );

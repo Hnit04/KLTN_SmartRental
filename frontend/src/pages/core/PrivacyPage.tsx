@@ -9,17 +9,21 @@ import {
   UserCheck, 
   Download, 
   Printer,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPage() {
   const [activeSection, setActiveSection] = useState('intro');
+  const [showTocMobile, setShowTocMobile] = useState(false);
 
   // Hàm xử lý cuộn mượt khi click vào mục lục
   const scrollToSection = (id: string) => {
     setActiveSection(id);
+    setShowTocMobile(false); // Đóng mobile TOC khi click
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -295,6 +299,47 @@ export default function PrivacyPage() {
 
           </div>
         </div>
+      </div>
+
+      {/* ─── FLOATING TOC BUTTON (MOBILE) ─── */}
+      <div className="lg:hidden fixed bottom-24 right-4 z-40">
+        <button
+          onClick={() => setShowTocMobile(!showTocMobile)}
+          className="flex items-center justify-center h-14 w-14 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all hover:scale-110"
+          aria-label="Mục lục"
+        >
+          {showTocMobile ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+
+        {/* Floating TOC Dropdown */}
+        {showTocMobile && (
+          <div className="absolute bottom-20 right-0 bg-background border rounded-xl shadow-xl p-3 w-56 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <h3 className="font-semibold text-foreground mb-3 text-sm px-1">Mục lục</h3>
+            <div className="space-y-1">
+              {[
+                { id: 'collection', label: '1. Thu thập thông tin' },
+                { id: 'usage', label: '2. Phạm vi sử dụng' },
+                { id: 'sharing', label: '3. Chia sẻ dữ liệu' },
+                { id: 'storage', label: '4. Lưu trữ & Bảo mật' },
+                { id: 'cookies', label: '5. Cookies & Tracking' },
+                { id: 'rights', label: '6. Quyền của bạn' },
+                { id: 'contact', label: '7. Liên hệ' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => scrollToSection(item.id)}
+                  className={`block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    activeSection === item.id
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

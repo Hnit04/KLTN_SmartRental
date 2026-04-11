@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   DoorOpen, MapPin, Zap, Droplets, Wifi,
   ShieldCheck, ExternalLink, Receipt, FileText, Search, ArrowRight,
-  AlertCircle, Loader2, Info, Users, UserPlus, Mail, Clock, Check, X, UserCircle, Trash2, LogOut
+  AlertCircle, Loader2, Info, Users, UserPlus, Mail, Clock, X, UserCircle, Trash2, LogOut
 } from "lucide-react";
 import { contractApi } from "@/api/contractApi";
 import { billApi } from "@/api/billApi";
@@ -586,7 +586,7 @@ export default function MyRoomPage() {
                           <Button 
                             className="flex-1 h-12 rounded-xl gap-2"
                             onClick={handleSendInvite}
-                            loading={isInviting}
+                            isLoading={isInviting}
                           >
                               Gửi yêu cầu <ArrowRight className="h-4 w-4" />
                           </Button>
