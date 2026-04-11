@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   CheckCircle, XCircle, Maximize, ArrowRight, 
-  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight
+  Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight,
+  Wrench      
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Room } from "@/types/index";
@@ -20,6 +21,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   // 1. Kiểm tra trạng thái phòng
   const isAvailable = data.status === "AVAILABLE";
   const isReserved = data.status === "RESERVED";
+  const isMaintenance = data.status === "MAINTENANCE";   // ← Thêm
 
   // 2. Format giá tiền
   const formatPrice = (price: number) => 
@@ -52,7 +54,6 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   // ✅ KHÔI PHỤC HÀM "THUÊ NGAY"
   const handleRentNow = () => {
     if (!isAvailable) return;
-    // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
     navigate(`/contracts/create?roomId=${data.id}`);
   };
 
@@ -70,7 +71,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
   return (
     <>
-      <div className={`group border rounded-xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 ${!isAvailable ? 'opacity-70 bg-gray-50' : ''}`}>
+      <div className={`group border rounded-xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 
+        ${!isAvailable || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
         <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={() => setIsDetailOpen(true)}>
@@ -123,6 +125,10 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             ) : isReserved ? (
               <span className="bg-orange-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
                 <CalendarClock className="h-3 w-3" /> Giữ chỗ
+              </span>
+            ) : isMaintenance ? (
+              <span className="bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
+                <Wrench className="h-3 w-3" /> Đang bảo trì
               </span>
             ) : (
               <span className="bg-gray-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
@@ -199,7 +205,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             </div>
           )}
 
-          {/* --- NÚT HÀNH ĐỘNG NGOÀI THẺ --- */}
+          {/* --- NÚT HÀNH ĐỘNG --- */}
           <div className="mt-auto grid grid-cols-2 gap-2 pt-3 border-t">
               <Button 
                   variant="outline" 
@@ -212,15 +218,15 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
               <Button 
                   size="sm"
-                  className={`text-xs h-9 gap-1 group/btn2 transition-all ${!isAvailable ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
-                  disabled={!isAvailable}
+                  className={`text-xs h-9 gap-1 ${(!isAvailable || isMaintenance) ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
+                  disabled={!isAvailable || isMaintenance}
                   onClick={(e) => {
                       e.stopPropagation();
                       if (onBookAppointment) onBookAppointment();
                   }}
               >
-                  {isAvailable ? (
-                      <>Đặt lịch <CalendarClock className="h-3.5 w-3.5 ml-0.5 group-hover/btn2:rotate-12 transition-transform" /></>
+                  {isMaintenance ? "Đang bảo trì" : isAvailable ? (
+                      <>Đặt lịch xem <CalendarClock className="h-3.5 w-3.5 ml-0.5" /></>
                   ) : (
                       "Đã hết"
                   )}
@@ -232,78 +238,106 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
       {/* --- MODAL CHI TIẾT PHÒNG --- */}
       {isDetailOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-             <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
-                
-                <div className="h-56 bg-gray-100 relative shrink-0">
-                    {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
-                    <button onClick={() => setIsDetailOpen(false)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
-                        <XCircle className="h-6 w-6" />
-                    </button>
+          <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
+            
+            <div className="h-56 bg-gray-100 relative shrink-0">
+              {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
+              <button 
+                onClick={() => setIsDetailOpen(false)} 
+                className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
+              <p className="text-2xl text-primary font-bold mb-4">
+                {formatPrice(data.price)} 
+                <span className="text-sm font-normal text-gray-500">/tháng</span>
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <span className="text-xs text-gray-500 uppercase font-bold">Diện tích & Không gian</span>
+                  <p className="font-semibold text-sm mt-1">{data.area} m²</p>
+                  {(data.hasMezzanine || data.hasBalcony || data.type) && (
+                    <div className="mt-1 flex gap-1 flex-wrap">
+                      {data.type && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{mapRoomType(data.type)}</span>}
+                      {data.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Gác lửng</span>}
+                      {data.hasBalcony && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Ban công</span>}
+                    </div>
+                  )}
                 </div>
-                
-                <div className="p-6 overflow-y-auto">
-                    <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
-                    <p className="text-2xl text-primary font-bold mb-4">{formatPrice(data.price)} <span className="text-sm font-normal text-gray-500">/tháng</span></p>
-                    
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                            <span className="text-xs text-gray-500 uppercase font-bold">Diện tích & Không gian</span>
-                            <p className="font-semibold text-sm mt-1">{data.area} m²</p>
-                            {(data.hasMezzanine || data.hasBalcony || data.type) && (
-                              <div className="mt-1 flex gap-1 flex-wrap">
-                                {data.type && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{mapRoomType(data.type)}</span>}
-                                {data.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Gác lửng</span>}
-                                {data.hasBalcony && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Ban công</span>}
-                              </div>
-                            )}
-                        </div>
-                        <div className="bg-gray-50 p-3 rounded-lg flex flex-col justify-center">
-                            <span className="text-xs text-gray-500 uppercase font-bold mb-1">Trạng thái</span>
-                            <p className={`font-semibold text-sm ${isAvailable ? 'text-green-600' : isReserved ? 'text-orange-600' : 'text-gray-500'}`}>
-                                {isAvailable ? "Sẵn sàng đón khách" : isReserved ? "Đang có người đợi ký HĐ" : "Đang có người thuê"}
-                            </p>
-                        </div>
-                    </div>
 
-                    <div className="mb-6">
-                        <h4 className="font-bold mb-2 text-sm uppercase text-gray-500">Tiện nghi phòng</h4>
-                        <div className="flex flex-wrap gap-2">
-                             {amenities.map((item, i) => (
-                                 <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-100">
-                                     {item}
-                                 </span>
-                             ))}
-                        </div>
-                    </div>
-
-                    {/* ✅ CUNG CẤP CẢ 2 LỰA CHỌN TRONG MODAL CHI TIẾT */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t">
-                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsDetailOpen(false)}>Đóng</Button>
-                        
-                        <div className="flex flex-1 gap-3">
-                            <Button 
-                                variant="outline"
-                                className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50" 
-                                disabled={!isAvailable} 
-                                onClick={() => {
-                                    setIsDetailOpen(false); 
-                                    if (onBookAppointment) onBookAppointment(); 
-                                }}
-                            >
-                                <CalendarClock className="h-4 w-4 mr-2" /> Đặt lịch
-                            </Button>
-
-                            <Button 
-                                className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md" 
-                                disabled={!isAvailable} 
-                                onClick={handleRentNow}
-                            >
-                                <FileSignature className="h-4 w-4 mr-2" /> Thuê ngay
-                            </Button>
-                        </div>
-                    </div>
+                <div className="bg-gray-50 p-3 rounded-lg flex flex-col justify-center">
+                  <span className="text-xs text-gray-500 uppercase font-bold mb-1">Trạng thái</span>
+                  <p className={`font-semibold text-sm ${
+                    isAvailable ? 'text-green-600' : 
+                    isReserved ? 'text-orange-600' : 
+                    isMaintenance ? 'text-amber-600' : 
+                    'text-gray-500'
+                  }`}>
+                    {isAvailable 
+                      ? "Sẵn sàng đón khách" 
+                      : isReserved 
+                        ? "Đang có người đợi ký HĐ" 
+                        : isMaintenance 
+                          ? "Đang bảo trì / Sửa chữa" 
+                          : "Đang có người thuê"}
+                  </p>
                 </div>
-             </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="font-bold mb-2 text-sm uppercase text-gray-500">Tiện nghi phòng</h4>
+                <div className="flex flex-wrap gap-2">
+                  {amenities.map((item, i) => (
+                    <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-100">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nút hành động trong modal */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsDetailOpen(false)}>
+                  Đóng
+                </Button>
+                
+                <div className="flex flex-1 gap-3">
+                  <Button 
+                    variant="outline"
+                    className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50" 
+                    disabled={!isAvailable || isMaintenance} 
+                    onClick={() => {
+                      setIsDetailOpen(false); 
+                      if (onBookAppointment) onBookAppointment(); 
+                    }}
+                  >
+                    <CalendarClock className="h-4 w-4 mr-2" /> Đặt lịch
+                  </Button>
+
+                  <Button 
+                    className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md" 
+                    disabled={!isAvailable || isMaintenance} 
+                    onClick={handleRentNow}
+                  >
+                    <FileSignature className="h-4 w-4 mr-2" /> Thuê ngay
+                  </Button>
+                </div>
+              </div>
+
+              {/* Thông báo khi đang bảo trì */}
+              {isMaintenance && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm flex items-start gap-2">
+                  <Wrench className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  Phòng đang trong quá trình bảo trì. Không thể đặt lịch hoặc thuê lúc này.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </>

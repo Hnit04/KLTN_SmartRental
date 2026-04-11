@@ -314,4 +314,27 @@ public class PropertyService {
 
         return response.getBody();
     }
+    public PropertyResponse updatePropertyStatus(Long landlordId, Long propertyId, PropertyStatus newStatus) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
+
+        if (!property.getLandlord().getId().equals(landlordId)) {
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này!");
+        }
+        if(newStatus== PropertyStatus.HIDDEN){
+            List<Room> rooms = roomRepository.findByPropertyId(propertyId);
+
+            boolean hasActiveRooms = rooms.stream().anyMatch(room ->
+                    room.getStatus() == RoomStatus.RENTED || room.getStatus() == RoomStatus.RESERVED
+            );
+
+            if (hasActiveRooms) {
+                throw new RuntimeException("Không thể ẩn khu trọ vì hiện tại có phòng đang được thuê hoặc đã được đặt cọc.");
+            }
+        }
+        property.setStatus(newStatus);
+        Property saved = propertyRepository.save(property);
+
+        return mapToPropertyResponse(saved);
+    }
 }

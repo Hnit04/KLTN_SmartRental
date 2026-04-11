@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, LocateFixed, Trash2, AlertTriangle, Home, CheckCircle, Sparkles } from 'lucide-react';
+import { 
+  Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, 
+  LocateFixed, Trash2, AlertTriangle, Home, CheckCircle, 
+  Sparkles, EyeOff, Eye 
+} from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -32,18 +36,18 @@ export default function PropertiesManagePage() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
-  const [isFetchingLocation, setIsFetchingLocation] = useState(false); // State định vị
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false); 
   
-  // --- STATE XOÁ KHU TRỌ ---
-  const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // --- STATE CẬP NHẬT TRẠNG THÁI (ẨN/HIỆN) ---
+  const [statusConfirm, setStatusConfirm] = useState<Property | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '', city: '', district: '', address: '',
     elecPrice: '', waterPrice: '', internetPrice: '', description: '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
-    images: [] as string[] // Chứa các URL ảnh đã upload thành công hoặc ảnh cũ
+    images: [] as string[] 
   });
 
   // --- STATE CHO UPLOAD ẢNH ---
@@ -96,21 +100,42 @@ export default function PropertiesManagePage() {
     setShowModal(true);
   };
 
-  // Xác nhận và thực hiện xóa khu trọ
-  const handleDeleteConfirmed = async () => {
-    if (!deleteConfirm) return;
-    setIsDeleting(true);
-    try {
-      await propertyApi.deleteProperty(deleteConfirm.id);
-      toast.success(`Đã xóa khu trọ “${deleteConfirm.name}”!`);
-      setDeleteConfirm(null);
-      fetchProperties();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Xóa thất bại. Khu trọ có thể đang có phòng và hợp đồng. ');
-    } finally {
-      setIsDeleting(false);
+  const handleStatusChangeConfirmed = async () => {
+  if (!statusConfirm) return;
+  setIsUpdatingStatus(true);
+  
+  const isHiding = statusConfirm.status !== 'HIDDEN'; 
+  const newStatus = isHiding ? 'HIDDEN' : 'APPROVED';
+  const actionText = isHiding ? 'ẩn' : 'hiển thị lại';
+
+  try {
+    if (isHiding) {
+      const roomsRes = await propertyApi.getRooms(statusConfirm.id);
+      const rooms = (roomsRes as any).data || roomsRes;
+
+      const hasActiveRoom = rooms.some((room: any) => 
+        room.status === 'RENTED' || room.status === 'RESERVED'
+      );
+
+      if (hasActiveRoom) {
+        toast.error(`Không thể ẩn khu trọ vì hiện đang có phòng có người thuê hoặc đã đặt cọc!`);
+        setStatusConfirm(null);
+        return; // Dừng thực hiện tiếp
+      }
     }
-  };
+
+    await propertyApi.updatePropertyStatus(statusConfirm.id, newStatus);
+    toast.success(`Đã ${actionText} khu trọ “${statusConfirm.name}”!`);
+    
+    setStatusConfirm(null);
+    fetchProperties(); 
+  } catch (error: any) {
+    const errorMsg = error?.response?.data?.message || `Thao tác ${actionText} thất bại.`;
+    toast.error(errorMsg);
+  } finally {
+    setIsUpdatingStatus(false);
+  }
+};
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -123,23 +148,18 @@ export default function PropertiesManagePage() {
 
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
-        // Có tọa độ -> Lập tức tắt theo dõi để tiết kiệm tài nguyên
         navigator.geolocation.clearWatch(watchId);
 
         try {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
 
-          // 1. GỌI VỀ BACKEND SPRING BOOT
           const response = await propertyApi.reverseGeocode(lat, lon);
           
           let data = (response as any).data || response;
           if (typeof data === 'string') {
             data = JSON.parse(data);
           }
-
-          // 🔥 BẮT TẬN TAY API TRẢ VỀ GÌ
-          console.log("=== DỮ LIỆU ĐỊA CHỈ TỪ API ===", data);
 
           if (data) {
             const addr = data.address || {};
@@ -148,7 +168,6 @@ export default function PropertiesManagePage() {
             const street = addr.road || addr.pedestrian || '';
             const houseNumber = addr.house_number ? `${addr.house_number} ` : '';
             
-            // Helper 1: Xóa dấu Tiếng Việt cực mạnh
             const removeAccents = (str: string) => {
               if (!str) return '';
               return str.toString().normalize('NFD')
@@ -156,13 +175,12 @@ export default function PropertiesManagePage() {
                         .replace(/đ/g, 'd').replace(/Đ/g, 'D');
             };
 
-            // Helper 2: Chuẩn hóa cắt bỏ cả Tiếng Việt lẫn Tiếng Anh ("City", "Province")
             const normalizeCitySearch = (s: string) => {
               if (!s) return '';
               let res = removeAccents(s.toLowerCase());
               res = res.replace(/^(thanh pho|tinh|tp\.?|quan|huyen|thi xa)\s+/i, '')
                        .replace(/\s+(city|province|town|municipality)$/i, '')
-                       .replace(/-/g, ' ') // Xử lý vụ Bà Rịa - Vũng Tàu
+                       .replace(/-/g, ' ') 
                        .trim();
               return res;
             };
@@ -173,7 +191,6 @@ export default function PropertiesManagePage() {
             
             let matchedCity = '';
             
-            // CHIẾN THUẬT 1: Tìm trong các biến trả về của API
             for (const candidate of candidateCities) {
               const stripped = normalizeCitySearch(candidate);
               const found = VIETNAM_CITIES.find(city => {
@@ -186,7 +203,6 @@ export default function PropertiesManagePage() {
               }
             }
 
-            // CHIẾN THUẬT 2 (Vũ khí cuối): Quét toàn bộ chuỗi địa chỉ dài nếu Chiến thuật 1 xịt
             if (!matchedCity && fullAddress) {
                const noAccentFullAddr = removeAccents(fullAddress);
                const foundFallback = VIETNAM_CITIES.find(city => {
@@ -197,7 +213,6 @@ export default function PropertiesManagePage() {
                }
             }
             
-            // Xử lý Quận/Huyện
             const rawCity = addr.city || '';
             const rawDistrict = addr.county || addr.suburb || addr.city_district || addr.district || '';
             let finalDistrict = rawDistrict;
@@ -243,24 +258,17 @@ export default function PropertiesManagePage() {
     );
   };
 
-  // --- XỬ LÝ ẢNH TRƯỚC KHI UPLOAD ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files);
-      
-      // Lọc file quá nặng (VD: giới hạn 5MB)
       const validFiles = filesArray.filter(file => file.size <= 5 * 1024 * 1024);
       if (validFiles.length < filesArray.length) {
         toast.warning("Một số ảnh quá lớn (>5MB) đã bị bỏ qua.");
       }
-
       setSelectedFiles(prev => [...prev, ...validFiles]);
-      
-      // Tạo URL ảo để xem trước
       const newPreviews = validFiles.map(file => URL.createObjectURL(file));
       setPreviewUrls(prev => [...prev, ...newPreviews]);
     }
-    // Reset input để có thể chọn lại cùng 1 file
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -276,7 +284,6 @@ export default function PropertiesManagePage() {
     }));
   };
 
-  // --- SUBMIT FORM VÀ UPLOAD LÊN CLOUDINARY ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.address || !formData.city) {
@@ -287,7 +294,6 @@ export default function PropertiesManagePage() {
     try {
       setIsSubmitting(true);
       
-      // 1. Nếu có file ảnh mới được chọn -> Gọi API đẩy file lên Spring Boot -> Cloudinary
       let newlyUploadedUrls: string[] = [];
       if (selectedFiles.length > 0) {
         toast.info("Đang tải ảnh lên hệ thống...");
@@ -295,10 +301,8 @@ export default function PropertiesManagePage() {
         newlyUploadedUrls = (uploadRes as any).data || uploadRes; 
       }
 
-      // 2. Gom URL ảnh cũ và URL ảnh vừa upload thành công
       const finalImagesList = [...formData.images, ...newlyUploadedUrls];
 
-      // 3. Chuẩn bị Payload
       const payload = {
         name: formData.name, city: formData.city, district: formData.district, address: formData.address,
         description: formData.description,
@@ -308,7 +312,6 @@ export default function PropertiesManagePage() {
         images: finalImagesList 
       };
 
-      // 4. Lưu vào Database
       if (editingId) {
         await propertyApi.updateProperty(editingId, payload);
         toast.success('Cập nhật khu trọ thành công!');
@@ -332,7 +335,6 @@ export default function PropertiesManagePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header và List */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Khu trọ của tôi</h1>
@@ -341,20 +343,21 @@ export default function PropertiesManagePage() {
         <Button onClick={handleOpenCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Thêm Khu trọ</Button>
       </div>
 
-      {/* DANH SÁCH KHU TRỌ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties.map((property) => (
-          <Card key={property.id} className="overflow-hidden hover:shadow-md transition-shadow group relative flex flex-col">
+          <Card key={property.id} className={`overflow-hidden hover:shadow-md transition-shadow group relative flex flex-col ${property.status === 'HIDDEN' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
             {/* Nút sửa */}
             <button onClick={() => handleOpenEdit(property)} className="absolute top-2 right-10 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-blue-50 text-blue-600">
               <Edit className="h-4 w-4" />
             </button>
-            {/* Nút xóa */}
+            
+            {/* Nút Ẩn/Hiện */}
             <button
-              onClick={() => setDeleteConfirm(property)}
-              className="absolute top-2 right-2 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-red-50 text-red-500"
+              onClick={() => setStatusConfirm(property)}
+              className={`absolute top-2 right-2 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition ${property.status === 'HIDDEN' ? 'hover:bg-green-50 text-green-600' : 'hover:bg-orange-50 text-orange-500'}`}
+              title={property.status === 'HIDDEN' ? "Hiện lại khu trọ" : "Ẩn khu trọ"}
             >
-              <Trash2 className="h-4 w-4" />
+              {property.status === 'HIDDEN' ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </button>
 
             {/* Ảnh bìa */}
@@ -382,18 +385,21 @@ export default function PropertiesManagePage() {
                     <AlertTriangle className="h-2.5 w-2.5" /> BỊ TỪ CHỐI
                   </span>
                 )}
+                {property.status === 'HIDDEN' && (
+                  <span className="px-2 py-0.5 bg-gray-600/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                    <EyeOff className="h-2.5 w-2.5" /> ĐANG ẨN
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Nội dung */}
             <div className="p-5 flex-1 flex flex-col">
-              <h3 className="text-lg font-bold text-gray-900 mb-1 truncate pr-6">{property.name}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-1 truncate pr-14">{property.name}</h3>
               <div className="flex items-start gap-1.5 text-sm text-gray-500 mb-3 h-10">
                 <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="line-clamp-2">{property.address}, {property.district}, {property.city}</span>
               </div>
 
-              {/* THỐNG KÊ NHÀNH */}
               <div className="flex gap-3 text-xs mb-4">
                 <div className="flex items-center gap-1 text-gray-500">
                   <Home className="h-3.5 w-3.5" />
@@ -413,9 +419,7 @@ export default function PropertiesManagePage() {
         ))}
       </div>
 
-      {/* ========================================= */}
       {/* MODAL THÊM / SỬA KHU TRỌ */}
-      {/* ========================================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
@@ -431,8 +435,6 @@ export default function PropertiesManagePage() {
                   <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                 </div>
                 
-                {/* --- KHU VỰC NHẬP ĐỊA CHỈ & LẤY VỊ TRÍ --- */}
-                {/* --- KHỌI NHẬP ĐỊA CHỄ VÀ LẤY VỊ TRÍ --- */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh / Thành phố *</label>
@@ -475,11 +477,9 @@ export default function PropertiesManagePage() {
                   <div><label className="text-sm font-medium">Internet (đ/tháng)</label><input type="number" value={formData.internetPrice} onChange={e => setFormData({...formData, internetPrice: e.target.value})} className="w-full border p-2 rounded-md outline-none" /></div>
                 </div>
 
-                {/* --- KHU VỰC UPLOAD ẢNH --- */}
                 <div className="mt-6 border-t pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Khu trọ</label>
                   
-                  {/* Nút chọn ảnh */}
                   <div 
                     onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer"
@@ -493,11 +493,8 @@ export default function PropertiesManagePage() {
                     />
                   </div>
 
-                  {/* Lưới hiển thị ảnh (Cả cũ và mới) */}
                   {(formData.images.length > 0 || previewUrls.length > 0) && (
                     <div className="grid grid-cols-4 gap-3 mt-4">
-                      
-                      {/* Hiển thị ảnh cũ */}
                       {formData.images.map((url, idx) => (
                         <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border bg-gray-100">
                           <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
@@ -510,7 +507,6 @@ export default function PropertiesManagePage() {
                         </div>
                       ))}
 
-                      {/* Hiển thị ảnh mới chọn */}
                       {previewUrls.map((url, idx) => (
                         <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed bg-blue-50">
                           <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />
@@ -533,11 +529,11 @@ export default function PropertiesManagePage() {
                     value={formData.description} 
                     onChange={e => setFormData({...formData, description: e.target.value})} 
                     className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none resize-none" 
-                    placeholder="VD: Khu trọ an ninh, có camera 24/7. Giá thuê các phòng từ 1tr5 - 3tr. Liên hệ xem phòng giờ hành chính (gọi trước 30p)..."
+                    placeholder="VD: Khu trọ an ninh, có camera 24/7. Giá thuê các phòng từ 1tr5 - 3tr..."
                   />
                   <p className="text-xs text-blue-600 mt-1.5 flex items-start gap-1 bg-blue-50 p-2.5 rounded-md border border-blue-100">
                     <Sparkles className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-blue-500" /> 
-                    <span><strong>Mẹo duyệt bài nhanh:</strong> Hệ thống AI sẽ chấm điểm độ chi tiết của bạn. Bạn hãy nhập rõ khoảng giá, tiện ích và nội quy để nhận điểm AI cao, giúp Admin duyệt bài của bạn ngay lập tức!</span>
+                    <span><strong>Mẹo:</strong> Nhập chi tiết tiện ích để Admin duyệt bài nhanh hơn!</span>
                   </p>
                 </div>
               </form>
@@ -547,7 +543,7 @@ export default function PropertiesManagePage() {
               <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={isSubmitting}>Hủy</Button>
               <Button type="submit" form="property-form" disabled={isSubmitting} className="min-w-[140px] bg-primary">
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isSubmitting ? (selectedFiles.length > 0 ? 'Đang tải ảnh...' : 'Đang lưu...') : (editingId ? 'Lưu thay đổi' : 'Tạo khu trọ')}
+                {isSubmitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Tạo khu trọ')}
               </Button>
             </div>
             
@@ -555,41 +551,43 @@ export default function PropertiesManagePage() {
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* DIALOG XÁC NHẬN XÓA KHU TRỌ */}
-      {/* ============================================================ */}
-      {deleteConfirm && (
+      {/* MODAL XÁC NHẬN ẨN / HIỆN LẠI KHU TRỌ */}
+      {statusConfirm && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex flex-col items-center text-center">
-              <div className="p-3 bg-red-50 rounded-full mb-4">
-                <AlertTriangle className="h-8 w-8 text-red-500" />
+              <div className={`p-3 rounded-full mb-4 ${statusConfirm.status === 'HIDDEN' ? 'bg-green-50' : 'bg-orange-50'}`}>
+                {statusConfirm.status === 'HIDDEN' ? <Eye className="h-8 w-8 text-green-500" /> : <EyeOff className="h-8 w-8 text-orange-500" />}
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Xóa khu trọ?</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">
+                {statusConfirm.status === 'HIDDEN' ? 'Hiển thị lại khu trọ?' : 'Tạm ẩn khu trọ?'}
+              </h3>
               <p className="text-sm text-gray-500 mb-1">
-                Bạn có chắc muốn xóa khu trọ
+                Xác nhận thay đổi trạng thái cho
               </p>
-              <p className="font-semibold text-gray-900 mb-2">"{ deleteConfirm.name}"?</p>
-              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-                ⚠️ Hành động này không thể hoàn tác. Tất cả phòng trong khu trọ này cũng sẽ bị xóa.
+              <p className="font-semibold text-gray-900 mb-2">"{statusConfirm.name}"?</p>
+              
+              <p className={`text-xs px-3 py-2 rounded-lg border ${statusConfirm.status === 'HIDDEN' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                {statusConfirm.status === 'HIDDEN' 
+                  ? 'Khu trọ sẽ xuất hiện trở lại trong danh sách tìm kiếm của khách thuê.' 
+                  : 'Khu trọ sẽ bị ẩn khỏi danh sách tìm kiếm công khai nhưng bạn vẫn có thể quản lý.'}
               </p>
             </div>
             <div className="flex gap-3 mt-6">
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setDeleteConfirm(null)}
-                disabled={isDeleting}
+                onClick={() => setStatusConfirm(null)}
+                disabled={isUpdatingStatus}
               >
                 Hủy
               </Button>
               <Button
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleDeleteConfirmed}
-                disabled={isDeleting}
+                className={`flex-1 text-white ${statusConfirm.status === 'HIDDEN' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+                onClick={handleStatusChangeConfirmed}
+                disabled={isUpdatingStatus}
               >
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                Xóa vĩnh viễn
+                {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (statusConfirm.status === 'HIDDEN' ? 'Hiện lại ngay' : 'Ẩn khu trọ')}
               </Button>
             </div>
           </div>

@@ -22,6 +22,8 @@ export const propertyApi = {
   createProperty: (data: Partial<Property>) => axiosClient.post<Property>("/properties", data),
   updateProperty: (id: number | string, data: Partial<Property>) => axiosClient.put<Property>(`/properties/${id}`, data),
   deleteProperty: (id: number | string) => axiosClient.delete(`/properties/${id}`),
+  updatePropertyStatus: (id: number | string, status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN') => 
+    axiosClient.patch<Property>(`/properties/${id}/status`, null, { params: { status } }),
 
   // --- CÁC HÀM QUẢN LÝ PHÒNG ---
   createRoom: (propertyId: number | string, data: Partial<Room>) => axiosClient.post<Room>(`/properties/${propertyId}/rooms`, data),
