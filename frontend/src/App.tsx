@@ -47,7 +47,7 @@ import AiAnalyticsPage from "./pages/admin/AiAnalyticsPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
-
+import ScrollToTop from "./components/shared/ScrollToTop";
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -101,6 +101,7 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 function App() {
   return (
     <>
+      <ScrollToTop />
       <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
           <Route element={<PublicLayout />}>
@@ -160,6 +161,7 @@ function App() {
                 
                 {/* Hợp đồng & Lịch hẹn của khách thuê */}
                 <Route path="contracts" element={<ContractsPage />} />
+                <Route path="contracts/create" element={<CreateContractPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
                 <Route path="appointments" element={<AppointmentManagePage />} />
               </Route>
