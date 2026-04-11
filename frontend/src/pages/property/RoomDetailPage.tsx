@@ -348,7 +348,7 @@ export default function RoomDetailPage() {
                   <Button
                     variant="outline"
                     className="w-full h-11 gap-2 text-green-700 border-green-200 hover:bg-green-50"
-                    onClick={() => navigate(`/contracts/create?roomId=${room.id}`)}
+                    onClick={() => navigate(`/tenant/contracts/create?roomId=${room.id}`)}
                   >
                     <FileSignature className="h-4 w-4" />
                     Thuê ngay

@@ -137,7 +137,8 @@ export default function CreateContractPage() {
       toast.success(user?.role === 'LANDLORD' ? "Đã tạo hợp đồng nháp thành công!" : "Đã gửi yêu cầu thuê thành công!");
       
       const newContractId = (res as any).data?.id || (res as any).id;
-      navigate(`/contracts/${newContractId}`); 
+      const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
+      navigate(`${prefix}/contracts/${newContractId}`); 
       
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Lỗi tạo hợp đồng.");
@@ -165,7 +166,7 @@ export default function CreateContractPage() {
                   Mỗi người chỉ được thuê 1 phòng tại một thời điểm.
                 </p>
                 <div className="mt-4 flex gap-3">
-                  <Link to={`/contracts/${existingContract.id}`}>
+                  <Link to={`/tenant/contracts/${existingContract.id}`}>
                     <Button size="sm" className="gap-1 bg-red-600 hover:bg-red-700">
                       Xem hợp đồng hiện tại
                     </Button>
