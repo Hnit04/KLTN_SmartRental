@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { 
   MapPin, Calendar, CheckCircle2, AlertCircle, 
   Clock, XCircle, ChevronRight, FileText, Banknote
@@ -11,6 +12,7 @@ interface ContractItemProps {
 
 export default function ContractItem({ data }: ContractItemProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const formatPrice = (price: number) => 
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -34,7 +36,10 @@ export default function ContractItem({ data }: ContractItemProps) {
   return (
     <div 
       className="group bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-xl hover:border-primary/40 transition-all cursor-pointer relative overflow-hidden"
-      onClick={() => navigate(`/contracts/${data.id}`)}
+      onClick={() => {
+        const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
+        navigate(`${prefix}/contracts/${data.id}`);
+      }}
     >
       {/* Hiệu ứng màu nền nhẹ khi hover */}
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

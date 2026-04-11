@@ -39,7 +39,7 @@ export default function PropertiesPage() {
           propertyApi.getAll(page, 24),
           page === 0 ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
-        console.log("API responses:", { propsRes, recRoomsRes });
+        
         if (propsRes.status === "fulfilled") {
             const pageData = propsRes.value.data as any;
             if (page === 0) {
@@ -50,10 +50,7 @@ export default function PropertiesPage() {
             setTotalPages(pageData.totalPages || 1);
         }
 
-        // Chỗ này cần log lại lỗi nếu có, nhưng không làm crash trang.
-        // Chỉ hiện kết quả recRoomsRes nều gọi API thành công và trả ra mảng.
         if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data) && recRoomsRes.value.data.length > 0) {
-            // Đảm bảo luôn có matchScore để giao diện RoomCard hiện thị được Badge % Phù hợp
             const enrichedRooms = recRoomsRes.value.data.map((room: any) => ({
                 ...room,
                 matchScore: room.matchScore ? room.matchScore : 95,
@@ -66,7 +63,6 @@ export default function PropertiesPage() {
         console.error("Failed to fetch properties or recommendations:", error);
         toast.error("Không thể tải toàn bộ dữ liệu. Đã có lỗi xảy ra.");
       } finally {
-        // Giả lập delay một chút để thấy hiệu ứng Skeleton (có thể bỏ khi chạy thật)
         setTimeout(() => setIsLoading(false), 500);
       }
     };
@@ -76,21 +72,17 @@ export default function PropertiesPage() {
   // --- FILTER LOGIC ---
   const filteredProperties = useMemo(() => {
     let result = properties.filter(p => {
-      // 1. Tìm kiếm text
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         p.name?.toLowerCase().includes(searchLower) ||
         p.address?.toLowerCase().includes(searchLower) ||
         p.district?.toLowerCase().includes(searchLower);
 
-      // 2. Lọc City
       const matchesCity = selectedCity === "Tất cả" || p.city === selectedCity;
 
-      // 3. Lọc Giá (dùng minPrice của khu trọ)
       const price = Number(p.minPrice || 0);
       const matchesPrice = price <= maxPrice;
 
-      // 4. Lọc Tiện ích (LƯU Ý: Hiện tại tìm trong description vì Property không có field amenities riêng)
       const matchesAmenities = selectedAmenities.length === 0 || selectedAmenities.every(am =>
         p.description?.toLowerCase().includes(am.toLowerCase()) ||
         p.name?.toLowerCase().includes(am.toLowerCase())
@@ -99,7 +91,6 @@ export default function PropertiesPage() {
       return matchesSearch && matchesCity && matchesPrice && matchesAmenities;
     });
 
-    // 5. Sắp xếp
     switch (sortBy) {
       case "price_asc":
         result.sort((a, b) => Number(a.minPrice || 0) - Number(b.minPrice || 0));
@@ -110,16 +101,13 @@ export default function PropertiesPage() {
       case "newest":
         result.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
         break;
-      case "default":
       default:
-        // No specific sorting for default, maintain original order or some other default
         break;
     }
 
     return result;
   }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy]);
 
-  // Đếm số filter đang active
   const activeFilterCount = [
     searchTerm !== "",
     selectedCity !== "Tất cả",
@@ -135,20 +123,17 @@ export default function PropertiesPage() {
         <div className="container mx-auto max-w-7xl">
           <div className="flex flex-col lg:flex-row justify-between items-end lg:items-center gap-4">
             
-            {/* Title */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Tìm phòng trọ</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {isLoading 
                   ? "Đang cập nhật dữ liệu..." 
-                  : `Đang hiển thị ${filteredProperties.length} khu trọ đã Duyệt`
+                  : `Đang hiển thị ${filteredProperties.length} khu trọ đã duyệt`
                 }
               </p>
             </div>
 
-            {/* Filter Bar */}
             <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
-              {/* Search */}
               <div className="relative flex-1 sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input 
@@ -159,7 +144,6 @@ export default function PropertiesPage() {
                 />
               </div>
 
-              {/* City Filter */}
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select 
@@ -174,7 +158,6 @@ export default function PropertiesPage() {
                 </select>
               </div>
 
-              {/* Sort Dropdown */}
               <div className="relative">
                 <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select
@@ -189,7 +172,6 @@ export default function PropertiesPage() {
                 </select>
               </div>
 
-              {/* Advance Filter Toggle */}
               <Button 
                 variant="outline" 
                 className={`gap-2 relative ${showAdvanceFilters ? 'bg-primary/5 border-primary text-primary' : ''}`}
@@ -207,12 +189,10 @@ export default function PropertiesPage() {
             </div>
           </div>
 
-          {/* ADVANCED FILTER PANEL */}
           {showAdvanceFilters && (
             <div className="mt-6 pt-6 border-t animate-in slide-in-from-top-4 duration-300">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 
-                {/* 1. Thanh trượt giá */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-semibold text-gray-700">Mức giá tối đa</label>
@@ -236,7 +216,6 @@ export default function PropertiesPage() {
                   </div>
                 </div>
 
-                {/* 2. Tiện ích phổ biến */}
                 <div className="lg:col-span-2 space-y-3">
                     <label className="text-sm font-semibold text-gray-700">Tiện ích phổ biến</label>
                     <div className="flex flex-wrap gap-4">
@@ -276,7 +255,7 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* --- DANH SÁCH GỢI Ý CỦA AI (NẾU CÓ) --- */}
+      {/* --- AI RECOMMENDATIONS --- */}
       {recommendedRooms.length > 0 && (
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <div className="flex items-center gap-3 border-b pb-4 mb-6">
@@ -288,7 +267,7 @@ export default function PropertiesPage() {
                 Phòng Gợi Ý Từ AI
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Dựa trên sở thích bạn đã cài đặt, AI tìm thấy {recommendedRooms.length} phòng phù hợp nhất.
+                Dựa trên sở thích của bạn, AI đã chọn ra {recommendedRooms.length} phòng tối ưu nhất.
               </p>
             </div>
           </div>
@@ -299,12 +278,11 @@ export default function PropertiesPage() {
                    <RoomCard data={room} />
                  </div>
                  
-                 {/* Nút Hỏi AI nhanh ở ngay thẻ gợi ý trên danh sách */}
                  <Button 
                    variant="outline" 
                    className="w-full gap-2 border-primary/40 text-primary font-medium hover:bg-primary/5 shadow-sm h-10"
                    onClick={() => window.dispatchEvent(new CustomEvent('openAiChat', { 
-                     detail: { question: `Nhờ AI phân tích ưu nhược điểm của phòng "${room.name}" này xem có phù hợp với tôi không?` } 
+                     detail: { question: `Bạn hãy phân tích ưu điểm và nhược điểm của phòng "${room.name}" này so với nhu cầu của mình nhé.` } 
                    }))}
                  >
                    <Bot className="h-4 w-4" /> Hỏi AI về phòng này
@@ -315,7 +293,7 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* --- LIST CONTENT --- */}
+      {/* --- MAIN CONTENT --- */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2 flex justify-between items-center">
             <span>Khám Phá Khu Trọ Toàn Quốc</span>
@@ -334,8 +312,8 @@ export default function PropertiesPage() {
               </button>
             </div>
         </h2>
+        
         {isLoading ? (
-          // SKELETON LOADING (Thay cho Spinner xoay)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="bg-white rounded-xl overflow-hidden border shadow-sm h-[320px] animate-pulse">
@@ -379,7 +357,7 @@ export default function PropertiesPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900">Không tìm thấy kết quả</h3>
             <p className="text-gray-500 max-w-sm mt-2">
-              Thử thay đổi từ khóa hoặc bộ lọc để tìm kiếm lại nhé.
+              Hãy thử thay đổi từ khóa hoặc bộ lọc để tìm kiếm lại nhé.
             </p>
             <Button 
               variant="outline" 

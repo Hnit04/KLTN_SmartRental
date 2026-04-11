@@ -397,7 +397,7 @@ export default function PropertyManageDetailPage() {
     <div className="space-y-6">
       {/* --- HEADER --- */}
       <div>
-        <Link to="/properties/manage" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
+        <Link to="/landlord/properties" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
           <ArrowLeft className="h-4 w-4 mr-1" /> Về danh sách khu trọ
         </Link>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -11,22 +11,22 @@ import {
   HelpCircle,
   ArrowRight,
   BookOpen,
-  ChevronRight
+  ChevronRight,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { cn } from "@/utils/cn";
 
 // Dữ liệu bài viết giả lập để phục vụ tìm kiếm
 const allArticles = [
-  { id: 1, title: "Hướng dẫn đăng tin cho thuê phòng", category: "Dành cho Chủ trọ" },
-  { id: 2, title: "Làm thế nào để nạp tiền vào ví?", category: "Thanh toán" },
-  { id: 3, title: "Quy trình xác thực danh tính (KYC)", category: "Tài khoản" },
-  { id: 4, title: "Cách lấy lại mật khẩu đã quên", category: "Tài khoản" },
-  { id: 5, title: "Hủy hợp đồng thuê trước hạn", category: "Hợp đồng" },
-  { id: 6, title: "Báo cáo người dùng vi phạm", category: "An toàn & Bảo mật" },
-  { id: 7, title: "Chính sách hoàn tiền cọc", category: "Thanh toán" },
-  { id: 8, title: "Cách sửa thông tin cá nhân", category: "Tài khoản" },
+  { id: 1, title: "Hướng dẫn đăng tin cho thuê phòng", category: "Dành cho Chủ trọ", preview: "Hướng dẫn từng bước cách đăng tin cho thuê phòng với ảnh chất lượng cao và thông tin chi tiết.", readTime: 5 },
+  { id: 2, title: "Làm thế nào để nạp tiền vào ví?", category: "Thanh toán", preview: "SmartRental hỗ trợ nạp tiền qua thẻ ngân hàng, ví điện tử và chuyển khoản ngân hàng.", readTime: 3 },
+  { id: 3, title: "Quy trình xác thực danh tính (KYC)", category: "Tài khoản", preview: "Xác thực danh tính bổ sung để tăng độ tin tưởng và mở khóa các tính năng cao cấp.", readTime: 4 },
+  { id: 4, title: "Cách lấy lại mật khẩu đã quên", category: "Tài khoản", preview: "Hướng dẫn đặt lại mật khẩu thông qua email hoặc số điện thoại được đăng ký.", readTime: 2 },
+  { id: 5, title: "Hủy hợp đồng thuê trước hạn", category: "Hợp đồng", preview: "Quy trình hủy hợp đồng, chính sách tiền phạt và xử lý hoàn cọc cho bên thuê.", readTime: 6 },
+  { id: 6, title: "Báo cáo người dùng vi phạm", category: "An toàn & Bảo mật", preview: "Cách báo cáo người dùng có hành vi vi phạm quy tắc cộng đồng của SmartRental.", readTime: 3 },
+  { id: 7, title: "Chính sách hoàn tiền cọc", category: "Thanh toán", preview: "Quy tắc hoàn cọc, thời gian xử lý và các trường hợp không hoàn cọc.", readTime: 5 },
+  { id: 8, title: "Cách sửa thông tin cá nhân", category: "Tài khoản", preview: "Cập nhật thông tin tài khoản, ảnh đại diện và các trường thông tin cá nhân.", readTime: 2 },
 ];
 
 const categories = [
@@ -69,12 +69,12 @@ const categories = [
 ];
 
 const popularArticles = [
-  "Hướng dẫn xác thực tài khoản (KYC) bước-từng-bước",
-  "Biểu phí dịch vụ dành cho Chủ trọ mới nhất 2024",
-  "Làm thế nào để đẩy tin lên top tìm kiếm?",
-  "Chính sách bảo vệ người thuê của SmartRental",
-  "Quy trình thanh toán tiền phòng qua cổng SmartPay",
-  "Mẫu hợp đồng thuê nhà chuẩn"
+  { title: "Hướng dẫn xác thực tài khoản (KYC) bước-từng-bước", readTime: 5, views: 12400 },
+  { title: "Biểu phí dịch vụ dành cho Chủ trọ mới nhất 2024", readTime: 4, views: 8900 },
+  { title: "Làm thế nào để đẩy tin lên top tìm kiếm?", readTime: 6, views: 15600 },
+  { title: "Chính sách bảo vệ người thuê của SmartRental", readTime: 7, views: 7200 },
+  { title: "Quy trình thanh toán tiền phòng qua cổng SmartPay", readTime: 4, views: 9800 },
+  { title: "Mẫu hợp đồng thuê nhà chuẩn", readTime: 8, views: 11500 }
 ];
 
 export default function HelpCenter() {
@@ -115,20 +115,28 @@ export default function HelpCenter() {
             {searchQuery && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-card border rounded-xl shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200">
                 {searchResults.length > 0 ? (
-                  <ul className="py-2">
+                  <ul className="py-2 max-h-96 overflow-y-auto">
                     {searchResults.map((article) => (
                       <li key={article.id}>
                         <Link 
                           to="#" 
-                          className="flex items-center justify-between px-6 py-3 hover:bg-muted/50 transition-colors group"
+                          className="flex flex-col justify-between px-6 py-4 hover:bg-muted/50 transition-colors group border-b last:border-b-0"
                         >
-                          <div className="flex items-center gap-3">
-                            <BookOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                            <span className="text-foreground font-medium">{article.title}</span>
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-3 flex-1">
+                              <BookOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 mt-0.5" />
+                              <span className="text-foreground font-medium group-hover:text-primary transition-colors">{article.title}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded whitespace-nowrap flex-shrink-0">
+                              {article.category}
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                            {article.category}
-                          </span>
+                          <div className="flex items-center gap-4 ml-7 text-xs text-muted-foreground">
+                            <span className="line-clamp-1">{article.preview}</span>
+                            <span className="flex items-center gap-1 whitespace-nowrap">
+                              <Clock className="h-3 w-3" /> {article.readTime} phút
+                            </span>
+                          </div>
                         </Link>
                       </li>
                     ))}
@@ -182,17 +190,27 @@ export default function HelpCenter() {
                 <Link 
                   key={idx} 
                   to="#" 
-                  className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors group"
+                  className="flex items-start justify-between p-5 hover:bg-muted/30 transition-colors group"
                 >
-                  <div className="flex items-center gap-4">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <div className="flex items-start gap-4 flex-1">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors flex-shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                      {article}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground group-hover:text-primary transition-colors mb-2">
+                        {article.title}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" /> {article.readTime} phút đọc
+                        </span>
+                        <span className="flex items-center gap-1">
+                          👁️ {article.views.toLocaleString()} views
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform flex-shrink-0" />
                 </Link>
               ))}
             </div>

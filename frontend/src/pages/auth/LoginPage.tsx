@@ -96,7 +96,9 @@ export default function LoginPage() {
       });
 
       setTimeout(() => {
-        navigate("/dashboard");
+        if (user.role === 'ADMIN') navigate("/admin/dashboard");
+        else if (user.role === 'LANDLORD') navigate("/landlord/dashboard");
+        else navigate("/tenant/dashboard");
       }, 1500);
     } catch (error: any) {
       console.error("Lỗi đăng nhập:", error?.response?.data);
@@ -147,7 +149,10 @@ export default function LoginPage() {
     });
 
     setTimeout(() => {
-      navigate("/dashboard");
+      const role = response.user?.role;
+      if (role === 'ADMIN') navigate("/admin/dashboard");
+      else if (role === 'LANDLORD') navigate("/landlord/dashboard");
+      else navigate("/tenant/dashboard");
     }, 800);
 
   } catch (error: any) {

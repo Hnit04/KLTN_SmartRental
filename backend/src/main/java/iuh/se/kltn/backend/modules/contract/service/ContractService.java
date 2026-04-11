@@ -44,6 +44,12 @@ public class ContractService {
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
+    
+    @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-landlord-wallet:}")
+    private String fallbackLandlordWallet;
+
+    @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-tenant-wallet:}")
+    private String fallbackTenantWallet;
 
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -325,14 +331,14 @@ public class ContractService {
                 String realLandlord = contract.getLandlordWalletSnapshot() != null && !contract.getLandlordWalletSnapshot().isEmpty() ? contract.getLandlordWalletSnapshot().toLowerCase() : 
                         (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null
                         && contract.getRoom().getProperty().getLandlord().getWalletAddress() != null && !contract.getRoom().getProperty().getLandlord().getWalletAddress().isEmpty()
-                        ? contract.getRoom().getProperty().getLandlord().getWalletAddress().toLowerCase() : "0x5b38da6a701c568545dcfcb03fcb875f56beddc4".toLowerCase());
+                        ? contract.getRoom().getProperty().getLandlord().getWalletAddress().toLowerCase() : fallbackLandlordWallet.toLowerCase());
                 comparisons.add(createComparison("landlordAddress", realLandlord, onChainLandlord));
 
                 // So sánh tenantAddress
                 String onChainTenant = (String) onChain.get("tenantAddress");
                 String realTenant = contract.getTenantWalletSnapshot() != null && !contract.getTenantWalletSnapshot().isEmpty() ? contract.getTenantWalletSnapshot().toLowerCase() : 
                         (contract.getTenant() != null && contract.getTenant().getWalletAddress() != null && !contract.getTenant().getWalletAddress().isEmpty()
-                        ? contract.getTenant().getWalletAddress().toLowerCase() : "0xab8483f64d9c6d1ecf9b849ae677dd3315835cb2".toLowerCase());
+                        ? contract.getTenant().getWalletAddress().toLowerCase() : fallbackTenantWallet.toLowerCase());
                 comparisons.add(createComparison("tenantAddress", realTenant, onChainTenant));
 
                 boolean allMatch = comparisons.stream()
@@ -460,12 +466,12 @@ public class ContractService {
                     
                     String tenantWallet = contract.getTenantWalletSnapshot() != null ? contract.getTenantWalletSnapshot() : contract.getTenant().getWalletAddress();
                     if (tenantWallet == null || tenantWallet.isEmpty()) {
-                        tenantWallet = "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"; // fallback
+                        tenantWallet = fallbackTenantWallet; // fallback
                     }
 
                     String landlordWallet = contract.getLandlordWalletSnapshot() != null ? contract.getLandlordWalletSnapshot() : contract.getRoom().getProperty().getLandlord().getWalletAddress();
                     if (landlordWallet == null || landlordWallet.isEmpty()) {
-                        landlordWallet = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"; // fallback
+                        landlordWallet = fallbackLandlordWallet; // fallback
                     }
 
                     long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;

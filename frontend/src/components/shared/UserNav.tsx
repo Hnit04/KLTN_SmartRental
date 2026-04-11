@@ -46,13 +46,13 @@ export function UserNav() {
       {/* ✅ MENU ĐỘNG DỰA TRÊN ROLE */}
       {user.role === 'LANDLORD' ? (
         <>
-          <Link to="/dashboard">
+          <Link to="/landlord/dashboard">
             <DropdownItem>
               <LayoutDashboard className="mr-3 h-4 w-4 text-gray-500" />
               Tổng quan
             </DropdownItem>
           </Link>
-          <Link to="/properties/manage">
+          <Link to="/landlord/properties">
             <DropdownItem>
               <Home className="mr-3 h-4 w-4 text-gray-500" />
               Quản lý nhà trọ
@@ -61,7 +61,7 @@ export function UserNav() {
         </>
       ) : (
         <>
-          <Link to="/contracts">
+          <Link to="/tenant/contracts">
             <DropdownItem>
               <FileText className="mr-3 h-4 w-4 text-gray-500" />
               Hợp đồng của tôi
