@@ -68,11 +68,11 @@ const PublicRoute = () => {
     }
     
     if (user?.role === 'LANDLORD') {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/landlord/dashboard" replace />;
     }
     
     if (user?.role === 'TENANT') {
-      return <Navigate to="/tenant-dashboard" replace />;
+      return <Navigate to="/tenant/dashboard" replace />;
     }
     
     return <Navigate to="/" replace />;
@@ -89,8 +89,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   
   if (!allowedRoles.includes(user.role ?? '')) {
     if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
-    if (user?.role === 'LANDLORD') return <Navigate to="/dashboard" replace />;
-     if (user?.role === 'TENANT') return <Navigate to="/tenant-dashboard" replace />;
+    if (user?.role === 'LANDLORD') return <Navigate to="/landlord/dashboard" replace />;
+     if (user?.role === 'TENANT') return <Navigate to="/tenant/dashboard" replace />;
     return <Navigate to="/" replace />;
 
   }
@@ -136,38 +136,42 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               
               {/* === KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD) === */}
-              <Route element={<RoleRoute allowedRoles={['LANDLORD']} />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/properties/manage" element={<PropertiesManagePage />} />
-                <Route path="/properties/manage/:id" element={<PropertyManageDetailPage />} />
-                <Route path="/properties/manage/:propertyId/rooms/:roomId" element={<PropertyRoomDetailPage />} />
+              <Route path="/landlord" element={<RoleRoute allowedRoles={['LANDLORD']} />}>
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="properties" element={<PropertiesManagePage />} />
+                <Route path="properties/:id" element={<PropertyManageDetailPage />} />
+                <Route path="properties/:propertyId/rooms/:roomId" element={<PropertyRoomDetailPage />} />
                 
-                <Route path="/finance" element={<BillManagePage />} />
-                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="finance" element={<BillManagePage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                
+                {/* Hợp đồng & Lịch hẹn của chủ trọ */}
+                <Route path="contracts" element={<ContractsPage />} />
+                <Route path="contracts/create" element={<CreateContractPage />} />
+                <Route path="contracts/:id" element={<ContractDetailPage />} />
+                <Route path="appointments" element={<AppointmentManagePage />} />
               </Route>
 
               {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}
-              <Route element={<RoleRoute allowedRoles={['TENANT']} />}>
-                <Route path="/tenant-dashboard" element={<TenantDashboardPage />} />
-                <Route path="/my-room" element={<MyRoomPage />} />
-                <Route path="/rental-history" element={<RentalHistoryPage />} />
+              <Route path="/tenant" element={<RoleRoute allowedRoles={['TENANT']} />}>
+                <Route path="dashboard" element={<TenantDashboardPage />} />
+                <Route path="my-room" element={<MyRoomPage />} />
+                <Route path="rental-history" element={<RentalHistoryPage />} />
+                
+                {/* Hợp đồng & Lịch hẹn của khách thuê */}
+                <Route path="contracts" element={<ContractsPage />} />
+                <Route path="contracts/:id" element={<ContractDetailPage />} />
+                <Route path="appointments" element={<AppointmentManagePage />} />
               </Route>
               
-              {/* === CONTRACT & INTERACTION ROUTES (DÙNG CHUNG CẢ LANDLORD & TENANT) === */}
-              <Route path="/contracts/create" element={<CreateContractPage />} />
-              <Route path="/contracts/:id" element={<ContractDetailPage />} />
-              <Route path="/contracts" element={<ContractsPage />} />
-              
-              <Route path="/appointments" element={<AppointmentManagePage />} />
-
-              {/* === KHU VỰC ADMIN (không dùng MainLayout) === */}
-            <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-              <Route path="/admin/approvals" element={<AdminApprovalPage />} />
-              <Route path="/admin/users" element={<UserManagementPage />} />
-              <Route path="/admin/blockchain-logs" element={<BlockchainLogsPage />} />
-              <Route path="/admin/ai-analytics" element={<AiAnalyticsPage />} />
-            </Route>
+              {/* === KHU VỰC ADMIN === */}
+              <Route path="/admin" element={<RoleRoute allowedRoles={['ADMIN']} />}>
+                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="approvals" element={<AdminApprovalPage />} />
+                <Route path="users" element={<UserManagementPage />} />
+                <Route path="blockchain-logs" element={<BlockchainLogsPage />} />
+                <Route path="ai-analytics" element={<AiAnalyticsPage />} />
+              </Route>
             </Route> 
 
             

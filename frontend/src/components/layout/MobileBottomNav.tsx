@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, FileText, CalendarClock, LayoutDashboard, DoorOpen } from "lucide-react";
+import { Home, Search, FileText, CalendarClock, LayoutDashboard, DoorOpen, Wallet, PieChart } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/utils/cn";
 
@@ -14,18 +14,20 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
 
   const tenantNav = [
-    { to: "/tenant-dashboard", icon: Home,           label: "Trang chủ" },
-    { to: "/properties",      icon: Search,          label: "Tìm phòng" },
-    { to: "/my-room",         icon: DoorOpen,        label: "Phòng trọ" },
-    { to: "/contracts",       icon: FileText,        label: "Hợp đồng" },
-    { to: "/appointments",    icon: CalendarClock,   label: "Lịch hẹn" },
+    { to: "/tenant/dashboard", icon: LayoutDashboard, label: "Tổng quan" },
+    { to: "/properties",       icon: Search,          label: "Tìm phòng" },
+    { to: "/tenant/my-room",     icon: DoorOpen,        label: "Phòng trọ" },
+    { to: "/tenant/contracts",   icon: FileText,        label: "Hợp đồng" },
+    { to: "/tenant/appointments", icon: CalendarClock,   label: "Lịch hẹn" },
   ];
 
   const landlordNav = [
-    { to: "/dashboard",          icon: LayoutDashboard, label: "Tổng quan" },
-    { to: "/properties/manage",  icon: Home,            label: "Khu trọ" },
-    { to: "/contracts",          icon: FileText,        label: "Hợp đồng" },
-    { to: "/appointments",       icon: CalendarClock,   label: "Lịch hẹn" },
+    { to: "/landlord/dashboard",    icon: LayoutDashboard, label: "Tổng quan" },
+    { to: "/landlord/properties",   icon: Home,            label: "Khu trọ" },
+    { to: "/landlord/contracts",    icon: FileText,        label: "Hợp đồng" },
+    { to: "/landlord/finance",      icon: Wallet,          label: "Tài chính" },
+    { to: "/landlord/appointments", icon: CalendarClock,   label: "Lịch hẹn" },
+    { to: "/landlord/reports",      icon: PieChart,        label: "Báo cáo" },
   ];
 
   const navItems = user?.role === "LANDLORD" ? landlordNav : tenantNav;

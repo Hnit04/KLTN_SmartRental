@@ -341,7 +341,7 @@ const handleDuplicate = async (room: any) => {
     <div className="space-y-6">
       {/* --- HEADER --- */}
       <div>
-        <Link to="/properties/manage" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
+        <Link to="/landlord/properties" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
           <ArrowLeft className="h-4 w-4 mr-1" /> Về danh sách khu trọ
         </Link>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -366,7 +366,7 @@ const handleDuplicate = async (room: any) => {
           <div 
             key={room.id} 
             className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
-            onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`} // ← Click vào phòng chuyển trang
+            onClick={() => window.location.href = `/landlord/properties/${id}/rooms/${room.id}`} // ← Click vào phòng chuyển trang
           >
             {/* Ảnh phòng */}
             <div className="h-40 bg-gray-200 relative">
@@ -460,13 +460,13 @@ const handleDuplicate = async (room: any) => {
                 </Button>
 
                 {room.status === 'AVAILABLE' ? (
-                  <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                  <Link to={`/landlord/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                     <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
                       <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
                     </Button>
                   </Link>
                 ) : (
-                  <Link to={`/contracts?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                  <Link to={`/landlord/contracts?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                     <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
                       <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
                     </Button>

@@ -6,16 +6,21 @@ import NotificationBell from "../shared/NotificationBell";
 
 // Map route → tên trang hiển thị trên Header
 const PAGE_TITLES: Record<string, string> = {
-  '/dashboard':         'Tổng quan & Thống kê',
-  '/properties/manage': 'Khu trọ & Phòng trọ',
-  '/contracts':         'Quản lý Hợp đồng',
-  '/finance':           'Tài chính & Hóa đơn',
-  '/appointments':      'Quản lý Lịch hẹn',
-  '/reports':           'Báo cáo Doanh thu',
-  '/tenant-dashboard':  'Trang chủ',
-  '/properties':        'Tìm phòng trọ',
-  '/profile':           'Hồ sơ cá nhân',
-  '/settings':          'Cài đặt tài khoản',
+  '/landlord/dashboard':   'Tổng quan & Thống kê',
+  '/landlord/properties':  'Khu trọ & Phòng trọ',
+  '/landlord/contracts':   'Quản lý Hợp đồng',
+  '/landlord/finance':     'Tài chính & Hóa đơn',
+  '/landlord/appointments': 'Quản lý Lịch hẹn',
+  '/landlord/reports':     'Báo cáo Doanh thu',
+  '/tenant/dashboard':     'Trang chủ',
+  '/tenant/my-room':       'Phòng trọ của tôi',
+  '/tenant/contracts':     'Hợp đồng của tôi',
+  '/tenant/appointments':  'Lịch hẹn của tôi',
+  '/tenant/rental-history': 'Lịch sử thuê',
+  '/admin/dashboard':      'Quản trị hệ thống',
+  '/properties':           'Tìm phòng trọ',
+  '/profile':              'Hồ sơ cá nhân',
+  '/settings':             'Cài đặt tài khoản',
 };
 
 const Header = () => {

@@ -173,7 +173,7 @@ export default function MyRoomPage() {
               <Search className="h-4 w-4" /> Tìm kiếm phòng ngay
             </Button>
           </Link>
-          <Link to="/appointments">
+          <Link to="/tenant/appointments">
             <Button variant="outline" className="px-8">Lịch hẹn của tôi</Button>
           </Link>
         </div>
@@ -201,7 +201,7 @@ export default function MyRoomPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-            <Link to={`/contracts/${contract.id}`}>
+            <Link to={`/tenant/contracts/${contract.id}`}>
                <Button variant="outline" className="gap-2">
                  <FileText className="h-4 w-4" /> Chi tiết hợp đồng
                </Button>
@@ -253,7 +253,7 @@ export default function MyRoomPage() {
                    <div>
                        <p className="text-sm font-bold text-amber-800">Cần chữ ký của bạn</p>
                        <p className="text-xs text-amber-700 mt-0.5">Hợp đồng này đang chờ bạn xác nhận và ký để có hiệu lực chính thức.</p>
-                       <Link to={`/contracts/${contract.id}`}>
+                       <Link to={`/tenant/contracts/${contract.id}`}>
                          <Button size="sm" className="mt-3 bg-amber-600 hover:bg-amber-700 h-8">Ký ngay</Button>
                        </Link>
                    </div>
@@ -306,7 +306,7 @@ export default function MyRoomPage() {
                 <h2 className="font-bold text-gray-900 flex items-center gap-2">
                     <Receipt className="h-5 w-5 text-primary" /> Hóa đơn gần đây
                 </h2>
-                <Link to="/tenant-dashboard" className="text-xs text-primary hover:underline">Xem thêm ở dashboard</Link>
+                <Link to="/tenant/dashboard" className="text-xs text-primary hover:underline">Xem thêm ở dashboard</Link>
             </div>
             <div className="divide-y">
                 {bills.length === 0 ? (
@@ -498,7 +498,7 @@ export default function MyRoomPage() {
                    <div className="text-xs text-gray-600 line-clamp-4 italic whitespace-pre-wrap">
                        {contract.additionalTerms || "Không có thỏa thuận bổ sung."}
                    </div>
-                   <Link to={`/contracts/${contract.id}`} className="mt-4 block text-xs text-primary font-bold hover:underline flex items-center gap-1">
+                   <Link to={`/tenant/contracts/${contract.id}`} className="mt-4 block text-xs text-primary font-bold hover:underline flex items-center gap-1">
                       Đọc toàn bộ văn bản <ExternalLink className="h-3 w-3" />
                    </Link>
                 </div>

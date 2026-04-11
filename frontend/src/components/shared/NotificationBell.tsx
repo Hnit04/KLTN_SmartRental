@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useAuth } from '@/context/AuthContext';
 import {
   Bell, CheckCircle2, Info, Check,
   Star, CalendarClock, Banknote, FileText, Trash2, X
@@ -50,6 +51,7 @@ function NotiIcon({ type }: { type: string }) {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen]               = useState(false);
@@ -186,14 +188,17 @@ export default function NotificationBell() {
     setIsOpen(false);
 
     if (!noti.referenceId) return;
-  switch (noti.type as string) {
+    
+    const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
+
+    switch (noti.type as string) {
       case 'APPOINTMENT_UPDATE':
-        navigate('/appointments');
+        navigate(`${prefix}/appointments`);
         break;
       case 'CONTRACT_UPDATE':
       case 'PAYMENT_REMINDER':
       case 'BILL_CREATED':
-        navigate(`/contracts/${noti.referenceId}`);
+        navigate(`${prefix}/contracts/${noti.referenceId}`);
         break;
       case 'NEW_REVIEW':
         navigate(`/properties/${noti.referenceId}`);

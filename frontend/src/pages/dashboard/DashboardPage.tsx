@@ -300,7 +300,7 @@ export default function DashboardPage() {
             {/* ... giữ nguyên nội dung to-do list ... */}
           </div>
 
-          <Link to="/contracts" className="w-full mt-4 block">
+          <Link to="/landlord/contracts" className="w-full mt-4 block">
             <Button variant="outline" className="w-full">
               Xem tất cả công việc
             </Button>

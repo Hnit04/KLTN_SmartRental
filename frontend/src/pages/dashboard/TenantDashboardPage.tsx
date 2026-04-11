@@ -222,7 +222,7 @@ export default function TenantDashboardPage() {
               </div>
               Phòng hiện tại của tôi
             </h2>
-            <Link to={`/contracts/${activeContract.id}`}
+            <Link to={`/tenant/contracts/${activeContract.id}`}
               className="text-sm text-primary hover:underline flex items-center gap-1 font-medium">
               Xem hợp đồng <ExternalLink className="h-3.5 w-3.5" />
             </Link>
@@ -309,7 +309,7 @@ export default function TenantDashboardPage() {
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" /> Hợp đồng của tôi
             </h2>
-            <Link to="/contracts" className="text-sm text-primary hover:underline flex items-center gap-1">
+            <Link to="/tenant/contracts" className="text-sm text-primary hover:underline flex items-center gap-1">
               Xem tất cả <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
@@ -324,7 +324,7 @@ export default function TenantDashboardPage() {
           ) : (
             <div className="space-y-3">
               {contracts.slice(0, 4).map(c => (
-                <Link key={c.id} to={`/contracts/${c.id}`}
+                <Link key={c.id} to={`/tenant/contracts/${c.id}`}
                   className="block bg-white rounded-2xl border p-5 hover:shadow-lg transition-all hover:border-primary/50 hover:-translate-y-1 active:scale-[0.98] group">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -409,7 +409,7 @@ export default function TenantDashboardPage() {
               <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
                 <CalendarClock className="h-4 w-4 text-primary" /> Lịch hẹn xem phòng
               </h2>
-              <Link to="/appointments" className="text-xs text-primary hover:underline">Xem tất cả</Link>
+              <Link to="/tenant/appointments" className="text-xs text-primary hover:underline">Xem tất cả</Link>
             </div>
 
             {recentAppts.length === 0 ? (
@@ -448,8 +448,8 @@ export default function TenantDashboardPage() {
             <p className="text-sm font-bold text-gray-700 mb-3">Truy cập nhanh</p>
             {[
               { to: "/properties", icon: <Search className="h-4 w-4" />, label: "Tìm phòng trọ" },
-              { to: "/contracts", icon: <FileText className="h-4 w-4" />, label: "Hợp đồng của tôi" },
-              { to: "/appointments", icon: <CalendarClock className="h-4 w-4" />, label: "Lịch hẹn xem phòng" },
+              { to: "/tenant/contracts", icon: <FileText className="h-4 w-4" />, label: "Hợp đồng của tôi" },
+              { to: "/tenant/appointments", icon: <CalendarClock className="h-4 w-4" />, label: "Lịch hẹn xem phòng" },
             ].map(item => (
               <Link key={item.to} to={item.to}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-all text-gray-600 hover:text-primary hover:shadow-sm hover:border-gray-100 border border-transparent active:scale-[0.98] group">
@@ -485,7 +485,7 @@ export default function TenantDashboardPage() {
                 <Star className="h-4 w-4 fill-amber-500 text-amber-500" /> Chia sẻ trải nghiệm
               </p>
               <p className="text-xs text-amber-700 mb-3">Bạn có thể đánh giá chủ nhà và phòng trọ sau khi kết thúc hợp đồng.</p>
-              <Link to={`/contracts/${activeContract.id}`}>
+              <Link to={`/tenant/contracts/${activeContract.id}`}>
                 <Button size="sm" variant="outline" className="text-amber-700 border-amber-300 hover:bg-amber-100 text-xs w-full">
                   Xem hợp đồng & đánh giá
                 </Button>

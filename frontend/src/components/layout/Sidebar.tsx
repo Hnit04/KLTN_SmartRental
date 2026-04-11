@@ -27,33 +27,33 @@ const Sidebar = () => {
   const landlordItems = [
     {
       title: 'Tổng quan & Thống kê',
-      path: '/dashboard',
+      path: '/landlord/dashboard',
       icon: LayoutDashboard,
     },
     {
       title: 'Khu trọ & Phòng trọ',
-      path: '/properties/manage',
+      path: '/landlord/properties',
       icon: Building,
     },
     {
       title: 'Quản lý Hợp đồng',
-      path: '/contracts',
+      path: '/landlord/contracts',
       icon: FileText,
     },
     {
       title: 'Tài chính & Hóa đơn',
-      path: '/finance',
+      path: '/landlord/finance',
       icon: Wallet,
 
     },
     {
       title: 'Quản lý Lịch hẹn',
-      path: '/appointments',
+      path: '/landlord/appointments',
       icon: Calendar,
     },
     {
       title: 'Báo cáo doanh thu',
-      path: '/reports',
+      path: '/landlord/reports',
       icon: PieChart,
     },
   ];
@@ -62,7 +62,7 @@ const Sidebar = () => {
   const tenantItems = [
     {
       title: 'Trang chủ',
-      path: '/tenant-dashboard',
+      path: '/tenant/dashboard',
       icon: LayoutDashboard,
     },
     {
@@ -72,22 +72,22 @@ const Sidebar = () => {
     },
     {
       title: 'Hợp đồng của tôi',
-      path: '/contracts',
+      path: '/tenant/contracts',
       icon: FileText,
     },
     {
       title: 'Phòng của tôi',
-      path: '/my-room',
+      path: '/tenant/my-room',
       icon: DoorOpen,
     },
     {
       title: 'Lịch sử thuê phòng',
-      path: '/rental-history',
+      path: '/tenant/rental-history',
       icon: History,
     },
     {
       title: 'Lịch hẹn xem phòng',
-      path: '/appointments', 
+      path: '/tenant/appointments', 
       icon: Calendar,
     },
   ];

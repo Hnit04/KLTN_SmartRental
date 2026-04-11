@@ -47,7 +47,7 @@ export default function PublicLayout() {
             
             {isAuthenticated && (
               <NavLink
-                to={user?.role === 'LANDLORD' ? '/dashboard' : '/tenant-dashboard'}
+                to={user?.role === 'LANDLORD' ? '/landlord/dashboard' : '/tenant/dashboard'}
                 className={({ isActive }) => 
                   `flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full transition-colors ${
                     isActive 
