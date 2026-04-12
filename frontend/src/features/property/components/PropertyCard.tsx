@@ -25,7 +25,7 @@ export default function PropertyCard({ data }: PropertyCardProps) {
   return (
     <div 
       onClick={() => navigate(`/properties/${data.id}`)}
-      className="group bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer relative"
+      className={`group bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-70 grayscale-[0.3]' : ''}`}
     >
       {/* 1. Hình ảnh & Badge giá */}
       <div className="relative h-52 overflow-hidden bg-gray-100">
@@ -43,9 +43,9 @@ export default function PropertyCard({ data }: PropertyCardProps) {
         </div>
         
         {/* Badge số phòng trống */}
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-black text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+        <div className={`absolute top-3 right-3 backdrop-blur-sm text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 ${data.availableRooms === 0 ? 'bg-red-500 text-white' : 'bg-white/90 text-black'}`}>
           <Home className="h-3 w-3" />
-          {data.availableRooms || 0} phòng trống
+          {data.availableRooms && data.availableRooms > 0 ? `${data.availableRooms} phòng trống` : "Hết phòng"}
         </div>
       </div>
 

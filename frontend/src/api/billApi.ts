@@ -50,4 +50,7 @@ export const billApi = {
   landlordConfirmPayment: (billId: number) => {
     return axiosClient.post(`/bills/${billId}/landlord-confirm`);
   },
+  getAnnualReport: (year: number) => {
+    return axiosClient.get(`/bills/reports/annual-report?year=${year}`);
+  },
 };

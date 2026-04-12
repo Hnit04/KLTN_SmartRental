@@ -26,6 +26,7 @@ export default function PropertiesPage() {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
+  const [isAvailableOnly, setIsAvailableOnly] = useState(true);
 
   const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
 
@@ -88,7 +89,9 @@ export default function PropertiesPage() {
         p.name?.toLowerCase().includes(am.toLowerCase())
       );
 
-      return matchesSearch && matchesCity && matchesPrice && matchesAmenities;
+      const matchesAvailability = !isAvailableOnly || Number(p.availableRooms || 0) > 0;
+
+      return matchesSearch && matchesCity && matchesPrice && matchesAmenities && matchesAvailability;
     });
 
     switch (sortBy) {
@@ -114,6 +117,7 @@ export default function PropertiesPage() {
     maxPrice < 20000000,
     selectedAmenities.length > 0,
     sortBy !== "default",
+    !isAvailableOnly // Count as active filter if user manually UNCHECKS it (since default is true)
   ].filter(Boolean).length;
 
   return (
@@ -216,7 +220,7 @@ export default function PropertiesPage() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-2 space-y-3">
+                <div className="space-y-3">
                     <label className="text-sm font-semibold text-gray-700">Tiện ích phổ biến</label>
                     <div className="flex flex-wrap gap-4">
                         {amenityOptions.map(am => (
@@ -234,6 +238,21 @@ export default function PropertiesPage() {
                         ))}
                     </div>
                 </div>
+
+                <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Trạng thái phòng</label>
+                    <div className="flex items-center">
+                        <Checkbox 
+                            id="filter-available"
+                            label="Chỉ hiện khu trọ còn phòng"
+                            checked={isAvailableOnly}
+                            onCheckedChange={(checked) => setIsAvailableOnly(!!checked)}
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                        Tắt tùy chọn này để xem tất cả khu trọ kể cả đã hết phòng.
+                    </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
@@ -243,6 +262,7 @@ export default function PropertiesPage() {
                       setSearchTerm("");
                       setSelectedCity("Tất cả");
                       setSortBy("default");
+                      setIsAvailableOnly(true);
                   }}>
                       Đặt lại tất cả
                   </Button>
@@ -257,7 +277,7 @@ export default function PropertiesPage() {
 
       {/* --- AI RECOMMENDATIONS --- */}
       {recommendedRooms.length > 0 && (
-        <div className="container mx-auto max-w-7xl px-4 py-8">
+        <div className="container mx-auto max-w-7xl px-4 py-8 relative z-20">
           <div className="flex items-center gap-3 border-b pb-4 mb-6">
             <div className="p-2 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-lg text-amber-600">
               <Sparkles className="h-6 w-6" />
@@ -281,9 +301,24 @@ export default function PropertiesPage() {
                  <Button 
                    variant="outline" 
                    className="w-full gap-2 border-primary/40 text-primary font-medium hover:bg-primary/5 shadow-sm h-10"
-                   onClick={() => window.dispatchEvent(new CustomEvent('openAiChat', { 
-                     detail: { question: `Bạn hãy phân tích ưu điểm và nhược điểm của phòng "${room.name}" này so với nhu cầu của mình nhé.` } 
-                   }))}
+                   onClick={() => {
+                     const amenitiesList = Array.isArray(room.amenities) ? room.amenities.join(', ') : '';
+                     const details = [
+                       `Tên phòng: "${room.name}"`,
+                       room.propertyName ? `Khu trọ: "${room.propertyName}"` : '',
+                       (room as any).propertyAddress || (room as any).address ? `Địa chỉ: ${(room as any).propertyAddress || (room as any).address}` : '',
+                       `Diện tích: ${room.area}m²`,
+                       `Giá thuê: ${room.price?.toLocaleString('vi-VN')}đ/tháng`,
+                       room.type ? `Loại: ${room.type}` : '',
+                       room.hasMezzanine ? 'Có gác lửng' : '',
+                       room.hasBalcony ? 'Có ban công' : '',
+                       amenitiesList ? `Tiện nghi: ${amenitiesList}` : '',
+                       room.description ? `Mô tả: ${room.description.substring(0, 200)}` : '',
+                     ].filter(Boolean).join('. ');
+                     const q = `Hãy phân tích chi tiết ưu điểm và nhược điểm của phòng trọ sau đây, đánh giá mức giá có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
+                     const shortText = `Phân tích phòng "${room.name}" tại "${room.propertyName || 'khu trọ này'}" giúp mình nhé! 🏠`;
+                     window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question: q, autoSend: true, displayText: shortText } }));
+                   }}
                  >
                    <Bot className="h-4 w-4" /> Hỏi AI về phòng này
                  </Button>

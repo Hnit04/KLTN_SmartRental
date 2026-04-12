@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
+import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/contracts")
@@ -53,6 +57,16 @@ public class ContractController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getContractById(@PathVariable Long id) {
         return ResponseEntity.ok(contractService.getContractById(id));
+    }
+
+    @GetMapping("/history/{userId}")
+    public ResponseEntity<List<ContractResponse>> getRentalHistory(@PathVariable Long userId) {
+        return ResponseEntity.ok(contractService.getRentalHistory(userId));
+    }
+
+    @GetMapping("/dashboard/insights")
+    public ResponseEntity<DashboardInsightsResponse> getDashboardInsights(@AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(contractService.getDashboardInsights(currentUser.getId()));
     }
 
     // 3.5. Admin: Lấy tất cả hợp đồng (cho Blockchain Logs)
@@ -164,6 +178,32 @@ public class ContractController {
             @PathVariable Long id) {
         try {
             return ResponseEntity.ok(contractService.confirmDepositRefund(id, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    // 💰 Xác nhận nạp cọc Web3 (Tenant gọi sau khi tx.wait())
+    @PostMapping("/{id}/confirm-web3-deposit")
+    public ResponseEntity<?> confirmWeb3Deposit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        String txHash = request.get("txHash");
+        try {
+            return ResponseEntity.ok(contractService.confirmWeb3Deposit(id, txHash, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    // 💰 Xác nhận nạp cọc Truyền thống (Chủ trọ nhấn nút)
+    @PostMapping("/{id}/confirm-traditional-deposit")
+    public ResponseEntity<?> confirmTraditionalDeposit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(contractService.confirmTraditionalDeposit(id, currentUser.getId()));
         } catch (Exception e) {
             return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
         }

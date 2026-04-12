@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -46,4 +47,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
            "WHERE c.tenant.id = :userId OR m.user.id = :userId " +
            "ORDER BY c.startDate DESC")
     List<Contract> findAllRentalHistoryByUserId(@Param("userId") Long userId);
+
+    // ✅ Tìm hợp đồng sắp hết hạn của chủ trọ
+    List<Contract> findByRoom_Property_Landlord_IdAndStatusAndEndDateBetween(Long landlordId, ContractStatus status, java.time.LocalDate start, java.time.LocalDate end);
 }

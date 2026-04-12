@@ -44,14 +44,29 @@ public class AiController {
         }
 
         // B1: Thử tìm trong kho tri thức tĩnh (FAQ Cache) trước
-        String faqAnswer = aiOrchestratorService.searchFaq(message);
-        if (faqAnswer != null) {
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "sessionId", sessionId,
-                    "reply", faqAnswer,
-                    "source", "FAQ_CACHE"
-            ));
+        // NHƯNG: Bỏ qua FAQ cho câu hỏi phân tích phòng (dài, chứa dữ liệu phòng cụ thể)
+        // vì FAQ vector search dễ bị false-positive với câu hỏi dài/phức tạp.
+        String lowerMessage = message.toLowerCase();
+        boolean isRoomAnalysis = (lowerMessage.contains("phân tích") || lowerMessage.contains("ưu điểm") 
+                || lowerMessage.contains("nhược điểm") || lowerMessage.contains("đánh giá") 
+                || lowerMessage.contains("lời khuyên") || lowerMessage.contains("tư vấn"))
+                && (lowerMessage.contains("diện tích") || lowerMessage.contains("giá thuê") 
+                || lowerMessage.contains("tiện nghi") || lowerMessage.contains("m²")
+                || lowerMessage.contains("khu trọ") || lowerMessage.contains("giá dịch vụ")
+                || lowerMessage.contains("khoảng giá") || lowerMessage.contains("tổng số phòng"));
+        
+        if (!isRoomAnalysis) {
+            String faqAnswer = aiOrchestratorService.searchFaq(message);
+            if (faqAnswer != null) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "sessionId", sessionId,
+                        "reply", faqAnswer,
+                        "source", "FAQ_CACHE"
+                ));
+            }
+        } else {
+            System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Bỏ qua FAQ Cache, chuyển thẳng cho SmartRentalAi.");
         }
 
         // B2: Nếu không thấy, gọi mô hình LLM

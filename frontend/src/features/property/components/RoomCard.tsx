@@ -55,7 +55,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   const handleRentNow = () => {
     if (!isAvailable) return;
     // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
-    navigate(`/contracts/create?roomId=${data.id}`);
+    navigate(`/tenant/contracts/create?roomId=${data.id}`);
   };
 
   const mapRoomType = (type?: string) => {
@@ -223,7 +223,11 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   disabled={!isAvailable || isMaintenance}
                   onClick={(e) => {
                       e.stopPropagation();
-                      if (onBookAppointment) onBookAppointment();
+                      if (onBookAppointment) {
+                          onBookAppointment();
+                      } else {
+                          navigate(`/rooms/${data.id}?action=book`);
+                      }
                   }}
               >
                   {isMaintenance ? "Đang bảo trì" : isAvailable ? (
@@ -314,7 +318,11 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                     disabled={!isAvailable || isMaintenance}
                     onClick={() => {
                       setIsDetailOpen(false);
-                      if (onBookAppointment) onBookAppointment();
+                      if (onBookAppointment) {
+                          onBookAppointment();
+                      } else {
+                          navigate(`/rooms/${data.id}?action=book`);
+                      }
                     }}
                   >
                     <CalendarClock className="h-4 w-4 mr-2" /> Đặt lịch
