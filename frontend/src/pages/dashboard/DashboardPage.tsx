@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Link } from 'react-router-dom';
 import { billApi } from '@/api/billApi';
 import { roomApi } from '@/api/roomApi';
+import { contractApi } from '@/api/contractApi';
 
 // Dữ liệu Mock cho Biểu đồ Doanh thu (Sẽ thay bằng API sau nếu cần)
 const REVENUE_DATA = [
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const [overdueCount, setOverdueCount] = useState<number>(0);
   const [overdueAmount, setOverdueAmount] = useState<number>(0);
   const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any>(null);
   useEffect(() => {
     const fetchRevenue = async () => {
       try {
@@ -107,11 +109,21 @@ export default function DashboardPage() {
         console.error("Lỗi khi lấy dữ liệu doanh thu:", error);
       }
     };
+    const fetchDashboardInsights = async () => {
+      try {
+        const response = await contractApi.getDashboardInsights();
+        setInsights(response.data);
+      } catch (error) {
+        console.error("Lỗi khi lấy thông tin chi tiết dashboard:", error);
+      }
+    };
+
     const fetchAllStats = () => {
       fetchRevenueLast6Months();
       fetchOverdueStats();
       fetchRevenue();
       fetchOccupancy();
+      fetchDashboardInsights();
     };
 
     fetchAllStats();
@@ -184,73 +196,60 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tỷ lệ lấp đầy */}
+        {/* Dự kiến thu (Tháng tới) */}
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-gray-500">Tỷ lệ lấp đầy</p>
-              {occupancyLoading ? (
-                <h3 className="text-2xl font-bold text-gray-900 mt-1">Đang tải...</h3>
-              ) : occupancyError ? (
-                <h3 className="text-2xl font-bold text-red-600 mt-1">Lỗi</h3>
-              ) : (
-                <h3 className="text-2xl font-bold text-gray-900 mt-1">
-                  {occupancyRate}%
-                </h3>
-              )}
+              <p className="text-sm font-medium text-gray-500">Dự kiến thu (Tháng tới)</p>
+              <h3 className="text-2xl font-bold text-blue-600 mt-1">
+                {formatCurrency(insights?.projectedRevenue || 0)}
+              </h3>
             </div>
-            <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-              <HomeIcon className="h-5 w-5" />
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+              <TrendingUp className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            {occupancyLoading || occupancyError ? (
-              <span className="text-gray-400">—</span>
-            ) : (
-              <span className="text-gray-600 font-medium">{occupiedRooms}/{totalRooms} Phòng</span>
-            )}
-            <span className="text-gray-400 ml-2">đang có khách thuê</span>
-          </div>
+          <p className="mt-4 text-xs text-gray-400">
+            Dựa trên các hợp đồng đang hiệu lực
+          </p>
         </div>
 
-        {/* Khách thuê đang ở */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        {/* Tiền thất thoát (Phòng trống) */}
+        <div className="bg-white p-6 rounded-2xl border shadow-sm border-l-4 border-l-red-500">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-gray-500">Khách thuê</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-1">{totalTenants}</h3>
-            </div>
-            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-gray-400">Dựa trên hợp đồng đang hiệu lực</span>
-          </div>
-        </div>
-
-        {/* Cảnh báo nợ đọng */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Hóa đơn quá hạn</p>
-              {loading ? (
-                <h3 className="text-2xl font-bold text-red-600 mt-1">Đang tải...</h3>
-              ) : (
-                <h3 className="text-2xl font-bold text-red-600 mt-1">
-                  {overdueCount}
-                </h3>
-              )}
+              <p className="text-sm font-medium text-gray-500 text-red-600">Thất thoát (Phòng trống)</p>
+              <h3 className="text-2xl font-bold text-red-600 mt-1">
+                -{formatCurrency(insights?.opportunityCost || 0)}
+              </h3>
             </div>
             <div className="p-2 bg-red-50 rounded-lg text-red-600">
               <AlertCircle className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-red-600 font-medium">
-              {overdueAmount.toLocaleString('vi-VN')}đ
-            </span>
-            <span className="text-gray-400 ml-2">đang chờ thanh toán</span>
+          <p className="mt-4 text-xs text-red-400 font-medium">
+             Cần đẩy nhanh việc tìm khách thuê
+          </p>
+        </div>
+
+        {/* Tỷ lệ lấp đầy */}
+        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Tỷ lệ lấp đầy</p>
+              <h3 className="text-2xl font-bold text-gray-900 mt-1">
+                {occupancyRate}%
+              </h3>
+            </div>
+            <div className="p-2 bg-green-50 rounded-lg text-green-600">
+              <HomeIcon className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500" style={{ width: `${occupancyRate}%` }} />
+            </div>
+            <span className="text-xs text-gray-400 font-medium">{occupiedRooms}/{totalRooms} phòng</span>
           </div>
         </div>
       </div>
@@ -296,7 +295,45 @@ export default function DashboardPage() {
           </h3>
 
           <div className="space-y-4 flex-1">
-            {/* ... giữ nguyên nội dung to-do list ... */}
+            {overdueCount > 0 && (
+              <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
+                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-red-900">{overdueCount} hóa đơn quá hạn</p>
+                  <p className="text-xs text-red-700">Tổng cộng {overdueAmount.toLocaleString()}đ chưa thu hồi.</p>
+                </div>
+              </div>
+            )}
+
+            {insights?.expiringContractsCount > 0 && (
+              <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-900">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
+                  <p className="text-xs text-amber-700">Trong 30 ngày tới. Cần liên hệ khách sớm.</p>
+                </div>
+              </div>
+            )}
+
+            {occupancyRate < 100 && (
+              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                <HomeIcon className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-blue-900">Phòng trống cần cho thuê</p>
+                  <p className="text-xs text-blue-700">Còn {totalRooms - occupiedRooms} phòng đang trống.</p>
+                </div>
+              </div>
+            )}
+            
+            {insights?.latePaymentRoomsCount > 0 && (
+              <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+                <Users className="h-5 w-5 text-purple-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-purple-900">{insights.latePaymentRoomsCount} phòng đóng tiền trễ</p>
+                  <p className="text-xs text-purple-700">Cần có biện pháp nhắc nhở hoặc đánh giá uy tín.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <Link to="/landlord/contracts" className="w-full mt-4 block">

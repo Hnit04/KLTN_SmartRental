@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.contract.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.modules.contract.dto.response.AnnualReportResponse;
 import iuh.se.kltn.backend.modules.contract.dto.response.MonthlyRevenueResponse;
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.RevenueChartResponse;
@@ -98,5 +99,12 @@ public class BillController {
     public ResponseEntity<?> landlordConfirmPayment(@PathVariable Long billId,
                                                     @AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(billService.landlordConfirmPayment(billId, currentUser.getId()));
+    }
+
+    @GetMapping("/reports/annual-report")
+    public ResponseEntity<AnnualReportResponse> getAnnualReport(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "2026") int year) {
+        return ResponseEntity.ok(billService.getAnnualReport(currentUser.getId(), year));
     }
 }

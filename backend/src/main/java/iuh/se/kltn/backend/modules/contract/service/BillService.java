@@ -1,5 +1,6 @@
 package iuh.se.kltn.backend.modules.contract.service;
 
+import iuh.se.kltn.backend.modules.contract.dto.response.AnnualReportResponse;
 import iuh.se.kltn.backend.modules.contract.dto.response.MonthlyRevenueResponse;
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.BillResponse;
@@ -491,5 +492,66 @@ public class BillService {
         double waterCost = (savedBill.getNewWaterIndex() - savedBill.getOldWaterIndex()) * property.getWaterPrice();
 
         return mapToResponse(savedBill, elecCost, waterCost, savedBill.getContract().getActualPrice());
+    }
+
+    public AnnualReportResponse getAnnualReport(Long landlordId, int year) {
+        List<Bill> yearBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndYear(landlordId, year);
+        List<Bill> prevYearBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndYear(landlordId, year - 1);
+
+        double totalCurrent = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
+        double totalPrev = prevYearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
+
+        double growthRate = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : (totalCurrent > 0 ? 100.0 : 0.0);
+
+        // 1. Monthly Revenue
+        List<AnnualReportResponse.MonthlyRevenueDTO> monthlyRevenue = new ArrayList<>();
+        Map<Integer, List<Bill>> billsByMonth = yearBills.stream().collect(Collectors.groupingBy(Bill::getMonth));
+        for (int m = 1; m <= 12; m++) {
+            List<Bill> mBills = billsByMonth.getOrDefault(m, new ArrayList<>());
+            double rent = mBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> b.getContract().getActualPrice()).sum();
+            double total = mBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
+            monthlyRevenue.add(new AnnualReportResponse.MonthlyRevenueDTO("T" + String.format("%02d", m), rent, total - rent));
+        }
+
+        // 2. Revenue Distribution
+        double totalRent = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> b.getContract().getActualPrice()).sum();
+        double totalElec = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> (b.getNewElecIndex() - b.getOldElecIndex()) * b.getContract().getElecPriceSnapshot()).sum();
+        double totalWater = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> (b.getNewWaterIndex() - b.getOldWaterIndex()) * b.getContract().getWaterPriceSnapshot()).sum();
+        double totalMisc = totalCurrent - totalRent - totalElec - totalWater;
+
+        List<AnnualReportResponse.RevenueDistributionDTO> distribution = List.of(
+            new AnnualReportResponse.RevenueDistributionDTO("Tiền phòng", totalCurrent > 0 ? (totalRent / totalCurrent) * 100 : 0, "#3b82f6"),
+            new AnnualReportResponse.RevenueDistributionDTO("Tiền điện", totalCurrent > 0 ? (totalElec / totalCurrent) * 100 : 0, "#f59e0b"),
+            new AnnualReportResponse.RevenueDistributionDTO("Tiền nước", totalCurrent > 0 ? (totalWater / totalCurrent) * 100 : 0, "#0ea5e9"),
+            new AnnualReportResponse.RevenueDistributionDTO("Dịch vụ khác", totalCurrent > 0 ? (totalMisc / totalCurrent) * 100 : 0, "#10b981")
+        );
+
+        // 3. Property Details
+        Map<Long, List<Bill>> billsByProperty = yearBills.stream().collect(Collectors.groupingBy(b -> b.getContract().getRoom().getProperty().getId()));
+        List<AnnualReportResponse.PropertyRevenueDTO> propertyDetails = new ArrayList<>();
+        String bestProp = "Chưa có dữ liệu";
+        double maxPropRev = -1;
+
+        for (Map.Entry<Long, List<Bill>> entry : billsByProperty.entrySet()) {
+            List<Bill> pBills = entry.getValue();
+            String name = pBills.get(0).getContract().getRoom().getProperty().getName();
+            int totalRooms = pBills.get(0).getContract().getRoom().getProperty().getRooms().size();
+            double rev = pBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
+            
+            propertyDetails.add(new AnnualReportResponse.PropertyRevenueDTO(name, totalRooms, rev, "stable"));
+            if (rev > maxPropRev) {
+                maxPropRev = rev;
+                bestProp = name;
+            }
+        }
+
+        return AnnualReportResponse.builder()
+                .totalAnnualRevenue(totalCurrent)
+                .growthRate(growthRate)
+                .bestPerformingProperty(bestProp)
+                .monthlyRevenue(monthlyRevenue)
+                .distribution(distribution)
+                .propertyDetails(propertyDetails)
+                .build();
     }
 }

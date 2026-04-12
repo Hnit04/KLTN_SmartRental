@@ -66,4 +66,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
       AND c.status = 'ACTIVE'
 """)
     List<User> findTenantsByRoomId(@Param("roomId") Long roomId);
+
+    @Query("SELECT r FROM Room r WHERE r.property.landlord.id = :landlordId")
+    List<Room> findAllByProperty_Landlord_Id(@Param("landlordId") Long landlordId);
 }

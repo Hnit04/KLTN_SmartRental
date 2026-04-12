@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
+import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/contracts")
@@ -53,6 +57,16 @@ public class ContractController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getContractById(@PathVariable Long id) {
         return ResponseEntity.ok(contractService.getContractById(id));
+    }
+
+    @GetMapping("/history/{userId}")
+    public ResponseEntity<List<ContractResponse>> getRentalHistory(@PathVariable Long userId) {
+        return ResponseEntity.ok(contractService.getRentalHistory(userId));
+    }
+
+    @GetMapping("/dashboard/insights")
+    public ResponseEntity<DashboardInsightsResponse> getDashboardInsights(@AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(contractService.getDashboardInsights(currentUser.getId()));
     }
 
     // 3.5. Admin: Lấy tất cả hợp đồng (cho Blockchain Logs)

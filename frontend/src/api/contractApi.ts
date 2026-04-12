@@ -16,8 +16,11 @@ export const contractApi = {
   getMyCurrentRoom: () => {
     return axiosClient.get<Contract>("/contracts/my-current-room");
   },
-  getRentalHistory: () => {
-    return axiosClient.get<Contract[]>("/contracts/history");
+  getRentalHistory: (userId: number) => {
+    return axiosClient.get(`/contracts/history/${userId}`);
+  },
+  getDashboardInsights: () => {
+    return axiosClient.get('/contracts/dashboard/insights');
   },
   createContract: (data: CreateContractPayload) => {
     return axiosClient.post<Contract>("/contracts", data);

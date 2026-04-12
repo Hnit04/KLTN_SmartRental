@@ -4,6 +4,7 @@ import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.entity.ContractChangeRequest; // ✅ BỔ SUNG IMPORT
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
@@ -11,6 +12,7 @@ import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestType; // ✅ BỔ SUNG IMPORT
+import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
@@ -27,6 +29,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -44,6 +47,7 @@ public class ContractService {
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
+    @Autowired private BillRepository billRepository;
     
     @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-landlord-wallet:}")
     private String fallbackLandlordWallet;
@@ -233,8 +237,70 @@ public class ContractService {
     }
 
     // --- 2c. Lấy TẤT CẢ lịch sử thuê của người dùng ---
+    public List<Contract> findAllRentalHistoryByUserId(Long userId) {
+        return contractRepository.findAllRentalHistoryByUserId(userId);
+    }
+
+    public DashboardInsightsResponse getDashboardInsights(Long landlordId) {
+        java.time.LocalDate now = java.time.LocalDate.now();
+        java.time.LocalDate oneMonthLater = now.plusDays(30);
+
+        // 1. Projected Revenue (from ACTIVE contracts)
+        List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
+        double projectedRevenue = activeContracts.stream().mapToDouble(Contract::getActualPrice).sum();
+
+        // 2. Opportunity Cost (from AVAILABLE rooms)
+        List<Room> availableRooms = roomRepository.findAllByProperty_Landlord_Id(landlordId).stream()
+                .filter(r -> r.getStatus() == RoomStatus.AVAILABLE).collect(Collectors.toList());
+        double opportunityCost = availableRooms.stream().mapToDouble(Room::getPrice).sum();
+
+        // 3. Expiring Contracts (< 30 days)
+        List<Contract> expiring = contractRepository.findByRoom_Property_Landlord_IdAndStatusAndEndDateBetween(
+                landlordId, ContractStatus.ACTIVE, now, oneMonthLater);
+        long expiringCount = expiring.size();
+
+        // 4. Late Payment Rooms (Query from BillRepository)
+        // Count distinct contracts that have at least one LATE bill
+        List<Long> contractIds = activeContracts.stream().map(Contract::getId).collect(Collectors.toList());
+        long latePaymentRooms = 0;
+        if (!contractIds.isEmpty()) {
+            latePaymentRooms = billRepository.findByContractIdInAndStatus(
+                contractIds, iuh.se.kltn.backend.modules.contract.enums.BillStatus.LATE).stream()
+                .map(b -> b.getContract().getId())
+                .distinct()
+                .count();
+        }
+
+        // 5. Occupancy Trend (Last 6 months)
+        List<DashboardInsightsResponse.OccupancyTrendDTO> trend = new ArrayList<>();
+        List<Room> allRooms = roomRepository.findAllByProperty_Landlord_Id(landlordId);
+        int totalRoomsCount = allRooms.size();
+
+        for (int i = 5; i >= 0; i--) {
+            java.time.LocalDate date = now.minusMonths(i);
+            java.time.LocalDate endOfMonth = date.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+            
+            // Count contracts active during this month
+            long occupied = activeContracts.stream().filter(c -> 
+                (c.getStartDate().isBefore(endOfMonth) || c.getStartDate().isEqual(endOfMonth)) &&
+                (c.getEndDate() == null || c.getEndDate().isAfter(date) || c.getEndDate().isEqual(date))
+            ).count();
+            
+            double rate = totalRoomsCount > 0 ? ((double) occupied / totalRoomsCount) * 100 : 0;
+            trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
+        }
+
+        return DashboardInsightsResponse.builder()
+                .projectedRevenue(projectedRevenue)
+                .opportunityCost(opportunityCost)
+                .expiringContractsCount(expiringCount)
+                .latePaymentRoomsCount(latePaymentRooms)
+                .occupancyTrend(trend)
+                .build();
+    }
+
     public List<ContractResponse> getRentalHistory(Long userId) {
-        List<Contract> contracts = contractRepository.findAllRentalHistoryByUserId(userId);
+        List<Contract> contracts = findAllRentalHistoryByUserId(userId);
         return contracts.stream()
                 .map(c -> mapToResponse(c, userId))
                 .collect(Collectors.toList());
