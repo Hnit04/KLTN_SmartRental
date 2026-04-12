@@ -134,11 +134,15 @@ public class BillService {
         // =========================================================
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
-                long billAmountForChain = Math.round(savedBill.getTotalAmount());
+                long EXCHANGE_RATE = 80_000_000L;
+                java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
+                java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(savedBill.getTotalAmount()))
+                        .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+
                 blockchainService.registerExternalBill(
                         contract.getSmartContractAddress(),
                         savedBill.getId(),
-                        billAmountForChain
+                        billAmountWei
                 );
                 System.out.println("✅ Đã đăng ký hóa đơn #" + savedBill.getId() + " lên Blockchain");
             }
@@ -430,11 +434,15 @@ public class BillService {
         }
 
         try {
-            long billAmountForChain = Math.round(bill.getTotalAmount());
+            long EXCHANGE_RATE = 80_000_000L;
+            java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
+            java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(bill.getTotalAmount()))
+                        .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+
             blockchainService.registerExternalBill(
                     contract.getSmartContractAddress(),
                     bill.getId(),
-                    billAmountForChain
+                    billAmountWei
             );
             System.out.println("✅ Đã đồng bộ hóa đơn #" + bill.getId() + " lên Blockchain");
         } catch (Exception e) {

@@ -44,6 +44,7 @@ public class Contract {
     private String contractHash;
     private String smartContractAddress;
     private String deployTxHash;
+    private String depositTxHash;
 
     // Các trường Snapshot bảo tồn tính bất biến của hợp đồng
     private Double elecPriceSnapshot;
@@ -55,10 +56,12 @@ public class Contract {
     private String tenantWalletSnapshot;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private ContractStatus status;
     private Boolean isTenantSigned = false;
     private Boolean isLandlordSigned = false;
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private DepositStatus depositStatus;
     @Column(columnDefinition = "TEXT")
     private String additionalTerms;

@@ -169,6 +169,32 @@ public class ContractController {
         }
     }
 
+    // 💰 Xác nhận nạp cọc Web3 (Tenant gọi sau khi tx.wait())
+    @PostMapping("/{id}/confirm-web3-deposit")
+    public ResponseEntity<?> confirmWeb3Deposit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        String txHash = request.get("txHash");
+        try {
+            return ResponseEntity.ok(contractService.confirmWeb3Deposit(id, txHash, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    // 💰 Xác nhận nạp cọc Truyền thống (Chủ trọ nhấn nút)
+    @PostMapping("/{id}/confirm-traditional-deposit")
+    public ResponseEntity<?> confirmTraditionalDeposit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(contractService.confirmTraditionalDeposit(id, currentUser.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
     private ResponseEntity<?> handleAiException(Exception e) {
         if (e.getMessage() != null && e.getMessage().contains("429")) {
             return ResponseEntity.status(429).body(java.util.Collections.singletonMap("message", "AI đang quá tải (Rate Limit). Vui lòng thử lại sau ít phút!"));

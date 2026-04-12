@@ -56,5 +56,13 @@ export const contractApi = {
   // --- XÁC NHẬN HOÀN CỌC ---
   confirmDepositRefund: (id: number | string) => {
     return axiosClient.put(`/contracts/${id}/confirm-deposit-refund`);
+  },
+  
+  // --- XÁC NHẬN NẠP CỌC (WEB3 & TRADITIONAL) ---
+  confirmWeb3Deposit: (id: number | string, txHash: string) => {
+    return axiosClient.post(`/contracts/${id}/confirm-web3-deposit`, { txHash });
+  },
+  confirmTraditionalDeposit: (id: number | string) => {
+    return axiosClient.post(`/contracts/${id}/confirm-traditional-deposit`);
   }
 };

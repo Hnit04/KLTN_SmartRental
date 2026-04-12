@@ -26,6 +26,7 @@ export default function PropertiesPage() {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
+  const [isAvailableOnly, setIsAvailableOnly] = useState(true);
 
   const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
 
@@ -88,7 +89,9 @@ export default function PropertiesPage() {
         p.name?.toLowerCase().includes(am.toLowerCase())
       );
 
-      return matchesSearch && matchesCity && matchesPrice && matchesAmenities;
+      const matchesAvailability = !isAvailableOnly || Number(p.availableRooms || 0) > 0;
+
+      return matchesSearch && matchesCity && matchesPrice && matchesAmenities && matchesAvailability;
     });
 
     switch (sortBy) {
@@ -114,6 +117,7 @@ export default function PropertiesPage() {
     maxPrice < 20000000,
     selectedAmenities.length > 0,
     sortBy !== "default",
+    !isAvailableOnly // Count as active filter if user manually UNCHECKS it (since default is true)
   ].filter(Boolean).length;
 
   return (
@@ -216,7 +220,7 @@ export default function PropertiesPage() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-2 space-y-3">
+                <div className="space-y-3">
                     <label className="text-sm font-semibold text-gray-700">Tiện ích phổ biến</label>
                     <div className="flex flex-wrap gap-4">
                         {amenityOptions.map(am => (
@@ -234,6 +238,21 @@ export default function PropertiesPage() {
                         ))}
                     </div>
                 </div>
+
+                <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Trạng thái phòng</label>
+                    <div className="flex items-center">
+                        <Checkbox 
+                            id="filter-available"
+                            label="Chỉ hiện khu trọ còn phòng"
+                            checked={isAvailableOnly}
+                            onCheckedChange={(checked) => setIsAvailableOnly(!!checked)}
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                        Tắt tùy chọn này để xem tất cả khu trọ kể cả đã hết phòng.
+                    </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
@@ -243,6 +262,7 @@ export default function PropertiesPage() {
                       setSearchTerm("");
                       setSelectedCity("Tất cả");
                       setSortBy("default");
+                      setIsAvailableOnly(true);
                   }}>
                       Đặt lại tất cả
                   </Button>
