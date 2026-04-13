@@ -132,6 +132,21 @@ export default function CreateContractPage() {
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
 
+      if (existingContract && user?.role === 'TENANT') {
+        if (!existingContract.endDate) {
+           toast.warning(`Hợp đồng hiện tại của bạn chưa xác định ngày kết thúc. Vui lòng chấm dứt hợp đồng cũ trước khi đặt phòng mới!`);
+           setIsLoading(false);
+           return;
+        }
+        const existingEnd = new Date(existingContract.endDate);
+        const newStart = new Date(formData.startDate);
+        if (newStart <= existingEnd) {
+          toast.warning(`Hợp đồng hiện tại của bạn đến ngày ${existingEnd.toLocaleDateString('vi-VN')} mới kết thúc. Vui lòng chọn ngày bắt đầu hợp đồng mới sau ngày này!`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const res = await contractApi.createContract(payload as any);
       
       toast.success(user?.role === 'LANDLORD' ? "Đã tạo hợp đồng nháp thành công!" : "Đã gửi yêu cầu thuê thành công!");
@@ -149,38 +164,39 @@ export default function CreateContractPage() {
 
   if (!room) return <LoadingSpinner />;
 
+
   return (
     <div className="min-h-screen bg-gray-50 py-10">
       <div className="container mx-auto max-w-3xl">
 
         {/* ❌ CẢNH BÁO NẾU ĐÃ CÓ HỢP ĐỒNG */}
         {existingContract && user?.role === 'TENANT' && (
-          <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-6 shadow-sm">
+          <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-6 w-6 text-orange-600 shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-red-800 text-lg">Bạn đã có phòng đang thuê!</h3>
-                <p className="text-sm text-red-700 mt-1">
+                <h3 className="font-bold text-orange-800 text-lg">Bạn đang có phòng đang thuê!</h3>
+                <p className="text-sm text-orange-700 mt-1">
                   Bạn đang có hợp đồng <strong>{existingContract.status === 'ACTIVE' ? 'đang thuê' : 'chờ ký'}</strong> tại phòng{' '}
-                  <strong>{existingContract.roomName || `#${existingContract.roomId}`}</strong>.
-                  Mỗi người chỉ được thuê 1 phòng tại một thời điểm.
+                  <strong>{existingContract.roomName || `#${existingContract.roomId}`}</strong> 
+                  {existingContract.endDate ? ` (Đến ngày ${new Date(existingContract.endDate).toLocaleDateString('vi-VN')})` : ' (Vô thời hạn)'}.
+                </p>
+                <p className="text-sm text-orange-700 mt-1 font-semibold">
+                  Mỗi người chỉ được ở 1 phòng tại một thời điểm. {existingContract.endDate ? 'Để thuê phòng mới này, bạn phải chọn khoảng thời gian bắt đầu sau khi hợp đồng cũ kết thúc.' : 'Vui lòng hoàn tất trả phòng cũ trước khi dọn đến đây.'}
                 </p>
                 <div className="mt-4 flex gap-3">
                   <Link to={`/tenant/contracts/${existingContract.id}`}>
-                    <Button size="sm" className="gap-1 bg-red-600 hover:bg-red-700">
+                    <Button size="sm" className="gap-1 bg-orange-600 hover:bg-orange-700 text-white">
                       Xem hợp đồng hiện tại
                     </Button>
                   </Link>
-                  <Button size="sm" variant="outline" onClick={() => navigate(-1)} className="text-red-700 border-red-300 hover:bg-red-100">
-                    Quay lại
-                  </Button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className={`bg-white rounded-xl shadow-lg border overflow-hidden ${existingContract && user?.role === 'TENANT' ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+        <div className={`bg-white rounded-xl shadow-lg border overflow-hidden`}>
           
           <div className="bg-primary/5 p-6 border-b border-primary/10">
             <h1 className="text-2xl font-bold text-gray-900">

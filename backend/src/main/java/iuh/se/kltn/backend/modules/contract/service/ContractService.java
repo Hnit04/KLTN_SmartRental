@@ -4,6 +4,7 @@ import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.entity.ContractChangeRequest; // ✅ BỔ SUNG IMPORT
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
@@ -11,6 +12,7 @@ import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
 import iuh.se.kltn.backend.modules.contract.enums.DepositStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.enums.RequestType; // ✅ BỔ SUNG IMPORT
+import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
@@ -27,6 +29,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -44,6 +47,7 @@ public class ContractService {
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
+    @Autowired private BillRepository billRepository;
     
     @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-landlord-wallet:}")
     private String fallbackLandlordWallet;
@@ -69,7 +73,7 @@ public class ContractService {
             throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
         }
 
-        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm
+        // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm (Cho phép thuê gối đầu nếu HĐ cũ sắp hết)
         Long tenantIdToCheck = null;
         if (currentUser.getRole() == Role.TENANT) {
             tenantIdToCheck = currentUserId;
@@ -81,13 +85,21 @@ public class ContractService {
         }
         if (tenantIdToCheck != null) {
             List<Contract> existingContracts = contractRepository.findByTenantIdAndStatusIn(
-                tenantIdToCheck, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+                tenantIdToCheck, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE, ContractStatus.AWAITING_DEPOSIT)
             );
+            
+            // Lọc các hợp đồng thực sự bị xung đột thời gian (Ngày bắt đầu mới phải sau hoặc bằng ngày kết thúc của HĐ cũ)
+            java.time.LocalDate requestedStart = request.getStartDate();
+            existingContracts = existingContracts.stream().filter(c -> 
+                c.getEndDate() == null || c.getEndDate().isAfter(requestedStart) || c.getEndDate().isEqual(requestedStart)
+            ).collect(Collectors.toList());
+
             if (!existingContracts.isEmpty()) {
                 Contract existing = existingContracts.get(0);
                 String roomName = existing.getRoom() != null ? existing.getRoom().getName() : "#" + existing.getId();
                 String statusLabel = existing.getStatus() == ContractStatus.ACTIVE ? "đang thuê" : "đang chờ ký";
-                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + ". Mỗi người chỉ được thuê 1 phòng tại một thời điểm!");
+                String endDateStr = existing.getEndDate() != null ? "ngày " + existing.getEndDate() : "vô thời hạn (chưa xác định ngày kết thúc)";
+                throw new RuntimeException("Người thuê đã có hợp đồng " + statusLabel + " tại phòng " + roomName + " đến " + endDateStr + ". Hãy chọn ngày bắt đầu hợp đồng mới sau thời điểm này (nếu có)!");
             }
         }
 
@@ -208,7 +220,7 @@ public class ContractService {
         // Tìm các hợp đồng ACTIVE hoặc PENDING_SIGNATURE mà user là Tenant hoặc Member
         List<Contract> contracts = contractRepository.findCurrentContractsByUserId(
             userId, 
-            java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE)
+            java.util.List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE, ContractStatus.AWAITING_DEPOSIT)
         );
 
         if (contracts.isEmpty()) {
@@ -225,8 +237,70 @@ public class ContractService {
     }
 
     // --- 2c. Lấy TẤT CẢ lịch sử thuê của người dùng ---
+    public List<Contract> findAllRentalHistoryByUserId(Long userId) {
+        return contractRepository.findAllRentalHistoryByUserId(userId);
+    }
+
+    public DashboardInsightsResponse getDashboardInsights(Long landlordId) {
+        java.time.LocalDate now = java.time.LocalDate.now();
+        java.time.LocalDate oneMonthLater = now.plusDays(30);
+
+        // 1. Projected Revenue (from ACTIVE contracts)
+        List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
+        double projectedRevenue = activeContracts.stream().mapToDouble(Contract::getActualPrice).sum();
+
+        // 2. Opportunity Cost (from AVAILABLE rooms)
+        List<Room> availableRooms = roomRepository.findAllByProperty_Landlord_Id(landlordId).stream()
+                .filter(r -> r.getStatus() == RoomStatus.AVAILABLE).collect(Collectors.toList());
+        double opportunityCost = availableRooms.stream().mapToDouble(Room::getPrice).sum();
+
+        // 3. Expiring Contracts (< 30 days)
+        List<Contract> expiring = contractRepository.findByRoom_Property_Landlord_IdAndStatusAndEndDateBetween(
+                landlordId, ContractStatus.ACTIVE, now, oneMonthLater);
+        long expiringCount = expiring.size();
+
+        // 4. Late Payment Rooms (Query from BillRepository)
+        // Count distinct contracts that have at least one LATE bill
+        List<Long> contractIds = activeContracts.stream().map(Contract::getId).collect(Collectors.toList());
+        long latePaymentRooms = 0;
+        if (!contractIds.isEmpty()) {
+            latePaymentRooms = billRepository.findByContractIdInAndStatus(
+                contractIds, iuh.se.kltn.backend.modules.contract.enums.BillStatus.LATE).stream()
+                .map(b -> b.getContract().getId())
+                .distinct()
+                .count();
+        }
+
+        // 5. Occupancy Trend (Last 6 months)
+        List<DashboardInsightsResponse.OccupancyTrendDTO> trend = new ArrayList<>();
+        List<Room> allRooms = roomRepository.findAllByProperty_Landlord_Id(landlordId);
+        int totalRoomsCount = allRooms.size();
+
+        for (int i = 5; i >= 0; i--) {
+            java.time.LocalDate date = now.minusMonths(i);
+            java.time.LocalDate endOfMonth = date.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+            
+            // Count contracts active during this month
+            long occupied = activeContracts.stream().filter(c -> 
+                (c.getStartDate().isBefore(endOfMonth) || c.getStartDate().isEqual(endOfMonth)) &&
+                (c.getEndDate() == null || c.getEndDate().isAfter(date) || c.getEndDate().isEqual(date))
+            ).count();
+            
+            double rate = totalRoomsCount > 0 ? ((double) occupied / totalRoomsCount) * 100 : 0;
+            trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
+        }
+
+        return DashboardInsightsResponse.builder()
+                .projectedRevenue(projectedRevenue)
+                .opportunityCost(opportunityCost)
+                .expiringContractsCount(expiringCount)
+                .latePaymentRoomsCount(latePaymentRooms)
+                .occupancyTrend(trend)
+                .build();
+    }
+
     public List<ContractResponse> getRentalHistory(Long userId) {
-        List<Contract> contracts = contractRepository.findAllRentalHistoryByUserId(userId);
+        List<Contract> contracts = findAllRentalHistoryByUserId(userId);
         return contracts.stream()
                 .map(c -> mapToResponse(c, userId))
                 .collect(Collectors.toList());
@@ -255,10 +329,14 @@ public class ContractService {
 
                 java.util.List<java.util.Map<String, Object>> comparisons = new java.util.ArrayList<>();
 
+                long EXCHANGE_RATE = 80_000_000L;
+                java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
+
                 // So sánh rentAmount (ÁP DỤNG ADDENDUM PATTERN)
                 java.math.BigInteger onChainRent = (java.math.BigInteger) onChain.get("rentAmount");
                 long dbRent = contract.getActualPrice() != null ? contract.getActualPrice().longValue() : 0;
-                java.util.Map<String, Object> rentComp = createComparison("rentAmount", String.valueOf(dbRent), onChainRent.toString());
+                java.math.BigInteger dbRentWei = java.math.BigInteger.valueOf(dbRent).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                java.util.Map<String, Object> rentComp = createComparison("rentAmount", dbRentWei.toString(), onChainRent.toString());
                 
                 // 🔍 Addendum Pattern: Nếu giá lệch, kiểm tra có Phụ lục hợp pháp không
                 if (!Boolean.TRUE.equals(rentComp.get("match"))) {
@@ -278,7 +356,8 @@ public class ContractService {
                 // So sánh depositAmount
                 java.math.BigInteger onChainDeposit = (java.math.BigInteger) onChain.get("depositAmount");
                 long dbDeposit = contract.getDepositAmount() != null ? contract.getDepositAmount().longValue() : 0;
-                comparisons.add(createComparison("depositAmount", String.valueOf(dbDeposit), onChainDeposit.toString()));
+                java.math.BigInteger dbDepositWei = java.math.BigInteger.valueOf(dbDeposit).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                comparisons.add(createComparison("depositAmount", dbDepositWei.toString(), onChainDeposit.toString()));
 
                 // So sánh contractHash
                 String onChainHash = (String) onChain.get("contractHash");
@@ -295,21 +374,24 @@ public class ContractService {
                 long dbElec = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot().longValue() : 
                               (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getElecPrice() != null 
                               ? contract.getRoom().getProperty().getElecPrice().longValue() : 0L);
-                comparisons.add(createComparison("elecPrice", String.valueOf(dbElec), onChainElec.toString()));
+                java.math.BigInteger dbElecWei = java.math.BigInteger.valueOf(dbElec).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                comparisons.add(createComparison("elecPrice", dbElecWei.toString(), onChainElec.toString()));
 
                 // So sánh waterPrice
                 java.math.BigInteger onChainWater = (java.math.BigInteger) onChain.get("waterPrice");
                 long dbWater = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot().longValue() : 
                                (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getWaterPrice() != null 
                                ? contract.getRoom().getProperty().getWaterPrice().longValue() : 0L);
-                comparisons.add(createComparison("waterPrice", String.valueOf(dbWater), onChainWater.toString()));
+                java.math.BigInteger dbWaterWei = java.math.BigInteger.valueOf(dbWater).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                comparisons.add(createComparison("waterPrice", dbWaterWei.toString(), onChainWater.toString()));
 
                 // So sánh internetPrice
                 java.math.BigInteger onChainInternet = (java.math.BigInteger) onChain.get("internetPrice");
                 long dbInternet = contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot().longValue() : 
                                (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getInternetPrice() != null 
                                ? contract.getRoom().getProperty().getInternetPrice().longValue() : 0L);
-                comparisons.add(createComparison("internetPrice", String.valueOf(dbInternet), onChainInternet.toString()));
+                java.math.BigInteger dbInternetWei = java.math.BigInteger.valueOf(dbInternet).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                comparisons.add(createComparison("internetPrice", dbInternetWei.toString(), onChainInternet.toString()));
 
                 // So sánh startDate
                 java.math.BigInteger onChainStartDate = (java.math.BigInteger) onChain.get("startDate");
@@ -427,18 +509,24 @@ public class ContractService {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
-        if (contract.getStatus() == ContractStatus.ACTIVE) {
-            throw new RuntimeException("Hợp đồng này đã được ký hoàn tất!");
+        // Lấy thông tin user đang thao tác
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        // Nếu đã ở trạng thái nâng cao (ACTIVE hoặc AWAITING_DEPOSIT)
+        if (contract.getStatus() == ContractStatus.ACTIVE || contract.getStatus() == ContractStatus.AWAITING_DEPOSIT) {
+            // Nếu chính user này đã ký rồi, thì trả về thành công luôn (Idempotent)
+            if ((currentUser.getRole() == Role.TENANT && Boolean.TRUE.equals(contract.getIsTenantSigned())) ||
+                (currentUser.getRole() == Role.LANDLORD && Boolean.TRUE.equals(contract.getIsLandlordSigned()))) {
+                return mapToResponse(contract, currentUserId);
+            }
+            throw new RuntimeException("Hợp đồng này đã được ký hoàn tất hoặc đang chờ nạp cọc!");
         }
 
         boolean hasPendingRequest = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.PENDING);
         if (hasPendingRequest) {
             throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
         }
-
-        // Lấy thông tin user đang thao tác
-        User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
         // 1. Cập nhật trạng thái ký của từng người
         if (currentUser.getRole() == Role.TENANT) {
@@ -450,17 +538,18 @@ public class ContractService {
         // Lưu tạm phương thức ký của người thao tác cuối cùng
         contract.setSignMethod(request.getSignMethod());
 
-        // 2. NẾU CẢ 2 BÊN ĐÃ KÝ -> KÍCH HOẠT HỢP ĐỒNG & DEPLOY BLOCKCHAIN
+        // 2. NẾU CẢ 2 BÊN ĐÃ KÝ -> CHUYỂN SANG CHỜ ĐẶT CỌC
         if (Boolean.TRUE.equals(contract.getIsTenantSigned()) && Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
             contract.setSignDate(LocalDateTime.now());
-            contract.setStatus(ContractStatus.ACTIVE);
-            contract.setDepositStatus(DepositStatus.DEPOSITED); // Xác nhận đã nộp cọc khi ký xong HĐ
+            contract.setStatus(ContractStatus.AWAITING_DEPOSIT);
+            contract.setDepositStatus(DepositStatus.UNPAID); 
 
-            // Cập nhật uy tín cho cả hai bên
-            reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Ký hợp đồng thuê trọ thành công (#" + contract.getId() + ")");
-            reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Ký hợp đồng cho thuê phòng thành công (#" + contract.getId() + ")");
+            // (Bỏ qua việc cộng điểm ở đây, sẽ cộng khi tiền cọc được xác nhận)
 
-            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN && (contract.getSmartContractAddress() == null || contract.getSmartContractAddress().isEmpty())) {
+                if (blockchainService.getPrivateKey() == null || blockchainService.getPrivateKey().isEmpty()) {
+                    throw new RuntimeException("Cấu hình Blockchain (Private Key) đang trống! Không thể triển khai hợp đồng. Vui lòng liên hệ Admin.");
+                }
                 try {
                     String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
                     
@@ -487,11 +576,14 @@ public class ContractService {
                     long endDateVal = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
                     long penaltyVal = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
 
-                    BigInteger rentWei = BigInteger.valueOf(priceVal);
-                    BigInteger depositWei = BigInteger.valueOf(depositVal);
-                    BigInteger elecWei = BigInteger.valueOf(elecVal);
-                    BigInteger waterWei = BigInteger.valueOf(waterVal);
-                    BigInteger internetWei = BigInteger.valueOf(internetVal);
+                    long EXCHANGE_RATE = 80_000_000L;
+                    BigInteger WEI_MULT = BigInteger.TEN.pow(18);
+
+                    BigInteger rentWei = BigInteger.valueOf(priceVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
+                    BigInteger depositWei = BigInteger.valueOf(depositVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
+                    BigInteger elecWei = BigInteger.valueOf(elecVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
+                    BigInteger waterWei = BigInteger.valueOf(waterVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
+                    BigInteger internetWei = BigInteger.valueOf(internetVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
                     BigInteger startWei = BigInteger.valueOf(startDateVal);
                     BigInteger endWei = BigInteger.valueOf(endDateVal);
                     BigInteger penaltyWei = BigInteger.valueOf(penaltyVal);
@@ -619,6 +711,86 @@ public class ContractService {
 
         Contract saved = contractRepository.save(contract);
         return mapToResponse(saved, currentUserId);
+    }
+    
+    // --- Xác nhận đặt cọc Web3 ---
+    @Transactional
+    public ContractResponse confirmWeb3Deposit(Long contractId, String txHash, Long userId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        
+        if (contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
+            throw new RuntimeException("Hợp đồng này không trong trạng thái chờ nạp cọc.");
+        }
+
+        // 🔍 Xác minh giao dịch thật trên Blockchain
+        if (!blockchainService.verifyTransaction(txHash)) {
+            throw new RuntimeException("Giao dịch nạp cọc không hợp lệ hoặc chưa được xác nhận trên Blockchain!");
+        }
+
+        // Kích hoạt hợp đồng
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setDepositStatus(DepositStatus.DEPOSITED);
+        contract.setDepositTxHash(txHash);
+        
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.RENTED);
+            roomRepository.save(contract.getRoom());
+        }
+
+        // Cộng điểm uy tín
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Nạp cọc và kích hoạt hợp đồng thành công (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã được bên thuê nạp cọc thành công (#" + contract.getId() + ")");
+
+        // Thông báo cho chủ nhà
+        notificationService.createNotification(
+            contract.getRoom().getProperty().getLandlord(),
+            "Khách thuê đã nạp cọc Web3",
+            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực sau khi hệ thống xác nhận tiền cọc.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        return mapToResponse(contractRepository.save(contract), userId);
+    }
+
+    // --- Xác nhận đặt cọc Truyền thống (Chủ nhà xác nhận tay) ---
+    @Transactional
+    public ContractResponse confirmTraditionalDeposit(Long contractId, Long landlordId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        
+        if (!contract.getRoom().getProperty().getLandlord().getId().equals(landlordId)) {
+            throw new RuntimeException("Bạn không phải chủ nhà của hợp đồng này!");
+        }
+
+        if (contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
+            throw new RuntimeException("Hợp đồng này không trong trạng thái chờ nạp cọc.");
+        }
+
+        // Kích hoạt hợp đồng
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setDepositStatus(DepositStatus.DEPOSITED);
+        
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.RENTED);
+            roomRepository.save(contract.getRoom());
+        }
+
+        // Cộng điểm uy tín
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã kích hoạt sau khi Chủ trọ nhận được tiền cọc (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Xác nhận nhận tiền cọc thành công (#" + contract.getId() + ")");
+
+        // Thông báo cho khách thuê
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Chủ trọ đã xác nhận tiền cọc",
+            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        return mapToResponse(contractRepository.save(contract), landlordId);
     }
 
     private String calculateSHA256(String data) {

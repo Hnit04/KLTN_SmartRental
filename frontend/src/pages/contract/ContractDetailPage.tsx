@@ -27,7 +27,7 @@ import type {
 import { useAuth } from "@/context/AuthContext"; 
 import ReviewModal from "@/features/interaction/components/ReviewModal";
 import html2pdf from "html2pdf.js";
-
+import { ethers } from "ethers";
 interface ContractDetail extends Contract {
   roomName?: string;
   propertyAddress?: string;
@@ -314,14 +314,21 @@ export default function ContractDetailPage() {
         try {
           toast.info("Smart Contract đã triển khai! Đang đặt cọc on-chain...");
           const smartContract = await getSmartContract(signResult.data.smartContractAddress);
-          const depositAmount = BigInt(Math.round(signResult.data.depositAmount || contract?.depositAmount || 0));
-          const tx = await smartContract.deposit({ value: depositAmount });
+          const depositVnd = signResult.data.depositAmount || contract?.depositAmount || 0;
+          const ethValue = (depositVnd / 80000000).toFixed(18);
+          const depositWeiOnChain = ethers.parseEther(ethValue);
+          const tx = await smartContract.deposit({ value: depositWeiOnChain });
           toast.info(`Đang chờ xác nhận đặt cọc... (Hash: ${tx.hash.substring(0, 10)}...)`);
           await tx.wait();
-          toast.success("Đặt cọc thành công trên Smart Contract!");
+          toast.info("Giao dịch Blockchain thành công! Đang đồng bộ hóa trạng thái hệ thống...");
+          
+          // Gọi API xác nhận tiền cọc lên Backend
+          await contractApi.confirmWeb3Deposit(Number(id), tx.hash);
+          
+          toast.success("Đặt cọc thành công và hợp đồng đã chính thức có hiệu lực!");
         } catch (depositError: any) {
           console.error("Lỗi đặt cọc on-chain:", depositError);
-          toast.warning("Hợp đồng đã ký thành công nhưng đặt cọc on-chain thất bại. Vui lòng thử lại sau.");
+          toast.warning("Hợp đồng đã ký nhưng quá trình nạp cọc bị gián đoạn. Bạn có thể nạp lại ở trang quản lý.");
         }
       }
 
@@ -329,7 +336,8 @@ export default function ContractDetailPage() {
       setIsSignModalOpen(false);
       fetchContractData(); 
     } catch (error: any) {
-      toast.error(error.reason || error.message || error.response?.data?.message || "Lỗi khi ký hợp đồng.");
+      const errorMsg = error.response?.data?.message || error.reason || error.message || "Lỗi khi ký hợp đồng.";
+      toast.error(errorMsg);
     } finally {
       setIsSigning(false);
     }
@@ -374,8 +382,9 @@ export default function ContractDetailPage() {
       // Kết nối MetaMask
       await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-      // Dùng VND amount trực tiếp làm Wei (khớp với giá trị lưu trên Blockchain)
-      const billAmountOnChain = BigInt(Math.round(bill.totalAmount));
+      // Quy đổi VND sang ETH rồi convert ra WEI (1 ETH = 80.000.000 VNĐ)
+      const ethAmount = (bill.totalAmount / 80000000).toFixed(18);
+      const billAmountOnChain = ethers.parseEther(ethAmount);
 
       // Đồng bộ hóa đơn lên Blockchain (nếu chưa có trên chain)
       try {
@@ -422,6 +431,45 @@ export default function ContractDetailPage() {
       }
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const [isConfirmingDeposit, setIsConfirmingDeposit] = useState(false);
+
+  const handleConfirmWeb3Deposit = async () => {
+    if (!contract?.smartContractAddress || !window.ethereum) return;
+    setIsConfirmingDeposit(true);
+    try {
+      toast.info("Đang bật MetaMask để nạp cọc...");
+      const smartContract = await getSmartContract(contract.smartContractAddress);
+      const depositVnd = contract.depositAmount || 0;
+      const ethValue = (depositVnd / 80000000).toFixed(18);
+      const depositWeiOnChain = ethers.parseEther(ethValue);
+      
+      const tx = await smartContract.deposit({ value: depositWeiOnChain });
+      toast.info("Đang chờ xác nhận giao dịch...");
+      await tx.wait();
+      
+      await contractApi.confirmWeb3Deposit(Number(id), tx.hash);
+      toast.success("Kích hoạt hợp đồng thành công!");
+      fetchContractData();
+    } catch (error: any) {
+      toast.error(error.reason || error.message || "Không thể thực hiện nạp cọc.");
+    } finally {
+      setIsConfirmingDeposit(false);
+    }
+  };
+
+  const handleConfirmTraditionalDeposit = async () => {
+    setIsConfirmingDeposit(true);
+    try {
+      await contractApi.confirmTraditionalDeposit(Number(id));
+      toast.success("Đã xác nhận nhận cọc! Hợp đồng đã có hiệu lực.");
+      fetchContractData();
+    } catch (error: any) {
+      toast.error("Lỗi xác nhận cọc.");
+    } finally {
+      setIsConfirmingDeposit(false);
     }
   };
 
@@ -1217,7 +1265,8 @@ export default function ContractDetailPage() {
               )}
 
               <p className="font-bold text-lg mb-1">
-                {contract.status === 'ACTIVE' ? 'Đã có hiệu lực' : 'Đang chờ ký xác nhận'}
+                {contract.status === 'ACTIVE' ? 'Đã có hiệu lực' : 
+                 contract.status === 'AWAITING_DEPOSIT' ? 'Chờ nạp tiền cọc' : 'Đang chờ ký xác nhận'}
               </p>
               
               {contract.status !== 'ACTIVE' && (
@@ -1243,11 +1292,41 @@ export default function ContractDetailPage() {
                       <PenTool className="h-4 w-4" /> Ký xác nhận
                     </Button>
                   ) : (
-                    !isPartnerSigned && (
+                    !isPartnerSigned && contract.status === 'PENDING_SIGNATURE' && (
                       <div className="flex items-center justify-center gap-2 p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold rounded-lg">
                         <Loader2 className="w-4 h-4 animate-spin" /> Đang chờ đối tác ký...
                       </div>
                     )
+                  )}
+
+                  {contract.status === 'AWAITING_DEPOSIT' && (
+                    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-4">
+                        <p className="text-sm text-orange-800 font-medium">
+                            {user?.role === 'TENANT' 
+                                ? "Mọi người đã ký xong! Vui lòng thực hiện nạp cọc để hợp đồng có hiệu lực."
+                                : "Mọi người đã ký xong! Đang chờ khách thuê nạp cọc để kích hoạt hợp đồng."}
+                        </p>
+                        
+                        {user?.role === 'TENANT' && contract.signMethod === 'BLOCKCHAIN' && (
+                            <Button 
+                                className="w-full gap-2 bg-orange-600 hover:bg-orange-700 h-11 shadow-lg shadow-orange-200"
+                                onClick={handleConfirmWeb3Deposit}
+                                isLoading={isConfirmingDeposit}
+                            >
+                                <Blocks className="w-4 h-4" /> Nạp cọc Web3 ngay
+                            </Button>
+                        )}
+
+                        {user?.role === 'LANDLORD' && contract.signMethod === 'TRADITIONAL' && (
+                            <Button 
+                                className="w-full gap-2 bg-green-600 hover:bg-green-700 h-11"
+                                onClick={handleConfirmTraditionalDeposit}
+                                isLoading={isConfirmingDeposit}
+                            >
+                                <CheckCircle className="w-4 h-4" /> Xác nhận đã nhận cọc (Tiền mặt/CK)
+                            </Button>
+                        )}
+                    </div>
                   )}
                   
                   {!pendingRequest && !isMeSigned && (

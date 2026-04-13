@@ -160,13 +160,14 @@ public class AiOrchestratorService {
         if (role.equalsIgnoreCase("TENANT")) {
             roleRules = "1. HỌ KHÔNG ĐƯỢC XEM DOANH THU CỦA CHỦ TRỌ.\n" +
                     "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC.\n" +
-                    "3. Tuy nhiên, nếu họ hỏi về hóa đơn hay hợp đồng, BẮT BUỘC phải JOIN với bảng contracts và lọc bằng `contracts.tenant_id = {{userId}}`.\n" +
-                    "4. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản (giá, tên, trạng thái).\n" +
-                    "5. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm (District/City/Address), BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
-                    "6. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê (TENANT) nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`, hãy giữ SQL như tìm kiếm khách ngoài bình thường.";
+                    "3. Tuy nhiên, nếu họ hỏi về hóa đơn (bills) hay hợp đồng (contracts), BẮT BUỘC phải lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật).\n" +
+                    "4. ĐỐI VỚI BẢNG BILLS: Bảng bills không có cột tenant_id. Nên khi cần xem hóa đơn, BẮT BUỘC phải JOIN bills với contracts (ON bills.contract_id = contracts.id) RỒI MỚI lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER`.\n" +
+                    "5. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản (giá, tên, trạng thái).\n" +
+                    "6. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm (District/City/Address), BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
+                    "7. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê (TENANT) nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`, hãy giữ SQL như tìm kiếm khách ngoài bình thường.";
         } else if (role.equalsIgnoreCase("LANDLORD")) {
-            roleRules = "1. BẮT BUỘC phải thêm điều kiện `properties.landlord_id = {{userId}}` vào TẤT CẢ các câu query để họ không xem trộm được nhà trọ của chủ khác.\n" +
-                    "2. MẸO JOIN BẢNG: Nếu truy cập bảng rooms, bills, hay contracts, BẮT BUỘC JOIN với properties để có thể lọc `properties.landlord_id`.\n" +
+            roleRules = "1. BẮT BUỘC phải thêm điều kiện `properties.landlord_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật) vào TẤT CẢ các câu query để họ không xem trộm được nhà trọ của chủ khác.\n" +
+                    "2. MẸO JOIN BẢNG: Nếu truy cập bảng rooms, bills, hay contracts, BẮT BUỘC JOIN với properties để có thể lọc `properties.landlord_id = USER_ID_PLACEHOLDER`.\n" +
                     "3. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm (address LIKE hoặc district LIKE).";
         } else {
             roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
@@ -226,30 +227,6 @@ public class AiOrchestratorService {
             }
         }
 
-        // Chặn 2: Ngăn chặn Chủ trọ B lấy nhầm Cache của Chủ trọ A
-        // Ví dụ: Chủ trọ A (ID=1) hỏi "Có bao nhiêu phòng trống?", Cache lưu: WHERE landlord_id = 1
-        // Chủ trọ B (ID=2) hỏi y hệt -> Dính Cache. Nếu chạy luôn thì B sẽ xem được phòng của A!
-        if (role.equalsIgnoreCase("LANDLORD") && !matches.isEmpty()) {
-            if (!sqlToExecute.contains(userId.toString())) {
-                System.out.println("🚨 [SECURITY WARNING] SQL lấy từ Cache không khớp ID Chủ trọ! Đang ép sinh lại...");
-
-                try {
-                    sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, roleRules);
-                } catch (Exception llmEx) {
-                    System.err.println("⚠️ Lỗi gọi AI sinh SQL lại: " + llmEx.getMessage());
-                    return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ạ!";
-                }
-
-                sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
-                selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
-                if (selectIndex >= 0) {
-                    sqlToExecute = sqlToExecute.substring(selectIndex);
-                }
-
-                matches.clear();
-            }
-        }
-
         if (role.equalsIgnoreCase("TENANT")) {
             String upperSql = sqlToExecute.toUpperCase();
             if (upperSql.contains("SUM(") || upperSql.contains("REVENUE")) {
@@ -278,9 +255,12 @@ public class AiOrchestratorService {
         // ====================================================================
 
 
+        // Cập nhật Placeholder thành User ID thật sự (Tiết kiệm Token hoàn hảo!)
+        String finalSql = sqlToExecute.replace("USER_ID_PLACEHOLDER", userId.toString());
+
         // 3. THỰC THI SQL
         try {
-            List<Map<String, Object>> results = jdbcTemplate.queryForList(sqlToExecute);
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(finalSql);
 
             if (matches.isEmpty()) {
                 AiSqlCache newCache = AiSqlCache.builder()

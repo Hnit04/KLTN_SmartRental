@@ -51,6 +51,8 @@ export default function PropertyManageDetailPage() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiTone, setAiTone] = useState<'SEO' | 'GENZ' | 'PRO'>('SEO');
+  const [aiContentPreview, setAiContentPreview] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | string | null>(null);
 
   // --- STATE XÓA PHÒNG ---
@@ -320,17 +322,29 @@ export default function PropertyManageDetailPage() {
     try {
       setIsGeneratingAI(true);
       const allAmenities = [...formData.amenities, formData.customAmenitiesInput].filter(Boolean).join(', ');
-      const keywords = `Phòng ${formData.name}, diện tích ${formData.area}m2, giá ${formData.price} VND/tháng. Tiện ích: ${allAmenities}. Sạch sẽ, an ninh tốt.`;
+      
+      let tonePrompt = "Mô tả chuẩn SEO, hấp dẫn, dễ đọc.";
+      if (aiTone === 'GENZ') tonePrompt = "Giọng văn gần gũi, thân thiện, dùng ngôn ngữ trẻ trung phù hợp sinh viên.";
+      if (aiTone === 'PRO') tonePrompt = "Phong cách chuyên nghiệp, lịch sự, nhắm tới người đi làm hoặc gia đình nhỏ.";
+
+      const keywords = `Tên phòng hoặc số phòng: ${formData.name}. Diện tích: ${formData.area}m2. Giá thuê: ${formData.price} VND/tháng. \nTiện ích có sẵn: ${allAmenities}.\nYêu cầu viết: ${tonePrompt}`;
       
       const res = await propertyApi.generateRoomDescription(keywords);
       const generatedText = (res as any).data?.description || res; 
       
-      setFormData(prev => ({ ...prev, description: generatedText }));
-      toast.success('AI đã tạo mô tả thành công!');
+      setAiContentPreview(generatedText); // Bật preview modal
     } catch (error) {
       toast.error('Lỗi khi gọi AI. Tính năng đang bảo trì.');
     } finally {
       setIsGeneratingAI(false);
+    }
+  };
+
+  const handleAcceptAiContent = () => {
+    if (aiContentPreview) {
+      setFormData(prev => ({ ...prev, description: aiContentPreview }));
+      setAiContentPreview(null);
+      toast.success('Đã áp dụng nội dung AI!');
     }
   };
 
@@ -568,13 +582,13 @@ export default function PropertyManageDetailPage() {
                   )}
 
                   {room.status === 'AVAILABLE' ? (
-                    <Link to={`/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                    <Link to={`/landlord/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                       <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
                         <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
                       </Button>
                     </Link>
                   ) : (
-                    <Link to={`/contracts/${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                    <Link to={`/landlord/contracts/${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                       <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
                         <FileText className="h-4 w-4 mr-1.5" /> Xem HĐ
                       </Button>
@@ -718,15 +732,30 @@ export default function PropertyManageDetailPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* AI Mô tả */}
                   <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col">
-                    <div className="flex justify-between items-end mb-2">
-                      <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Mô tả phòng</label>
-                      <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm h-8 px-2 text-xs">
-                        {isGeneratingAI ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                        Tạo bằng AI
+                    <div className="flex justify-between items-end mb-2 border-b border-purple-100 pb-2">
+                      <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Copilot Viết Mô Tả</label>
+                    </div>
+                    
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-purple-800 font-medium">Giọng văn:</span>
+                      <select 
+                        value={aiTone} 
+                        onChange={e => setAiTone(e.target.value as any)}
+                        className="text-xs border border-purple-200 rounded px-2 py-1 bg-white outline-none text-purple-900 focus:ring-1 focus:ring-purple-400"
+                      >
+                         <option value="SEO">🔥 Tiêu chuẩn (Chuẩn SEO)</option>
+                         <option value="GENZ">🎓 Sinh viên (Gần gũi, GenZ)</option>
+                         <option value="PRO">💼 Chuyên nghiệp (Dành cho Căn hộ)</option>
+                      </select>
+                      
+                      <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="ml-auto bg-purple-600 hover:bg-purple-700 text-white shadow-sm h-7 px-2.5 text-xs rounded-md">
+                        {isGeneratingAI ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                        Tạo nội dung ngay
                       </Button>
                     </div>
-                    <textarea rows={6} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none text-sm" placeholder="Nhập mô tả... VD: Phòng rộng rãi có cửa sổ thoáng mát, giờ giấc tự do, điện 3k rác 50k..." />
-                    <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">Mẹo: Bạn có thể nhập Tên, Giá, Diện tích rồi bấm "Tạo bằng AI" để được viết tự động chuẩn SEO.</p>
+
+                    <textarea rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none text-sm leading-relaxed" placeholder="Bạn có thể tự nhập mô tả hoặc sử dụng AI để tạo tự động..." />
+                    <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">💡 Copilot sẽ quét Tên phòng, Giá, Diện tích và Tiện ích để tự động viết bài quảng cáo thay bạn.</p>
                   </div>
 
                   {/* Điều khoản & Nội quy mẫu */}
@@ -930,6 +959,51 @@ export default function PropertyManageDetailPage() {
           </div>
         </div>
       )}
+
+      {/* --- MODAL XEM TRƯỚC NỘI DUNG AI (PREVIEW) --- */}
+      {aiContentPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-purple-50 px-5 py-4 border-b border-purple-100 flex justify-between items-center flex-shrink-0">
+               <h3 className="text-lg font-bold text-purple-900 flex items-center gap-2">
+                 <Sparkles className="h-5 w-5 text-purple-600" />
+                 Bản nháp từ Copilot
+               </h3>
+               <button onClick={() => setAiContentPreview(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="h-5 w-5" /></button>
+            </div>
+            
+            <div className="p-6 bg-gray-50 flex-1 overflow-y-auto max-h-[60vh]">
+               <div className="bg-white border rounded-xl p-5 shadow-sm text-sm leading-relaxed text-gray-800 whitespace-pre-line relative">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-100/50 flex flex-col items-center pointer-events-none select-none">
+                     <Sparkles className="h-24 w-24 mb-2" />
+                     <span className="font-black text-3xl tracking-widest uppercase">AI Generated</span>
+                  </div>
+                  <div className="relative z-10">{aiContentPreview}</div>
+               </div>
+            </div>
+
+            <div className="p-4 border-t bg-white flex justify-between items-center">
+               <Button 
+                 variant="outline" 
+                 onClick={handleGenerateAI}
+                 disabled={isGeneratingAI}
+                 className="text-purple-600 hover:bg-purple-50"
+               >
+                 {isGeneratingAI ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Sparkles className="w-4 h-4 mr-2" />}
+                 Thử lại văn phong khác
+               </Button>
+               
+               <div className="flex gap-3">
+                 <Button variant="ghost" onClick={() => setAiContentPreview(null)}>Hủy bỏ</Button>
+                 <Button className="bg-purple-600 hover:bg-purple-700 font-bold" onClick={handleAcceptAiContent}>
+                   <CheckCircle className="w-4 h-4 mr-2" />
+                   Sử dụng nội dung này
+                 </Button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Maximize, Zap, Droplets, Wifi, CalendarClock,
   CheckCircle, XCircle, Bot, Loader2, X, Phone, MessageSquare,
@@ -34,6 +34,9 @@ export default function RoomDetailPage() {
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [searchParams] = useSearchParams();
+  const actionQuery = searchParams.get("action");
+
   useEffect(() => {
     const load = async () => {
       if (!id) return;
@@ -49,6 +52,16 @@ export default function RoomDetailPage() {
     };
     load();
   }, [id]);
+
+  useEffect(() => {
+    // Tự động mở hộp thoại đặt lịch nếu được chuyển tới từ nơi khác kèm ?action=book
+    if (room && actionQuery === "book") {
+      navigate(`/rooms/${room.id}`, { replace: true }); // Xoá query trên URL để tránh lặp lại
+      setTimeout(() => {
+        handleBooking();
+      }, 300);
+    }
+  }, [room, actionQuery, navigate]);
 
   // Kiểm tra trạng thái phòng
   const isAvailable = room?.status === "AVAILABLE";
@@ -108,8 +121,31 @@ export default function RoomDetailPage() {
 
   const handleAskAI = () => {
     if (!room) return;
-    const q = `Phân tích ưu nhược điểm của phòng "${room.name}" diện tích ${room.area}m², giá ${room.price?.toLocaleString("vi-VN")}đ/tháng. Có phù hợp không?`;
-    window.dispatchEvent(new CustomEvent("openAiChat", { detail: { question: q } }));
+    // Parse amenities for the prompt
+    let roomAmenities: string[] = [];
+    try {
+      roomAmenities = room.amenities ? (typeof room.amenities === "string" ? JSON.parse(room.amenities) : room.amenities) : [];
+    } catch { roomAmenities = []; }
+
+    const details = [
+      `Tên phòng: "${room.name}"`,
+      `Khu trọ: "${room.propertyName || ''}"`,
+      `Địa chỉ: ${room.propertyAddress || room.address || ''}`,
+      `Diện tích: ${room.area}m²`,
+      `Giá thuê: ${room.price?.toLocaleString("vi-VN")}đ/tháng`,
+      room.type ? `Loại phòng: ${room.type === 'STUDIO' ? 'Studio' : room.type === 'ONE_BEDROOM' ? '1 Phòng ngủ' : room.type === 'TWO_BEDROOM' ? '2 Phòng ngủ' : room.type === 'SINGLE_ROOM' ? 'Phòng đơn' : room.type === 'SHARED_ROOM' ? 'Phòng ghép' : room.type === 'MEZZANINE_ROOM' ? 'Phòng gác lửng' : room.type}` : '',
+      room.hasMezzanine ? 'Có gác lửng' : '',
+      room.hasBalcony ? 'Có ban công' : '',
+      roomAmenities.length > 0 ? `Tiện nghi: ${roomAmenities.join(', ')}` : '',
+      room.elecPrice ? `Tiền điện: ${room.elecPrice.toLocaleString()}đ/kWh` : '',
+      room.waterPrice ? `Tiền nước: ${room.waterPrice.toLocaleString()}đ/khối` : '',
+      room.internetPrice ? `Internet: ${room.internetPrice.toLocaleString()}đ/tháng` : '',
+      room.description ? `Mô tả: ${room.description.substring(0, 200)}` : '',
+    ].filter(Boolean).join('. ');
+
+    const q = `Hãy phân tích chi tiết ưu điểm và nhược điểm của phòng trọ sau đây, đánh giá mức giá có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
+    const shortText = `Phân tích phòng "${room.name}" tại "${room.propertyName || 'khu trọ này'}" giúp mình nhé! 🏠`;
+    window.dispatchEvent(new CustomEvent("openAiChat", { detail: { question: q, autoSend: true, displayText: shortText } }));
   };
 
   const formatPrice = (n: number) => 
