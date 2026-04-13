@@ -87,7 +87,7 @@ export default function ContractList() {
               <option value="ACTIVE">Đang hiệu lực</option>
               <option value="PENDING_SIGNATURE">Chờ ký tên</option>
               <option value="EXPIRED">Đã hết hạn</option>
-              <option value="CANCELLED">Đã hủy</option>
+              <option value="TERMINATED_EARLY">Đã hủy</option>
             </select>
           </div>
 

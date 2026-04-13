@@ -412,7 +412,7 @@ export default function PropertiesManagePage() {
               </div>
 
               <div className="mt-auto">
-                <Link to={`/properties/manage/${property.id}`}><Button variant="secondary" className="w-full">Quản lý phòng</Button></Link>
+                <Link to={`/landlord/properties/${property.id}`}><Button variant="secondary" className="w-full">Quản lý phòng</Button></Link>
               </div>
             </div>
           </Card>
