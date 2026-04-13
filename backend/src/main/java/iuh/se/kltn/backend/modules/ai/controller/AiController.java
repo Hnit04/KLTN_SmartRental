@@ -12,6 +12,21 @@ import java.util.Collection;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import iuh.se.kltn.backend.modules.ai.service.DraftReminderAi;
+import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
+import iuh.se.kltn.backend.modules.contract.entity.Bill;
+import iuh.se.kltn.backend.modules.contract.enums.BillStatus;
+import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
+import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import iuh.se.kltn.backend.modules.ai.service.AnomalyAi;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
@@ -24,6 +39,24 @@ public class AiController {
 
     @Autowired
     private ChatLanguageModel geminiChatModel;
+
+    @Autowired
+    private DraftReminderAi draftReminderAi;
+
+    @Autowired
+    private AnomalyAi anomalyAi;
+
+    @Autowired
+    private BillRepository billRepository;
+
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private iuh.se.kltn.backend.modules.user.repository.UserRepository userRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
 
     @PostMapping("/chat")
@@ -164,6 +197,218 @@ public class AiController {
             return ResponseEntity.ok(Map.of("status", "success", "message", "Đã thêm câu hỏi FAQ vào kho tri thức thành công!"));
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    // Admin: Khởi tạo dữ liệu Vector mẫu (Để test)
+    @PostMapping("/admin/init-data")
+    public ResponseEntity<?> initSampleData() {
+        // Code ở đây
+        return ResponseEntity.ok("This is a placeholder");
+    }
+
+    @PostMapping("/actions/generate-reminders")
+    public ResponseEntity<?> generateReminders(@AuthenticationPrincipal UserPrincipal currentUser) {
+        try {
+            Long landlordId = currentUser.getId();
+            List<Bill> dueBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndStatusIn(
+                    landlordId, Arrays.asList(BillStatus.UNPAID, BillStatus.LATE));
+
+            if (dueBills.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "data", new ArrayList<>(),
+                        "message", "Không có phòng nào đang nợ tiền."
+                ));
+            }
+
+            List<Map<String, Object>> billDataList = new ArrayList<>();
+            for (Bill b : dueBills) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("billId", b.getId());
+                map.put("roomId", b.getContract().getRoom().getId());
+                map.put("roomName", b.getContract().getRoom().getName());
+                map.put("tenantId", b.getContract().getTenant().getId());
+                map.put("tenantName", b.getContract().getTenant().getFullName());
+                map.put("totalAmount", b.getTotalAmount() != null ? b.getTotalAmount() : 0);
+                map.put("deadline", b.getDeadline() != null ? b.getDeadline().toString() : "");
+                map.put("status", b.getStatus().toString());
+                billDataList.add(map);
+            }
+
+            String billsJson = objectMapper.writeValueAsString(billDataList);
+            String aiResultString = draftReminderAi.generateReminders(billsJson);
+
+            // Clean up backticks if any
+            aiResultString = aiResultString.replace("```json", "").replace("```", "").trim();
+
+            List<Map<String, Object>> draftedReminders = objectMapper.readValue(aiResultString, List.class);
+
+            // Gộp thông tin tenantId và roomName lại cho Client dễ hiển thị
+            for (Map<String, Object> draft : draftedReminders) {
+                Long billId = Long.valueOf(draft.get("billId").toString());
+                Map<String, Object> matchedBill = billDataList.stream()
+                        .filter(b -> Long.valueOf(b.get("billId").toString()).equals(billId))
+                        .findFirst().orElse(null);
+                if (matchedBill != null) {
+                    draft.put("tenantId", matchedBill.get("tenantId"));
+                    draft.put("roomName", matchedBill.get("roomName"));
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "data", draftedReminders
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/actions/analyze-anomalies")
+    public ResponseEntity<?> analyzeAnomalies(@AuthenticationPrincipal UserPrincipal currentUser) {
+        try {
+            Long landlordId = currentUser.getId();
+            List<Bill> allBills = billRepository.findAllByContract_Room_Property_Landlord_IdOrderByYearDescMonthDesc(landlordId);
+            
+            if (allBills.isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "success", "report", "Chưa có dữ liệu hóa đơn để phân tích."));
+            }
+
+            // Lấy thông tin tháng/năm mới nhất có trong DB
+            Bill theLatest = allBills.get(0);
+            int latestYear = theLatest.getYear();
+            int latestMonth = theLatest.getMonth();
+
+            // Tính toán mức tiêu thụ trung bình của toàn bộ khu trọ trong tháng mới nhất (để tìm Outlier)
+            List<Bill> latestMonthBills = allBills.stream()
+                    .filter(b -> b.getYear() == latestYear && b.getMonth() == latestMonth)
+                    .collect(Collectors.toList());
+
+            double totalElec = 0;
+            double totalWater = 0;
+            int countElec = 0;
+            int countWater = 0;
+
+            for (Bill b : latestMonthBills) {
+                if (b.getNewElecIndex() != null && b.getOldElecIndex() != null) {
+                    totalElec += (b.getNewElecIndex() - b.getOldElecIndex());
+                    countElec++;
+                }
+                if (b.getNewWaterIndex() != null && b.getOldWaterIndex() != null) {
+                    totalWater += (b.getNewWaterIndex() - b.getOldWaterIndex());
+                    countWater++;
+                }
+            }
+
+            double avgElec = countElec > 0 ? totalElec / countElec : 0;
+            double avgWater = countWater > 0 ? totalWater / countWater : 0;
+
+            // Group bills by Room ID để so sánh với tháng trước (Time-series)
+            Map<Long, List<Bill>> billsByRoom = allBills.stream()
+                    .collect(Collectors.groupingBy(b -> b.getContract().getRoom().getId()));
+            
+            List<Map<String, Object>> anomalies = new ArrayList<>();
+
+            for (Map.Entry<Long, List<Bill>> entry : billsByRoom.entrySet()) {
+                List<Bill> roomBills = entry.getValue();
+                Bill latestBill = roomBills.stream()
+                        .filter(b -> b.getYear() == latestYear && b.getMonth() == latestMonth)
+                        .findFirst().orElse(null);
+                
+                if (latestBill == null) continue;
+
+                int currElec = (latestBill.getNewElecIndex() != null && latestBill.getOldElecIndex() != null) ? (latestBill.getNewElecIndex() - latestBill.getOldElecIndex()) : 0;
+                int currWater = (latestBill.getNewWaterIndex() != null && latestBill.getOldWaterIndex() != null) ? (latestBill.getNewWaterIndex() - latestBill.getOldWaterIndex()) : 0;
+
+                boolean isAnomaly = false;
+                Map<String, Object> anomalyData = new HashMap<>();
+                anomalyData.put("roomName", latestBill.getContract().getRoom().getName());
+                anomalyData.put("avgElecSystem", Math.round(avgElec));
+                anomalyData.put("avgWaterSystem", Math.round(avgWater));
+
+                // 1. So sánh với CHÍNH NÓ tháng trước (Time-series)
+                if (roomBills.size() >= 2) {
+                    // Tìm bill của tháng ngay trước đó (ví dụ: month-1 hoặc year-1 month 12)
+                    // Ở đây lấy đơn giản là index 1 vì đã sort Desc, nhưng có thể bị lệch nếu thiếu tháng.
+                    // Tuy nhiên với nghiệp vụ trọ thường bill ra hàng tháng nên index 1 là tin cậy.
+                    Bill prevBill = roomBills.get(1); 
+                    int prevElec = (prevBill.getNewElecIndex() != null && prevBill.getOldElecIndex() != null) ? (prevBill.getNewElecIndex() - prevBill.getOldElecIndex()) : 0;
+                    int prevWater = (prevBill.getNewWaterIndex() != null && prevBill.getOldWaterIndex() != null) ? (prevBill.getNewWaterIndex() - prevBill.getOldWaterIndex()) : 0;
+
+                    if (prevElec > 0 && currElec >= prevElec * 1.35) {
+                        anomalyData.put("electricityTimeAnomaly", String.format("Tăng %d%% so với tháng trước (Từ %d lên %d kWh)", ((currElec - prevElec) * 100 / prevElec), prevElec, currElec));
+                        isAnomaly = true;
+                    }
+                    if (prevWater > 0 && currWater >= prevWater * 1.35) {
+                        anomalyData.put("waterTimeAnomaly", String.format("Tăng %d%% so với tháng trước (Từ %d lên %d m3)", ((currWater - prevWater) * 100 / prevWater), prevWater, currWater));
+                        isAnomaly = true;
+                    }
+                }
+
+                // 2. So sánh với MẶT BẰNG CHUNG tòa nhà (Cross-sectional Outlier)
+                // Ngưỡng: Điện 2.0x Avg, Nước 1.5x Avg
+                if (avgElec > 0 && currElec >= avgElec * 2.0) {
+                    anomalyData.put("electricityOutlier", String.format("Vượt 200%% mức trung bình tòa nhà (%d so với trung bình %d kWh)", currElec, (int)avgElec));
+                    isAnomaly = true;
+                }
+                if (avgWater > 0 && currWater >= avgWater * 1.5) {
+                    anomalyData.put("waterOutlier", String.format("Vượt 150%% mức trung bình tòa nhà (%d so với trung bình %d m3)", currWater, (int)avgWater));
+                    isAnomaly = true;
+                }
+                
+                if (isAnomaly) {
+                    anomalies.add(anomalyData);
+                }
+            }
+
+            if (anomalies.isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "success", "report", "✅ Hệ thống không phát hiện dấu hiệu bất thường nào. Lượng tiêu thụ điện nước của các phòng đều nằm trong ngưỡng ổn định so với tháng trước và mặt bằng chung của tòa nhà."));
+            }
+
+            String anomaliesJson = objectMapper.writeValueAsString(anomalies);
+            String report = anomalyAi.generateAnomalyReport(anomaliesJson);
+            
+            // Clean markdown blocks
+            report = report.replace("```markdown", "").replace("```", "").trim();
+
+            return ResponseEntity.ok(Map.of("status", "success", "report", report));
+        } catch(Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/actions/send-reminders")
+    public ResponseEntity<?> sendReminders(@RequestBody List<Map<String, Object>> approvedReminders,
+                                           @AuthenticationPrincipal UserPrincipal currentUser) {
+        try {
+            int count = 0;
+            for (Map<String, Object> reminder : approvedReminders) {
+                Long tenantId = Long.parseLong(reminder.get("tenantId").toString());
+                Long billId = Long.parseLong(reminder.get("billId").toString());
+                String message = reminder.get("draftedMessage").toString();
+                String roomName = reminder.get("roomName").toString();
+
+                iuh.se.kltn.backend.modules.user.entity.User tenant = userRepository.findById(tenantId).orElse(null);
+                
+                if (tenant != null) {
+                    notificationService.createNotification(
+                        tenant,
+                        "Thông báo nhắc phí phòng " + roomName,
+                        message,
+                        NotificationType.PAYMENT_REMINDER,
+                        billId
+                    );
+                    count++;
+                }
+            }
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Đã gửi thông báo thành công cho " + count + " phòng!"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
         }
     }
 

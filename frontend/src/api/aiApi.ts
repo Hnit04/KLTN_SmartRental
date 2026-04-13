@@ -42,4 +42,20 @@ export const aiApi = {
   clearCache: () => {
     return axiosClient.post("/ai/clear-cache");
   },
+
+  // Actionable AI: Nhắc đóng tiền hàng loạt
+  generateReminders: async () => {
+    const response = await axiosClient.post('/ai/actions/generate-reminders');
+    return response.data;
+  },
+
+  sendReminders: async (approvedReminders: any[]) => {
+    const response = await axiosClient.post('/ai/actions/send-reminders', approvedReminders);
+    return response.data;
+  },
+
+  analyzeAnomalies: async () => {
+    const response = await axiosClient.post('/ai/actions/analyze-anomalies');
+    return response.data;
+  }
 };

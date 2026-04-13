@@ -6,7 +6,6 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
-// Tạo custom icon vì icon mặc định của Leaflet hay bị lỗi URL trên Vite/Webpack
 const customMarkerIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
