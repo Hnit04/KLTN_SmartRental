@@ -75,4 +75,8 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     List<Bill> findAllByContract_Room_Property_Landlord_IdAndYear(Long landlordId, int year);
 
     List<Bill> findByContractIdInAndStatus(Collection<Long> contractIds, BillStatus status);
+
+    List<Bill> findAllByContract_Room_Property_Landlord_IdAndStatusIn(Long landlordId, Collection<BillStatus> statuses);
+
+    List<Bill> findAllByContract_Room_Property_Landlord_IdOrderByYearDescMonthDesc(Long landlordId);
 }
