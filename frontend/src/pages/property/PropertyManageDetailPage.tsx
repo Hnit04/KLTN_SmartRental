@@ -438,7 +438,7 @@ export default function PropertyManageDetailPage() {
             <div 
               key={room.id} 
               className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
-              onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`}
+              onClick={() => window.location.href = `/landlord/properties/${id}/rooms/${room.id}`}
             >
               {/* Ảnh phòng */}
               <div className="h-40 bg-gray-200 relative">
@@ -1006,4 +1006,4 @@ export default function PropertyManageDetailPage() {
       )}
     </div>
   );
-}
+}

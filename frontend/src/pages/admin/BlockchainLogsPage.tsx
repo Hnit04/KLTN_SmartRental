@@ -9,6 +9,8 @@ import {
 import { Button } from '@/components/ui/Button';
 
 const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
+const ETH_TO_VND = 80_000_000;
+const WEI_PRECISION = 10 ** 18;
 
 interface ContractLog {
   id: number;
@@ -54,11 +56,34 @@ const FIELD_LABELS: Record<string, string> = {
   elecPrice: 'Tiền điện (VNĐ/kWh)',
   waterPrice: 'Tiền nước (VNĐ/khối)',
   internetPrice: 'Tiền internet (VNĐ)',
-  startDate: 'Ngày bắt đầu (Unix)',
-  endDate: 'Ngày kết thúc (Unix)',
+  startDate: 'Ngày bắt đầu',
+  endDate: 'Ngày kết thúc',
   latePenaltyPercent: 'Phạt trễ (%/ngày)',
   landlordAddress: 'Ví Web3 (Chủ trọ)',
   tenantAddress: 'Ví Web3 (Khách thuê)',
+};
+
+const formatDisplayValue = (field: string, value: string) => {
+  if (!value || value === '—' || value === '0') return value || '—';
+  
+  if (field.toLowerCase().includes('amount') || field.toLowerCase().includes('price')) {
+    const num = Number(value);
+    if (isNaN(num)) return value;
+    const vndValue = (num / WEI_PRECISION) * ETH_TO_VND;
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(vndValue);
+  }
+  
+  if (field.toLowerCase().includes('date')) {
+    const num = Number(value);
+    if (isNaN(num) || num < 1000000) return value; // Not a unix timestamp
+    return new Date(num * 1000).toLocaleDateString('vi-VN');
+  }
+  
+  if (value.length > 25) {
+    return value.slice(0, 10) + '...' + value.slice(-8);
+  }
+  
+  return value;
 };
 
 export default function BlockchainLogsPage() {
@@ -426,7 +451,8 @@ export default function BlockchainLogsPage() {
       {/* ============================================ */}
       {diffModal.open && diffModal.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDiffModal({ open: false, contractId: 0, data: null })}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] mx-4 overflow-hidden animate-in fade-in zoom-in-95 flex flex-col" onClick={e => e.stopPropagation()}>
+
 
             {/* Modal Header */}
             <div className={`px-6 py-4 flex items-center justify-between ${diffModal.data.valid ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-red-500 to-rose-500'}`}>
@@ -447,22 +473,22 @@ export default function BlockchainLogsPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               {diffModal.data.comparisons && diffModal.data.comparisons.length > 0 ? (
                 <>
                   {/* Comparison Table */}
                   <div className="rounded-xl border overflow-hidden">
-                    <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trường dữ liệu</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[18%]">Trường dữ liệu</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[34%]">
                             <span className="flex items-center gap-1"><Database className="h-3 w-3" /> Database</span>
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[34%]">
                             <span className="flex items-center gap-1"><Link2 className="h-3 w-3" /> Blockchain</span>
                           </th>
-                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Kết quả</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-[14%]">Kết quả</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -470,13 +496,13 @@ export default function BlockchainLogsPage() {
                           <tr key={idx} className={comp.match ? 'bg-white' : 'bg-red-50/50'}>
                             <td className="px-4 py-3 font-semibold text-gray-800">{FIELD_LABELS[comp.field] || comp.field}</td>
                             <td className="px-4 py-3">
-                              <code className={`text-xs px-2 py-0.5 rounded font-mono break-all ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700 line-through'}`}>
-                                {comp.field.includes('Amount') || comp.field.includes('Price') ? Number(comp.database).toLocaleString('vi-VN') : (comp.database.length > 30 ? comp.database.slice(0, 15) + '...' + comp.database.slice(-10) : comp.database)}
+                              <code className={`text-[10px] px-1.5 py-0.5 rounded font-mono break-all block ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700 line-through'}`}>
+                                {formatDisplayValue(comp.field, comp.database)}
                               </code>
                             </td>
                             <td className="px-4 py-3">
-                              <code className={`text-xs px-2 py-0.5 rounded font-mono break-all ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-emerald-100 text-emerald-700 font-bold'}`}>
-                                {comp.field.includes('Amount') || comp.field.includes('Price') ? Number(comp.onChain).toLocaleString('vi-VN') : (comp.onChain.length > 30 ? comp.onChain.slice(0, 15) + '...' + comp.onChain.slice(-10) : comp.onChain)}
+                              <code className={`text-[10px] px-1.5 py-0.5 rounded font-mono break-all block ${comp.match ? 'bg-gray-100 text-gray-700' : 'bg-emerald-100 text-emerald-700 font-bold'}`}>
+                                {formatDisplayValue(comp.field, comp.onChain)}
                               </code>
                             </td>
                             <td className="px-4 py-3 text-center">
@@ -487,10 +513,10 @@ export default function BlockchainLogsPage() {
                                     {comp.addendum && <p className="text-[10px] text-orange-500 mt-1 leading-tight">{comp.addendum}</p>}
                                   </div>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Khớp</span>
+                                  <span className="inline-flex items-center gap-1 text-emerald-600 whitespace-nowrap"><CheckCircle2 className="h-4 w-4" /> Khớp</span>
                                 )
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-red-600 font-bold"><XCircle className="h-4 w-4" /> Lệch!</span>
+                                <span className="inline-flex items-center gap-1 text-red-600 font-bold whitespace-nowrap"><XCircle className="h-4 w-4" /> Lệch!</span>
                               )}
                             </td>
                           </tr>

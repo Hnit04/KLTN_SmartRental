@@ -335,7 +335,7 @@ export default function PropertyRoomDetailPage() {
       {/* Header */}
       <div>
         <Link 
-          to={`/properties/manage/${propertyId}`}
+          to={`/landlord/properties/${propertyId}`}
           className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" /> Quay về danh sách phòng

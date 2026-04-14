@@ -5,7 +5,7 @@
 // ==========================================
 
 export type UserRole = "TENANT" | "LANDLORD" | "ADMIN";
-export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED"; 
+export type KYCStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface User {
   id: number;
@@ -13,27 +13,27 @@ export interface User {
   email: string;
   fullName: string;
   role: UserRole;
-  
+
   // Optional fields
   phoneNumber?: string;
-  avatarUrl?: string;      
-  walletAddress?: string;  
-  cccdNumber?: string;     
-  dateOfBirth?: string;    
+  avatarUrl?: string;
+  walletAddress?: string;
+  cccdNumber?: string;
+  dateOfBirth?: string;
   currentAddress?: string;
-  
+
   // Zalo Phone
-  zaloPhone?: string;      
-  
+  zaloPhone?: string;
+
   // KYC Images
-  cccdFrontUrl?: string;   
-  cccdBackUrl?: string;    
-  
+  cccdFrontUrl?: string;
+  cccdBackUrl?: string;
+
   // System fields
-  reputationScore: number; 
+  reputationScore: number;
   kycStatus: KYCStatus;
-  createdAt: string;       
-  updatedAt: string;       
+  createdAt: string;
+  updatedAt: string;
 
   locked?: boolean;
   lockedAt?: string | null;
@@ -46,7 +46,7 @@ export interface User {
   bankQrUrl?: string;
 }
 
-export interface ResetPasswordRequest{
+export interface ResetPasswordRequest {
   email: string;
   code?: string;
   newPassword: string;
@@ -76,18 +76,18 @@ export interface UserHistory {
   email: string;
   phoneNumber: string;
   isLocked: boolean;
-  lockUntil: string | null;     
+  lockUntil: string | null;
   lockReason: string | null;
   modifiedBy: string;
-  modifiedAt: string;    
-  modifiedByFullName: string;       
+  modifiedAt: string;
+  modifiedByFullName: string;
   auditRemark: string | null;
 }
 
 export interface AuthResponse {
   accessToken: string;
   refreshToken?: string;
-  user: User; 
+  user: User;
 }
 
 export interface LoginRequest {
@@ -107,8 +107,8 @@ export interface RegisterRequest {
 export interface UpdateProfileRequest {
   fullName?: string;
   phoneNumber?: string;
-  zaloPhone?: string;     
-  dateOfBirth?: string;   
+  zaloPhone?: string;
+  dateOfBirth?: string;
   currentAddress?: string;
   cccdNumber?: string;
   avatarUrl?: string;
@@ -152,7 +152,7 @@ export interface Property {
   maxPrice?: number;
   totalRooms?: number;
   availableRooms?: number;
-  status?: "PENDING" | "APPROVED" | "REJECTED"| "HIDDEN";
+  status?: "PENDING" | "APPROVED" | "REJECTED" | "HIDDEN";
   safetyScore?: number;
   moderationReason?: string;
 }
@@ -170,14 +170,14 @@ export interface Room {
   hasMezzanine?: boolean;
   hasBalcony?: boolean;
   images: string[];
-  amenities: string[]; 
+  amenities: string[];
   description?: string;
   propertyId: number;
   propertyName?: string;
-  address?: string;      
+  address?: string;
   propertyAddress?: string;
-  maxOccupants?: number| null;
-  landlordName?: string; 
+  maxOccupants?: number | null;
+  landlordName?: string;
   elecPrice?: number;
   waterPrice?: number;
   internetPrice?: number;
@@ -193,7 +193,7 @@ export interface Room {
 // 3. CONTRACT TYPES
 // ==========================================
 
-export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY" | "CANCELLED";
+export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY" | "CANCELLED" | "AWAITING_DEPOSIT";
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED" | "PENALIZED";
 
 // ✅ 1. Thêm Enum phương thức ký
@@ -201,22 +201,22 @@ export type ContractSignMethod = "TRADITIONAL" | "BLOCKCHAIN";
 
 export interface Contract {
   id: number;
-  code: string; 
+  code: string;
   tenantId: number;
   landlordId: number;
   roomId: number;
-  
+
   startDate: string;
   endDate: string;
   signDate?: string;
-  
+
   actualPrice: number;   // Khớp với Backend Contract.java
   depositAmount: number;
   additionalTerms?: string;
   status: ContractStatus;
   depositStatus?: DepositStatus;
   signMethod: "TRADITIONAL" | "BLOCKCHAIN";
-  
+
   // Các trường Flattened để hiển thị UI
   roomName?: string;
   propertyAddress?: string;
@@ -304,11 +304,11 @@ export interface Appointment {
   roomName?: string;
   landlordName?: string;
   tenantName?: string;
-  meetTime: string;      
+  meetTime: string;
   status: AppointmentStatus;
   note?: string;
   meetingLink?: string
-  
+
   createdAt: string;
 }
 
@@ -332,7 +332,7 @@ export interface AppointmentResponse {
   tenantId: number;
   tenantFullName: string;   // ✅ Đổi từ tenantName thành tenantFullName
   tenantPhone: string;
-  meetTime: string; 
+  meetTime: string;
   status: 'PENDING' | 'CONFIRMED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'; // ✅ Thêm APPROVED
   note: string;
   meetingLink?: string;
@@ -353,7 +353,7 @@ export interface ContractBilling {
   elecPrice: number;
   waterPrice: number;
   internetPrice: number;
-  billStatus: BillStatus; 
+  billStatus: BillStatus;
   oldElecIndex: number;
   oldWaterIndex: number;
   totalAmount?: number;
@@ -382,8 +382,8 @@ export interface Bill {
   paymentTxHash?: string;
 }
 export interface RevenueChartData {
-    name: string; 
-    total: number; 
+  name: string;
+  total: number;
 }
 // --- REVIEW TYPES ---
 export interface ReviewResponse {
