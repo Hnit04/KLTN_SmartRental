@@ -7,12 +7,12 @@ import {
   Clock, 
   Facebook, 
   Linkedin, 
-  Instagram, 
-  CheckCircle2 
+  Instagram
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 
 export default function ContactPage() {
@@ -155,9 +155,7 @@ export default function ContactPage() {
               {isSent ? (
                 /* Trạng thái sau khi gửi thành công */
                 <div className="h-full flex flex-col items-center justify-center text-center py-12 animate-in fade-in zoom-in duration-300">
-                  <div className="h-20 w-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                    <CheckCircle2 className="h-10 w-10" />
-                  </div>
+                  <StatusBadge label="Gửi thành công" tone="success" className="mb-6 text-sm font-bold px-4 py-2" />
                   <h2 className="text-2xl font-bold text-foreground">Tin nhắn đã được gửi!</h2>
                   <p className="text-muted-foreground mt-2 max-w-md">
                     Cảm ơn bạn đã liên hệ. Chúng tôi đã nhận được thông tin và sẽ phản hồi qua email <b>trancongtinh20042004@gmail.com</b> sớm nhất có thể.

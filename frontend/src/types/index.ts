@@ -428,7 +428,7 @@ export interface ChangeRequestDTO {
 export interface ResidentRequestResponse {
   id: number;
   contractId: number;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "ACCEPTED" | "APPROVED" | "REJECTED";
   type: "ADD" | "REMOVE";
   message?: string;
   createdAt: string;

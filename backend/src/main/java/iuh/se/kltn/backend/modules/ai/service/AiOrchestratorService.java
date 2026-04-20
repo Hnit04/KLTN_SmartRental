@@ -128,11 +128,11 @@ public class AiOrchestratorService {
      */
     public boolean isLocationQuery(String question) {
         if (question == null) return false;
-        String lower = question.toLowerCase();
-        return (lower.contains("gần") || lower.contains("gan ") || lower.contains("nearby")
-                || lower.contains("khu vực") || lower.contains("quanh "))
-                && (lower.contains("phòng") || lower.contains("trọ") || lower.contains("thuê")
-                    || lower.contains("tìm") || lower.contains("room"));
+        String normalized = normalizeText(question);
+        return (normalized.contains("gần") || normalized.contains("gan ") || normalized.contains("nearby")
+                || normalized.contains("khu vực") || normalized.contains("quanh "))
+                && (normalized.contains("phòng") || normalized.contains("trọ") || normalized.contains("thuê")
+                    || normalized.contains("tìm") || normalized.contains("room"));
     }
 
     @Autowired
@@ -152,8 +152,26 @@ public class AiOrchestratorService {
         }
     }
 
+    private String normalizeText(String text) {
+        if (text == null) return "";
+        // Chuyển về NFC (Canonical Composition) để đồng nhất các loại dấu tiếng Việt
+        return java.text.Normalizer.normalize(text.toLowerCase(), java.text.Normalizer.Form.NFC);
+    }
+
     // 1. Thêm 2 tham số role và userId vào hàm
     public Object processDataQuery(String question, String role, Long userId) {
+        String normalizedQuestion = normalizeText(question);
+
+        // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính xác tuyệt đối
+        if (role.equalsIgnoreCase("GUEST")) {
+            // Regex kiểm tra các từ khóa nhạy cảm: hóa đơn, hợp đồng, lịch hẹn, doanh thu, nợ, thanh toán, của tôi/mình
+            String sensitivePattern = ".*(hóa đơn|hoá đơn|bill|hợp đồng|contract|lịch hẹn|appointment|doanh thu|revenue|của tôi|của mình|nợ|thanh toán|trễ|quá hạn|phí).*";
+            if (normalizedQuestion.matches(sensitivePattern)) {
+                System.out.println("🛡️ [SECURITY GUEST] Chặn truy vấn nhạy cảm: " + question);
+                return "Dạ, vì lý do bảo mật, các thông tin cá nhân như hóa đơn, hợp đồng và lịch hẹn chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng các tính năng này nhé!";
+            }
+        }
+
         String sqlToExecute = null;
 
         String roleRules = "";
@@ -171,8 +189,8 @@ public class AiOrchestratorService {
                     "3. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm (address LIKE hoặc district LIKE).";
         } else {
             roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
-                        "2. CHỈ ĐƯỢC PHÉP xem thông tin từ bảng `rooms` và `properties` (Ví dụ: giá phòng, địa chỉ, diện tích).\n" +
-                        "3. Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
+                        "2. Nếu câu hỏi yêu cầu xem hóa đơn, hợp đồng, lịch hẹn hoặc doanh thu, BẮT BUỘC CHỈ TRẢ VỀ CHỮ: UNAUTHORIZED.\n" +
+                        "3. CHỈ ĐƯỢC PHÉP xem thông tin từ bảng `rooms` và `properties` (Ví dụ: giá phòng, địa chỉ, diện tích). Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
         }
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();

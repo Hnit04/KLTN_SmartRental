@@ -23,6 +23,12 @@ public class ContractScheduler {
     @Autowired
     private RoomRepository roomRepository;
 
+    @Autowired
+    private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
+
+    @Autowired
+    private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+
     // Chạy mỗi giờ (cron: giây phút giờ ngày tháng thứ)
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
@@ -48,7 +54,48 @@ public class ContractScheduler {
         }
         
         if (!expiredContracts.isEmpty()) {
-            System.out.println("Đã hủy tự động " + expiredContracts.size() + " hợp đồng quá hạn 24h.");
+            System.out.println("Đã hủy tự động " + expiredContracts.size() + " hợp đồng chưa ký quá hạn 24h.");
+        }
+    }
+
+    // Tự động hủy hợp đồng TRỄ NẠP CỌC (Quá 24h kể từ khi cả 2 bên ký)
+    @Scheduled(cron = "0 30 * * * *") // Chạy mỗi giờ tại phút 30
+    @Transactional
+    public void cancelExpiredAwaitingDepositContracts() {
+        LocalDateTime threshold = LocalDateTime.now().minusHours(24);
+        // Lưu ý: Cần đảm bảo trong DB có lưu thời điểm chuyển sang AWAITING_DEPOSIT 
+        // hoặc dùng signDate (đã được set trong signContract)
+        List<Contract> stuckContracts = contractRepository.findByStatusAndSignDateBefore(ContractStatus.AWAITING_DEPOSIT, threshold);
+
+        for (Contract contract : stuckContracts) {
+            contract.setStatus(ContractStatus.EXPIRED);
+            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.UNPAID);
+            contractRepository.save(contract);
+
+            // Nhả phòng
+            Room room = contract.getRoom();
+            if (room != null) {
+                room.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(room);
+            }
+
+            // Trừ điểm uy tín khách thuê
+            reputationService.processPoints(contract.getTenant(), 
+                iuh.se.kltn.backend.modules.user.enums.ReputationAction.SMART_CONTRACT_PENALTY, 
+                -10, "Hợp đồng bị hủy tự động do quá 24h không thực hiện nạp cọc (#" + contract.getId() + ")");
+
+            // Thông báo cho cả 2 bên
+            notificationService.createNotification(contract.getTenant(), "Hợp đồng bị hủy", 
+                "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do quá hạn 24h nạp cọc. Bạn bị trừ 10 điểm uy tín.", 
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            
+            notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
+                "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không nạp cọc sau 24h. Phòng đã được nhả về trạng thái Trống.", 
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+        }
+
+        if (!stuckContracts.isEmpty()) {
+            System.out.println("Đã hủy tự động " + stuckContracts.size() + " hợp đồng trễ nạp cọc.");
         }
     }
     // Chạy hàng ngày lúc 01:00 sáng

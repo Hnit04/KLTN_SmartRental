@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { propertyApi } from '@/api/propertyApi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { 
   Loader2, CheckCircle, XCircle, Building, MapPin, ExternalLink, 
@@ -128,16 +129,19 @@ export default function AdminApprovalPage() {
         </div>
         <div className="flex items-center gap-2">
           {s >= 80 ? (
-            <div className="flex items-center text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
-              <ShieldCheck className="h-3 w-3 mr-1" /> Độ an toàn cao
+            <div className="flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3 text-green-700" />
+              <StatusBadge label="Do an toan cao" tone="success" className="text-[11px]" />
             </div>
           ) : s >= 50 ? (
-            <div className="flex items-center text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
-              <AlertTriangle className="h-3 w-3 mr-1" /> Cần xem kỹ nội dung
+            <div className="flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3 text-amber-700" />
+              <StatusBadge label="Can xem ky noi dung" tone="warning" className="text-[11px]" />
             </div>
           ) : (
-            <div className="flex items-center text-xs text-red-700 bg-red-50 px-2 py-1 rounded animate-pulse">
-              <ShieldAlert className="h-3 w-3 mr-1" /> Nguy cơ vi phạm cao
+            <div className="flex items-center gap-1">
+              <ShieldAlert className="h-3 w-3 text-red-700" />
+              <StatusBadge label="Nguy co vi pham cao" tone="danger" className="text-[11px]" />
             </div>
           )}
           <span className="text-[10px] text-gray-400 italic font-normal">
@@ -208,9 +212,7 @@ export default function AdminApprovalPage() {
             <Building className="h-4 w-4" />
             Khu trọ
             {pendingProperties.length > 0 && activeTab !== 'properties' && (
-              <span className="bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {pendingProperties.length}
-              </span>
+              <StatusBadge label={`${pendingProperties.length}`} tone="warning" className="text-[10px] font-bold" />
             )}
           </button>
           <button
@@ -224,9 +226,7 @@ export default function AdminApprovalPage() {
             <DoorOpen className="h-4 w-4" />
             Phòng trọ
             {pendingRooms.length > 0 && activeTab !== 'rooms' && (
-              <span className="bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {pendingRooms.length}
-              </span>
+              <StatusBadge label={`${pendingRooms.length}`} tone="warning" className="text-[10px] font-bold" />
             )}
           </button>
         </div>

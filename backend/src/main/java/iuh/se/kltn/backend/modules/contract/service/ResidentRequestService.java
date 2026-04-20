@@ -94,12 +94,11 @@ public class ResidentRequestService {
 
         ResidentRequest savedFinal = residentRequestRepository.save(request);
 
-        // ✅ THÊM THÔNG BÁO CHO CHỦ TRỌ
-        User landlord = contract.getRoom().getProperty().getLandlord();
+        // ✅ THÔNG BÁO CHO NGƯỜI ĐƯỢC MỜI (INVITEE)
         notificationService.createNotification(
-            landlord,
-            "Yêu cầu thêm người ở cùng mới",
-            "Khách thuê " + request.getRequester().getFullName() + " đã đề xuất thêm " + invitee.getFullName() + " vào ở tại phòng " + contract.getRoom().getName(),
+            invitee,
+            "Lời mời vào ở cùng phòng",
+            request.getRequester().getFullName() + " đã mời bạn vào ở cùng tại phòng " + contract.getRoom().getName() + ". Vui lòng xác nhận lời mời.",
             NotificationType.CONTRACT_UPDATE,
             contract.getId()
         );
@@ -136,7 +135,8 @@ public class ResidentRequestService {
 
         ResidentRequest request = new ResidentRequest();
         request.setContract(contract);
-        request.setRequester(userRepository.findById(requesterId).get());
+        User requester = userRepository.findById(requesterId).get();
+        request.setRequester(requester);
         request.setInvitee(invitee);
         request.setMessage(message);
         request.setRequestType(iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.REMOVE);
@@ -144,15 +144,27 @@ public class ResidentRequestService {
 
         ResidentRequest saved = residentRequestRepository.save(request);
 
-        // ✅ THÔNG BÁO CHO CHỦ TRỌ
-        User landlord = contract.getRoom().getProperty().getLandlord();
+        // ✅ THÔNG BÁO CHO NGƯỜI BỊ XÓA (Để xác nhận rời đi)
         notificationService.createNotification(
-            landlord,
-            "Yêu cầu xóa người ở cùng",
-            "Khách thuê " + request.getRequester().getFullName() + " yêu cầu xóa " + invitee.getFullName() + " khỏi phòng " + contract.getRoom().getName(),
+            invitee,
+            "Yêu cầu rời khỏi phòng",
+            java.text.MessageFormat.format("Bạn vừa nhận được yêu cầu rời khỏi phòng {0} từ {1}. Vui lòng xác nhận để hoàn tất thủ tục.", 
+                contract.getRoom().getName(), requester.getFullName()),
             NotificationType.CONTRACT_UPDATE,
             contract.getId()
         );
+
+        // ✅ THÔNG BÁO CHO CHỦ TRỌ (Để đồng bộ real-time trạng thái PENDING)
+        User landlord = contract.getRoom().getProperty().getLandlord();
+        if (!landlord.getId().equals(requester.getId())) {
+            notificationService.createNotification(
+                landlord,
+                "Yêu cầu xóa thành viên mới",
+                "Khách thuê " + requester.getFullName() + " yêu cầu xóa " + invitee.getFullName() + " khỏi phòng " + contract.getRoom().getName(),
+                NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+            );
+        }
 
         return mapToResponse(saved);
     }
@@ -163,61 +175,171 @@ public class ResidentRequestService {
                 .collect(Collectors.toList());
     }
 
+    public List<ResidentRequestResponse> getRequestsByInvitee(Long inviteeId) {
+        return residentRequestRepository.findByInviteeId(inviteeId).stream()
+                .filter(r -> r.getStatus() == RequestStatus.PENDING)
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
-    public ResidentRequestResponse updateStatus(Long requestId, RequestStatus status) {
+    public ResidentRequestResponse updateStatus(Long requestId, RequestStatus status, Long userId) {
         ResidentRequest residentRequest = residentRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Yêu cầu không tồn tại"));
 
-        if (residentRequest.getStatus() != RequestStatus.PENDING) {
-            throw new RuntimeException("Yêu cầu này đã được xử lý trước đó");
+        if (residentRequest.getStatus() == RequestStatus.APPROVED || residentRequest.getStatus() == RequestStatus.REJECTED) {
+            throw new RuntimeException("Yêu cầu này đã được xử lý xong");
         }
 
-        residentRequest.setStatus(status);
+        User landlord = residentRequest.getContract().getRoom().getProperty().getLandlord();
+        User invitee = residentRequest.getInvitee();
+        User requester = residentRequest.getRequester();
         
-        // Nếu DUYỆT -> Xử lý tùy theo loại yêu cầu
-        if (status == RequestStatus.APPROVED) {
+        String title = "";
+        String msg = "";
+
+        // 1. XỬ LÝ CHẤP NHẬN TỪ NGƯỜI ĐƯỢC MỜI (INVITEE)
+        if (status == RequestStatus.ACCEPTED) {
+            if (!invitee.getId().equals(userId)) {
+                throw new RuntimeException("Chỉ người được mời mới có quyền chấp nhận lời mời.");
+            }
+            residentRequest.setStatus(RequestStatus.ACCEPTED);
+            
+            // ✅ THÔNG BÁO CHO CHỦ TRỌ (Để chủ trọ phê duyệt)
+            notificationService.createNotification(
+                landlord,
+                residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD 
+                    ? "Yêu cầu thêm người mới: Chờ phê duyệt" 
+                    : "Yêu cầu xóa thành viên: Chờ phê duyệt",
+                residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                    ? "Người dùng " + invitee.getFullName() + " đã đồng ý gia nhập phòng " + residentRequest.getContract().getRoom().getName() + ". Vui lòng phê duyệt để hoàn tất."
+                    : "Người dùng " + invitee.getFullName() + " đã xác nhận yêu cầu rời phòng " + residentRequest.getContract().getRoom().getName() + ". Vui lòng phê duyệt để hoàn tất.",
+                NotificationType.CONTRACT_UPDATE,
+                residentRequest.getContract().getId()
+            );
+
+            // ✅ THÔNG BÁO CHO NGƯỜI GỬI (Để đồng bộ real-time trạng thái ACCEPTED)
+            if (!requester.getId().equals(invitee.getId()) && !requester.getId().equals(landlord.getId())) {
+                 notificationService.createNotification(
+                    requester,
+                    residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                        ? "Người ở cùng đã đồng ý"
+                        : "Thành viên đã xác nhận rời đi",
+                     residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                        ? invitee.getFullName() + " đã chấp nhận lời mời của bạn. Đang chờ chủ trọ phê duyệt cuối cùng."
+                        : invitee.getFullName() + " đã xác nhận yêu cầu rời đi của bạn. Đang chờ chủ trọ phê duyệt cuối cùng.",
+                    NotificationType.CONTRACT_UPDATE,
+                    residentRequest.getContract().getId()
+                );
+            }
+        } 
+        // 2. XỬ LÝ PHÊ DUYỆT TỪ CHỦ TRỌ (LANDLORD)
+        else if (status == RequestStatus.APPROVED) {
+            if (!landlord.getId().equals(userId)) {
+                throw new RuntimeException("Chỉ chủ trọ mới có quyền phê duyệt yêu cầu.");
+            }
+            // ✅ TẤT CẢ yêu cầu (ADD & REMOVE) đều phải qua bước ACCEPTED mới được APPROVED
+            if (residentRequest.getStatus() != RequestStatus.ACCEPTED) {
+                if (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD) {
+                    throw new RuntimeException("Người được mời chưa xác nhận lời mời.");
+                } else {
+                    throw new RuntimeException("Thành viên bị xóa chưa xác nhận yêu cầu rời phòng.");
+                }
+            }
+
+            residentRequest.setStatus(RequestStatus.APPROVED);
+            
             if (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD) {
                 ContractMember member = new ContractMember();
                 member.setContract(residentRequest.getContract());
-                member.setUser(residentRequest.getInvitee());
+                member.setUser(invitee);
                 member.setJoinedDate(LocalDate.now());
                 contractMemberRepository.save(member);
             } else if (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.REMOVE) {
-                // TÌM THÀNH VIÊN ĐANG Ở VÀ SET leftDate
                 contractMemberRepository.findByContractIdAndLeftDateIsNull(residentRequest.getContract().getId()).stream()
-                    .filter(m -> m.getUser().getId().equals(residentRequest.getInvitee().getId()))
+                    .filter(m -> m.getUser().getId().equals(invitee.getId()))
                     .findFirst()
                     .ifPresent(m -> {
                         m.setLeftDate(LocalDate.now());
                         contractMemberRepository.save(m);
                     });
             }
+
+            // ✅ THÔNG BÁO CHO NGƯỜI GỬI (A)
+            title = "Yêu cầu đã được phê duyệt";
+            msg = residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                ? "Chủ trọ đã phê duyệt cho " + invitee.getFullName() + " vào ở cùng bạn."
+                : "Chủ trọ đã phê duyệt yêu cầu xóa " + invitee.getFullName() + " khỏi phòng của bạn.";
+
+            // ✅ THÔNG BÁO CHO NGƯỜI ĐƯỢC MỜI (B)
+            notificationService.createNotification(
+                invitee,
+                residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                    ? "Đã chính thức vào phòng"
+                    : "Đã chính thức rời phòng",
+                residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                    ? "Chủ trọ đã phê duyệt yêu cầu. Bạn hiện đã là thành viên của phòng " + residentRequest.getContract().getRoom().getName()
+                    : "Chủ trọ đã phê duyệt yêu cầu. Bạn đã không còn là thành viên của phòng " + residentRequest.getContract().getRoom().getName(),
+                NotificationType.CONTRACT_UPDATE,
+                residentRequest.getContract().getId()
+            );
+
+            // ✅ THÔNG BÁO CHO CHỦ TRỌ (Để đồng bộ real-time nhiều phiên đăng nhập)
+            notificationService.createNotification(
+                landlord,
+                "Phê duyệt thành công",
+                "Bạn đã phê duyệt yêu cầu thay đổi thành viên cho phòng " + residentRequest.getContract().getRoom().getName(),
+                NotificationType.CONTRACT_UPDATE,
+                residentRequest.getContract().getId()
+            );
+        }
+        // 3. XỬ LÝ TỪ CHỐI
+        else if (status == RequestStatus.REJECTED) {
+            residentRequest.setStatus(RequestStatus.REJECTED);
+            
+            if (userId.equals(invitee.getId())) {
+                title = residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                    ? "Người ở cùng đã từ chối"
+                    : "Thành viên từ chối rời đi";
+                msg = residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
+                    ? invitee.getFullName() + " đã từ chối lời mời vào ở cùng bạn."
+                    : invitee.getFullName() + " không đồng ý với yêu cầu rời khỏi phòng.";
+
+                // Thông báo cho chủ trọ để đồng bộ UI
+                notificationService.createNotification(
+                    landlord,
+                    "Yêu cầu bị từ chối",
+                    invitee.getFullName() + " đã từ chối yêu cầu " + (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD ? "vào ở" : "rời phòng"),
+                    NotificationType.CONTRACT_UPDATE,
+                    residentRequest.getContract().getId()
+                );
+            } else if (userId.equals(landlord.getId())) {
+                title = "Chủ trọ đã từ chối";
+                msg = "Chủ trọ đã từ chối yêu cầu " + (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD ? "thêm " : "xóa ") + invitee.getFullName() + " khỏi phòng.";
+                
+                // Thông báo cho B nữa
+                notificationService.createNotification(
+                    invitee,
+                    "Yêu cầu bị từ chối",
+                    "Chủ trọ đã từ chối yêu cầu liên quan đến việc bạn " + (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD ? "vào ở" : "rời phòng") + " tại phòng " + residentRequest.getContract().getRoom().getName(),
+                    NotificationType.CONTRACT_UPDATE,
+                    residentRequest.getContract().getId()
+                );
+            }
         }
 
         ResidentRequest updated = residentRequestRepository.save(residentRequest);
 
-        String title = status == RequestStatus.APPROVED 
-            ? (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD ? "Yêu cầu thêm người được DUYỆT" : "Yêu cầu xóa người được DUYỆT")
-            : (residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD ? "Yêu cầu thêm người bị TỪ CHỐI" : "Yêu cầu xóa người bị TỪ CHỐI");
-        
-        String message = "";
-        if (status == RequestStatus.APPROVED) {
-            message = residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
-                ? "Chủ trọ đã đồng ý cho " + residentRequest.getInvitee().getFullName() + " vào ở cùng bạn."
-                : "Chủ trọ đã đồng ý xóa " + residentRequest.getInvitee().getFullName() + " khỏi phòng của bạn.";
-        } else {
-            message = residentRequest.getRequestType() == iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD
-                ? "Chủ trọ đã từ chối đề xuất thêm người " + residentRequest.getInvitee().getFullName() + "."
-                : "Chủ trọ đã từ chối yêu cầu xóa người " + residentRequest.getInvitee().getFullName() + ".";
+        // Gửi thông báo chính cho người yêu cầu (Tenant A)
+        if (!title.isEmpty()) {
+            notificationService.createNotification(
+                requester,
+                title,
+                msg,
+                NotificationType.CONTRACT_UPDATE,
+                residentRequest.getContract().getId()
+            );
         }
-        
-        notificationService.createNotification(
-            residentRequest.getRequester(),
-            title,
-            message,
-            NotificationType.CONTRACT_UPDATE,
-            residentRequest.getContract().getId()
-        );
 
         return mapToResponse(updated);
     }

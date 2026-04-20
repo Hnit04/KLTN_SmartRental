@@ -4,6 +4,7 @@ import { userApi } from '@/api/userApi';
 import type { User } from '@/types';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,DialogDescription } from '@/components/ui/Dialog'; // shadcn/ui dialog
 
@@ -269,24 +270,19 @@ export default function UserManagementPage() {
                       {user.cccdNumber || '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold border uppercase',
-                          user.kycStatus === 'VERIFIED'
-                            ? 'bg-green-100 text-green-800 border-green-200'
-                            : user.kycStatus === 'PENDING'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                            : 'bg-red-100 text-red-800 border-red-200'
-                        )}
-                      >
-                        {user.kycStatus || 'UNKNOWN'}
-                      </span>
+                      <StatusBadge
+                        label={user.kycStatus || 'UNKNOWN'}
+                        tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'warning' : 'danger'}
+                        className="text-[11px] uppercase"
+                      />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col w-24">
-                        <span className={cn('text-center rounded text-[10px] font-bold border uppercase', reputation.class)}>
-                          {reputation.label}
-                        </span>
+                        <StatusBadge
+                          label={reputation.label}
+                          tone={(user.reputationScore || 0) >= 70 ? 'success' : (user.reputationScore || 0) >= 30 ? 'warning' : 'danger'}
+                          className="justify-center text-[10px] uppercase"
+                        />
                         <span className="text-[15px] text-center text-gray-400 mt-1">{user.reputationScore}/100</span>
                       </div>
                     </td>

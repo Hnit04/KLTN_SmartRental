@@ -47,10 +47,10 @@ export default function LandlordPropertiesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* --- HERO / LANDLORD INFO --- */}
       <div className="bg-white border-b pt-24 pb-12">
-        <div className="container mx-auto max-w-7xl px-4">
+        <div className="page-shell">
           <Link to="/top-landlords" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-8">
             <ArrowLeft className="h-4 w-4" /> Quay lại Bảng Xếp Hạng
           </Link>
@@ -124,7 +124,7 @@ export default function LandlordPropertiesPage() {
       </div>
 
       {/* --- CONTENT --- */}
-      <div className="container mx-auto max-w-7xl px-4 py-12">
+      <div className="page-shell py-12">
         <div className="flex items-center justify-between mb-8 border-b pb-4">
           <h2 className="text-2xl font-bold text-gray-900">Danh Sách Khu Trọ</h2>
           <div className="text-sm text-muted-foreground">

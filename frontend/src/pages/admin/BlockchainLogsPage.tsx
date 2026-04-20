@@ -7,6 +7,7 @@ import {
   ScanSearch, X, AlertTriangle, Database, Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 
 const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
 const ETH_TO_VND = 80_000_000;
@@ -221,11 +222,11 @@ export default function BlockchainLogsPage() {
     toast.success(`Kiểm toán hoàn tất: ${valid} toàn vẹn, ${invalid} bất thường, ${errors} lỗi`);
   }, [contracts]);
 
-  const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-    ACTIVE: { label: 'Đang hiệu lực', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-    PENDING_SIGNATURE: { label: 'Chờ ký', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
-    EXPIRED: { label: 'Hết hạn', color: 'bg-gray-100 text-gray-600 border-gray-200', icon: XCircle },
-    TERMINATED: { label: 'Đã hủy', color: 'bg-red-100 text-red-600 border-red-200', icon: XCircle },
+  const statusConfig: Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' | 'danger'; icon: any }> = {
+    ACTIVE: { label: 'Đang hiệu lực', tone: 'success', icon: CheckCircle2 },
+    PENDING_SIGNATURE: { label: 'Chờ ký', tone: 'warning', icon: Clock },
+    EXPIRED: { label: 'Hết hạn', tone: 'neutral', icon: XCircle },
+    TERMINATED: { label: 'Đã hủy', tone: 'danger', icon: XCircle },
   };
 
   if (loading) {
@@ -383,14 +384,9 @@ export default function BlockchainLogsPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-700">{c.tenantName || '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${st.color}`}>
-                          <StIcon className="h-3 w-3" />
-                          {st.label}
-                        </span>
+                        <StatusBadge label={st.label} tone={st.tone} className="text-xs font-semibold" />
                         {c.signMethod === 'BLOCKCHAIN' && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold border border-violet-200">
-                            ⛓ Web3
-                          </span>
+                          <StatusBadge label="Web3" tone="info" className="ml-1.5 text-[10px] font-bold" />
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -419,12 +415,12 @@ export default function BlockchainLogsPage() {
                           {verifyingId === c.id ? (
                             <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
                           ) : vResult === 'valid' ? (
-                            <button onClick={() => handleVerify(c)} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer">
-                              <ShieldCheck className="h-3.5 w-3.5" /> Toàn vẹn
+                            <button onClick={() => handleVerify(c)} className="transition cursor-pointer">
+                              <StatusBadge label="Toàn vẹn" tone="success" className="text-xs font-semibold" />
                             </button>
                           ) : vResult === 'invalid' ? (
-                            <button onClick={() => handleVerify(c)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200 hover:bg-red-100 transition cursor-pointer">
-                              <ShieldAlert className="h-3.5 w-3.5" /> Bất thường
+                            <button onClick={() => handleVerify(c)} className="transition cursor-pointer">
+                              <StatusBadge label="Bất thường" tone="danger" className="text-xs font-semibold" />
                             </button>
                           ) : (
                             <Button size="sm" variant="outline" onClick={() => handleVerify(c)} className="text-xs h-7 px-2 gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50">

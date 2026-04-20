@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { appointmentApi } from '@/api/appointmentApi';
 import type { AppointmentResponse } from '@/types'; 
@@ -209,9 +210,9 @@ export default function AppointmentManagePage() {
                     </td>
 
                     <td className="px-6 py-4 text-center">
-                      {apt.status === 'PENDING' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-yellow-100 text-yellow-700"><Clock className="h-3.5 w-3.5" /> Chờ duyệt</span>}
-                      {apt.status === 'CONFIRMED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700"><CheckCircle2 className="h-3.5 w-3.5" /> Đã chốt</span>}
-                      {apt.status === 'CANCELLED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700"><XCircle className="h-3.5 w-3.5" /> Đã từ chối</span>}
+                      {apt.status === 'PENDING' && <StatusBadge label="Chờ duyệt" tone="warning" className="text-xs" />}
+                      {apt.status === 'CONFIRMED' && <StatusBadge label="Đã chốt" tone="success" className="text-xs" />}
+                      {apt.status === 'CANCELLED' && <StatusBadge label="Đã từ chối" tone="danger" className="text-xs" />}
                     </td>
 
                     <td className="px-6 py-4 text-right space-x-2">
@@ -258,9 +259,9 @@ export default function AppointmentManagePage() {
                  <h2 className="text-xl font-bold text-gray-900">Chi tiết Lịch hẹn</h2>
                  <p className="text-sm font-medium text-gray-500 mt-1">Phòng {viewingApt.roomName}</p>
                  <div className="mt-3">
-                   {viewingApt.status === 'PENDING' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700"><Clock className="h-3.5 w-3.5" /> Chờ xác nhận</span>}
-                   {viewingApt.status === 'CONFIRMED' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700"><CheckCircle2 className="h-3.5 w-3.5" /> Đã chốt lịch hẹn</span>}
-                   {viewingApt.status === 'CANCELLED' && <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><XCircle className="h-3.5 w-3.5" /> Đã từ chối</span>}
+                   {viewingApt.status === 'PENDING' && <StatusBadge label="Chờ xác nhận" tone="warning" className="text-xs" />}
+                   {viewingApt.status === 'CONFIRMED' && <StatusBadge label="Đã chốt lịch hẹn" tone="success" className="text-xs" />}
+                   {viewingApt.status === 'CANCELLED' && <StatusBadge label="Đã từ chối" tone="danger" className="text-xs" />}
                  </div>
               </div>
 

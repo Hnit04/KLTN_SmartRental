@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Maximize, Zap, Droplets, Wifi, CalendarClock,
-  CheckCircle, XCircle, Bot, Loader2, X, Phone, MessageSquare,
+  XCircle, Bot, Loader2, X, Phone, MessageSquare,
   MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn,
-  Wrench
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -13,6 +12,7 @@ import type { Room } from "@/types/index";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
 export default function RoomDetailPage() {
@@ -180,7 +180,7 @@ export default function RoomDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-background pb-20">
 
       {/* ============ LIGHTBOX ============ */}
       {lightboxOpen && images.length > 0 && (
@@ -225,7 +225,7 @@ export default function RoomDetailPage() {
         </div>
       )}
 
-      <div className="container mx-auto max-w-5xl px-4 py-8">
+      <div className="page-shell max-w-5xl py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <Link to="/properties" className="hover:text-primary transition">Tìm phòng</Link>
@@ -293,45 +293,36 @@ export default function RoomDetailPage() {
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     {room.type && (
-                      <span className="text-xs font-medium text-primary bg-primary/5 border border-primary/20 px-2.5 py-1 rounded-full">
-                        {room.type === 'STUDIO' ? 'Phòng Studio' :
-                         room.type === 'ONE_BEDROOM' ? '1 Phòng ngủ' :
-                         room.type === 'TWO_BEDROOM' ? '2 Phòng ngủ' :
-                         room.type === 'SINGLE_ROOM' ? 'Phòng đơn' :
-                         room.type === 'SHARED_ROOM' ? 'Phòng ghép' :
-                         room.type === 'MEZZANINE_ROOM' ? 'Phòng có gác lửng' : ''}
-                      </span>
+                      <StatusBadge
+                        label={room.type === 'STUDIO' ? 'Phòng Studio' :
+                          room.type === 'ONE_BEDROOM' ? '1 Phòng ngủ' :
+                          room.type === 'TWO_BEDROOM' ? '2 Phòng ngủ' :
+                          room.type === 'SINGLE_ROOM' ? 'Phòng đơn' :
+                          room.type === 'SHARED_ROOM' ? 'Phòng ghép' :
+                          room.type === 'MEZZANINE_ROOM' ? 'Phòng có gác lửng' : ''}
+                        tone="info"
+                        className="text-xs font-medium"
+                      />
                     )}
                     {room.hasMezzanine && (
-                      <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                        Có gác lửng
-                      </span>
+                      <StatusBadge label="Có gác lửng" tone="warning" className="text-xs font-medium" />
                     )}
                     {room.hasBalcony && (
-                      <span className="text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-full">
-                        Có ban công
-                      </span>
+                      <StatusBadge label="Có ban công" tone="info" className="text-xs font-medium" />
                     )}
                   </div>
                 </div>
 
                 {/* Badge trạng thái */}
-                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
-                  isAvailable ? "bg-green-100 text-green-700" : 
-                  isReserved ? "bg-orange-100 text-orange-700" : 
-                  isMaintenance ? "bg-amber-100 text-amber-700" : 
-                  "bg-gray-100 text-gray-500"
-                }`}>
-                  {isAvailable ? (
-                    <><CheckCircle className="h-3.5 w-3.5" /> Còn trống</>
-                  ) : isReserved ? (
-                    <><CalendarClock className="h-3.5 w-3.5" /> Đã có người đặt cọc</>
-                  ) : isMaintenance ? (
-                    <><Wrench className="h-3.5 w-3.5" /> Đang bảo trì</>
-                  ) : (
-                    <><XCircle className="h-3.5 w-3.5" /> Đã thuê</>
-                  )}
-                </span>
+                {isAvailable ? (
+                  <StatusBadge label="Còn trống" tone="success" className="text-xs font-bold" />
+                ) : isReserved ? (
+                  <StatusBadge label="Đã có người đặt cọc" tone="warning" className="text-xs font-bold" />
+                ) : isMaintenance ? (
+                  <StatusBadge label="Đang bảo trì" tone="warning" className="text-xs font-bold" />
+                ) : (
+                  <StatusBadge label="Đã thuê" tone="neutral" className="text-xs font-bold" />
+                )}
               </div>
 
               {/* Giá + Diện tích */}
@@ -394,9 +385,7 @@ export default function RoomDetailPage() {
                   <p className="text-sm font-semibold text-gray-700 mb-3">Tiện nghi phòng</p>
                   <div className="flex flex-wrap gap-2">
                     {amenities.map((a, i) => (
-                      <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-100">
-                        {a}
-                      </span>
+                      <StatusBadge key={i} label={a} tone="info" className="text-xs font-medium" />
                     ))}
                   </div>
                 </div>

@@ -103,14 +103,24 @@ public class AiController {
         }
 
         // B2: Nếu không thấy, gọi mô hình LLM
-        String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
-        
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "sessionId", sessionId,
-                "reply", response,
-                "source", "GEMINI_AI"
-        ));
+        try {
+            String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
+            
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "sessionId", sessionId,
+                    "reply", response,
+                    "source", "GEMINI_AI"
+            ));
+        } catch (Throwable t) {
+            System.err.println("❌ [AI ERROR] Dịch vụ Gemini đang quá tải hoặc lỗi: " + t.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "status", "error",
+                    "sessionId", sessionId,
+                    "reply", "Dịch vụ AI hiện đang quá tải (Spikes in demand). Vui lòng thử lại sau giây lát. 😅",
+                    "source", "ERROR_FALLBACK"
+            ));
+        }
     }
 
 
@@ -136,21 +146,28 @@ public class AiController {
 
         System.out.println("👤 Khách đang tra cứu: ID=" + userId + ", Role=" + role);
 
-        Object result;
+        try {
+            Object result;
+            // 📍 Ưu tiên: Kiểm tra câu hỏi về vị trí/landmark trước
+            if (aiOrchestratorService.isLocationQuery(question)) {
+                System.out.println("📍 [ROUTER] Phát hiện câu hỏi về vị trí → processLocationQuery");
+                result = aiOrchestratorService.processLocationQuery(question, role, userId);
+            } else {
+                result = aiOrchestratorService.processDataQuery(question, role, userId);
+            }
 
-        // 📍 Ưu tiên: Kiểm tra câu hỏi về vị trí/landmark trước
-        if (aiOrchestratorService.isLocationQuery(question)) {
-            System.out.println("📍 [ROUTER] Phát hiện câu hỏi về vị trí → processLocationQuery");
-            result = aiOrchestratorService.processLocationQuery(question, role, userId);
-        } else {
-            result = aiOrchestratorService.processDataQuery(question, role, userId);
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "question", question,
+                    "data", result
+            ));
+        } catch (Throwable t) {
+            System.err.println("❌ [AI DATA ERROR] Lỗi khi xử lý truy vấn dữ liệu AI: " + t.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                    "status", "error",
+                    "message", "Dịch vụ AI hiện đang quá tải. Không thể phân tích dữ liệu lúc này. Vui lòng thử lại sau."
+            ));
         }
-
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "question", question,
-                "data", result
-        ));
     }
     // Admin: Lấy thống kê AI NLP (tất cả cache SQL)
     @GetMapping("/admin/analytics")
@@ -262,8 +279,11 @@ public class AiController {
             ));
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+            System.err.println("❌ [AI REMINDER ERROR] " + e.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                "status", "error", 
+                "message", "Dịch vụ AI soạn tin nhắn đang bận (503). Vui lòng thử lại sau giây lát."
+            ));
         }
     }
 
@@ -375,9 +395,12 @@ public class AiController {
             report = report.replace("```markdown", "").replace("```", "").trim();
 
             return ResponseEntity.ok(Map.of("status", "success", "report", report));
-        } catch(Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        } catch(Throwable t) {
+            System.err.println("❌ [AI ANOMALY ERROR] " + t.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                "status", "error", 
+                "message", "Dịch vụ AI phân tích đang bận (503). Vui lòng thử lại sau giây lát."
+            ));
         }
     }
 
@@ -407,8 +430,11 @@ public class AiController {
             }
             return ResponseEntity.ok(Map.of("status", "success", "message", "Đã gửi thông báo thành công cho " + count + " phòng!"));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+            System.err.println("❌ [AI REMINDER ERROR] " + e.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                "status", "error", 
+                "message", "Dịch vụ AI soạn tin nhắn đang bận (503). Vui lòng thử lại sau giây lát."
+            ));
         }
     }
 
@@ -438,9 +464,12 @@ public class AiController {
 
             String description = geminiChatModel.generate(aiPrompt);
             return ResponseEntity.ok(Map.of("description", description));
-        } catch (Exception e) {
-            System.err.println("Lỗi AI generate description: " + e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("status", "error", "message", "Không thể tạo mô tả. Vui lòng thử lại."));
+        } catch (Throwable t) {
+            System.err.println("Lỗi AI generate description: " + t.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                "status", "error", 
+                "message", "Dịch vụ AI đang bận. Không thể tạo mô tả lúc này. Vui lòng thử lại sau."
+            ));
         }
     }
 }

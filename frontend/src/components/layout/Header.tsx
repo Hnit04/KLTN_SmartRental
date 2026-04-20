@@ -3,24 +3,21 @@ import { Input } from '@/components/ui/Input';
 import { useLocation } from 'react-router-dom';
 import { UserNav } from "../shared/UserNav"; 
 import NotificationBell from "../shared/NotificationBell";
+import { ROLE_NAV_ITEMS } from '@/config/navigation';
+
+const NAV_TITLES = Object.values(ROLE_NAV_ITEMS).flat().reduce((acc, item) => {
+  acc[item.path] = item.title;
+  return acc;
+}, {} as Record<string, string>);
 
 // Map route → tên trang hiển thị trên Header
 const PAGE_TITLES: Record<string, string> = {
-  '/landlord/dashboard':   'Tổng quan & Thống kê',
-  '/landlord/properties':  'Khu trọ & Phòng trọ',
-  '/landlord/contracts':   'Quản lý Hợp đồng',
-  '/landlord/finance':     'Tài chính & Hóa đơn',
-  '/landlord/appointments': 'Quản lý Lịch hẹn',
-  '/landlord/reports':     'Báo cáo Doanh thu',
-  '/tenant/dashboard':     'Trang chủ',
-  '/tenant/my-room':       'Phòng trọ của tôi',
-  '/tenant/contracts':     'Hợp đồng của tôi',
-  '/tenant/appointments':  'Lịch hẹn của tôi',
-  '/tenant/rental-history': 'Lịch sử thuê',
-  '/admin/dashboard':      'Quản trị hệ thống',
-  '/properties':           'Tìm phòng trọ',
-  '/profile':              'Hồ sơ cá nhân',
-  '/settings':             'Cài đặt tài khoản',
+  ...NAV_TITLES,
+  '/properties': 'Tìm phòng trọ',
+  '/properties/:id': 'Chi tiết khu trọ',
+  '/rooms/:id': 'Chi tiết phòng',
+  '/profile': 'Hồ sơ cá nhân',
+  '/settings': 'Cài đặt tài khoản',
 };
 
 const Header = () => {
