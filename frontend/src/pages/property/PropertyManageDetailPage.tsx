@@ -10,6 +10,7 @@ import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
 import { roomApi } from '@/api/roomApi';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
 
@@ -438,7 +439,7 @@ export default function PropertyManageDetailPage() {
             <div 
               key={room.id} 
               className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
-              onClick={() => window.location.href = `/properties/manage/${id}/rooms/${room.id}`}
+              onClick={() => window.location.href = `/landlord/properties/${id}/rooms/${room.id}`}
             >
               {/* Ảnh phòng */}
               <div className="h-40 bg-gray-200 relative">
@@ -492,8 +493,8 @@ export default function PropertyManageDetailPage() {
                   <span className="text-xs font-medium text-gray-500">
                     {ROOM_TYPE_LABELS[(room.type as RoomType) || 'STUDIO']}
                   </span>
-                  {room.hasMezzanine && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Gác lửng</span>}
-                  {room.hasBalcony && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-medium">Ban công</span>}
+                  {room.hasMezzanine && <StatusBadge label="Gác lửng" tone="warning" className="text-[10px] font-medium" />}
+                  {room.hasBalcony && <StatusBadge label="Ban công" tone="info" className="text-[10px] font-medium" />}
                 </div>
 
                 <div className="space-y-1.5 text-sm text-gray-600 mb-4 flex-1">
@@ -1006,4 +1007,4 @@ export default function PropertyManageDetailPage() {
       )}
     </div>
   );
-}
+}

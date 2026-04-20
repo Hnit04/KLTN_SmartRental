@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { 
-  Search, Filter, ArrowUpDown, FileText, Loader2 
+  Search, Filter, ArrowUpDown, FileText, Loader2, X
 } from "lucide-react";
 import { contractApi } from "@/api/contractApi";
 import type { Contract } from "@/types";
 import ContractItem from "./ContractItem";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
 export default function ContractList() {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -53,6 +54,25 @@ export default function ContractList() {
     return 0;
   });
 
+  const summary = {
+    total: contracts.length,
+    active: contracts.filter(c => c.status === 'ACTIVE').length,
+    pending: contracts.filter(c => c.status === 'PENDING_SIGNATURE').length,
+    ended: contracts.filter(c => c.status === 'EXPIRED' || c.status === 'TERMINATED_EARLY').length,
+  };
+
+  const activeFilterChips = [
+    searchTerm ? { key: 'search', label: `Từ khóa: ${searchTerm}`, clear: () => setSearchTerm('') } : null,
+    filterStatus !== 'ALL' ? { key: 'status', label: `Trạng thái: ${filterStatus}`, clear: () => setFilterStatus('ALL') } : null,
+    sortBy !== 'NEWEST' ? { key: 'sort', label: `Sắp xếp: ${sortBy}`, clear: () => setSortBy('NEWEST') } : null,
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('ALL');
+    setSortBy('NEWEST');
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -63,6 +83,25 @@ export default function ContractList() {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="section-card p-3">
+          <p className="text-xs text-muted-foreground">Tổng hợp đồng</p>
+          <p className="text-xl font-bold text-foreground mt-1">{summary.total}</p>
+        </div>
+        <div className="section-card p-3">
+          <p className="text-xs text-muted-foreground">Đang hiệu lực</p>
+          <p className="text-xl font-bold text-green-700 mt-1">{summary.active}</p>
+        </div>
+        <div className="section-card p-3">
+          <p className="text-xs text-muted-foreground">Chờ ký</p>
+          <p className="text-xl font-bold text-amber-700 mt-1">{summary.pending}</p>
+        </div>
+        <div className="section-card p-3">
+          <p className="text-xs text-muted-foreground">Kết thúc / Hủy</p>
+          <p className="text-xl font-bold text-gray-700 mt-1">{summary.ended}</p>
+        </div>
+      </div>
+
       {/* --- THANH CÔNG CỤ (TOOLBAR) --- */}
       <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <div className="relative flex-1">
@@ -87,7 +126,7 @@ export default function ContractList() {
               <option value="ACTIVE">Đang hiệu lực</option>
               <option value="PENDING_SIGNATURE">Chờ ký tên</option>
               <option value="EXPIRED">Đã hết hạn</option>
-              <option value="CANCELLED">Đã hủy</option>
+              <option value="TERMINATED_EARLY">Đã hủy</option>
             </select>
           </div>
 
@@ -107,12 +146,36 @@ export default function ContractList() {
         </div>
       </div>
 
+      {activeFilterChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterChips.map(chip => (
+            <button
+              key={chip.key}
+              onClick={chip.clear}
+              className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium hover:bg-secondary/70"
+            >
+              {chip.label}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={resetFilters}>Xóa bộ lọc</Button>
+        </div>
+      )}
+
       {/* --- DANH SÁCH DẠNG HÀNG (LIST VIEW) --- */}
       <div className="space-y-3">
         {processedContracts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
             <FileText className="h-10 w-10 text-gray-300 mb-2" />
-            <h3 className="text-lg font-medium text-gray-900">Không tìm thấy hợp đồng nào</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {contracts.length === 0 ? "Bạn chưa có hợp đồng nào" : "Không tìm thấy hợp đồng phù hợp"}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {contracts.length === 0 ? "Hợp đồng mới sẽ xuất hiện tại đây khi được tạo." : "Hãy thử đổi từ khóa hoặc trạng thái lọc."}
+            </p>
+            {contracts.length > 0 && (
+              <Button variant="outline" className="mt-3" onClick={resetFilters}>Đặt lại bộ lọc</Button>
+            )}
           </div>
         ) : (
           processedContracts.map((contract) => (

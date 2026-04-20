@@ -22,12 +22,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntimeException(RuntimeException ex) {
-        System.err.println("SERVER ERROR: " + ex.getMessage());
+        String message = ex.getMessage() != null ? ex.getMessage() : "Lỗi hệ thống không xác định";
+        
+        // 🛡️ Xử lý đặc biệt cho lỗi AI quá tải (Gemini 503)
+        if (message.contains("503") || message.contains("demand") || message.contains("UNAVAILABLE")) {
+            System.err.println("🛡️ [GLOBAL AI FALLBACK] Phát hiện lỗi AI quá tải: " + message);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of(
+                            "status", "error",
+                            "message", "Dịch vụ AI hiện đang quá tải. Vui lòng thử lại sau giây lát. 🙏"
+                    ));
+        }
+
+        System.err.println("SERVER ERROR: " + message);
         ex.printStackTrace();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "status", "error",
-                        "message", ex.getMessage() != null ? ex.getMessage() : "Lỗi hệ thống không xác định"
+                        "message", message
                 ));
     }
 }

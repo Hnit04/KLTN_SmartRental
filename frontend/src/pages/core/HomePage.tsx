@@ -12,6 +12,7 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import React, { useEffect, useState } from "react";
+import StatusBadge from "@/components/shared/StatusBadge";
 
 // Custom hook để animate số
 const useCountUp = (end: number, duration: number = 2000) => {
@@ -202,9 +203,7 @@ export default function App() {
               {/* Floating Badge */}
               <div className="absolute -top-6 -right-6 bg-white p-4 rounded-2xl shadow-xl hidden sm:block animate-bounce">
                 <div className="flex items-center gap-3">
-                  <div className="bg-green-100 p-2 rounded-full">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
+                  <StatusBadge label="Đã xác thực" tone="success" className="text-xs font-bold" />
                   <div>
                     <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Trạng thái</p>
                     <p className="text-sm font-bold">Phòng đã xác thực</p>

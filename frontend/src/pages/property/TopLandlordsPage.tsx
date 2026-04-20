@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { userApi } from '@/api/userApi';
 import type { User } from '@/types';
-import { Crown, ShieldCheck, Mail, Award, ArrowRight, Sparkles } from 'lucide-react';
+import { Crown, Mail, Award, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 
 const TopLandlordsPage = () => {
   const [landlords, setLandlords] = useState<User[]>([]);
@@ -30,7 +31,7 @@ const TopLandlordsPage = () => {
   const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Banner */}
       <div className="bg-primary text-white py-20 px-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
@@ -50,7 +51,7 @@ const TopLandlordsPage = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 -mt-12 relative z-20">
+      <div className="page-shell max-w-5xl -mt-12 relative z-20">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 bg-white rounded-3xl shadow-xl border border-gray-100">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mb-4"></div>
@@ -187,9 +188,11 @@ const TopLandlordsPage = () => {
                       </div>
                       <div className="text-right shrink-0 flex items-center gap-4">
                         <div className="flex flex-col items-end">
-                          <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-2xl text-base font-black border border-green-100 shadow-sm group-hover:bg-green-100/50 transition-colors">
-                            <ShieldCheck className="h-5 w-5" /> {user.reputationScore}
-                          </div>
+                          <StatusBadge
+                            label={`Uy tín ${user.reputationScore}`}
+                            tone="success"
+                            className="px-4 py-2 text-base font-black shadow-sm group-hover:bg-green-100/50 transition-colors"
+                          />
                         </div>
                         <div className="bg-gray-100 p-2 rounded-full text-gray-400 group-hover:bg-primary group-hover:text-white transition-all duration-300">
                           <ArrowRight className="h-5 w-5" />

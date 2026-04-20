@@ -13,6 +13,7 @@ import { billApi } from "@/api/billApi";
 import { useAuth } from "@/context/AuthContext";
 import type { Contract, AppointmentResponse, Bill } from "@/types/index";
 import { Button } from "@/components/ui/Button";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
 // ---- HELPER ----
@@ -20,14 +21,14 @@ const fmt = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", c
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 const ContractStatusBadge = ({ status }: { status: string }) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    ACTIVE: { label: "Đang thuê", cls: "bg-green-100 text-green-700 border-green-200" },
-    PENDING_SIGNATURE: { label: "Chờ ký", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    EXPIRED: { label: "Hết hạn", cls: "bg-gray-100 text-gray-500 border-gray-200" },
-    CANCELLED: { label: "Đã hủy", cls: "bg-red-100 text-red-600 border-red-200" },
+  const map: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+    ACTIVE: { label: "Đang thuê", tone: "success" },
+    PENDING_SIGNATURE: { label: "Chờ ký", tone: "warning" },
+    EXPIRED: { label: "Hết hạn", tone: "neutral" },
+    CANCELLED: { label: "Đã hủy", tone: "danger" },
   };
-  const { label, cls } = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-500 border-gray-200" };
-  return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${cls}`}>{label}</span>;
+  const cfg = map[status] ?? { label: status, tone: "neutral" as const };
+  return <StatusBadge label={cfg.label} tone={cfg.tone} />;
 };
 
 const AppointmentStatusBadge = ({ status }: { status: string }) => {
@@ -43,14 +44,14 @@ const AppointmentStatusBadge = ({ status }: { status: string }) => {
 };
 
 const BillStatusBadge = ({ status }: { status: string }) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    PAID: { label: "Đã thanh toán", cls: "text-green-700 bg-green-50 border-green-200" },
-    PENDING: { label: "Chờ thanh toán", cls: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-    LATE: { label: "Quá hạn", cls: "text-red-600 bg-red-50 border-red-200" },
-    UNBILLED: { label: "Chưa xuất", cls: "text-gray-500 bg-gray-50 border-gray-200" },
+  const map: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+    PAID: { label: "Đã thanh toán", tone: "success" },
+    PENDING: { label: "Chờ thanh toán", tone: "warning" },
+    LATE: { label: "Quá hạn", tone: "danger" },
+    UNBILLED: { label: "Chưa xuất", tone: "neutral" },
   };
-  const { label, cls } = map[status] ?? { label: status, cls: "text-gray-500 bg-gray-50 border-gray-200" };
-  return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${cls}`}>{label}</span>;
+  const cfg = map[status] ?? { label: status, tone: "neutral" as const };
+  return <StatusBadge label={cfg.label} tone={cfg.tone} />;
 };
 
 // ---- MAIN COMPONENT ----
@@ -235,9 +236,7 @@ export default function TenantDashboardPage() {
                 <h3 className="text-xl font-extrabold text-gray-900">
                   {activeContract.roomName || `Phòng #${activeContract.roomId}`}
                 </h3>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full border bg-green-100 text-green-700 border-green-200 animate-pulse">
-                  ● Đang thuê
-                </span>
+                <StatusBadge label="Dang thue" tone="success" />
               </div>
               {activeContract.propertyAddress && (
                 <p className="text-sm text-gray-500 flex items-center gap-1.5">

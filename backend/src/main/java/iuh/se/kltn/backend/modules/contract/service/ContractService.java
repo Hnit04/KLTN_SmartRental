@@ -30,9 +30,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.web3j.crypto.Keys;
+import org.web3j.crypto.Sign;
+import org.web3j.utils.Numeric;
 
 @Service
 public class ContractService {
@@ -528,6 +533,21 @@ public class ContractService {
             throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
         }
 
+        // --- XÁC MINH CHỮ KÝ SỐ (BLOCKCHAIN METHOD) ---
+        if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+            if (request.getSignature() == null || request.getSignature().isEmpty()) {
+                throw new RuntimeException("Chữ ký số không được để trống khi ký bằng Blockchain!");
+            }
+            
+            String userWallet = currentUser.getWalletAddress();
+            if (userWallet == null || userWallet.isEmpty()) {
+                throw new RuntimeException("Bạn chưa liên kết địa chỉ ví trên hệ thống!");
+            }
+            
+            // Xác minh chữ ký với Contract Hash
+            verifyWeb3Signature(contract.getContractHash(), request.getSignature(), userWallet);
+        }
+
         // 1. Cập nhật trạng thái ký của từng người
         if (currentUser.getRole() == Role.TENANT) {
             contract.setIsTenantSigned(true);
@@ -604,7 +624,8 @@ public class ContractService {
             }
 
             if (contract.getRoom() != null) {
-                contract.getRoom().setStatus(RoomStatus.RENTED);
+                // Giữ ở trạng thái Đã giữ chỗ, chỉ chuyển RENTED sau khi nạp cọc thành công
+                contract.getRoom().setStatus(RoomStatus.RESERVED);
                 roomRepository.save(contract.getRoom());
             }
         }
@@ -791,6 +812,51 @@ public class ContractService {
         );
 
         return mapToResponse(contractRepository.save(contract), landlordId);
+    }
+
+    private boolean verifyWeb3Signature(String message, String signature, String expectedWalletAddress) {
+        if (message == null || message.isEmpty()) {
+            throw new RuntimeException("Lỗi: Hợp đồng này chưa được băm (Hash). Vui lòng báo kỹ thuật viên.");
+        }
+        try {
+            byte[] signatureBytes = Numeric.hexStringToByteArray(signature);
+            byte v = signatureBytes[64];
+            if (v < 27) v += 27;
+            byte[] r = Arrays.copyOfRange(signatureBytes, 0, 32);
+            byte[] s = Arrays.copyOfRange(signatureBytes, 32, 64);
+            Sign.SignatureData sd = new Sign.SignatureData(v, r, s);
+
+            // CÁCH 1: Coi message là chuỗi ký tự UTF-8 (Mặc định của MetaMask)
+            String addressFromText = recoverAddress(message.getBytes(StandardCharsets.UTF_8), sd);
+            if (addressFromText.equalsIgnoreCase(expectedWalletAddress.trim())) {
+                return true;
+            }
+
+            // CÁCH 2: Nếu message là mã Hex (64 ký tự), thử coi nó là dữ liệu nhị phân (Binary)
+            // Một số ví (Trust, Ledger) có thể tự convert Hex String sang Bytes trước khi ký
+            if (message.length() == 64) {
+                try {
+                    String addressFromHex = recoverAddress(Numeric.hexStringToByteArray(message), sd);
+                    if (addressFromHex.equalsIgnoreCase(expectedWalletAddress.trim())) {
+                        return true;
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            throw new RuntimeException("Xác thực thất bại! \n" +
+                "Ví trong hồ sơ: " + expectedWalletAddress.trim() + "\n" +
+                "Ví khôi phục (dạng văn bản): " + addressFromText + "\n" +
+                "Hash đang ký: " + message);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi hệ thống khi xác minh chữ ký: " + e.getMessage());
+        }
+    }
+
+    private String recoverAddress(byte[] msgBytes, Sign.SignatureData sd) throws Exception {
+        BigInteger publicKey = Sign.signedPrefixedMessageToKey(msgBytes, sd);
+        return "0x" + Keys.getAddress(publicKey);
     }
 
     private String calculateSHA256(String data) {

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { billApi } from '@/api/billApi';
 import { propertyApi } from '@/api/propertyApi';
@@ -329,10 +330,10 @@ export default function BillManagePage() {
                     Hợp đồng #{contract.id}
                   </p>
                 </div>
-                {contract.billStatus === 'UNBILLED' && <Badge variant="destructive" icon={<AlertCircle />}>Chưa chốt</Badge>}
-                {contract.billStatus === 'PENDING' && <Badge variant="warning" icon={<Clock />}>Chờ đóng</Badge>}
-                {contract.billStatus === 'PAID' && <Badge variant="success" icon={<CheckCircle2 />}>Đã thu</Badge>}
-                {contract.billStatus === 'LATE' && <Badge variant="destructive" icon={<AlertCircle />}>Trễ hạn</Badge>}
+                {contract.billStatus === 'UNBILLED' && <StatusBadge label="Chưa chốt" tone="danger" />}
+                {contract.billStatus === 'PENDING' && <StatusBadge label="Chờ đóng" tone="warning" />}
+                {contract.billStatus === 'PAID' && <StatusBadge label="Đã thu" tone="success" />}
+                {contract.billStatus === 'LATE' && <StatusBadge label="Trễ hạn" tone="danger" />}
               </div>
 
               <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
@@ -533,11 +534,11 @@ export default function BillManagePage() {
                  
                  <div className="mt-4 inline-flex items-center justify-center">
                    {viewingContract.billStatus === 'PAID' ? (
-                     <span className="px-4 py-1.5 bg-green-100 text-green-700 text-sm font-bold rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-4 h-4"/> ĐÃ THANH TOÁN</span>
+                    <StatusBadge label="ĐÃ THANH TOÁN" tone="success" className="text-sm font-bold" />
                    ) : viewingContract.billStatus === 'LATE' ? (
-                     <span className="px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-full border border-red-200 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> TRỄ HẠN</span>
+                    <StatusBadge label="TRỄ HẠN" tone="danger" className="text-sm font-bold" />
                    ) : (
-                     <span className="px-4 py-1.5 bg-orange-100 text-orange-700 text-sm font-bold rounded-full border border-orange-200 flex items-center gap-1"><Clock className="w-4 h-4"/> CHỜ THANH TOÁN</span>
+                    <StatusBadge label="CHỜ THANH TOÁN" tone="warning" className="text-sm font-bold" />
                    )}
                  </div>
               </div>
@@ -656,17 +657,3 @@ export default function BillManagePage() {
     </div>
   );
 }
-
-const Badge = ({ children, variant, icon }: any) => {
-  const styles = {
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-orange-100 text-orange-700',
-    destructive: 'bg-red-100 text-red-700',
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant as keyof typeof styles]}`}>
-      {icon && <span className="[&>svg]:h-3 [&>svg]:w-3">{icon}</span>}
-      {children}
-    </span>
-  );
-};

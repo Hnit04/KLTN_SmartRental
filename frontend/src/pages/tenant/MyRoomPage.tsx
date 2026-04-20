@@ -12,8 +12,10 @@ import type { Contract, Bill, ContractMemberResponse, ResidentRequestResponse } 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import InvitationsList from "@/components/tenant/InvitationsList";
 
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -66,7 +68,7 @@ export default function MyRoomPage() {
 
         setBills(Array.isArray(billData) ? billData : []);
         setMembers(Array.isArray(memberData) ? memberData : []);
-        setPendingInvites((Array.isArray(requestData) ? requestData : []).filter(r => r.status === 'PENDING'));
+        setPendingInvites((Array.isArray(requestData) ? requestData : []).filter(r => r.status === 'PENDING' || r.status === 'ACCEPTED'));
 
       } else {
         setContract(null);
@@ -184,7 +186,10 @@ export default function MyRoomPage() {
   const unpaidBills = bills.filter(b => b.status === "PENDING" || b.status === "LATE");
 
   return (
-    <div className="space-y-8 pb-10 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
+      {/* ── INVITATIONS (NEW) ── */}
+      <InvitationsList onStatusChange={() => fetchRoomInfo(true)} />
+
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
@@ -207,6 +212,23 @@ export default function MyRoomPage() {
                </Button>
             </Link>
             {isRefreshing && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="section-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trang thai hop dong</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {contract.status === 'ACTIVE' ? 'Dang hieu luc' : 'Dang cho ky/xac nhan'}
+          </p>
+        </div>
+        <div className="section-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hoa don can xu ly</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{unpaidBills.length} hoa don</p>
+        </div>
+        <div className="section-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">So nguoi dang o</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{members.length + 1} / {contract.maxOccupants || 'Khong gioi han'}</p>
         </div>
       </div>
 
@@ -328,12 +350,11 @@ export default function MyRoomPage() {
                             </div>
                             <div className="text-right">
                                 <p className="font-extrabold text-gray-900">{fmt(bill.totalAmount)}</p>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                    bill.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-200' : 
-                                    bill.status === 'LATE' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                }`}>
-                                    {bill.status === 'PAID' ? 'Đã thanh toán' : bill.status === 'LATE' ? 'Quá hạn' : 'Chưa đóng'}
-                                </span>
+                                <StatusBadge
+                                  label={bill.status === 'PAID' ? 'Đã thanh toán' : bill.status === 'LATE' ? 'Quá hạn' : 'Chưa đóng'}
+                                  tone={bill.status === 'PAID' ? 'success' : bill.status === 'LATE' ? 'danger' : 'warning'}
+                                  className="text-[10px]"
+                                />
                             </div>
                         </div>
                     ))
@@ -407,25 +428,29 @@ export default function MyRoomPage() {
                    </div>
                 ))}
 
-                {/* Các lời mời đang chờ */}
-                {pendingInvites.map(invite => (
-                   <div key={invite.id} className="p-5 flex items-center justify-between bg-amber-50/30">
-                      <div className="flex items-center gap-4 opacity-70">
-                         <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center border border-amber-200">
-                            <Clock className="h-6 w-6 text-amber-600" />
-                         </div>
-                         <div>
-                            <p className="font-bold text-gray-900">{invite.inviteeName}</p>
-                            <p className="text-xs text-amber-600 font-medium">Đang chờ chủ nhà duyệt...</p>
-                         </div>
-                      </div>
-                      <div className="text-right">
-                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100/50 px-2 py-1 rounded-full border border-amber-200 uppercase">
-                            Chờ duyệt
-                         </span>
-                      </div>
-                   </div>
-                ))}
+                 {/* Các lời mời đang chờ */}
+                 {pendingInvites.map(invite => (
+                    <div key={invite.id} className="p-5 flex items-center justify-between bg-amber-50/30">
+                       <div className="flex items-center gap-4 opacity-70">
+                          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center border border-amber-200">
+                             <Clock className="h-6 w-6 text-amber-600" />
+                          </div>
+                          <div>
+                             <p className="font-bold text-gray-900">{invite.inviteeName}</p>
+                             <p className="text-xs text-amber-600 font-medium">
+                                {invite.status === 'PENDING' ? 'Đang chờ người ở cùng xác nhận...' : 'Đang chờ chủ nhà duyệt...'}
+                             </p>
+                          </div>
+                       </div>
+                       <div className="text-right">
+                          <StatusBadge
+                            label={invite.status === 'PENDING' ? 'Chờ xác nhận' : 'Chờ duyệt'}
+                            tone={invite.status === 'PENDING' ? 'info' : 'warning'}
+                            className="text-[10px] uppercase"
+                          />
+                       </div>
+                    </div>
+                 ))}
 
                 {/* Nút thêm thành viên */}
                 {(!contract.maxOccupants || members.length + 1 < contract.maxOccupants) ? (
@@ -453,7 +478,7 @@ export default function MyRoomPage() {
             
             {/* Cảnh báo nợ */}
             {unpaidBills.length > 0 && (
-                <div className="bg-red-600 rounded-2xl p-6 text-white shadow-lg shadow-red-200 animate-pulse">
+                <div className="rounded-2xl bg-red-600 p-6 text-white shadow-lg shadow-red-200">
                     <div className="flex items-center gap-2 mb-3">
                         <AlertCircle className="h-5 w-5 text-red-200" />
                         <span className="font-bold uppercase tracking-tight text-xs">Phát hiện nợ</span>

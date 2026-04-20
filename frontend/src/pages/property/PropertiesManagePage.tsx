@@ -2,12 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Building, MapPin, Plus, Loader2, Edit, X, ImagePlus, 
-  LocateFixed, Trash2, AlertTriangle, Home, CheckCircle, 
+  LocateFixed, AlertTriangle, Home, CheckCircle,
   Sparkles, EyeOff, Eye 
 } from 'lucide-react';
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property } from '@/types/index';
 
@@ -29,6 +30,21 @@ const VIETNAM_CITIES = [
 ];
 
 export default function PropertiesManagePage() {
+  const getPropertyStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'PENDING':
+        return <StatusBadge label="Cho duyet" tone="warning" className="text-[10px] font-bold uppercase" />;
+      case 'APPROVED':
+        return <StatusBadge label="Da duyet" tone="success" className="text-[10px] font-bold uppercase" />;
+      case 'REJECTED':
+        return <StatusBadge label="Bi tu choi" tone="danger" className="text-[10px] font-bold uppercase" />;
+      case 'HIDDEN':
+        return <StatusBadge label="Dang an" tone="neutral" className="text-[10px] font-bold uppercase" />;
+      default:
+        return <StatusBadge label={status || 'Khong ro'} tone="neutral" className="text-[10px] font-bold uppercase" />;
+    }
+  };
+
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -370,26 +386,7 @@ export default function PropertiesManagePage() {
 
               {/* NHÃN TRẠNG THÁI */}
               <div className="absolute top-2 left-2 flex gap-1">
-                {property.status === 'PENDING' && (
-                  <span className="px-2 py-0.5 bg-yellow-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" /> CHỜ DUYỆT
-                  </span>
-                )}
-                {property.status === 'APPROVED' && (
-                  <span className="px-2 py-0.5 bg-green-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
-                    <CheckCircle className="h-2.5 w-2.5" /> ĐÃ DUYỆT
-                  </span>
-                )}
-                {property.status === 'REJECTED' && (
-                  <span className="px-2 py-0.5 bg-red-500/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
-                    <AlertTriangle className="h-2.5 w-2.5" /> BỊ TỪ CHỐI
-                  </span>
-                )}
-                {property.status === 'HIDDEN' && (
-                  <span className="px-2 py-0.5 bg-gray-600/90 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
-                    <EyeOff className="h-2.5 w-2.5" /> ĐANG ẨN
-                  </span>
-                )}
+                {getPropertyStatusBadge(property.status)}
               </div>
             </div>
 
@@ -412,7 +409,7 @@ export default function PropertiesManagePage() {
               </div>
 
               <div className="mt-auto">
-                <Link to={`/properties/manage/${property.id}`}><Button variant="secondary" className="w-full">Quản lý phòng</Button></Link>
+                <Link to={`/landlord/properties/${property.id}`}><Button variant="secondary" className="w-full">Quản lý phòng</Button></Link>
               </div>
             </div>
           </Card>

@@ -22,4 +22,13 @@ public class CrawlerController {
         }
         return ResponseEntity.ok(crawledData);
     }
+
+    @GetMapping("/test-nhatrovn")
+    public ResponseEntity<?> testCrawlNhaTroVn() {
+        var crawledData = crawlerService.crawlNhaTroVn();
+        if (crawledData.isEmpty()) {
+            return ResponseEntity.internalServerError().body(crawledData);
+        }
+        return ResponseEntity.ok(crawledData);
+    }
 }

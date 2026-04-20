@@ -1,126 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  FileText, 
   Home, 
-  Calendar, 
   LogOut,
   UserCircle,
-  Building,
-  PieChart,
-  Wallet,
-  Users,          // Thêm icon cho Quản lý người dùng
-  Database,       // Thêm icon phù hợp cho Logs Blockchain
-  CheckSquare,    // Thêm icon cho Duyệt tin
-  BrainCircuit,   // Thêm icon cho AI Analytics
-  DoorOpen,       // Thêm icon cho Phòng của tôi
-  History,        // Thêm icon cho Lịch sử thuê phòng
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
+import { ROLE_NAV_ITEMS, type AppRole } from '@/config/navigation';
 
 const Sidebar = () => {
   const location = useLocation();
   const { logout, user } = useAuth();
-
-  // 1. Menu dành cho CHỦ TRỌ (LANDLORD)
-  const landlordItems = [
-    {
-      title: 'Tổng quan & Thống kê',
-      path: '/landlord/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Khu trọ & Phòng trọ',
-      path: '/landlord/properties',
-      icon: Building,
-    },
-    {
-      title: 'Quản lý Hợp đồng',
-      path: '/landlord/contracts',
-      icon: FileText,
-    },
-    {
-      title: 'Tài chính & Hóa đơn',
-      path: '/landlord/finance',
-      icon: Wallet,
-
-    },
-    {
-      title: 'Quản lý Lịch hẹn',
-      path: '/landlord/appointments',
-      icon: Calendar,
-    },
-    {
-      title: 'Báo cáo doanh thu',
-      path: '/landlord/reports',
-      icon: PieChart,
-    },
-  ];
-
-  // 2. Menu dành cho NGƯỜI THUÊ (TENANT / USER mặc định)
-  const tenantItems = [
-    {
-      title: 'Trang chủ',
-      path: '/tenant/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Tìm phòng trọ',
-      path: '/properties',
-      icon: Home,
-    },
-    {
-      title: 'Hợp đồng của tôi',
-      path: '/tenant/contracts',
-      icon: FileText,
-    },
-    {
-      title: 'Phòng của tôi',
-      path: '/tenant/my-room',
-      icon: DoorOpen,
-    },
-    {
-      title: 'Lịch sử thuê phòng',
-      path: '/tenant/rental-history',
-      icon: History,
-    },
-    {
-      title: 'Lịch hẹn xem phòng',
-      path: '/tenant/appointments', 
-      icon: Calendar,
-    },
-  ];
-
-
-  // 3. Menu dành cho ADMIN (mới thêm)
-  const adminItems = [
-    {
-      title: 'Tổng quan & Thống kê',
-      path: '/admin/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Quản lý người dùng',
-      path: '/admin/users',
-      icon: Users,
-    },
-    {
-      title: 'Duyệt tin bài đăng',
-      path: '/admin/approvals',
-      icon: CheckSquare,
-    },
-    {
-      title: 'Kiểm tra Logs Blockchain',
-      path: '/admin/blockchain-logs',
-      icon: Database,
-    },
-    {
-      title: 'Thống kê AI & NLP',
-      path: '/admin/ai-analytics',
-      icon: BrainCircuit,
-    },
-  ];
 
   const bottomItems = [
     {
@@ -130,17 +20,8 @@ const Sidebar = () => {
     },
   ];
 
-  // Logic chọn menu theo role
-  let menuItems: typeof landlordItems = [...bottomItems];
-
-  if (user?.role === 'ADMIN') {
-    menuItems = [...adminItems, ...bottomItems];
-  } else if (user?.role === 'LANDLORD') {
-    menuItems = [...landlordItems, ...bottomItems];
-  } else {
-    // tenant / user mặc định hoặc role khác
-    menuItems = [...tenantItems, ...bottomItems];
-  }
+  const normalizedRole: AppRole = user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT';
+  const menuItems = [...ROLE_NAV_ITEMS[normalizedRole], ...bottomItems];
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white text-gray-900 transition-transform hidden md:flex flex-col">

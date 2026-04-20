@@ -5,6 +5,7 @@ import {
   Clock, XCircle, ChevronRight, FileText, Banknote
 } from "lucide-react";
 import type { Contract } from "@/types";
+import StatusBadge from "@/components/shared/StatusBadge";
 
 interface ContractItemProps {
   data: Contract;
@@ -23,13 +24,13 @@ export default function ContractItem({ data }: ContractItemProps) {
   const renderStatus = (status: string) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-xs font-bold border border-green-200">Hiệu lực</span>;
+        return <StatusBadge label="Hiệu lực" tone="success" className="text-xs font-bold" />;
       case 'PENDING_SIGNATURE':
-        return <span className="bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-xs font-bold border border-orange-200">Chờ ký</span>;
+        return <StatusBadge label="Chờ ký" tone="warning" className="text-xs font-bold" />;
       case 'EXPIRED':
-        return <span className="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200">Hết hạn</span>;
+        return <StatusBadge label="Hết hạn" tone="neutral" className="text-xs font-bold" />;
       default:
-        return <span className="bg-red-100 text-red-700 px-4 py-1.5 rounded-full text-xs font-bold border border-red-200">Đã hủy</span>;
+        return <StatusBadge label="Đã hủy" tone="danger" className="text-xs font-bold" />;
     }
   };
 

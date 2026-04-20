@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  CheckCircle, XCircle, Maximize, ArrowRight, 
+  XCircle, Maximize,
   Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight,
   Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import StatusBadge from "@/components/shared/StatusBadge";
 import type { Room } from "@/types/index";
 
 interface RoomCardProps {
@@ -72,7 +73,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
   return (
     <>
-      <div className={`group border rounded-xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 
+      <div className={`group border rounded-2xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 
         ${!isAvailable || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
@@ -120,21 +121,13 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
           <div className="absolute top-3 right-3 shadow-sm z-10">
             {isAvailable ? (
-              <span className="bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
-                <CheckCircle className="h-3 w-3" /> Còn trống
-              </span>
+              <StatusBadge label="Còn trống" tone="success" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : isReserved ? (
-              <span className="bg-orange-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
-                <CalendarClock className="h-3 w-3" /> Giữ chỗ
-              </span>
+              <StatusBadge label="Giữ chỗ" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : isMaintenance ? (
-              <span className="bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
-                <Wrench className="h-3 w-3" /> Đang bảo trì
-              </span>
+              <StatusBadge label="Đang bảo trì" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : (
-              <span className="bg-gray-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wider">
-                <XCircle className="h-3 w-3" /> Đã thuê
-              </span>
+              <StatusBadge label="Đã thuê" tone="neutral" className="text-[10px] font-bold uppercase tracking-wider" />
             )}
           </div>
 
@@ -153,9 +146,9 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
         </div>
 
         {/* --- THÔNG TIN --- */}
-        <div className="p-4 flex-1 flex flex-col">
+        <div className="p-4 md:p-5 flex-1 flex flex-col">
           <div className="flex justify-between items-start mb-2">
-            <h4 className="font-bold text-lg text-gray-900 group-hover:text-primary transition-colors truncate pr-2">
+            <h4 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors truncate pr-2">
               Phòng {data.name}
             </h4>
             <span className="font-bold text-primary text-lg shrink-0">
@@ -207,11 +200,11 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
           )}
 
           {/* --- NÚT HÀNH ĐỘNG --- */}
-          <div className="mt-auto grid grid-cols-2 gap-2 pt-3 border-t">
+          <div className="mt-auto grid grid-cols-2 gap-2 pt-3 border-t border-border/70 min-h-[52px] items-end">
               <Button 
                   variant="outline" 
                   size="sm" 
-                  className="text-xs h-9 hover:bg-primary/5 text-gray-600 hover:text-primary border-gray-200 transition-colors group/btn1"
+                  className="text-xs h-10 hover:bg-primary/5 text-gray-600 hover:text-primary border-gray-200 transition-colors group/btn1 rounded-xl"
                   onClick={() => setIsDetailOpen(true)}
               >
                   <Eye className="h-3.5 w-3.5 mr-1.5 group-hover/btn1:-translate-y-0.5 transition-transform" /> Chi tiết
@@ -219,7 +212,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
               <Button 
                   size="sm"
-                  className={`text-xs h-9 gap-1 ${(!isAvailable || isMaintenance) ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
+                  className={`text-xs h-10 gap-1 rounded-xl ${(!isAvailable || isMaintenance) ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
                   disabled={!isAvailable || isMaintenance}
                   onClick={(e) => {
                       e.stopPropagation();
@@ -242,7 +235,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
       {/* --- MODAL CHI TIẾT PHÒNG --- */}
       {isDetailOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
 
             <div className="h-56 bg-gray-100 relative shrink-0">

@@ -45,8 +45,16 @@ public class ResidentRequestController {
         return ResponseEntity.ok(residentRequestService.getMembersByContract(contractId));
     }
 
+    @GetMapping("/invitations/me")
+    public ResponseEntity<?> getMyInvitations(@AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(residentRequestService.getRequestsByInvitee(currentUser.getId()));
+    }
+
     @PatchMapping("/{id}/status")
-    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam RequestStatus status) {
-        return ResponseEntity.ok(residentRequestService.updateStatus(id, status));
+    public ResponseEntity<?> updateStatus(
+            @PathVariable Long id, 
+            @RequestParam RequestStatus status,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(residentRequestService.updateStatus(id, status, currentUser.getId()));
     }
 }

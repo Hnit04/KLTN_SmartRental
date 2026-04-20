@@ -16,8 +16,9 @@ export const contractApi = {
   getMyCurrentRoom: () => {
     return axiosClient.get<Contract>("/contracts/my-current-room");
   },
-  getRentalHistory: (userId: number) => {
-    return axiosClient.get(`/contracts/history/${userId}`);
+  getRentalHistory: (userId?: number) => {
+    const url = userId ? `/contracts/history/${userId}` : "/contracts/history";
+    return axiosClient.get<Contract[]>(url);
   },
   getDashboardInsights: () => {
     return axiosClient.get('/contracts/dashboard/insights');

@@ -7,4 +7,7 @@ import lombok.Data;
 public class SignContractRequest {
     // Người dùng chọn cách ký nào: TRADITIONAL hay BLOCKCHAIN
     private ContractSignMethod signMethod;
+    
+    // Chữ ký điện tử (nếu dùng Blockchain)
+    private String signature;
 }
