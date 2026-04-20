@@ -234,6 +234,9 @@ export interface Contract {
   deployTxHash?: string;
   contractHash?: string;
   userRole?: string; // Vai trò của người xem: "CHỦ PHÒNG" hoặc "THÀNH VIÊN"
+  tenantReputationScore?: number;
+  tenantKycStatus?: string;
+  cancelReason?: string;
 }
 
 // Payload để tạo hợp đồng
