@@ -37,6 +37,16 @@ export const userApi = {
     return response.data;
   },
 
+  // ✅ (MỚI) Trích xuất thông tin định danh nhanh
+  extractKycInfo: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await axiosClient.post<{ id: string }>('/users/kyc/extract', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data.id;
+  },
+
   // ✅ 4. (MỚI) Nộp hồ sơ KYC (Xác thực danh tính)
   submitKYC: async (cccdNumber: string, frontFile: File, backFile: File): Promise<string> => {
     const formData = new FormData();
@@ -105,6 +115,26 @@ export const userApi = {
   // 11. Lấy danh sách Chủ trọ nổi bật
   getTopLandlords: async (limit: number = 10): Promise<User[]> => {
     const response = await axiosClient.get<User[]>('/users/top-landlords', { params: { limit } });
+    return response.data;
+  },
+
+  // 12. Quản trị KYC (Admin)
+  getPendingKYC: async (): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users/kyc/pending');
+    return response.data;
+  },
+
+  verifyKYC: async (userId: number, cccdNumber?: string): Promise<string> => {
+    const response = await axiosClient.post<string>(`/users/kyc/${userId}/verify`, null, {
+      params: { cccdNumber }
+    });
+    return response.data;
+  },
+
+  rejectKYC: async (userId: number, reason: string): Promise<string> => {
+    const response = await axiosClient.post<string>(`/users/kyc/${userId}/reject`, null, {
+      params: { reason }
+    });
     return response.data;
   },
 };

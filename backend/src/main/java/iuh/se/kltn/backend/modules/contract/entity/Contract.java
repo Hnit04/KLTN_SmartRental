@@ -58,6 +58,9 @@ public class Contract {
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private ContractStatus status;
+
+    private String cancelReason;
+
     private Boolean isTenantSigned = false;
     private Boolean isLandlordSigned = false;
     @Enumerated(EnumType.STRING)

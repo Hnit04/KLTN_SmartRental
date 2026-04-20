@@ -77,7 +77,9 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @NotNull(message = "Trạng thái KYC không được để trống")
-    private KYCStatus kycStatus = KYCStatus.PENDING;
+    private KYCStatus kycStatus = KYCStatus.NONE;
+
+    private String kycNote; // Lý do từ chối KYC
 
     @Min(value = 0, message = "Điểm uy tín không được nhỏ hơn 0")
     @Max(value = 100, message = "Điểm uy tín không được lớn hơn 100")
@@ -98,6 +100,9 @@ public class User {
 
     @Column(name = "cccd_back_url")
     private String cccdBackUrl;
+
+    @Min(value = 0)
+    private int kycAttempts = 0;
 
     @Column(name = "is_locked")
     private Boolean isLocked = false;

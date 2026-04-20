@@ -32,6 +32,9 @@ export const contractApi = {
   signContract: (id: number, data: SignContractPayload) => {
     return axiosClient.post(`/contracts/${id}/sign`, data); 
   },
+  rejectContract: (id: number | string, reason?: string) => {
+    return axiosClient.post(`/contracts/${id}/reject`, { reason });
+  },
   
   // --- CÁC API CHO ĐỀ XUẤT CHỈNH SỬA (NEGOTIATION) ---
   requestChange: (id: number | string, data: ChangeRequestDTO) => {

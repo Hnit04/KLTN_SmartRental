@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature, AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -28,7 +28,8 @@ export default function CreateContractPage() {
     startDate: new Date().toISOString().split('T')[0], 
     duration: 6, 
     tenantEmail: "", 
-    additionalTerms: "" 
+    landlordRules: "",
+    tenantRequests: ""
   });
 
   const LANDLORD_SUGGESTED_TERMS = [
@@ -48,14 +49,14 @@ export default function CreateContractPage() {
   ];
 
   const handleAddTerm = (term: string) => {
-    if (formData.additionalTerms.includes(term)) {
-      toast.info("Điều khoản này đã được thêm rồi!");
+    if (formData.tenantRequests.includes(term)) {
+      toast.info("Yêu cầu này đã được thêm rồi!");
       return;
     }
     setFormData(prev => ({
       ...prev,
-      additionalTerms: prev.additionalTerms 
-        ? `${prev.additionalTerms}\n- ${term}` 
+      tenantRequests: prev.tenantRequests 
+        ? `${prev.tenantRequests}\n- ${term}` 
         : `- ${term}`
     }));
   };
@@ -84,17 +85,14 @@ export default function CreateContractPage() {
             const roomData = (res as any).data || res;
             setRoom(roomData);
 
-            const systemTemplate = `I. NỘI QUY CHUNG:\n- Giữ gìn vệ sinh chung, đổ rác đúng nơi quy định.\n- Không gây ồn ào sau 22h00.\n- Không chứa chấp người lạ qua đêm khi chưa báo cáo Chủ nhà.\n\nII. TRÁCH NHIỆM TÀI SẢN:\n- Bồi thường 100% giá trị nếu làm hư hỏng tài sản có sẵn trong phòng.\n- Trả phòng phải báo trước ít nhất 30 ngày, nếu không sẽ mất cọc.\n\nIII. THANH TOÁN:\n- Thanh toán tiền nhà và dịch vụ từ ngày 01 đến ngày 05 hàng tháng. Chậm trễ phạt 5%.`;
+            const systemTemplate = `- Giữ gìn vệ sinh chung, đổ rác đúng nơi quy định.\n- Không gây ồn ào sau 22h00.\n- Không chứa chấp người lạ khi chưa báo cáo.\n- Bồi thường nếu làm hư hỏng tài sản phòng.\n- Trả phòng phải báo trước ít nhất 30 ngày.\n- Thanh toán tiền nhà từ ngày 01 đến ngày 05.`;
             
             const defaultText = roomData.defaultTerms || systemTemplate;
 
-            const formattedTerms = user?.role === 'TENANT' 
-                ? `--- NỘI QUY MẪU TỪ CHỦ TRỌ ---\n${defaultText}\n\n--- YÊU CẦU THÊM CỦA KHÁCH THUÊ ---\n`
-                : defaultText;
-
             setFormData(prev => ({
                 ...prev,
-                additionalTerms: formattedTerms
+                landlordRules: defaultText,
+                tenantRequests: ""
             }));
 
         } catch (error) {
@@ -122,13 +120,17 @@ export default function CreateContractPage() {
 
       const endDateStr = calculateEndDate();
 
+      const combinedTerms = user?.role === 'TENANT'
+          ? `${formData.landlordRules}\n[TENANT_REQUESTS_START]\n${formData.tenantRequests}`
+          : formData.landlordRules;
+
       const payload: CreateContractPayload = {
           roomId: Number(roomId),
           startDate: formData.startDate,
           endDate: endDateStr, 
           depositAmount: room.price, 
           signMethod: 'TRADITIONAL', 
-          additionalTerms: formData.additionalTerms,
+          additionalTerms: combinedTerms,
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
 
@@ -306,57 +308,65 @@ export default function CreateContractPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-3 pt-4 border-t mt-4">
-                        <div className="flex flex-col gap-2 mb-1">
-                            <Label className="text-gray-900 font-bold text-base">
-                                {user?.role === 'LANDLORD' ? 'Điều khoản & Nội quy hợp đồng' : 'Nội quy Chủ nhà & Yêu cầu của bạn'}
+                    <div className="space-y-4 pt-4 border-t mt-4">
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-gray-900 font-bold text-base flex items-center gap-2">
+                                <Info className="w-5 h-5 text-blue-500" />
+                                {user?.role === 'LANDLORD' ? 'Nội quy & Điều khoản cơ bản' : 'Nội quy từ Chủ nhà'}
                             </Label>
                             
-                            {user?.role === 'TENANT' && (
-                                <div className="bg-blue-50/80 text-blue-700 text-xs p-3 rounded-lg border border-blue-100 flex gap-2 items-start leading-relaxed">
-                                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
-                                    <p>
-                                        Đoạn văn bản bên dưới là <strong>Nội quy mẫu do Chủ trọ thiết lập</strong>. Bạn có thể đọc, giữ nguyên hoặc gõ thêm các đề xuất của riêng mình vào phần dưới cùng.
-                                    </p>
+                            <div className="bg-blue-50/50 rounded-xl border border-blue-100 p-4 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-2 opacity-5">
+                                   <ShieldCheck className="w-12 h-12" />
                                 </div>
-                            )}
-                            {user?.role === 'LANDLORD' && (
-                                <p className="text-xs text-gray-500">
-                                    Dưới đây là Nội quy mẫu của phòng. Bạn có thể chỉnh sửa cho phù hợp với khách này.
-                                </p>
-                            )}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
-                                const isAdded = formData.additionalTerms.includes(term);
-                                return (
-                                    <span
-                                        key={idx}
-                                        onClick={() => !isAdded && handleAddTerm(term)}
-                                        className={`text-[11px] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
-                                            isAdded 
-                                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                                : user?.role === 'LANDLORD'
-                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 cursor-pointer active:scale-95'
-                                                    : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
-                                        }`}
-                                    >
-                                        <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-primary'}`}>
-                                            {isAdded ? '✓' : '+'}
-                                        </span> 
-                                        {term.substring(0, 30)}...
-                                    </span>
-                                );
-                            })}
+                                <div className="space-y-2">
+                                    {formData.landlordRules.split('\n').filter(line => line.trim()).map((rule, idx) => (
+                                        <div key={idx} className="flex gap-2 text-sm text-blue-900 items-start">
+                                            <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                                                <Check className="w-3 h-3 text-blue-600" />
+                                            </div>
+                                            <span className="leading-relaxed">{rule.replace(/^- /, '')}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        <textarea 
-                            className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[220px] resize-y placeholder:text-gray-400"
-                            placeholder={user?.role === 'LANDLORD' ? "Đang tải điều khoản mẫu..." : "Nhập các yêu cầu riêng với chủ nhà..."}
-                            value={formData.additionalTerms}
-                            onChange={(e) => setFormData({...formData, additionalTerms: e.target.value})}
-                        />
+                        <div className="space-y-3 pt-4">
+                            <Label className="text-gray-900 font-bold text-base flex items-center gap-2">
+                                <FileSignature className="w-5 h-5 text-indigo-500" />
+                                Yêu cầu thêm của bạn
+                            </Label>
+                            
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {TENANT_SUGGESTED_TERMS.map((term, idx) => {
+                                    const isAdded = formData.tenantRequests.includes(term);
+                                    return (
+                                        <span
+                                            key={idx}
+                                            onClick={() => !isAdded && handleAddTerm(term)}
+                                            className={`text-[11px] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1 border cursor-pointer active:scale-95 ${
+                                                isAdded 
+                                                    ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60'
+                                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
+                                            }`}
+                                        >
+                                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-primary'}`}>
+                                                {isAdded ? '✓' : '+'}
+                                            </span> 
+                                            {term}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+
+                            <textarea 
+                                className="flex w-full rounded-xl border border-input bg-white px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[120px] resize-y placeholder:text-gray-400 shadow-sm"
+                                placeholder="Gõ thêm các yêu cầu riêng cho chủ nhà tại đây (ví dụ: xin thêm 1 chìa khóa)..."
+                                value={formData.tenantRequests}
+                                onChange={(e) => setFormData({...formData, tenantRequests: e.target.value})}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -456,11 +466,23 @@ export default function CreateContractPage() {
                             </ul>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             <p><strong>Điều 3: Các thỏa thuận bổ sung / Nội quy phòng trọ</strong></p>
-                            <div className="bg-gray-50 border p-4 rounded-md whitespace-pre-wrap italic">
-                                {formData.additionalTerms || "Không có thỏa thuận bổ sung nào khác."}
+                            <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl space-y-2">
+                                <p className="text-xs font-bold text-blue-800 uppercase tracking-wider">Nội quy phía Chủ trọ:</p>
+                                <div className="text-sm whitespace-pre-wrap italic text-gray-700">
+                                    {formData.landlordRules}
+                                </div>
                             </div>
+                            
+                            {formData.tenantRequests && (
+                                <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl space-y-2">
+                                    <p className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Yêu cầu từ người thuê:</p>
+                                    <div className="text-sm whitespace-pre-wrap italic text-gray-700">
+                                        {formData.tenantRequests}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2 mt-6">

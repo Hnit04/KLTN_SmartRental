@@ -152,6 +152,15 @@ public class UserController {
         }
     }
 
+    @PostMapping("/kyc/extract")
+    public ResponseEntity<?> extractKYCInfo(@RequestParam("image") MultipartFile image) {
+        String extractedId = ocrService.extractIdNumber(image);
+        if (extractedId == null) {
+            return ResponseEntity.badRequest().body("Không thể trích xuất thông tin từ ảnh");
+        }
+        return ResponseEntity.ok(java.util.Map.of("id", extractedId));
+    }
+
     @PostMapping(value = "/kyc", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitKYC(
             @AuthenticationPrincipal UserPrincipal currentUser,
@@ -160,30 +169,75 @@ public class UserController {
             @RequestParam("backImage") MultipartFile backImage) {
 
         try {
-            System.out.println("Đang gửi ảnh sang FPT.AI...");
-            String extractedId = ocrService.extractIdNumber(frontImage);
-            System.out.println("AI đọc được: " + extractedId);
-            System.out.println("User nhập: " + cccdNumber);
-
+            User user = userRepository.findById(currentUser.getId()).orElseThrow();
+            
+            // 1. Kiểm tra giới hạn lượt thử
+            boolean canUseOCR = user.getKycAttempts() < 3;
             boolean isAutoVerified = false;
-            if (extractedId != null && extractedId.equals(cccdNumber)) {
-                isAutoVerified = true;
+
+            String frontUrl = "";
+            String backUrl = "";
+
+            if (canUseOCR) {
+                System.out.println("Đang gửi ảnh sang FPT.AI (Lượt thử: " + (user.getKycAttempts() + 1) + ")...");
+                String extractedId = ocrService.extractIdNumber(frontImage);
+                
+                if (extractedId != null && extractedId.equals(cccdNumber)) {
+                    isAutoVerified = true;
+                }
             }
 
-            // ✅ SỬA LỖI TẠI ĐÂY: Truyền thêm tham số folderName ("smart-rental/kyc")
-            String frontUrl = cloudinaryService.uploadImage(frontImage, "smart-rental/kyc");
-            String backUrl = cloudinaryService.uploadImage(backImage, "smart-rental/kyc");
+            // 2. Upload ảnh vào folder Private/Authenticated
+            frontUrl = cloudinaryService.uploadPrivateImage(frontImage, "smart-rental/kyc");
+            backUrl = cloudinaryService.uploadPrivateImage(backImage, "smart-rental/kyc");
 
-            userService.submitKYC(currentUser.getId(), cccdNumber, frontUrl, backUrl, isAutoVerified);
+            // 3. Cập nhật database và tăng số lượt thử
+            userService.submitKYC(user.getId(), cccdNumber, frontUrl, backUrl, isAutoVerified);
 
             if (isAutoVerified) {
-                return ResponseEntity.ok("Xác thực danh tính thành công! (Duyệt tự động)");
+                // 4. Xóa ảnh ngay lập tức nếu xác thực thành công (theo yêu cầu bảo mật)
+                cloudinaryService.deleteImage(frontUrl);
+                cloudinaryService.deleteImage(backUrl);
+                return ResponseEntity.ok("Xác thực danh tính thành công! Dữ liệu hình ảnh đã được xóa để bảo mật.");
             } else {
-                return ResponseEntity.ok("Hồ sơ đã gửi. Hệ thống đang chờ Admin duyệt thủ công (Do ảnh mờ hoặc không khớp).");
+                if (!canUseOCR) {
+                    return ResponseEntity.ok("Bạn đã hết lượt xác thực tự động. Hồ sơ đã được gửi để Admin duyệt thủ công.");
+                }
+                return ResponseEntity.ok("Thông tin không khớp hoặc ảnh mờ. Hồ sơ đang chờ Admin duyệt thủ công.");
             }
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Lỗi xử lý: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/kyc/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserProfileResponse>> getPendingKYC() {
+        return ResponseEntity.ok(userService.getPendingKYCUsers());
+    }
+
+    @PostMapping("/kyc/{userId}/verify")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> verifyKYC(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String cccdNumber) {
+        try {
+            userService.verifyKYCAdmin(userId, cccdNumber);
+            return ResponseEntity.ok("Đã phê duyệt định danh người dùng ID " + userId);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Lỗi: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/kyc/{userId}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> rejectKYC(@PathVariable Long userId, @RequestParam String reason) {
+        try {
+            userService.rejectKYCAdmin(userId, reason);
+            return ResponseEntity.ok("Đã từ chối định danh người dùng ID " + userId + ". Lý do: " + reason);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Lỗi: " + e.getMessage());
         }
     }
 

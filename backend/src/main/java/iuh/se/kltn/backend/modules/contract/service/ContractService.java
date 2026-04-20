@@ -60,6 +60,9 @@ public class ContractService {
     @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-tenant-wallet:}")
     private String fallbackTenantWallet;
 
+    @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
+    private long vndEthRate;
+
     @Autowired
     public ContractService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -596,7 +599,7 @@ public class ContractService {
                     long endDateVal = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
                     long penaltyVal = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
 
-                    long EXCHANGE_RATE = 80_000_000L;
+                    long EXCHANGE_RATE = vndEthRate;
                     BigInteger WEI_MULT = BigInteger.TEN.pow(18);
 
                     BigInteger rentWei = BigInteger.valueOf(priceVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
@@ -685,14 +688,18 @@ public class ContractService {
             }
         }
         if (contract.getTenant() != null) {
-            res.setTenantName(contract.getTenant().getFullName());
-            res.setTenantPhone(contract.getTenant().getPhoneNumber());
-            res.setTenantCccd(contract.getTenant().getCccdNumber());
-            res.setTenantWalletAddress(contract.getTenant().getWalletAddress());
-            res.setTenantBankName(contract.getTenant().getBankName());
-            res.setTenantBankAccountNumber(contract.getTenant().getBankAccountNumber());
-            res.setTenantBankAccountHolder(contract.getTenant().getBankAccountHolder());
-            res.setTenantBankQrUrl(contract.getTenant().getBankQrUrl());
+            // ✅ Đảm bảo lấy thông tin mới nhất từ database để tránh lỗi cache/lazy load
+            User tenant = userRepository.findById(contract.getTenant().getId()).orElse(contract.getTenant());
+            res.setTenantName(tenant.getFullName());
+            res.setTenantPhone(tenant.getPhoneNumber());
+            res.setTenantCccd(tenant.getCccdNumber());
+            res.setTenantWalletAddress(tenant.getWalletAddress());
+            res.setTenantBankName(tenant.getBankName());
+            res.setTenantBankAccountNumber(tenant.getBankAccountNumber());
+            res.setTenantBankAccountHolder(tenant.getBankAccountHolder());
+            res.setTenantBankQrUrl(tenant.getBankQrUrl());
+            res.setTenantReputationScore(tenant.getReputationScore());
+            res.setTenantKycStatus(tenant.getKycStatus() != null ? tenant.getKycStatus().name() : "PENDING");
         }
         res.setActualPrice(contract.getActualPrice());
         return res;
@@ -750,28 +757,6 @@ public class ContractService {
         }
 
         // Kích hoạt hợp đồng
-        contract.setStatus(ContractStatus.ACTIVE);
-        contract.setDepositStatus(DepositStatus.DEPOSITED);
-        contract.setDepositTxHash(txHash);
-        
-        if (contract.getRoom() != null) {
-            contract.getRoom().setStatus(RoomStatus.RENTED);
-            roomRepository.save(contract.getRoom());
-        }
-
-        // Cộng điểm uy tín
-        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Nạp cọc và kích hoạt hợp đồng thành công (#" + contract.getId() + ")");
-        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã được bên thuê nạp cọc thành công (#" + contract.getId() + ")");
-
-        // Thông báo cho chủ nhà
-        notificationService.createNotification(
-            contract.getRoom().getProperty().getLandlord(),
-            "Khách thuê đã nạp cọc Web3",
-            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực sau khi hệ thống xác nhận tiền cọc.",
-            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
-            contract.getId()
-        );
-
         return mapToResponse(contractRepository.save(contract), userId);
     }
 
@@ -873,5 +858,42 @@ public class ContractService {
         } catch (Exception e) {
             return "HASH_ERROR";
         }
+    }
+
+    @Transactional
+    public ContractResponse rejectContract(Long contractId, Long currentUserId, String reason) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        // Chỉ chủ trọ mới có quyền từ chối yêu cầu
+        if (!currentUserId.equals(contract.getRoom().getProperty().getLandlord().getId())) {
+            throw new RuntimeException("Chỉ chủ trọ của phòng này mới có quyền từ chối yêu cầu!");
+        }
+
+        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE) {
+            throw new RuntimeException("Chỉ có thể từ chối hợp đồng khi đang ở trạng thái chờ ký!");
+        }
+
+        // 1. Cập nhật trạng thái hợp đồng
+        contract.setStatus(ContractStatus.CANCELLED);
+        contract.setCancelReason(reason);
+        contractRepository.save(contract);
+
+        // 2. Giải phóng phòng về trạng thái AVAILABLE
+        Room room = contract.getRoom();
+        room.setStatus(RoomStatus.AVAILABLE);
+        roomRepository.save(room);
+
+        // 3. Gửi thông báo cho khách thuê
+        String displayReason = (reason != null && !reason.isEmpty()) ? " với lý do: " + reason : "";
+        notificationService.createNotification(
+                contract.getTenant(),
+                "Yêu cầu thuê phòng bị từ chối",
+                "Chủ trọ đã từ chối yêu cầu thuê phòng " + room.getName() + displayReason,
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+        );
+
+        return mapToResponse(contract, currentUserId);
     }
 }

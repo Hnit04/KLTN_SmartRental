@@ -31,7 +31,9 @@ export interface User {
 
   // System fields
   reputationScore: number;
-  kycStatus: KYCStatus;
+  kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NONE' | string;
+  kycAttempts?: number;
+  kycNote?: string;
   createdAt: string;
   updatedAt: string;
 
@@ -234,6 +236,9 @@ export interface Contract {
   deployTxHash?: string;
   contractHash?: string;
   userRole?: string; // Vai trò của người xem: "CHỦ PHÒNG" hoặc "THÀNH VIÊN"
+  tenantReputationScore?: number;
+  tenantKycStatus?: string;
+  cancelReason?: string;
 }
 
 // Payload để tạo hợp đồng
@@ -251,6 +256,7 @@ export interface CreateContractPayload {
 export interface SignContractPayload {
   signMethod: ContractSignMethod;
   signatureImage?: string; // Optional (cho truyền thống nếu cần sau này)
+  signature?: string;      // Blockchain signature (Web3)
 }
 
 // ==========================================

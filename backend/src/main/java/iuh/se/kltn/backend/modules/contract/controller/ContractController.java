@@ -93,6 +93,14 @@ public class ContractController {
         return ResponseEntity.ok(contractService.signContract(id, request, currentUser.getId()));
     }
 
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<?> rejectContract(@AuthenticationPrincipal UserPrincipal currentUser,
+                                          @PathVariable Long id,
+                                          @RequestBody(required = false) java.util.Map<String, String> request) {
+        String reason = (request != null) ? request.get("reason") : null;
+        return ResponseEntity.ok(contractService.rejectContract(id, currentUser.getId(), reason));
+    }
+
     // 5. Đề xuất thay đổi
     @PostMapping("/{id}/change-requests")
     public ResponseEntity<?> requestChange(@AuthenticationPrincipal UserPrincipal currentUser,

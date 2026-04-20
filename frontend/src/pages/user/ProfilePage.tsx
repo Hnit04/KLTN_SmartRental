@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   User, Mail, Phone, ShieldCheck, Wallet,
   MapPin, Calendar, Edit3, X, Save,
-  MessageCircle, Camera, Lock, ArrowUpRight, ArrowDownRight, CircleDot
+  MessageCircle, Camera, Lock, ArrowUpRight, ArrowDownRight, CircleDot, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -71,6 +71,12 @@ const ProfilePage = () => {
     bankQrUrl: '',
   });
 
+  const convertArrDateToString = (dateArr: any) => {
+    if (!Array.isArray(dateArr)) return dateArr;
+    const [year, month, day] = dateArr;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
   const hasProfileChanges = user ? (
     formData.fullName !== (user.fullName || '') ||
     formData.phoneNumber !== (user.phoneNumber || '') ||
@@ -124,12 +130,6 @@ const ProfilePage = () => {
       });
     }
   }, [isChangePasswordModalOpen]);
-
-  const convertArrDateToString = (dateArr: any) => {
-    if (!Array.isArray(dateArr)) return dateArr;
-    const [year, month, day] = dateArr;
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
 
   // --- HANDLERS ---
   const handleAvatarClick = () => fileInputRef.current?.click();
@@ -205,11 +205,30 @@ const ProfilePage = () => {
     setIsEditModalOpen(false);
   };
 
-  const handleKycFileChange = (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleKycFileChange = async (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setKycFiles(prev => ({ ...prev, [side]: file }));
       setKycPreviews(prev => ({ ...prev, [side]: URL.createObjectURL(file) }));
+
+      // Tự động quét AI nếu là mặt trước
+      if (side === 'front' && user && (user.kycAttempts || 0) < 3) {
+        try {
+          setIsScanning(true);
+          const extractedId = await userApi.extractKycInfo(file);
+          if (extractedId) {
+            setKycCCCD(extractedId);
+            toast.success("AI đã tự động trích xuất mã số CCCD!");
+          }
+        } catch (err: any) {
+          console.error("AI Scan error:", err);
+          // Không toast lỗi ở đây để tránh phiền, người dùng vẫn có thể nhập tay
+        } finally {
+          setIsScanning(false);
+        }
+      }
     }
   };
 
@@ -460,13 +479,16 @@ const ProfilePage = () => {
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái xác thực</p>
                     <div className="flex items-center gap-3">
                       <StatusBadge
-                        label={user.kycStatus}
+                        label={user.kycStatus === 'VERIFIED' ? 'Đã xác minh' : user.kycStatus === 'PENDING' ? 'Đang chờ duyệt' : user.kycStatus === 'REJECTED' ? 'Bị từ chối' : 'Chưa xác thực'}
                         tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'info' : 'warning'}
                       />
-                      {user.kycStatus !== 'VERIFIED' && (
+                      {user.kycStatus !== 'VERIFIED' && user.kycStatus !== 'PENDING' && (
                         <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setIsKycModalOpen(true)}>
                           Xác thực ngay
                         </Button>
+                      )}
+                      {user.kycStatus === 'PENDING' && (
+                        <span className="text-[10px] text-gray-400 italic">Hồ sơ đã được gửi cho Admin</span>
                       )}
                     </div>
                   </div>
@@ -593,7 +615,12 @@ const ProfilePage = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cccdNumber">Số CCCD / CMND</Label>
-                    <Input id="cccdNumber" value={formData.cccdNumber} onChange={(e) => setFormData({ ...formData, cccdNumber: e.target.value })} disabled={user.kycStatus === 'VERIFIED'} />
+                    <Input 
+                      id="cccdNumber" 
+                      value={formData.cccdNumber} 
+                      onChange={(e) => setFormData({ ...formData, cccdNumber: e.target.value })} 
+                      disabled={user.kycStatus === 'VERIFIED' || user.kycStatus === 'PENDING'} 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currentAddress">Địa chỉ hiện tại</Label>
@@ -760,15 +787,49 @@ const ProfilePage = () => {
                 </div>
 
                 <div className="p-6 space-y-6">
+                  {/* Thông báo tình trạng */}
+                  {user.kycStatus === 'REJECTED' && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                      <p className="text-sm font-bold text-red-700 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" /> Hồ sơ bị từ chối
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">Lý do: {user.kycNote || 'Thông tin không chính xác'}</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Lượt xác thực tự động</p>
+                      <p className="text-sm text-indigo-600 mt-1">
+                        {user.kycAttempts && user.kycAttempts >= 3 
+                          ? "Bạn đã hết lượt tự động. Hồ sơ mới sẽ được Admin duyệt thủ công." 
+                          : `Còn lại ${3 - (user.kycAttempts || 0)}/3 lượt dùng AI.`}
+                      </p>
+                    </div>
+                    {user.kycAttempts !== undefined && user.kycAttempts < 3 && (
+                      <div className="h-10 w-10 rounded-full border-4 border-white bg-indigo-200 flex items-center justify-center font-bold text-indigo-700">
+                        {3 - user.kycAttempts}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="kycCCCD">Số CCCD / CMND <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="kycCCCD">
+                      Số CCCD / CMND <span className="text-red-500">*</span>
+                      {isScanning && <span className="ml-2 text-indigo-600 text-[10px] animate-pulse"> đang sử dụng AI quét ảnh...</span>}
+                    </Label>
                     <Input
                       id="kycCCCD"
                       value={kycCCCD}
                       onChange={(e) => setKycCCCD(e.target.value)}
-                      placeholder="Nhập chính xác số trên thẻ"
+                      placeholder={isScanning ? "Đang trích xuất..." : "Nhập chính xác số trên thẻ"}
+                      disabled={isScanning}
                     />
-                    <p className="text-[11px] text-muted-foreground">Hệ thống sẽ tự động đối chiếu số này với ảnh bạn tải lên.</p>
+                    <p className="text-[11px] text-muted-foreground italic">
+                      {user.kycAttempts && user.kycAttempts >= 3 
+                        ? "* Vui lòng tải ảnh rõ nét nhất để Admin dễ dàng đối soát." 
+                        : "* Hệ thống AI sẽ tự động điền khi bạn tải ảnh mặt trước lên."}
+                    </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
@@ -863,7 +924,7 @@ const ProfilePage = () => {
                       <div key={month} className="space-y-3">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{month}</p>
                         <div className="space-y-3">
-                          {items.map((item, idx) => (
+                          {(items as any[]).map((item: any, idx: number) => (
                             <div key={`${month}-${idx}`} className="flex gap-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
                               <div className="shrink-0 pt-1">
                                 {item.pointsChanged > 0 ? (

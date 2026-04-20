@@ -29,4 +29,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findTopUsersByRole(@Param("role") Role role, Pageable pageable);
 
     List<User> findByIsLockedTrueAndLockUntilBefore(LocalDateTime dateTime);
+
+    List<User> findByKycStatus(iuh.se.kltn.backend.modules.user.enums.KYCStatus status);
 }
