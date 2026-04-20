@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.user.service;
 
 import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.common.exception.ResourceNotFoundException;
+import iuh.se.kltn.backend.common.service.CloudinaryService;
 import iuh.se.kltn.backend.modules.user.dto.request.UpdateProfileRequest;
 import iuh.se.kltn.backend.modules.user.dto.response.UserProfileResponse;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
@@ -68,8 +69,8 @@ public class UserService {
         if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
 
         if (hasText(request.getCccdNumber())) {
-            boolean isVerified = user.getKycStatus() != null && user.getKycStatus() == KYCStatus.VERIFIED;
-            if (!isVerified) {
+            boolean canEditCccd = user.getKycStatus() == KYCStatus.NONE || user.getKycStatus() == KYCStatus.REJECTED;
+            if (canEditCccd) {
                 user.setCccdNumber(request.getCccdNumber());
             }
         }
@@ -119,10 +120,14 @@ public class UserService {
         user.setCccdNumber(cccdNumber);
         user.setCccdFrontUrl(frontUrl);
         user.setCccdBackUrl(backUrl);
+        
+        // Luôn tăng số lượt thử nếu có gọi logic OCR
+        // (Trong Controller đã check canUseOCR nên ở đây chỉ cần tăng nếu có tham số là auto)
+        user.setKycAttempts(user.getKycAttempts() + 1);
 
         if (isAutoVerified) {
             user.setKycStatus(KYCStatus.VERIFIED);
-            userRepository.save(user); // Save to ensure user has ID if needed, though Hibernate manages this
+            userRepository.save(user); 
             reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EKYC_VERIFIED, 10, "Hoàn thành xác thực danh tính điện tử (eKYC)");
         } else {
             user.setKycStatus(KYCStatus.PENDING);
@@ -165,4 +170,57 @@ public class UserService {
         userRepository.saveAndFlush(user);
     }
 
+    @Autowired
+    private CloudinaryService cloudinaryService;
+
+    public List<UserProfileResponse> getPendingKYCUsers() {
+        return userRepository.findByKycStatus(KYCStatus.PENDING).stream()
+                .map(user -> {
+                    UserProfileResponse resp = modelMapper.map(user, UserProfileResponse.class);
+                    if (user.getCccdFrontUrl() != null) {
+                        resp.setCccdFrontUrl(cloudinaryService.generateSignedUrl(cloudinaryService.extractPublicId(user.getCccdFrontUrl())));
+                    }
+                    if (user.getCccdBackUrl() != null) {
+                        resp.setCccdBackUrl(cloudinaryService.generateSignedUrl(cloudinaryService.extractPublicId(user.getCccdBackUrl())));
+                    }
+                    return resp;
+                })
+                .toList();
+    }
+
+    @Transactional
+    public void verifyKYCAdmin(Long userId, String cccdNumber) throws Exception {
+        User user = userRepository.findById(userId).orElseThrow();
+        String front = user.getCccdFrontUrl();
+        String back = user.getCccdBackUrl();
+
+        if (cccdNumber != null && !cccdNumber.isEmpty()) {
+            user.setCccdNumber(cccdNumber);
+        }
+
+        user.setKycStatus(KYCStatus.VERIFIED);
+        user.setCccdFrontUrl(null);
+        user.setCccdBackUrl(null);
+        userRepository.save(user);
+
+        cloudinaryService.deleteImage(front);
+        cloudinaryService.deleteImage(back);
+        reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EKYC_VERIFIED, 10, "Admin đã phê duyệt định danh thủ công");
+    }
+
+    @Transactional
+    public void rejectKYCAdmin(Long userId, String reason) throws Exception {
+        User user = userRepository.findById(userId).orElseThrow();
+        String front = user.getCccdFrontUrl();
+        String back = user.getCccdBackUrl();
+
+        user.setKycStatus(KYCStatus.REJECTED);
+        user.setKycNote(reason);
+        user.setCccdFrontUrl(null);
+        user.setCccdBackUrl(null);
+        userRepository.save(user);
+
+        cloudinaryService.deleteImage(front);
+        cloudinaryService.deleteImage(back);
+    }
 }

@@ -31,7 +31,9 @@ export interface User {
 
   // System fields
   reputationScore: number;
-  kycStatus: KYCStatus;
+  kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NONE' | string;
+  kycAttempts?: number;
+  kycNote?: string;
   createdAt: string;
   updatedAt: string;
 
