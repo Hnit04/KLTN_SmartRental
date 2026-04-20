@@ -251,6 +251,7 @@ export interface CreateContractPayload {
 export interface SignContractPayload {
   signMethod: ContractSignMethod;
   signatureImage?: string; // Optional (cho truyền thống nếu cần sau này)
+  signature?: string;      // Blockchain signature (Web3)
 }
 
 // ==========================================

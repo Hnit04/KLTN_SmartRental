@@ -57,6 +57,9 @@ blockchain:
 
   # Chain ID của Sepolia
   chain-id: ${BLOCKCHAIN_CHAIN_ID:11155111}
+
+  # Tỷ giá cố định VND/ETH
+  vnd-eth-rate: ${BLOCKCHAIN_VND_ETH_RATE:80000000}
 gemini:
   api:
     key: "${GEMINI_API_KEY:}"

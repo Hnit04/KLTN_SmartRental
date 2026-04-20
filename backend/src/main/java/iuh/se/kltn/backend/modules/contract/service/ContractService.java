@@ -60,6 +60,9 @@ public class ContractService {
     @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-tenant-wallet:}")
     private String fallbackTenantWallet;
 
+    @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
+    private long vndEthRate;
+
     @Autowired
     public ContractService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -596,7 +599,7 @@ public class ContractService {
                     long endDateVal = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
                     long penaltyVal = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
 
-                    long EXCHANGE_RATE = 80_000_000L;
+                    long EXCHANGE_RATE = vndEthRate;
                     BigInteger WEI_MULT = BigInteger.TEN.pow(18);
 
                     BigInteger rentWei = BigInteger.valueOf(priceVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
