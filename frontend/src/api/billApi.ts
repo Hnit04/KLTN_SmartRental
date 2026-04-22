@@ -17,6 +17,7 @@ export const billApi = {
     note?: string;
     elecMeterImageUrl?: string;
     waterMeterImageUrl?: string;
+    isMeterReset?: boolean;
   }) => {
     return axiosClient.post("/bills", data);
   },
@@ -47,8 +48,12 @@ export const billApi = {
   tenantNotifyPayment: (billId: number) => {
     return axiosClient.post(`/bills/${billId}/tenant-paid`);
   },
-  landlordConfirmPayment: (billId: number) => {
-    return axiosClient.post(`/bills/${billId}/landlord-confirm`);
+  landlordConfirmPayment: (billId: number, actualPaidDate?: string) => {
+    let url = `/bills/${billId}/landlord-confirm`;
+    if (actualPaidDate) {
+      url += `?actualPaidDate=${encodeURIComponent(actualPaidDate + ':00.000Z')}`; // Thêm mili giây và múi giờ
+    }
+    return axiosClient.post(url);
   },
   getAnnualReport: (year: number) => {
     return axiosClient.get(`/bills/reports/annual-report?year=${year}`);
