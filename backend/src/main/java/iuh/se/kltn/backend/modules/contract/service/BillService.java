@@ -48,6 +48,9 @@ public class BillService {
     @Autowired
     private BlockchainService blockchainService;
 
+    @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
+    private long vndEthRate;
+
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
     public BillResponse createBill(Long landlordId, BillRequest request) {
@@ -69,6 +72,11 @@ public class BillService {
             throw new RuntimeException("Không được chốt sổ cho thời gian ở tương lai!");
         }
 
+        // ✅ FIX #8: Kiểm tra hóa đơn trùng lặp
+        if (billRepository.findByContractIdAndMonthAndYear(request.getContractId(), request.getMonth(), request.getYear()).isPresent()) {
+            throw new RuntimeException("Đã có hóa đơn cho tháng " + request.getMonth() + "/" + request.getYear() + " của hợp đồng này!");
+        }
+
         // Logic check quay vòng đồng hồ (Meter Rollover)
         boolean isReset = Boolean.TRUE.equals(request.getIsMeterReset());
         if (!isReset && (request.getNewElecIndex() < request.getOldElecIndex() ||
@@ -76,20 +84,8 @@ public class BillService {
             throw new RuntimeException("Chỉ số mới không được nhỏ hơn chỉ số cũ (trừ khi đồng hồ quay vòng)!");
         }
 
-        double elecUsage = 0;
-        double waterUsage = 0;
-        
-        if (isReset && request.getNewElecIndex() < request.getOldElecIndex()) {
-            elecUsage = (10000 - request.getOldElecIndex()) + request.getNewElecIndex();
-        } else {
-            elecUsage = request.getNewElecIndex() - request.getOldElecIndex();
-        }
-
-        if (isReset && request.getNewWaterIndex() < request.getOldWaterIndex()) {
-            waterUsage = (1000 - request.getOldWaterIndex()) + request.getNewWaterIndex();
-        } else {
-            waterUsage = request.getNewWaterIndex() - request.getOldWaterIndex();
-        }
+        double elecUsage = calculateUsage(request.getOldElecIndex(), request.getNewElecIndex(), isReset, 10000);
+        double waterUsage = calculateUsage(request.getOldWaterIndex(), request.getNewWaterIndex(), isReset, 1000);
         Property property = contract.getRoom().getProperty();
         Double ePrice = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot() : property.getElecPrice();
         Double wPrice = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot() : property.getWaterPrice();
@@ -122,8 +118,8 @@ public class BillService {
         bill.setAdditionalFee(addFee);
         bill.setDiscountAmount(discount);
         bill.setNote(request.getNote());
-        // Lưu tỷ giá ETH/VND tại thời điểm tạo (1 ETH ≈ 80 triệu VND)
-        bill.setExchangeRate(80000000.0);
+        // Lưu tỷ giá ETH/VND tại thời điểm tạo
+        bill.setExchangeRate((double) vndEthRate);
 
         // Lưu vào DB
         Bill savedBill = billRepository.save(bill);
@@ -156,7 +152,7 @@ public class BillService {
         // =========================================================
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
-                long EXCHANGE_RATE = 80_000_000L;
+                long EXCHANGE_RATE = vndEthRate;
                 java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
                 java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(savedBill.getTotalAmount()))
                         .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
@@ -183,8 +179,8 @@ public class BillService {
                     Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
                     Double wPrice = bill.getContract().getWaterPriceSnapshot() != null ? bill.getContract().getWaterPriceSnapshot() : property.getWaterPrice();
                     
-                    double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * ePrice;
-                    double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * wPrice;
+                    double elecCost = calculateUsage(bill.getOldElecIndex(), bill.getNewElecIndex(), false, 10000) * ePrice;
+                    double waterCost = calculateUsage(bill.getOldWaterIndex(), bill.getNewWaterIndex(), false, 1000) * wPrice;
 
                     return mapToResponse(bill, elecCost, waterCost, bill.getContract().getActualPrice());
                 })
@@ -199,6 +195,17 @@ public class BillService {
         res.setRoomCost(room);
         return res;
     }
+
+    /**
+     * ✅ FIX #7: Helper tính lượng tiêu thụ có xử lý meter rollover
+     */
+    private double calculateUsage(double oldIndex, double newIndex, boolean isReset, int maxMeter) {
+        if (isReset && newIndex < oldIndex) {
+            return (maxMeter - oldIndex) + newIndex;
+        }
+        return Math.max(0, newIndex - oldIndex);
+    }
+
 
     @Transactional
     public BillResponse tenantNotifyPayment(Long billId, Long tenantId) {
@@ -465,7 +472,7 @@ public class BillService {
         }
 
         try {
-            long EXCHANGE_RATE = 80_000_000L;
+            long EXCHANGE_RATE = vndEthRate;
             java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
             java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(bill.getTotalAmount()))
                         .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
