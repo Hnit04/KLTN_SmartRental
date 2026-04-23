@@ -663,9 +663,9 @@ public class ContractService {
         // Xác định vai trò
         if (currentUserId != null) {
             if (contract.getTenant() != null && contract.getTenant().getId().equals(currentUserId)) {
-                res.setUserRole("CHỦ PHÒNG");
+                res.setUserRole("NGƯỜI THUÊ");
             } else {
-                res.setUserRole("THÀNH VIÊN");
+                res.setUserRole("CHỦ TRỌ");
             }
         }
         if (contract.getRoom() != null) {
@@ -755,6 +755,29 @@ public class ContractService {
         if (!blockchainService.verifyTransaction(txHash)) {
             throw new RuntimeException("Giao dịch nạp cọc không hợp lệ hoặc chưa được xác nhận trên Blockchain!");
         }
+
+        // ✅ FIX: Kích hoạt hợp đồng sau khi verify thành công (giống confirmTraditionalDeposit)
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setDepositStatus(DepositStatus.DEPOSITED);
+        contract.setDeployTxHash(txHash);
+
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.RENTED);
+            roomRepository.save(contract.getRoom());
+        }
+
+        // Cộng điểm uy tín
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã kích hoạt qua Web3 Deposit (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng được kích hoạt qua Blockchain (#" + contract.getId() + ")");
+
+        // Thông báo
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Nạp cọc Web3 thành công",
+            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
 
         // Kích hoạt hợp đồng
         return mapToResponse(contractRepository.save(contract), userId);
