@@ -303,7 +303,10 @@ export default function AiChatBot() {
     const dataKeywords = [
         "hoá đơn", "hóa đơn", "bill", "tiền", "nợ", "phòng", "hợp đồng", "contract", 
         "gần", "khu vực", "quanh", "nearby", "landmark", "lịch hẹn", "appointment",
-        "doanh thu", "revenue", "thanh toán", "trễ", "quá hạn", "phí"
+        "doanh thu", "revenue", "thanh toán", "trễ", "quá hạn", "phí",
+        "điện", "nước", "chỉ số", "tra cứu", "số điện", "số nước",
+        "khu trọ", "còn trống", "phòng trống", "tìm phòng",
+        "hết hạn", "gia hạn", "tiền cọc", "deposit"
     ];
     
     const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) && 

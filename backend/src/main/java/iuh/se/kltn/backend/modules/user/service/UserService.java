@@ -35,6 +35,9 @@ public class UserService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @Autowired
+    private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+
 
 
     public UserProfileResponse getUserProfile(Long userId) {
@@ -129,9 +132,17 @@ public class UserService {
             user.setKycStatus(KYCStatus.VERIFIED);
             userRepository.save(user); 
             reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EKYC_VERIFIED, 10, "Hoàn thành xác thực danh tính điện tử (eKYC)");
+            
+            notificationService.createNotification(user, "Định danh thành công ✅", "Tài khoản của bạn đã được xác thực tự động thành công.", iuh.se.kltn.backend.modules.interaction.enums.NotificationType.KYC_UPDATE, user.getId());
         } else {
             user.setKycStatus(KYCStatus.PENDING);
             userRepository.save(user);
+            
+            // Thông báo cho Admin có KYC mới
+            List<User> admins = userRepository.findAllByRole(Role.ADMIN);
+            for (User admin : admins) {
+                notificationService.createNotification(admin, "Yêu cầu KYC mới 👤", "Người dùng " + user.getFullName() + " vừa gửi yêu cầu xác thực danh tính.", iuh.se.kltn.backend.modules.interaction.enums.NotificationType.KYC_UPDATE, user.getId());
+            }
         }
     }
 
@@ -206,6 +217,8 @@ public class UserService {
         cloudinaryService.deleteImage(front);
         cloudinaryService.deleteImage(back);
         reputationService.processPoints(user, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EKYC_VERIFIED, 10, "Admin đã phê duyệt định danh thủ công");
+
+        notificationService.createNotification(user, "Định danh thành công ✅", "Hồ sơ định danh của bạn đã được Admin phê duyệt.", iuh.se.kltn.backend.modules.interaction.enums.NotificationType.KYC_UPDATE, user.getId());
     }
 
     @Transactional
@@ -222,5 +235,7 @@ public class UserService {
 
         cloudinaryService.deleteImage(front);
         cloudinaryService.deleteImage(back);
+
+        notificationService.createNotification(user, "Định danh bị từ chối ❌", "Hồ sơ định danh của bạn đã bị từ chối. Lý do: " + reason, iuh.se.kltn.backend.modules.interaction.enums.NotificationType.KYC_UPDATE, user.getId());
     }
 }

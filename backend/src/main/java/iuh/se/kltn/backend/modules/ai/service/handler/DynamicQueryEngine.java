@@ -113,7 +113,7 @@ public class DynamicQueryEngine {
                 "FROM bills b " +
                 "JOIN contracts c ON b.contract_id = c.id " +
                 "JOIN rooms r ON c.room_id = r.id " +
-                "WHERE c.tenant_id = ?"
+                "WHERE c.tenant_id = ? AND c.status = 'ACTIVE'"
         );
         List<Object> queryParams = new ArrayList<>();
         queryParams.add(userId);
@@ -150,7 +150,7 @@ public class DynamicQueryEngine {
                 "JOIN contracts c ON b.contract_id = c.id " +
                 "JOIN rooms r ON c.room_id = r.id " +
                 "JOIN properties p ON r.property_id = p.id " +
-                "WHERE c.tenant_id = ? AND b.status IN ('UNPAID', 'LATE') " +
+                "WHERE c.tenant_id = ? AND c.status = 'ACTIVE' AND b.status IN ('UNPAID', 'LATE') " +
                 "ORDER BY b.year DESC, b.month DESC";
         return jdbcTemplate.queryForList(sql, userId);
     }
@@ -273,7 +273,7 @@ public class DynamicQueryEngine {
                 "JOIN rooms r ON c.room_id = r.id " +
                 "JOIN properties p ON r.property_id = p.id " +
                 "JOIN users u ON c.tenant_id = u.id " +
-                "WHERE p.landlord_id = ? AND b.status IN ('UNPAID', 'LATE') " +
+                "WHERE p.landlord_id = ? AND c.status = 'ACTIVE' AND b.status IN ('UNPAID', 'LATE') " +
                 "ORDER BY b.deadline ASC";
         return jdbcTemplate.queryForList(sql, userId);
     }

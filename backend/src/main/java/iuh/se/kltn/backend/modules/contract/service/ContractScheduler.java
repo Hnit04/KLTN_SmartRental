@@ -51,6 +51,17 @@ public class ContractScheduler {
                 room.setStatus(RoomStatus.AVAILABLE);
                 roomRepository.save(room);
             }
+
+            // Thông báo cho cả 2 bên
+            notificationService.createNotification(contract.getTenant(), "Hợp đồng bị hủy", 
+                "Hợp đồng phòng " + (room != null ? room.getName() : "") + " đã bị hủy tự động do quá hạn 24h không thực hiện ký kết.", 
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            
+            if (room != null) {
+                notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
+                    "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không ký sau 24h. Phòng đã được nhả về trạng thái Trống.", 
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            }
         }
         
         if (!expiredContracts.isEmpty()) {
@@ -116,6 +127,17 @@ public class ContractScheduler {
             if (room != null && room.getStatus() != RoomStatus.AVAILABLE) {
                 room.setStatus(RoomStatus.AVAILABLE);
                 roomRepository.save(room);
+            }
+
+            // Thông báo hết hạn hợp đồng
+            notificationService.createNotification(contract.getTenant(), "Hợp đồng hết hạn", 
+                "Hợp đồng thuê phòng " + (room != null ? room.getName() : "") + " của bạn đã kết thúc thành công. Vui lòng bàn giao phòng.", 
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            
+            if (room != null) {
+                notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng hết hạn", 
+                    "Hợp đồng thuê phòng " + room.getName() + " với khách " + contract.getTenant().getFullName() + " đã kết thúc hôm nay.", 
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
             }
         }
         

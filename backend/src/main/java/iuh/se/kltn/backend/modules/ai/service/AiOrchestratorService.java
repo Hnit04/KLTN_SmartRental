@@ -331,7 +331,7 @@ public class AiOrchestratorService {
                 }
 
                 List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
-                String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
+                String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
                 try {
                     Object response = dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
                     // 💾 Ghi cache kết quả
@@ -343,9 +343,24 @@ public class AiOrchestratorService {
                     saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
                     return response;
                 } catch (Exception llmEx) {
+                    System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: " + llmEx.getMessage());
                     success = true;
                     saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                    return "Dạ hiện AI phản hồi kết quả thô: " + rawDataStr;
+                    // Trả về dữ liệu thô nhưng format dễ đọc hơn
+                    if (results.isEmpty()) {
+                        return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
+                    }
+                    StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
+                    for (int i = 0; i < results.size(); i++) {
+                        Map<String, Object> row = results.get(i);
+                        sb.append("\n--- ").append(i + 1).append(" ---\n");
+                        for (Map.Entry<String, Object> entry : row.entrySet()) {
+                            if (entry.getValue() != null) {
+                                sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+                            }
+                        }
+                    }
+                    return sb.toString();
                 }
             } else {
                 fallbackUsed = true;
