@@ -320,11 +320,10 @@ public class AuthService {
                 user.setUsername(email);
                 user.setAvatarUrl(picture);
                 user.setRole(Role.TENANT);
-                user.setKycStatus(KYCStatus.PENDING);
+                user.setKycStatus(KYCStatus.NONE);
                 user.setReputationScore(50);
                 user.setIsEnabled(true);
                 user.setIsLocked(false);
-                // ✅ FIX: Tạo password ngẫu nhiên thay vì hardcode "1111"
                 String randomPassword = java.util.UUID.randomUUID().toString().substring(0, 12);
                 user.setPassword(passwordEncoder.encode(randomPassword));
                 user = userRepository.save(user);
