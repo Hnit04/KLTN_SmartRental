@@ -91,10 +91,14 @@ public class PropertyService {
         property.setSafetyScore(modResult.getScore());
         property.setModerationReason(modResult.getReason());
 
-        System.out
-                .println(" [DEBUG] AI Result for property '" + request.getName() + "': Score=" + modResult.getScore());
-
         Property saved = propertyRepository.save(property);
+
+        // Thông báo cho Admin có tin đăng mới
+        List<User> admins = userRepository.findAllByRole(Role.ADMIN);
+        for (User admin : admins) {
+            notificationService.createNotification(admin, "Yêu cầu duyệt khu trọ mới 🏠", "Chủ trọ " + user.getFullName() + " vừa đăng khu trọ mới: " + saved.getName(), NotificationType.PROPERTY_APPROVED, saved.getId());
+        }
+
         return mapToPropertyResponse(saved);
     }
 
@@ -130,6 +134,13 @@ public class PropertyService {
         }
 
         Room savedRoom = roomRepository.save(room);
+
+        // Thông báo cho Admin có phòng mới cần duyệt
+        List<User> admins = userRepository.findAllByRole(Role.ADMIN);
+        for (User admin : admins) {
+            notificationService.createNotification(admin, "Yêu cầu duyệt phòng mới 🚪", "Chủ trọ " + property.getLandlord().getFullName() + " vừa thêm phòng mới: " + savedRoom.getName() + " tại " + property.getName(), NotificationType.PROPERTY_APPROVED, property.getId());
+        }
+
         return mapToRoomResponse(savedRoom);
     }
 
