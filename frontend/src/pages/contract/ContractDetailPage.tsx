@@ -4,7 +4,7 @@ import {
   FileText, Download, PenTool, CheckCircle, Calendar,
   MapPin, ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star, Users,
-  MessageSquare, XCircle, Check, Sparkles, Home, User, LogOut, TrendingUp, QrCode, Trash2, ShieldCheck
+  MessageSquare, XCircle, Check, Sparkles, User, LogOut, TrendingUp, QrCode, Trash2, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -1154,7 +1154,7 @@ export default function ContractDetailPage() {
                   <Clock className="h-5 w-5 text-indigo-500" /> Lịch sử thương lượng điều khoản
                 </h3>
                 <div className="relative pl-8 space-y-8 before:absolute before:inset-0 before:left-[11px] before:w-0.5 before:bg-gray-100 before:content-['']">
-                  {changeRequests.map((req, idx) => (
+                  {changeRequests.map((req) => (
                     <div key={req.id} className="relative group">
                       {/* Dot */}
                       <div className={cn(
@@ -2088,7 +2088,7 @@ export default function ContractDetailPage() {
                 
                 const clean = (t: string) => t.replace(modernSplitMarker, "").replace(landlordHeaderRegex, "").replace(tenantHeaderRegex, "").trim();
 
-                if (isModernSplit || isLegacySplit) {
+                if ((isModernSplit || isLegacySplit) && terms) {
                   const parts = isModernSplit ? terms.split(modernSplitMarker) : terms.split(tenantHeaderRegex);
                   const landlordPart = clean(parts[0]);
                   const tenantPart = clean(parts[1] || "");

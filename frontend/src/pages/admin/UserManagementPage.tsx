@@ -425,7 +425,7 @@ export default function UserManagementPage() {
         variant="destructive" 
         onClick={() => {
           if (selectedUser?.id) {
-            confirmLock(selectedUser.id, lockDuration, lockReasons);
+            confirmLock();
           }
         }} 
         disabled={lockReasons.length === 0}

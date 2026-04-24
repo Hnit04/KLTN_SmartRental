@@ -20,4 +20,5 @@ public class BillRequest {
     private Double additionalFee;
     private Double discountAmount;
     private String note;
+    private Boolean isMeterReset;
 }

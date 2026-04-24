@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { userApi } from '@/api/userApi';
 import type { User } from '@/types';
-import { Crown, Mail, Award, ArrowRight, Sparkles } from 'lucide-react';
+import { Crown, Mail, Award, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';

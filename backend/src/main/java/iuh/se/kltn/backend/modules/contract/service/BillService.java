@@ -48,6 +48,9 @@ public class BillService {
     @Autowired
     private BlockchainService blockchainService;
 
+    @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
+    private long vndEthRate;
+
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
     public BillResponse createBill(Long landlordId, BillRequest request) {
@@ -63,20 +66,34 @@ public class BillService {
         if (contract.getStatus() != ContractStatus.ACTIVE) {
             throw new RuntimeException("Hợp đồng này không còn hiệu lực!");
         }
-        if (request.getNewElecIndex() < request.getOldElecIndex() ||
-                request.getNewWaterIndex() < request.getOldWaterIndex()) {
-            throw new RuntimeException("Chỉ số mới không được nhỏ hơn chỉ số cũ!");
+        // Ngăn chặn chốt sổ ở khoảng thời gian ảo (tương lai)
+        LocalDate now = LocalDate.now();
+        if (request.getYear() > now.getYear() || (request.getYear() == now.getYear() && request.getMonth() > now.getMonthValue())) {
+            throw new RuntimeException("Không được chốt sổ cho thời gian ở tương lai!");
         }
 
-        // Tính tiền
+        // ✅ FIX #8: Kiểm tra hóa đơn trùng lặp
+        if (billRepository.findByContractIdAndMonthAndYear(request.getContractId(), request.getMonth(), request.getYear()).isPresent()) {
+            throw new RuntimeException("Đã có hóa đơn cho tháng " + request.getMonth() + "/" + request.getYear() + " của hợp đồng này!");
+        }
+
+        // Logic check quay vòng đồng hồ (Meter Rollover)
+        boolean isReset = Boolean.TRUE.equals(request.getIsMeterReset());
+        if (!isReset && (request.getNewElecIndex() < request.getOldElecIndex() ||
+                request.getNewWaterIndex() < request.getOldWaterIndex())) {
+            throw new RuntimeException("Chỉ số mới không được nhỏ hơn chỉ số cũ (trừ khi đồng hồ quay vòng)!");
+        }
+
+        double elecUsage = calculateUsage(request.getOldElecIndex(), request.getNewElecIndex(), isReset, 10000);
+        double waterUsage = calculateUsage(request.getOldWaterIndex(), request.getNewWaterIndex(), isReset, 1000);
         Property property = contract.getRoom().getProperty();
+        Double ePrice = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot() : property.getElecPrice();
+        Double wPrice = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot() : property.getWaterPrice();
+        Double iPrice = contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot() : property.getInternetPrice();
 
-        double elecUsage = request.getNewElecIndex() - request.getOldElecIndex();
-        double waterUsage = request.getNewWaterIndex() - request.getOldWaterIndex();
-
-        double elecCost = elecUsage * property.getElecPrice();
-        double waterCost = waterUsage * property.getWaterPrice();
-        double internetCost = property.getInternetPrice();
+        double elecCost = elecUsage * ePrice;
+        double waterCost = waterUsage * wPrice;
+        double internetCost = iPrice;
         double roomCost = contract.getActualPrice();
 
         double totalAmount = roomCost + elecCost + waterCost + internetCost;
@@ -101,8 +118,8 @@ public class BillService {
         bill.setAdditionalFee(addFee);
         bill.setDiscountAmount(discount);
         bill.setNote(request.getNote());
-        // Lưu tỷ giá ETH/VND tại thời điểm tạo (1 ETH ≈ 80 triệu VND)
-        bill.setExchangeRate(80000000.0);
+        // Lưu tỷ giá ETH/VND tại thời điểm tạo
+        bill.setExchangeRate((double) vndEthRate);
 
         // Lưu vào DB
         Bill savedBill = billRepository.save(bill);
@@ -135,7 +152,7 @@ public class BillService {
         // =========================================================
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
-                long EXCHANGE_RATE = 80_000_000L;
+                long EXCHANGE_RATE = vndEthRate;
                 java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
                 java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(savedBill.getTotalAmount()))
                         .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
@@ -159,8 +176,11 @@ public class BillService {
         return billRepository.findByContractId(contractId).stream()
                 .map(bill -> {
                     Property property = bill.getContract().getRoom().getProperty();
-                    double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
-                    double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+                    Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
+                    Double wPrice = bill.getContract().getWaterPriceSnapshot() != null ? bill.getContract().getWaterPriceSnapshot() : property.getWaterPrice();
+                    
+                    double elecCost = calculateUsage(bill.getOldElecIndex(), bill.getNewElecIndex(), false, 10000) * ePrice;
+                    double waterCost = calculateUsage(bill.getOldWaterIndex(), bill.getNewWaterIndex(), false, 1000) * wPrice;
 
                     return mapToResponse(bill, elecCost, waterCost, bill.getContract().getActualPrice());
                 })
@@ -175,6 +195,17 @@ public class BillService {
         res.setRoomCost(room);
         return res;
     }
+
+    /**
+     * ✅ FIX #7: Helper tính lượng tiêu thụ có xử lý meter rollover
+     */
+    private double calculateUsage(double oldIndex, double newIndex, boolean isReset, int maxMeter) {
+        if (isReset && newIndex < oldIndex) {
+            return (maxMeter - oldIndex) + newIndex;
+        }
+        return Math.max(0, newIndex - oldIndex);
+    }
+
 
     @Transactional
     public BillResponse tenantNotifyPayment(Long billId, Long tenantId) {
@@ -202,13 +233,15 @@ public class BillService {
         );
 
         Property property = bill.getContract().getRoom().getProperty();
-        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
-        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+        Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
+        Double wPrice = bill.getContract().getWaterPriceSnapshot() != null ? bill.getContract().getWaterPriceSnapshot() : property.getWaterPrice();
+        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * ePrice;
+        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * wPrice;
         return mapToResponse(saved, elecCost, waterCost, bill.getContract().getActualPrice());
     }
 
     @Transactional
-    public BillResponse landlordConfirmPayment(Long billId, Long landlordId) {
+    public BillResponse landlordConfirmPayment(Long billId, Long landlordId, LocalDateTime actualPaidDate) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new RuntimeException("Hóa đơn không tồn tại"));
 
@@ -221,7 +254,8 @@ public class BillService {
         }
 
         bill.setStatus(BillStatus.PAID);
-        bill.setPaidAt(LocalDateTime.now());
+        LocalDateTime confirmedDate = actualPaidDate != null ? actualPaidDate : LocalDateTime.now();
+        bill.setPaidAt(confirmedDate);
         Bill saved = billRepository.save(bill);
 
         // ✅ THÔNG BÁO CHO KHÁCH THUÊ
@@ -234,21 +268,23 @@ public class BillService {
         );
 
         // Process reputation score
-        if (saved.getPaidAt().toLocalDate().isAfter(saved.getDeadline().toLocalDate())) {
+        if (confirmedDate.toLocalDate().isAfter(saved.getDeadline().toLocalDate())) {
             reputationService.processPoints(saved.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_LATE, -5, "Thanh toán hóa đơn trễ hạn (Hóa đơn #" + saved.getId() + ")");
         } else {
             reputationService.processPoints(saved.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_PAID_ON_TIME, 2, "Thanh toán hóa đơn đúng hạn (Hóa đơn #" + saved.getId() + ")");
         }
 
         Property property = bill.getContract().getRoom().getProperty();
-        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * property.getElecPrice();
-        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * property.getWaterPrice();
+        Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
+        Double wPrice = bill.getContract().getWaterPriceSnapshot() != null ? bill.getContract().getWaterPriceSnapshot() : property.getWaterPrice();
+        double elecCost = (bill.getNewElecIndex() - bill.getOldElecIndex()) * ePrice;
+        double waterCost = (bill.getNewWaterIndex() - bill.getOldWaterIndex()) * wPrice;
         return mapToResponse(saved, elecCost, waterCost, bill.getContract().getActualPrice());
     }
 
     public List<BillingStatusResponse> getBillingStatus(Long landlordId, int month, int year) {
-        // 1. Lấy tất cả Hợp đồng đang ACTIVE của Chủ trọ này
-        List<Contract> activeContracts = contractRepository.findByRoom_Property_Landlord_IdAndStatus(landlordId, ContractStatus.ACTIVE);
+        // 1. Lấy tất cả Hợp đồng đang ACTIVE HOẶC Đã kết thúc nhưng vẫn còn nợ bill
+        List<Contract> activeContracts = contractRepository.findBillingContractsByLandlordId(landlordId);
 
         List<BillingStatusResponse> responses = new java.util.ArrayList<>();
 
@@ -260,9 +296,13 @@ public class BillService {
             res.setActualPrice(contract.getActualPrice());
 
             Property property = contract.getRoom().getProperty();
-            res.setElecPrice(property.getElecPrice());
-            res.setWaterPrice(property.getWaterPrice());
-            res.setInternetPrice(property.getInternetPrice());
+            Double ePrice = contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot() : property.getElecPrice();
+            Double wPrice = contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot() : property.getWaterPrice();
+            Double iPrice = contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot() : property.getInternetPrice();
+
+            res.setElecPrice(ePrice);
+            res.setWaterPrice(wPrice);
+            res.setInternetPrice(iPrice);
 
             // 2. Kiểm tra xem Tháng này đã có Hóa đơn chưa
             java.util.Optional<Bill> currentBillOpt = billRepository.findByContractIdAndMonthAndYear(contract.getId(), month, year);
@@ -288,16 +328,13 @@ public class BillService {
                     res.setPaymentMethod("BLOCKCHAIN");
                 }
             } else {
-                // NẾU CHƯA CHỐT SỔ (UNBILLED) -> Đi tìm số điện nước của tháng trước
+                // NẾU CHƯA CHỐT SỔ (UNBILLED) -> Đi tìm số điện nước của hóa đơn chốt gần nhất
                 res.setBillStatus("UNBILLED");
 
-                int prevMonth = (month == 1) ? 12 : month - 1;
-                int prevYear = (month == 1) ? year - 1 : year;
-
-                java.util.Optional<Bill> prevBillOpt = billRepository.findByContractIdAndMonthAndYear(contract.getId(), prevMonth, prevYear);
+                java.util.Optional<Bill> prevBillOpt = billRepository.findFirstByContractIdOrderByYearDescMonthDesc(contract.getId());
 
                 if (prevBillOpt.isPresent()) {
-                    // Lấy số mới của tháng trước làm số cũ của tháng này
+                    // Lấy số mới của lần chốt gần nhất làm số cũ của kỳ này
                     res.setOldElecIndex(prevBillOpt.get().getNewElecIndex());
                     res.setOldWaterIndex(prevBillOpt.get().getNewWaterIndex());
                 } else {
@@ -435,7 +472,7 @@ public class BillService {
         }
 
         try {
-            long EXCHANGE_RATE = 80_000_000L;
+            long EXCHANGE_RATE = vndEthRate;
             java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
             java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(bill.getTotalAmount()))
                         .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
@@ -488,8 +525,10 @@ public class BillService {
         }
 
         Property property = savedBill.getContract().getRoom().getProperty();
-        double elecCost = (savedBill.getNewElecIndex() - savedBill.getOldElecIndex()) * property.getElecPrice();
-        double waterCost = (savedBill.getNewWaterIndex() - savedBill.getOldWaterIndex()) * property.getWaterPrice();
+        Double ePrice = savedBill.getContract().getElecPriceSnapshot() != null ? savedBill.getContract().getElecPriceSnapshot() : property.getElecPrice();
+        Double wPrice = savedBill.getContract().getWaterPriceSnapshot() != null ? savedBill.getContract().getWaterPriceSnapshot() : property.getWaterPrice();
+        double elecCost = (savedBill.getNewElecIndex() - savedBill.getOldElecIndex()) * ePrice;
+        double waterCost = (savedBill.getNewWaterIndex() - savedBill.getOldWaterIndex()) * wPrice;
 
         return mapToResponse(savedBill, elecCost, waterCost, savedBill.getContract().getActualPrice());
     }
@@ -515,8 +554,14 @@ public class BillService {
 
         // 2. Revenue Distribution
         double totalRent = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> b.getContract().getActualPrice()).sum();
-        double totalElec = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> (b.getNewElecIndex() - b.getOldElecIndex()) * b.getContract().getElecPriceSnapshot()).sum();
-        double totalWater = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> (b.getNewWaterIndex() - b.getOldWaterIndex()) * b.getContract().getWaterPriceSnapshot()).sum();
+        double totalElec = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> {
+            Double ePrice = b.getContract().getElecPriceSnapshot() != null ? b.getContract().getElecPriceSnapshot() : b.getContract().getRoom().getProperty().getElecPrice();
+            return (b.getNewElecIndex() - b.getOldElecIndex()) * ePrice;
+        }).sum();
+        double totalWater = yearBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(b -> {
+            Double wPrice = b.getContract().getWaterPriceSnapshot() != null ? b.getContract().getWaterPriceSnapshot() : b.getContract().getRoom().getProperty().getWaterPrice();
+            return (b.getNewWaterIndex() - b.getOldWaterIndex()) * wPrice;
+        }).sum();
         double totalMisc = totalCurrent - totalRent - totalElec - totalWater;
 
         List<AnnualReportResponse.RevenueDistributionDTO> distribution = List.of(

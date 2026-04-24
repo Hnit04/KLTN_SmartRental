@@ -63,7 +63,8 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
-    private String googleClientId="853040464300-f2l17df4g8vf714ainbi1n4a74hk87g2.apps.googleusercontent.com";
+    @Value("${google.client-id}")
+    private String googleClientId;
 
     // ĐĂNG KÝ
     public User register(UserRegisterRequest request) {
@@ -188,12 +189,7 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    public void resetPasswordNoNeedOTP(String email, String newPassword) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại!"));
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-    }
+    // ❌ ĐÃ XÓA: resetPasswordNoNeedOTP — Lỗ hổng bảo mật nghiêm trọng
 
     private boolean hasText(String str) {
         return str != null && !str.trim().isEmpty();
@@ -328,9 +324,11 @@ public class AuthService {
                 user.setReputationScore(50);
                 user.setIsEnabled(true);
                 user.setIsLocked(false);
-                user.setPassword(passwordEncoder.encode("1111"));
+                // ✅ FIX: Tạo password ngẫu nhiên thay vì hardcode "1111"
+                String randomPassword = java.util.UUID.randomUUID().toString().substring(0, 12);
+                user.setPassword(passwordEncoder.encode(randomPassword));
                 user = userRepository.save(user);
-                loginResponseGoogle= new LoginResponseGoogle(user.getUsername(), "1111");
+                loginResponseGoogle= new LoginResponseGoogle(user.getUsername(), randomPassword);
                 emailService.sendSecurityAlert(user.getEmail());
             } else {
                 boolean needUpdate = false;

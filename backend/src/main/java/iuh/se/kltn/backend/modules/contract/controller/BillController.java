@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/bills")
@@ -97,8 +99,10 @@ public class BillController {
 
     @PostMapping("/{billId}/landlord-confirm")
     public ResponseEntity<?> landlordConfirmPayment(@PathVariable Long billId,
-                                                    @AuthenticationPrincipal UserPrincipal currentUser) {
-        return ResponseEntity.ok(billService.landlordConfirmPayment(billId, currentUser.getId()));
+                                                    @AuthenticationPrincipal UserPrincipal currentUser,
+                                                    @RequestParam(required = false) 
+                                                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime actualPaidDate) {
+        return ResponseEntity.ok(billService.landlordConfirmPayment(billId, currentUser.getId(), actualPaidDate));
     }
 
     @GetMapping("/reports/annual-report")

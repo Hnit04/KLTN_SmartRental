@@ -9,16 +9,23 @@ import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
+import iuh.se.kltn.backend.modules.ai.entity.AiActionLog;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
+import iuh.se.kltn.backend.modules.ai.repository.AiActionLogRepository;
+import iuh.se.kltn.backend.modules.ai.dto.IntentExtractionResult;
+import iuh.se.kltn.backend.modules.ai.service.handler.DynamicQueryEngine;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 @Service
 public class AiOrchestratorService {
@@ -27,7 +34,19 @@ public class AiOrchestratorService {
     private SqlGeneratorAi sqlGeneratorAi;
 
     @Autowired
+    private IntentExtractorAi intentExtractorAi;
+
+    @Autowired
+    private DynamicQueryEngine dynamicQueryEngine;
+
+    @Autowired
     private AiSqlCacheRepository cacheRepository;
+
+    @Autowired
+    private AiActionLogRepository actionLogRepository;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -64,6 +83,9 @@ public class AiOrchestratorService {
             System.out.println("ℹ️ Không cần cập nhật DB FAQ: " + e.getMessage());
         }
 
+        // 🌱 AUTO-SEED: Nếu DB trống, tự động nạp 204 câu hỏi mẫu
+        seedInitialDataIfEmpty();
+
         System.out.println("🔄 Đang nạp Kho tri thức (SQL & FAQ) vào Vector Store trên RAM...");
         List<AiSqlCache> allCaches = cacheRepository.findAll();
         for (AiSqlCache cache : allCaches) {
@@ -76,6 +98,39 @@ public class AiOrchestratorService {
             }
         }
         System.out.println("✅ Đã nạp xong " + allCaches.size() + " câu vào Vector Store!");
+    }
+
+    /**
+     * Tự động nạp dữ liệu seed (204 FAQ + SQL Cache) nếu bảng ai_sql_cache đang trống.
+     */
+    private void seedInitialDataIfEmpty() {
+        long count = cacheRepository.count();
+        if (count > 0) {
+            System.out.println("ℹ️ Kho tri thức đã có " + count + " câu, bỏ qua seed.");
+            return;
+        }
+        System.out.println("🌱 Kho tri thức trống! Đang nạp dữ liệu mẫu từ seed_faq_data.sql...");
+        try {
+            org.springframework.core.io.ClassPathResource resource =
+                    new org.springframework.core.io.ClassPathResource("data/seed_faq_data.sql");
+            String sql = new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            String[] statements = sql.split(";");
+            int executed = 0;
+            for (String stmt : statements) {
+                String trimmed = stmt.trim();
+                if (trimmed.toUpperCase().startsWith("INSERT")) {
+                    try {
+                        jdbcTemplate.execute(trimmed);
+                        executed++;
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Lỗi seed: " + e.getMessage());
+                    }
+                }
+            }
+            System.out.println("✅ Đã seed thành công " + executed + " câu lệnh vào kho tri thức!");
+        } catch (Exception e) {
+            System.err.println("❌ Lỗi đọc file seed_faq_data.sql: " + e.getMessage());
+        }
     }
 
     private void addQuestionToVectorStore(String question, String sql) {
@@ -174,24 +229,150 @@ public class AiOrchestratorService {
 
         String sqlToExecute = null;
 
+        String schemaGeneral = "Sơ đồ cơ sở dữ liệu thực tế:\n" +
+            "- properties: id, landlord_id, name, address, district, city, latitude, longitude, description, elec_price, water_price, internet_price, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED')\n" +
+            "- rooms: id, property_id, name, price, area, max_occupants, current_occupants, type (ENUM: 'STUDIO', 'ONE_BEDROOM', 'TWO_BEDROOM', 'SINGLE_ROOM', 'SHARED_ROOM', 'MEZZANINE_ROOM'), has_mezzanine, has_balcony, status (ENUM: 'AVAILABLE', 'RENTED', 'MAINTENANCE', 'RESERVED', 'HIDDEN'), amenities, default_terms\n";
+
+        String schemaTenantAndLandlord = schemaGeneral +
+            "- contracts: id, tenant_id, room_id, actual_price, sign_date, start_date, end_date, deposit_amount, status (ENUM: 'PENDING_SIGNATURE', 'AWAITING_DEPOSIT', 'ACTIVE', 'EXPIRED', 'TERMINATED_EARLY'), is_tenant_signed, is_landlord_signed\n" +
+            "- bills: id, contract_id, month, year, old_elec_index, new_elec_index, old_water_index, new_water_index, total_amount, payment_tx_hash, status (ENUM: 'UNPAID', 'PAID', 'LATE', 'PENDING'), penalty_fee, paid_at, additional_fee, discount_amount\n" +
+            "- appointments: id, tenant_id, landlord_id, room_id, meet_time, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'), meeting_link\n" +
+            "- reviews: id, contract_id, reviewer_id, target_id, rating, comment, created_at\n";
+
+        String schemaLandlordSpecial = "- users: id, username, full_name, email, phone_number, role, reputation_score, kyc_status\n";
+
+        String schemaContext = "";
         String roleRules = "";
+
         if (role.equalsIgnoreCase("TENANT")) {
+            schemaContext = schemaTenantAndLandlord;
             roleRules = "1. HỌ KHÔNG ĐƯỢC XEM DOANH THU CỦA CHỦ TRỌ.\n" +
-                    "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC.\n" +
+                    "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC. (Nhớ điều kiện rooms.status='AVAILABLE').\n" +
                     "3. Tuy nhiên, nếu họ hỏi về hóa đơn (bills) hay hợp đồng (contracts), BẮT BUỘC phải lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật).\n" +
-                    "4. ĐỐI VỚI BẢNG BILLS: Bảng bills không có cột tenant_id. Nên khi cần xem hóa đơn, BẮT BUỘC phải JOIN bills với contracts (ON bills.contract_id = contracts.id) RỒI MỚI lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER`.\n" +
-                    "5. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản (giá, tên, trạng thái).\n" +
-                    "6. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm (District/City/Address), BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
-                    "7. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê (TENANT) nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`, hãy giữ SQL như tìm kiếm khách ngoài bình thường.";
+                    "4. ĐỐI VỚI BẢNG LỊCH HẸN (appointments): BẮT BUỘC chèn điều kiện lọc `appointments.tenant_id = USER_ID_PLACEHOLDER`.\n" +
+                    "5. ĐỐI VỚI BẢNG BILLS: Bảng bills không có cột tenant_id. BẮT BUỘC phải JOIN bills với contracts RỒI MỚI lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER`. Nếu khách hỏi NỢ TIỀN CHƯA ĐÓNG, lọc thêm bills.status IN ('UNPAID', 'LATE').\n" +
+                    "6. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản.\n" +
+                    "7. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm, BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
+                    "8. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`.";
         } else if (role.equalsIgnoreCase("LANDLORD")) {
-            roleRules = "1. BẮT BUỘC phải thêm điều kiện `properties.landlord_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật) vào TẤT CẢ các câu query để họ không xem trộm được nhà trọ của chủ khác.\n" +
-                    "2. MẸO JOIN BẢNG: Nếu truy cập bảng rooms, bills, hay contracts, BẮT BUỘC JOIN với properties để có thể lọc `properties.landlord_id = USER_ID_PLACEHOLDER`.\n" +
-                    "3. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm (address LIKE hoặc district LIKE).";
+            schemaContext = schemaTenantAndLandlord + schemaLandlordSpecial;
+            roleRules = "1. BẮT BUỘC phải thêm điều kiện lọc `landlord_id = USER_ID_PLACEHOLDER` vào MỌI truy vấn cá nhân. Đối với bảng `appointments` nó có sẵn cột `landlord_id`. Đối với `rooms`, `contracts`, `bills` thì BẮT BUỘC phải JOIN qua `properties` để lấy cột `properties.landlord_id = USER_ID_PLACEHOLDER`.\n" +
+                    "2. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm.\n" +
+                    "3. NGUYÊN TẮC DOANH THU (Revenue): Nếu hỏi DOANH THU, BẮT BUỘC dùng hàm SUM(bills.total_amount) VÀ ĐIỀU KIỆN bills.status = 'PAID'. (Tuyệt đối không cộng gộp hóa đơn chưa thanh toán).\n" +
+                    "4. NGUYÊN TẮC CON NỢ (Debtors): Nếu hỏi KHÁCH NỢ TIỀN, lọc bills.status IN ('UNPAID', 'LATE').\n" +
+                    "5. NGUYÊN TẮC HỢP ĐỒNG: Nếu hỏi hợp đồng sắp hết hạn, kiểm tra contracts.status = 'ACTIVE'.";
         } else {
+            schemaContext = schemaGeneral;
             roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
                         "2. Nếu câu hỏi yêu cầu xem hóa đơn, hợp đồng, lịch hẹn hoặc doanh thu, BẮT BUỘC CHỈ TRẢ VỀ CHỮ: UNAUTHORIZED.\n" +
-                        "3. CHỈ ĐƯỢC PHÉP xem thông tin từ bảng `rooms` và `properties` (Ví dụ: giá phòng, địa chỉ, diện tích). Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
+                        "3. Khi truy vấn phòng trống theo yêu cầu khách, BẮT BUỘC kèm theo điều kiện kép: `rooms.status = 'AVAILABLE'` VÀ `properties.status = 'APPROVED'` để không lấy phòng ảo/đã có người.\n" +
+                        "4. Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
         }
+
+        // 🌟 NEW HYBRID AI PIPELINE (Strangler Fig Pattern)
+        long startTime = System.currentTimeMillis();
+        String predictedIntent = "UNKNOWN";
+        Double confidence = 0.0;
+        boolean fallbackUsed = false;
+        boolean success = false;
+
+        try {
+            System.out.println("🤖 [HYBRID AI] Calling Intent Extractor...");
+            String rawJson = intentExtractorAi.extractIntent(question, role);
+            // Cắt bỏ markdown wrapper nếu LLM tự ý bọc
+            rawJson = rawJson.replace("```json", "").replace("```", "").trim();
+            System.out.println("🤖 [HYBRID AI] Raw JSON: " + rawJson);
+
+            // Parse JSON thủ công bằng Jackson (tin cậy hơn POJO mapping)
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+
+            String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
+            confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
+            predictedIntent = intentStr;
+
+            // Parse params thành Map
+            Map<String, Object> extractedParams = new java.util.HashMap<>();
+            if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
+                jsonNode.get("params").fields().forEachRemaining(entry -> {
+                    com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
+                    if (val.isNumber()) extractedParams.put(entry.getKey(), val.numberValue());
+                    else if (val.isBoolean()) extractedParams.put(entry.getKey(), val.booleanValue());
+                    else extractedParams.put(entry.getKey(), val.asText());
+                });
+            }
+
+            // Chuyển đổi String intent thành Enum an toàn
+            iuh.se.kltn.backend.modules.ai.enums.SystemIntent systemIntent;
+            try {
+                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.valueOf(intentStr);
+            } catch (IllegalArgumentException e) {
+                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.UNKNOWN;
+            }
+
+            IntentExtractionResult extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
+            System.out.println("🤖 [HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
+
+            if (confidence != null && confidence >= 0.7
+                    && dynamicQueryEngine.canHandle(extraction.getIntent())) {
+                System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
+
+                // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params Hash
+                String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role);
+                Cache resultCache = cacheManager.getCache("aiQueryResults");
+                if (resultCache != null) {
+                    Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
+                    if (cachedResult != null) {
+                        System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
+                        success = true;
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        return cachedResult.get();
+                    }
+                }
+
+                List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
+                String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
+                try {
+                    Object response = dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+                    // 💾 Ghi cache kết quả
+                    if (resultCache != null) {
+                        resultCache.put(cacheKey, response);
+                        System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
+                    }
+                    success = true;
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    return response;
+                } catch (Exception llmEx) {
+                    System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: " + llmEx.getMessage());
+                    success = true;
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    // Trả về dữ liệu thô nhưng format dễ đọc hơn
+                    if (results.isEmpty()) {
+                        return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
+                    }
+                    StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
+                    for (int i = 0; i < results.size(); i++) {
+                        Map<String, Object> row = results.get(i);
+                        sb.append("\n--- ").append(i + 1).append(" ---\n");
+                        for (Map.Entry<String, Object> entry : row.entrySet()) {
+                            if (entry.getValue() != null) {
+                                sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+                            }
+                        }
+                    }
+                    return sb.toString();
+                }
+            } else {
+                fallbackUsed = true;
+                System.out.println("⚠️ [HYBRID AI] Confidence too low (" + confidence + ") or intent not fully supported. Fallback to SqlGeneratorAi.");
+            }
+        } catch (Exception e) {
+            fallbackUsed = true;
+            System.err.println("❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
+        }
+
+        // 📝 Ghi log cho luồng Fallback trước khi đi xuống Legacy Pipeline
+        saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false);
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();
 
@@ -213,7 +394,7 @@ public class AiOrchestratorService {
         } else {
             System.out.println("🐌 [CACHE MISS] Câu hỏi mới, gọi Gemini sinh SQL...");
             try {
-                sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, roleRules);
+                sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, schemaContext, roleRules);
             } catch (Exception llmEx) {
                 System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
                 return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
@@ -265,7 +446,7 @@ public class AiOrchestratorService {
                 return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm luồng bảo mật dữ liệu.";
             }
         } else if (role.equalsIgnoreCase("TENANT") && !upperCaseSql.contains("UNAUTHORIZED")) {
-            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS")) && !upperCaseSql.contains("TENANT_ID")) {
+            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS") || upperCaseSql.contains("APPOINTMENTS")) && !upperCaseSql.contains("TENANT_ID")) {
                 System.err.println("🚨 [HARD SECURITY ALERT] SQL của Khách thuê truy cập bảng nhạy cảm mà thiếu tenant_id: " + sqlToExecute);
                 return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm quyền riêng tư của khách hàng khác.";
             }
@@ -447,5 +628,40 @@ public class AiOrchestratorService {
             return matcher.group(1);
         }
         return "";
+    }
+
+    /**
+     * Sinh Cache Key xác định (deterministic) từ Intent + Params + UserId + Role.
+     * Dùng TreeMap để đảm bảo thứ tự params luôn nhất quán bất kể thứ tự nhập.
+     * VD: "AI_CACHE::SEARCH_ROOM::GUEST::0::{district=Gò Vấp, max_price=3000000}"
+     */
+    private String buildCacheKey(String intent, Map<String, Object> params, Long userId, String role) {
+        Map<String, Object> sortedParams = params != null ? new TreeMap<>(params) : new TreeMap<>();
+        return "AI_CACHE::" + intent + "::" + role + "::" + userId + "::" + sortedParams.toString();
+    }
+
+    /**
+     * Ghi bản ghi Observability vào DB (chạy async để không block response).
+     */
+    private void saveActionLog(Long userId, String role, String rawQuery,
+                               String predictedIntent, Double confidenceScore,
+                               boolean fallbackUsed, long startTime, boolean isSuccess) {
+        try {
+            long executionTimeMs = System.currentTimeMillis() - startTime;
+            AiActionLog log = AiActionLog.builder()
+                    .userId(userId)
+                    .userRole(role)
+                    .rawQuery(rawQuery)
+                    .predictedIntent(predictedIntent)
+                    .confidenceScore(confidenceScore)
+                    .isFallbackUsed(fallbackUsed)
+                    .executionTimeMs(executionTimeMs)
+                    .isSuccess(isSuccess)
+                    .build();
+            actionLogRepository.save(log);
+        } catch (Exception e) {
+            // Log Observability không bao giờ được phép làm sập luồng chính
+            System.err.println("⚠️ [OBSERVABILITY] Lỗi ghi AiActionLog: " + e.getMessage());
+        }
     }
 }
