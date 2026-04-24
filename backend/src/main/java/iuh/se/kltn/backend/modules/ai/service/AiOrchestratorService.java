@@ -173,39 +173,7 @@ public class AiOrchestratorService {
         return null; // Không tìm thấy FAQ tương tự
     }
 
-    // ====================================================================
-    // 📍 LOCATION-AWARE SEARCH: Tìm phòng theo vị trí / landmark
-    // ====================================================================
-
-    /**
-     * Kiểm tra câu hỏi có phải đang hỏi về vị trí/khoảng cách không.
-     * Ví dụ: "Tìm phòng gần Landmark 81", "Phòng trọ khu vực ĐH Bách Khoa"
-     */
-    public boolean isLocationQuery(String question) {
-        if (question == null) return false;
-        String normalized = normalizeText(question);
-        return (normalized.contains("gần") || normalized.contains("gan ") || normalized.contains("nearby")
-                || normalized.contains("khu vực") || normalized.contains("quanh "))
-                && (normalized.contains("phòng") || normalized.contains("trọ") || normalized.contains("thuê")
-                    || normalized.contains("tìm") || normalized.contains("room"));
-    }
-
-    @Autowired
-    private LocationAgentAi locationAgentAi;
-
-    /**
-     * Xử lý câu hỏi tìm phòng theo vị trí.
-     * Sử dụng Agentic Tool Calling (LocationAgentAi + LocationTools)
-     */
-    public Object processLocationQuery(String question, String role, Long userId) {
-        System.out.println("📍 [AGENT ROUTER] Chuyển tiếp câu hỏi cho LocationAgentAi: " + question);
-        try {
-            return locationAgentAi.processLocationQuery(question, role);
-        } catch (Exception e) {
-            System.err.println("❌ Lỗi thực thi LocationAgentAi: " + e.getMessage());
-            return "Dạ, máy chủ AI đang gặp sự cố khi tải dữ liệu định vị bản đồ. Bạn vui lòng thử lại sau nhé!";
-        }
-    }
+    // Legacy Location Query has been removed and integrated into IntentExtractor pipeline
 
     private String normalizeText(String text) {
         if (text == null) return "";
@@ -313,9 +281,84 @@ public class AiOrchestratorService {
             IntentExtractionResult extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
             System.out.println("🤖 [HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
 
-            if (confidence != null && confidence >= 0.7
-                    && dynamicQueryEngine.canHandle(extraction.getIntent())) {
-                System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
+            if (confidence != null && confidence >= 0.7) {
+                if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
+                    System.out.println("✅ [HYBRID AI] Intent match LOCATION_SEARCH! Bypassing LLM generation...");
+                    success = true;
+                    String locationName = extraction.getParams().containsKey("location") ? extraction.getParams().get("location").toString() : null;
+                    Double radius = 3.0;
+                    if (extraction.getParams().containsKey("radius")) {
+                        try {
+                            radius = Double.parseDouble(extraction.getParams().get("radius").toString());
+                        } catch (Exception e) {}
+                    }
+                    
+                    System.out.println("📍 [HYBRID AI] LOCATION_SEARCH -> location='" + locationName + "', radius=" + radius + "km");
+                    
+                    if (locationName == null || locationName.trim().isEmpty()) {
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        return "Dạ, bạn có thể cho mình biết tên địa điểm cụ thể bạn muốn tìm phòng gần đó không ạ?";
+                    }
+
+                    GeocodingService.GeoResult geoResult = geocodingService.geocode(locationName);
+                    if (geoResult == null) {
+                        System.out.println("❌ [HYBRID AI] GeoCache MISS -> '" + locationName + "'");
+                        List<String> topSuggestions = geocodingService.getSmartSuggestions(locationName, 3);
+                        StringBuilder sb = new StringBuilder("Dạ, mình không tìm thấy địa điểm '" + locationName + "'.\n");
+                        if (!topSuggestions.isEmpty()) {
+                            sb.append("Bạn có muốn tìm phòng gần các địa điểm sau không?\n");
+                            for (String sugg : topSuggestions) {
+                                sb.append("- ").append(sugg).append("\n");
+                            }
+                        }
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        return sb.toString();
+                    }
+
+                    List<Map<String, Object>> results = propertyRepository.findNearbyRooms(geoResult.latitude, geoResult.longitude, radius);
+                    if (results.isEmpty()) {
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + radius.intValue() + "km quanh '" + geoResult.displayName + "'.";
+                    }
+
+                    StringBuilder responseStr = new StringBuilder();
+                    responseStr.append("Dạ, mình tìm được ").append(results.size())
+                            .append(" phòng trống gần '").append(geoResult.displayName)
+                            .append("' (trong bán kính ").append(radius.intValue()).append("km):\n\n");
+
+                    int limit = Math.min(results.size(), 5);
+                    for (int i = 0; i < limit; i++) {
+                        Map<String, Object> row = results.get(i);
+                        Object roomId = row.get("room_id");
+                        Object nameObj = row.get("name");
+                        String name = nameObj != null ? nameObj.toString() : "";
+                        if (name.length() > 35) {
+                            name = name.substring(0, 32) + "...";
+                        }
+                        
+                        Object priceObj = row.get("price");
+                        String priceStr = "0";
+                        if (priceObj instanceof Number) {
+                            priceStr = String.valueOf(((Number) priceObj).longValue());
+                        } else if (priceObj != null) {
+                            try {
+                                priceStr = String.valueOf(Double.valueOf(priceObj.toString()).longValue());
+                            } catch (Exception e) {
+                                priceStr = priceObj.toString();
+                            }
+                        }
+
+                        Object distance = row.get("distance_km");
+                        String firstImg = extractFirstImage(row.get("images"));
+
+                        responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
+                                roomId, name, priceStr, firstImg, distance));
+                    }
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    return responseStr.toString();
+
+                } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
+                    System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
 
                 // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params Hash
                 String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role);
@@ -362,9 +405,10 @@ public class AiOrchestratorService {
                     }
                     return sb.toString();
                 }
+                }
             } else {
                 fallbackUsed = true;
-                System.out.println("⚠️ [HYBRID AI] Confidence too low (" + confidence + ") or intent not fully supported. Fallback to SqlGeneratorAi.");
+                System.out.println("⚠️ [HYBRID AI] Intent not fully supported or Confidence too low (" + confidence + "). Fallback to SqlGeneratorAi.");
             }
         } catch (Exception e) {
             fallbackUsed = true;

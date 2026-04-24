@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Đại học Bách Khoa TP.HCM",
+    "aliases": ["dhbk", "bk", "bach khoa", "bách khoa", "hcmut"],
+    "latitude": 10.773,
+    "longitude": 106.660
+  },
+  {
+    "name": "Landmark 81",
+    "aliases": ["landmark", "vincom landmark", "vincom landmark 81"],
+    "latitude": 10.794,
+    "longitude": 106.721
+  },
+  {
+    "name": "Đại học Công nghiệp TP.HCM",
+    "aliases": ["iuh", "đại học công nghiệp", "dai hoc cong nghiep", "cn tphcm"],
+    "latitude": 10.822,
+    "longitude": 106.687
+  },
+  {
+    "name": "Đại học Hutech",
+    "aliases": ["hutech", "đại học công nghệ tphcm", "dai hoc cong nghe tphcm"],
+    "latitude": 10.801,
+    "longitude": 106.714
+  },
+  {
+    "name": "Bến xe Miền Đông",
+    "aliases": ["bx miền đông", "bx mien dong", "bến xe mien dong"],
+    "latitude": 10.811,
+    "longitude": 106.711
+  },
+  {
+    "name": "Sân bay Tân Sơn Nhất",
+    "aliases": ["sân bay", "tsn", "tan son nhat", "sân bay tsn"],
+    "latitude": 10.814,
+    "longitude": 106.666
+  },
+  {
+    "name": "Đại học RMIT",
+    "aliases": ["rmit", "đại học rmit"],
+    "latitude": 10.730,
+    "longitude": 106.696
+  },
+  {
+    "name": "Đại học Kinh tế TP.HCM",
+    "aliases": ["ueh", "đại học kinh tế", "dai hoc kinh te", "kinh tế tphcm"],
+    "latitude": 10.781,
+    "longitude": 106.689
+  },
+  {
+    "name": "Khu công nghệ cao Q9",
+    "aliases": ["kcnc", "khu công nghệ cao", "khu cong nghe cao", "shtp"],
+    "latitude": 10.852,
+    "longitude": 106.797
+  },
+  {
+    "name": "Làng Đại học Thủ Đức",
+    "aliases": ["làng đại học", "lang dai hoc", "khu đô thị đhqg", "làng đh"],
+    "latitude": 10.870,
+    "longitude": 106.799
+  }
+]
