@@ -21,6 +21,8 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     Optional<Bill> findByContractIdAndMonthAndYear(Long contractId, Integer month, Integer year);
 
+    Optional<Bill> findFirstByContractIdOrderByYearDescMonthDesc(Long contractId);
+
     @Query("SELECT COALESCE(SUM(b.totalAmount), 0) " +
            "FROM Bill b " +
            "WHERE b.contract.room.property.landlord.id = :landlordId " +

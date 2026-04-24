@@ -4,17 +4,49 @@ import { userApi } from '@/api/userApi';
 import type { User } from '@/types';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,DialogDescription } from '@/components/ui/Dialog'; // shadcn/ui dialog
+import { Label } from '@/components/ui/Label';
+import { Input } from '@/components/ui/Input';
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState<'tenant' | 'landlord'>('tenant');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [lockReasons, setLockReasons] = useState<string[]>([]);  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [lockReasons, setLockReasons] = useState<string[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [showKycModal, setShowKycModal] = useState(false);
+  const [kycRejectReason, setKycRejectReason] = useState('');
   const [userHistory, setUserHistory] = useState<any[]>([]); 
-  const [showUnlockModal, setShowUnlockModal] = useState(false); 
+
+  // ... (QUICK_REASONS, toggleReason, lockDuration, DURATION_OPTIONS)
+
+  const [editedCccd, setEditedCccd] = useState('');
+
+  // Mutations
+  const verifyKycMutation = useMutation({
+    mutationFn: (userId: number) => userApi.verifyKYC(userId, editedCccd),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowKycModal(false);
+      toast.success("Đã phê duyệt định danh!");
+    },
+    onError: (err: any) => toast.error("Lỗi: " + (err.response?.data?.message || err.message))
+  });
+
+  const rejectKycMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: number; reason: string }) => userApi.rejectKYC(userId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowKycModal(false);
+      setKycRejectReason('');
+      toast.success("Đã từ chối định danh!");
+    },
+    onError: (err: any) => toast.error("Lỗi: " + (err.response?.data?.message || err.message))
+  });
 
   const QUICK_REASONS = [
     "Vi phạm nội quy",
@@ -269,28 +301,37 @@ export default function UserManagementPage() {
                       {user.cccdNumber || '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold border uppercase',
-                          user.kycStatus === 'VERIFIED'
-                            ? 'bg-green-100 text-green-800 border-green-200'
-                            : user.kycStatus === 'PENDING'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                            : 'bg-red-100 text-red-800 border-red-200'
-                        )}
-                      >
-                        {user.kycStatus || 'UNKNOWN'}
-                      </span>
+                      <StatusBadge
+                        label={user.kycStatus === 'VERIFIED' ? 'Đã xác minh' : user.kycStatus === 'PENDING' ? 'Đang chờ duyệt' : user.kycStatus === 'REJECTED' ? 'Bị từ chối' : 'Chưa xác thực'}
+                        tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'info' : 'warning'}
+                        className="text-[11px] uppercase"
+                      />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col w-24">
-                        <span className={cn('text-center rounded text-[10px] font-bold border uppercase', reputation.class)}>
-                          {reputation.label}
-                        </span>
+                        <StatusBadge
+                          label={reputation.label}
+                          tone={(user.reputationScore || 0) >= 70 ? 'success' : (user.reputationScore || 0) >= 30 ? 'warning' : 'danger'}
+                          className="justify-center text-[10px] uppercase"
+                        />
                         <span className="text-[15px] text-center text-gray-400 mt-1">{user.reputationScore}/100</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 flex gap-2">
+                      {user.kycStatus === 'PENDING' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setEditedCccd(user.cccdNumber || '');
+                            setShowKycModal(true);
+                          }}
+                        >
+                          Duyệt KYC
+                        </Button>
+                      )}
                       <Button
                       variant={user.locked ? 'default' : 'destructive'}
                       size="sm"
@@ -384,7 +425,7 @@ export default function UserManagementPage() {
         variant="destructive" 
         onClick={() => {
           if (selectedUser?.id) {
-            confirmLock(selectedUser.id, lockDuration, lockReasons);
+            confirmLock();
           }
         }} 
         disabled={lockReasons.length === 0}
@@ -471,6 +512,90 @@ export default function UserManagementPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowHistoryModal(false)}>
               Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Modal Xét duyệt KYC */}
+      <Dialog open={showKycModal} onOpenChange={setShowKycModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Xét duyệt Định danh (KYC)</DialogTitle>
+            <DialogDescription>
+              Người dùng: <span className="font-bold text-gray-900">{selectedUser?.fullName}</span> (ID: #{selectedUser?.id})
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid md:grid-cols-2 gap-6 mt-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">Mặt trước CCCD:</p>
+              <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                {selectedUser?.cccdFrontUrl ? (
+                  <img src={selectedUser.cccdFrontUrl} alt="Mặt trước" className="w-full h-full object-contain" />
+                ) : (
+                  <p className="text-gray-400 text-sm">Không có ảnh</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">Mặt sau CCCD:</p>
+              <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                {selectedUser?.cccdBackUrl ? (
+                  <img src={selectedUser.cccdBackUrl} alt="Mặt sau" className="w-full h-full object-contain" />
+                ) : (
+                  <p className="text-gray-400 text-sm">Không có ảnh</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <h4 className="font-bold text-gray-800 mb-2">Thông tin định danh (Admin có thể sửa nếu AI quét sai):</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <Label htmlFor="adminEditCccd" className="text-gray-500 mb-1 block">Số CCCD:</Label>
+                <Input 
+                  id="adminEditCccd"
+                  value={editedCccd}
+                  onChange={(e) => setEditedCccd(e.target.value)}
+                  className="font-mono font-bold text-lg text-indigo-700 bg-white"
+                  placeholder="Nhập số CCCD xác nhận"
+                />
+              </div>
+              <div>
+                <p className="text-gray-500 mb-1">Số lượt AI thử thất bại:</p>
+                <p className="font-bold text-amber-600 h-10 flex items-center">{selectedUser?.kycAttempts || 0} lần</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Lý do từ chối (Chỉ nhập nếu từ chối):</label>
+            <textarea
+              className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:ring-2 focus:ring-indigo-500"
+              placeholder="VD: Ảnh mờ không đọc được, Số CCCD không khớp hình ảnh..."
+              rows={3}
+              value={kycRejectReason}
+              onChange={(e) => setKycRejectReason(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter className="mt-6 gap-2">
+            <Button variant="outline" onClick={() => setShowKycModal(false)}>Để sau</Button>
+            <Button 
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => selectedUser && rejectKycMutation.mutate({ userId: selectedUser.id, reason: kycRejectReason })}
+              disabled={rejectKycMutation.isPending || !kycRejectReason.trim()}
+            >
+              {rejectKycMutation.isPending ? "Đang xử lý..." : "Từ chối hồ sơ"}
+            </Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => selectedUser && verifyKycMutation.mutate(selectedUser.id)}
+              disabled={verifyKycMutation.isPending}
+            >
+              {verifyKycMutation.isPending ? "Đang xử lý..." : "Phê duyệt định danh"}
             </Button>
           </DialogFooter>
         </DialogContent>

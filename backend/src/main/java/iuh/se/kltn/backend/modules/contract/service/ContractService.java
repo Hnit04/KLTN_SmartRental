@@ -30,9 +30,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.web3j.crypto.Keys;
+import org.web3j.crypto.Sign;
+import org.web3j.utils.Numeric;
 
 @Service
 public class ContractService {
@@ -54,6 +59,9 @@ public class ContractService {
 
     @org.springframework.beans.factory.annotation.Value("${blockchain.fallback-tenant-wallet:}")
     private String fallbackTenantWallet;
+
+    @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
+    private long vndEthRate;
 
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -528,6 +536,21 @@ public class ContractService {
             throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
         }
 
+        // --- XÁC MINH CHỮ KÝ SỐ (BLOCKCHAIN METHOD) ---
+        if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+            if (request.getSignature() == null || request.getSignature().isEmpty()) {
+                throw new RuntimeException("Chữ ký số không được để trống khi ký bằng Blockchain!");
+            }
+            
+            String userWallet = currentUser.getWalletAddress();
+            if (userWallet == null || userWallet.isEmpty()) {
+                throw new RuntimeException("Bạn chưa liên kết địa chỉ ví trên hệ thống!");
+            }
+            
+            // Xác minh chữ ký với Contract Hash
+            verifyWeb3Signature(contract.getContractHash(), request.getSignature(), userWallet);
+        }
+
         // 1. Cập nhật trạng thái ký của từng người
         if (currentUser.getRole() == Role.TENANT) {
             contract.setIsTenantSigned(true);
@@ -576,7 +599,7 @@ public class ContractService {
                     long endDateVal = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
                     long penaltyVal = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent().longValue() : 5L;
 
-                    long EXCHANGE_RATE = 80_000_000L;
+                    long EXCHANGE_RATE = vndEthRate;
                     BigInteger WEI_MULT = BigInteger.TEN.pow(18);
 
                     BigInteger rentWei = BigInteger.valueOf(priceVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
@@ -604,7 +627,8 @@ public class ContractService {
             }
 
             if (contract.getRoom() != null) {
-                contract.getRoom().setStatus(RoomStatus.RENTED);
+                // Giữ ở trạng thái Đã giữ chỗ, chỉ chuyển RENTED sau khi nạp cọc thành công
+                contract.getRoom().setStatus(RoomStatus.RESERVED);
                 roomRepository.save(contract.getRoom());
             }
         }
@@ -639,9 +663,9 @@ public class ContractService {
         // Xác định vai trò
         if (currentUserId != null) {
             if (contract.getTenant() != null && contract.getTenant().getId().equals(currentUserId)) {
-                res.setUserRole("CHỦ PHÒNG");
+                res.setUserRole("NGƯỜI THUÊ");
             } else {
-                res.setUserRole("THÀNH VIÊN");
+                res.setUserRole("CHỦ TRỌ");
             }
         }
         if (contract.getRoom() != null) {
@@ -664,14 +688,18 @@ public class ContractService {
             }
         }
         if (contract.getTenant() != null) {
-            res.setTenantName(contract.getTenant().getFullName());
-            res.setTenantPhone(contract.getTenant().getPhoneNumber());
-            res.setTenantCccd(contract.getTenant().getCccdNumber());
-            res.setTenantWalletAddress(contract.getTenant().getWalletAddress());
-            res.setTenantBankName(contract.getTenant().getBankName());
-            res.setTenantBankAccountNumber(contract.getTenant().getBankAccountNumber());
-            res.setTenantBankAccountHolder(contract.getTenant().getBankAccountHolder());
-            res.setTenantBankQrUrl(contract.getTenant().getBankQrUrl());
+            // ✅ Đảm bảo lấy thông tin mới nhất từ database để tránh lỗi cache/lazy load
+            User tenant = userRepository.findById(contract.getTenant().getId()).orElse(contract.getTenant());
+            res.setTenantName(tenant.getFullName());
+            res.setTenantPhone(tenant.getPhoneNumber());
+            res.setTenantCccd(tenant.getCccdNumber());
+            res.setTenantWalletAddress(tenant.getWalletAddress());
+            res.setTenantBankName(tenant.getBankName());
+            res.setTenantBankAccountNumber(tenant.getBankAccountNumber());
+            res.setTenantBankAccountHolder(tenant.getBankAccountHolder());
+            res.setTenantBankQrUrl(tenant.getBankQrUrl());
+            res.setTenantReputationScore(tenant.getReputationScore());
+            res.setTenantKycStatus(tenant.getKycStatus() != null ? tenant.getKycStatus().name() : "PENDING");
         }
         res.setActualPrice(contract.getActualPrice());
         return res;
@@ -728,29 +756,30 @@ public class ContractService {
             throw new RuntimeException("Giao dịch nạp cọc không hợp lệ hoặc chưa được xác nhận trên Blockchain!");
         }
 
-        // Kích hoạt hợp đồng
+        // ✅ FIX: Kích hoạt hợp đồng sau khi verify thành công (giống confirmTraditionalDeposit)
         contract.setStatus(ContractStatus.ACTIVE);
         contract.setDepositStatus(DepositStatus.DEPOSITED);
-        contract.setDepositTxHash(txHash);
-        
+        contract.setDeployTxHash(txHash);
+
         if (contract.getRoom() != null) {
             contract.getRoom().setStatus(RoomStatus.RENTED);
             roomRepository.save(contract.getRoom());
         }
 
         // Cộng điểm uy tín
-        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Nạp cọc và kích hoạt hợp đồng thành công (#" + contract.getId() + ")");
-        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã được bên thuê nạp cọc thành công (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã kích hoạt qua Web3 Deposit (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng được kích hoạt qua Blockchain (#" + contract.getId() + ")");
 
-        // Thông báo cho chủ nhà
+        // Thông báo
         notificationService.createNotification(
-            contract.getRoom().getProperty().getLandlord(),
-            "Khách thuê đã nạp cọc Web3",
-            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực sau khi hệ thống xác nhận tiền cọc.",
+            contract.getTenant(),
+            "Nạp cọc Web3 thành công",
+            "Hợp đồng phòng " + contract.getRoom().getName() + " đã chính thức có hiệu lực.",
             iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
             contract.getId()
         );
 
+        // Kích hoạt hợp đồng
         return mapToResponse(contractRepository.save(contract), userId);
     }
 
@@ -793,6 +822,51 @@ public class ContractService {
         return mapToResponse(contractRepository.save(contract), landlordId);
     }
 
+    private boolean verifyWeb3Signature(String message, String signature, String expectedWalletAddress) {
+        if (message == null || message.isEmpty()) {
+            throw new RuntimeException("Lỗi: Hợp đồng này chưa được băm (Hash). Vui lòng báo kỹ thuật viên.");
+        }
+        try {
+            byte[] signatureBytes = Numeric.hexStringToByteArray(signature);
+            byte v = signatureBytes[64];
+            if (v < 27) v += 27;
+            byte[] r = Arrays.copyOfRange(signatureBytes, 0, 32);
+            byte[] s = Arrays.copyOfRange(signatureBytes, 32, 64);
+            Sign.SignatureData sd = new Sign.SignatureData(v, r, s);
+
+            // CÁCH 1: Coi message là chuỗi ký tự UTF-8 (Mặc định của MetaMask)
+            String addressFromText = recoverAddress(message.getBytes(StandardCharsets.UTF_8), sd);
+            if (addressFromText.equalsIgnoreCase(expectedWalletAddress.trim())) {
+                return true;
+            }
+
+            // CÁCH 2: Nếu message là mã Hex (64 ký tự), thử coi nó là dữ liệu nhị phân (Binary)
+            // Một số ví (Trust, Ledger) có thể tự convert Hex String sang Bytes trước khi ký
+            if (message.length() == 64) {
+                try {
+                    String addressFromHex = recoverAddress(Numeric.hexStringToByteArray(message), sd);
+                    if (addressFromHex.equalsIgnoreCase(expectedWalletAddress.trim())) {
+                        return true;
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            throw new RuntimeException("Xác thực thất bại! \n" +
+                "Ví trong hồ sơ: " + expectedWalletAddress.trim() + "\n" +
+                "Ví khôi phục (dạng văn bản): " + addressFromText + "\n" +
+                "Hash đang ký: " + message);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi hệ thống khi xác minh chữ ký: " + e.getMessage());
+        }
+    }
+
+    private String recoverAddress(byte[] msgBytes, Sign.SignatureData sd) throws Exception {
+        BigInteger publicKey = Sign.signedPrefixedMessageToKey(msgBytes, sd);
+        return "0x" + Keys.getAddress(publicKey);
+    }
+
     private String calculateSHA256(String data) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -807,5 +881,42 @@ public class ContractService {
         } catch (Exception e) {
             return "HASH_ERROR";
         }
+    }
+
+    @Transactional
+    public ContractResponse rejectContract(Long contractId, Long currentUserId, String reason) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        // Chỉ chủ trọ mới có quyền từ chối yêu cầu
+        if (!currentUserId.equals(contract.getRoom().getProperty().getLandlord().getId())) {
+            throw new RuntimeException("Chỉ chủ trọ của phòng này mới có quyền từ chối yêu cầu!");
+        }
+
+        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE) {
+            throw new RuntimeException("Chỉ có thể từ chối hợp đồng khi đang ở trạng thái chờ ký!");
+        }
+
+        // 1. Cập nhật trạng thái hợp đồng
+        contract.setStatus(ContractStatus.CANCELLED);
+        contract.setCancelReason(reason);
+        contractRepository.save(contract);
+
+        // 2. Giải phóng phòng về trạng thái AVAILABLE
+        Room room = contract.getRoom();
+        room.setStatus(RoomStatus.AVAILABLE);
+        roomRepository.save(room);
+
+        // 3. Gửi thông báo cho khách thuê
+        String displayReason = (reason != null && !reason.isEmpty()) ? " với lý do: " + reason : "";
+        notificationService.createNotification(
+                contract.getTenant(),
+                "Yêu cầu thuê phòng bị từ chối",
+                "Chủ trọ đã từ chối yêu cầu thuê phòng " + room.getName() + displayReason,
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+        );
+
+        return mapToResponse(contract, currentUserId);
     }
 }

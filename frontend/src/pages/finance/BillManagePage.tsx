@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { billApi } from '@/api/billApi';
 import { propertyApi } from '@/api/propertyApi';
@@ -54,6 +55,12 @@ export default function BillManagePage() {
 
   // States tính toán Real-time
   const [previewTotal, setPreviewTotal] = useState<number>(0);
+  const [isMeterReset, setIsMeterReset] = useState<boolean>(false);
+
+  // States cho Thực Thu Popup
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState<ContractBilling | null>(null);
+  const [actualPaidDate, setActualPaidDate] = useState<string>(new Date().toISOString().slice(0, 16));
 
   const fetchBillingStatus = async () => {
     setIsLoading(true);
@@ -67,20 +74,29 @@ export default function BillManagePage() {
     }
   };
 
-  const handleConfirmPayment = async (contract: ContractBilling) => {
-    if (!contract.billId) {
+  const handleConfirmPaymentClick = (contract: ContractBilling) => {
+    setSelectedBillForPayment(contract);
+    setActualPaidDate(new Date().toISOString().slice(0, 16));
+    setPaymentModalOpen(true);
+  };
+
+  const executeConfirmPayment = async () => {
+    if (!selectedBillForPayment || !selectedBillForPayment.billId) {
       toast.error("Không tìm thấy mã hóa đơn!");
       return;
     }
+    const contract = selectedBillForPayment;
     setIsConfirmingPayment(contract.billId);
     try {
-      await billApi.landlordConfirmPayment(contract.billId);
+      await billApi.landlordConfirmPayment(contract.billId, actualPaidDate);
       toast.success("Đã xác nhận thu tiền thành công!");
       
       // Cập nhật state ngay lập tức
       setContracts(contracts.map(c => 
         c.billId === contract.billId ? { ...c, billStatus: 'PAID' } : c
       ));
+      setPaymentModalOpen(false);
+      setSelectedBillForPayment(null);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Lỗi khi xác nhận thanh toán");
     } finally {
@@ -94,8 +110,20 @@ export default function BillManagePage() {
   useEffect(() => {
     if (!selectedContract) return;
 
-    const elecUsed = Math.max(0, Number(newElec) - selectedContract.oldElecIndex);
-    const waterUsed = Math.max(0, Number(newWater) - selectedContract.oldWaterIndex);
+    let elecUsed = 0;
+    let waterUsed = 0;
+    
+    if (isMeterReset && Number(newElec) < selectedContract.oldElecIndex) {
+      elecUsed = (10000 - selectedContract.oldElecIndex) + Number(newElec);
+    } else {
+      elecUsed = Math.max(0, Number(newElec) - selectedContract.oldElecIndex);
+    }
+
+    if (isMeterReset && Number(newWater) < selectedContract.oldWaterIndex) {
+      waterUsed = (1000 - selectedContract.oldWaterIndex) + Number(newWater);
+    } else {
+      waterUsed = Math.max(0, Number(newWater) - selectedContract.oldWaterIndex);
+    }
     
     const elecCost = elecUsed * selectedContract.elecPrice;
     const waterCost = waterUsed * selectedContract.waterPrice;
@@ -107,7 +135,7 @@ export default function BillManagePage() {
 
     const total = roomCost + elecCost + waterCost + internetCost + extra - discount;
     setPreviewTotal(Math.max(0, total)); 
-  }, [newElec, newWater, additionalFee, discountAmount, selectedContract]);
+  }, [newElec, newWater, additionalFee, discountAmount, selectedContract, isMeterReset]);
 
 
   const handlePrevMonth = () => {
@@ -116,6 +144,10 @@ export default function BillManagePage() {
   };
 
   const handleNextMonth = () => {
+    const now = new Date();
+    if (currentYear > now.getFullYear() || (currentYear === now.getFullYear() && currentMonth >= now.getMonth() + 1)) {
+        return; 
+    }
     if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(prev => prev + 1); } 
     else { setCurrentMonth(prev => prev + 1); }
   };
@@ -124,12 +156,23 @@ export default function BillManagePage() {
     setSelectedContract(contract);
     setNewElec(''); setNewWater('');
     setAdditionalFee(''); setDiscountAmount(''); setNote('');
+    setIsMeterReset(false);
     setMeterFiles({ elec: null, water: null });
     setMeterPreviews({ elec: '', water: '' });
     
+    const now = new Date();
     const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
     const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-    setDeadlineDate(`${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-05T23:59:59`);
+    let defaultDeadline = new Date(nextMonthYear, nextMonth - 1, 5, 23, 59, 59);
+
+    // Nếu mùng 5 tháng sau đã qua, dời deadline thành 5 ngày kể từ "Hôm nay"
+    if (defaultDeadline < now) {
+      defaultDeadline = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+    }
+    
+    // Offset local timezone
+    defaultDeadline.setMinutes(defaultDeadline.getMinutes() - defaultDeadline.getTimezoneOffset());
+    setDeadlineDate(defaultDeadline.toISOString().slice(0, 16));
     
     setIsChotSoModalOpen(true);
   };
@@ -196,6 +239,7 @@ export default function BillManagePage() {
         note: note,
         elecMeterImageUrl: uploadedElecUrl,
         waterMeterImageUrl: uploadedWaterUrl,
+        isMeterReset: isMeterReset,
       });
 
       toast.success('Chốt sổ thành công!');
@@ -329,10 +373,10 @@ export default function BillManagePage() {
                     Hợp đồng #{contract.id}
                   </p>
                 </div>
-                {contract.billStatus === 'UNBILLED' && <Badge variant="destructive" icon={<AlertCircle />}>Chưa chốt</Badge>}
-                {contract.billStatus === 'PENDING' && <Badge variant="warning" icon={<Clock />}>Chờ đóng</Badge>}
-                {contract.billStatus === 'PAID' && <Badge variant="success" icon={<CheckCircle2 />}>Đã thu</Badge>}
-                {contract.billStatus === 'LATE' && <Badge variant="destructive" icon={<AlertCircle />}>Trễ hạn</Badge>}
+                {contract.billStatus === 'UNBILLED' && <StatusBadge label="Chưa chốt" tone="danger" />}
+                {contract.billStatus === 'PENDING' && <StatusBadge label="Chờ đóng" tone="warning" />}
+                {contract.billStatus === 'PAID' && <StatusBadge label="Đã thu" tone="success" />}
+                {contract.billStatus === 'LATE' && <StatusBadge label="Trễ hạn" tone="danger" />}
               </div>
 
               <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
@@ -361,7 +405,7 @@ export default function BillManagePage() {
                       </Button>
                       <Button 
                         className="flex-[3] bg-orange-500 hover:bg-orange-600 text-white" 
-                        onClick={() => handleConfirmPayment(contract)}
+                        onClick={() => handleConfirmPaymentClick(contract)}
                         isLoading={isConfirmingPayment === contract.billId}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" /> Thực Thu
@@ -395,6 +439,18 @@ export default function BillManagePage() {
 
             <div className="flex flex-col md:flex-row">
                 <div className="p-6 flex-1 space-y-5 border-r border-gray-100">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
+                        <h3 className="text-sm font-semibold text-gray-800">Thông số tiêu thụ</h3>
+                        <label className="flex items-center gap-2 cursor-pointer group tooltip" title="Tích vào khi đồng hồ chạy hết mức và quay về 0">
+                            <input 
+                                type="checkbox" 
+                                checked={isMeterReset} 
+                                onChange={(e) => setIsMeterReset(e.target.checked)}
+                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm text-orange-600 font-medium group-hover:text-orange-700 transition-colors">Đồng hồ quay vòng</span>
+                        </label>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         {/* Nhập điện */}
                         <div className="space-y-2">
@@ -462,8 +518,25 @@ export default function BillManagePage() {
                     </div>
                 </div>
 
-                <div className="p-6 md:w-72 bg-gray-50 flex flex-col justify-between">
+                <div className="p-6 md:w-80 bg-gray-50 flex flex-col justify-between">
                     <div>
+                        <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mb-5 shadow-sm">
+                            <label className="text-xs font-bold text-orange-800 uppercase flex items-center gap-1.5 mb-2">
+                                <Clock className="h-3.5 w-3.5" /> Hạn Chót Nộp Tiền
+                            </label>
+                            <Input
+                                type="datetime-local"
+                                value={deadlineDate}
+                                onChange={(e) => setDeadlineDate(e.target.value)}
+                                className={`w-full bg-white font-medium text-sm border-orange-200 focus-visible:ring-orange-500 hover:border-orange-300 transition-colors ${new Date(deadlineDate) < new Date() ? 'text-red-600 border-red-300 focus-visible:ring-red-500' : 'text-gray-900'}`}
+                            />
+                            {new Date(deadlineDate) < new Date() && (
+                                <p className="text-xs text-red-600 mt-1.5 font-medium flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" /> Không thể lùi về quá khứ
+                                </p>
+                            )}
+                        </div>
+
                         <h3 className="text-sm font-bold text-gray-800 uppercase mb-4 border-b pb-2">Tạm tính</h3>
                         <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
@@ -471,12 +544,28 @@ export default function BillManagePage() {
                                 <span>{formatCurrency(selectedContract.actualPrice)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Tiền điện ({Math.max(0, Number(newElec) - selectedContract.oldElecIndex)} kí):</span>
-                                <span>{formatCurrency(Math.max(0, Number(newElec) - selectedContract.oldElecIndex) * selectedContract.elecPrice)}</span>
+                                <span className="text-gray-500">Tiền điện ({
+                                    isMeterReset && Number(newElec) < selectedContract.oldElecIndex
+                                    ? (10000 - selectedContract.oldElecIndex) + Number(newElec)
+                                    : Math.max(0, Number(newElec) - selectedContract.oldElecIndex)
+                                } kí):</span>
+                                <span>{formatCurrency(
+                                    (isMeterReset && Number(newElec) < selectedContract.oldElecIndex
+                                    ? (10000 - selectedContract.oldElecIndex) + Number(newElec)
+                                    : Math.max(0, Number(newElec) - selectedContract.oldElecIndex)) * selectedContract.elecPrice
+                                )}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Tiền nước ({Math.max(0, Number(newWater) - selectedContract.oldWaterIndex)} khối):</span>
-                                <span>{formatCurrency(Math.max(0, Number(newWater) - selectedContract.oldWaterIndex) * selectedContract.waterPrice)}</span>
+                                <span className="text-gray-500">Tiền nước ({
+                                    isMeterReset && Number(newWater) < selectedContract.oldWaterIndex
+                                    ? (1000 - selectedContract.oldWaterIndex) + Number(newWater)
+                                    : Math.max(0, Number(newWater) - selectedContract.oldWaterIndex)
+                                } khối):</span>
+                                <span>{formatCurrency(
+                                    (isMeterReset && Number(newWater) < selectedContract.oldWaterIndex
+                                    ? (1000 - selectedContract.oldWaterIndex) + Number(newWater)
+                                    : Math.max(0, Number(newWater) - selectedContract.oldWaterIndex)) * selectedContract.waterPrice
+                                )}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Mạng / Dịch vụ:</span>
@@ -504,7 +593,7 @@ export default function BillManagePage() {
                         <Button 
                             className="w-full mt-4" 
                             onClick={handleChotSo} 
-                            disabled={!newElec || !newWater || isSubmitting}
+                            disabled={!newElec || !newWater || isSubmitting || new Date(deadlineDate) < new Date()}
                         >
                             {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                             {isSubmitting ? 'Đang tải minh chứng...' : 'Phát Hành Hóa Đơn'}
@@ -533,11 +622,11 @@ export default function BillManagePage() {
                  
                  <div className="mt-4 inline-flex items-center justify-center">
                    {viewingContract.billStatus === 'PAID' ? (
-                     <span className="px-4 py-1.5 bg-green-100 text-green-700 text-sm font-bold rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-4 h-4"/> ĐÃ THANH TOÁN</span>
+                    <StatusBadge label="ĐÃ THANH TOÁN" tone="success" className="text-sm font-bold" />
                    ) : viewingContract.billStatus === 'LATE' ? (
-                     <span className="px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-full border border-red-200 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> TRỄ HẠN</span>
+                    <StatusBadge label="TRỄ HẠN" tone="danger" className="text-sm font-bold" />
                    ) : (
-                     <span className="px-4 py-1.5 bg-orange-100 text-orange-700 text-sm font-bold rounded-full border border-orange-200 flex items-center gap-1"><Clock className="w-4 h-4"/> CHỜ THANH TOÁN</span>
+                    <StatusBadge label="CHỜ THANH TOÁN" tone="warning" className="text-sm font-bold" />
                    )}
                  </div>
               </div>
@@ -653,20 +742,51 @@ export default function BillManagePage() {
            </div>
          </div>
       )}
+      {/* --- MODAL THỰC THU --- */}
+      {paymentModalOpen && selectedBillForPayment && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-5 border-b text-center bg-orange-50">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm text-orange-500 border border-orange-100">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">Xác nhận Thực Thu</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600 text-center">
+                Xác nhận đã thu tiền phòng <strong>{selectedBillForPayment.roomName}</strong>?<br/>
+                Tổng: <strong className="text-primary text-base">{formatCurrency(selectedBillForPayment.totalAmount || selectedBillForPayment.actualPrice)}</strong>
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-800">Ngày nhận tiền thực tế</label>
+                <p className="text-xs text-gray-500 mb-1">Mốc thời gian này sẽ được dùng để chấm điểm uy tín nộp tiền của khách.</p>
+                <Input 
+                  type="datetime-local" 
+                  value={actualPaidDate} 
+                  onChange={(e) => setActualPaidDate(e.target.value)}
+                  className={`w-full ${new Date(actualPaidDate) > new Date() ? 'border-red-300 text-red-600 focus-visible:ring-red-500' : ''}`}
+                />
+                {new Date(actualPaidDate) > new Date() && (
+                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Không được chọn ngày ở Tương Lai
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 flex gap-3 border-t">
+              <Button className="flex-1" variant="outline" onClick={() => setPaymentModalOpen(false)}>Hủy</Button>
+              <Button 
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" 
+                onClick={executeConfirmPayment}
+                disabled={!actualPaidDate || new Date(actualPaidDate) > new Date()}
+                isLoading={isConfirmingPayment === selectedBillForPayment.billId}
+              >
+                Xác nhận
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-const Badge = ({ children, variant, icon }: any) => {
-  const styles = {
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-orange-100 text-orange-700',
-    destructive: 'bg-red-100 text-red-700',
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant as keyof typeof styles]}`}>
-      {icon && <span className="[&>svg]:h-3 [&>svg]:w-3">{icon}</span>}
-      {children}
-    </span>
-  );
-};

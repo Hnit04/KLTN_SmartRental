@@ -59,11 +59,32 @@ export function UserNav() {
             </DropdownItem>
           </Link>
         </>
-      ) : (
+      ) : user.role === 'ADMIN' ? (
         <>
-          <Link to="/tenant/contracts">
+          <Link to="/admin/dashboard">
+            <DropdownItem>
+              <LayoutDashboard className="mr-3 h-4 w-4 text-gray-500" />
+              Quản trị hệ thống
+            </DropdownItem>
+          </Link>
+          <Link to="/admin/approvals">
             <DropdownItem>
               <FileText className="mr-3 h-4 w-4 text-gray-500" />
+              Duyệt tin bài đăng
+            </DropdownItem>
+          </Link>
+        </>
+      ) : (
+        <>
+          <Link to="/tenant/dashboard">
+            <DropdownItem>
+              <LayoutDashboard className="mr-3 h-4 w-4 text-gray-500" />
+              Tổng quan
+            </DropdownItem>
+          </Link>
+          <Link to="/tenant/contracts">
+            <DropdownItem>
+              <Home className="mr-3 h-4 w-4 text-gray-500" />
               Hợp đồng của tôi
             </DropdownItem>
           </Link>

@@ -14,6 +14,7 @@ import RoomCard from "@/features/property/components/RoomCard";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
 export default function PropertyDetailPage() {
@@ -201,8 +202,13 @@ export default function PropertyDetailPage() {
   const images = property.images && property.images.length > 0 ? property.images : ["https://placehold.co/800x600?text=No+Image"];
   const displayImages = images.slice(0, 5); // max 5, không duplicate
 
+  const activeRoomFilters = [
+    roomStatusFilter !== "ALL" ? { key: "status", label: `Trang thai: ${roomStatusFilter}` } : null,
+    roomSortBy !== "default" ? { key: "sort", label: `Sap xep: ${roomSortBy}` } : null,
+  ].filter(Boolean) as { key: string; label: string }[];
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-background pb-20 space-y-6">
 
       {/* ============ LIGHTBOX ============ */}
       {lightboxOpen && (
@@ -248,8 +254,9 @@ export default function PropertyDetailPage() {
       )}
 
       {/* 1. HEADER & GALLERY */}
-      <div className="bg-white border-b pb-6">
-        <div className="container mx-auto max-w-7xl px-4 pt-6">
+      <div className="page-shell pt-6">
+        <div className="section-card border bg-card pb-6">
+        <div className="px-4 md:px-6">
           <Link to="/properties" className="inline-flex items-center text-sm text-gray-500 hover:text-primary mb-4 transition-colors">
             <ArrowLeft className="h-4 w-4 mr-1" /> Quay lại tìm kiếm
           </Link>
@@ -305,15 +312,15 @@ export default function PropertyDetailPage() {
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="flex-1 space-y-8">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.name}</h1>
-                <div className="flex items-center text-gray-600">
+                <h1 className="text-3xl font-bold text-foreground mb-2">{property.name}</h1>
+                <div className="flex items-center text-muted-foreground">
                   <MapPin className="h-5 w-5 mr-2 text-primary shrink-0" />
                   <span>{property.address}, {property.district}, {property.city}</span>
                 </div>
               </div>
 
               <div className="border-t pt-6">
-                <h3 className="font-bold text-lg mb-4 text-gray-800">Bảng giá dịch vụ</h3>
+                <h3 className="font-bold text-lg mb-4 text-foreground">Bảng giá dịch vụ</h3>
                 <div className="flex flex-wrap gap-4">
                   <ServiceItem icon={<Zap className="text-yellow-500" />} label="Điện" value={property.elecPrice} unit="kW" />
                   <ServiceItem icon={<Droplets className="text-blue-500" />} label="Nước" value={property.waterPrice} unit="khối" />
@@ -322,8 +329,8 @@ export default function PropertyDetailPage() {
               </div>
               
               <div className="border-t pt-6">
-                 <h3 className="font-bold text-lg mb-3 text-gray-800">Mô tả chi tiết</h3>
-                 <div className="text-gray-600 bg-gray-50 p-5 rounded-xl border leading-relaxed whitespace-pre-line text-sm md:text-base">
+                 <h3 className="font-bold text-lg mb-3 text-foreground">Mô tả chi tiết</h3>
+                 <div className="text-muted-foreground bg-muted/40 p-5 rounded-xl border leading-relaxed whitespace-pre-line text-sm md:text-base">
                     {property.description || "Chủ nhà chưa cung cấp mô tả chi tiết."}
                  </div>
               </div>
@@ -331,7 +338,7 @@ export default function PropertyDetailPage() {
 
             <div className="lg:w-80 shrink-0">
               <div className="sticky top-24 space-y-4">
-                <div className="bg-white rounded-xl shadow-lg shadow-gray-100 border p-5">
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
                    <div className="flex items-center gap-3 mb-5 border-b pb-4 border-dashed">
                       <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
                          <User className="h-6 w-6" />
@@ -384,19 +391,19 @@ export default function PropertyDetailPage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* 2. DANH SÁCH PHÒNG */}
-      <div className="container mx-auto max-w-7xl px-4 py-10">
+      <div className="page-shell py-10">
+        <div className="section-card p-4 md:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-2xl font-bold text-foreground">
             Danh sách phòng
             <span className="ml-2 text-base font-normal text-gray-500">({filteredRooms.length}/{rooms.length})</span>
           </h2>
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-2 text-sm text-green-700 font-medium bg-green-50 px-4 py-1.5 rounded-full border border-green-200 shadow-sm">
-               <ShieldCheck className="h-4 w-4" /> Tin đăng đã xác thực
-            </div>
+            <StatusBadge label="Tin đăng đã xác thực" tone="success" className="text-sm font-medium" />
             <button
               onClick={() => setShowRoomFilter(!showRoomFilter)}
               className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition ${
@@ -410,7 +417,7 @@ export default function PropertyDetailPage() {
 
         {/* PANEL LỌC PHÒNG */}
         {showRoomFilter && (
-          <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-6 items-end animate-in slide-in-from-top-2 duration-200">
+          <div className="rounded-xl border bg-card p-4 mb-6 flex flex-wrap gap-6 items-end animate-in slide-in-from-top-2 duration-200">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</label>
               <div className="flex gap-2">
@@ -460,6 +467,14 @@ export default function PropertyDetailPage() {
           </div>
         )}
 
+        {activeRoomFilters.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {activeRoomFilters.map((filter) => (
+              <StatusBadge key={filter.key} label={filter.label} tone="info" className="text-xs" />
+            ))}
+          </div>
+        )}
+
         {filteredRooms.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRooms.map((room) => (
@@ -497,8 +512,8 @@ export default function PropertyDetailPage() {
         )}
 
         {/* --- 4. KHỐI ĐÁNH GIÁ (REVIEWS) với Rating Tổng Hợp --- */}
-        <div className="mt-12 bg-white rounded-2xl border p-6 md:p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+        <div className="mt-12 rounded-2xl border bg-card p-6 md:p-8 shadow-sm">
+          <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
             <Star className="h-6 w-6 text-yellow-500 fill-yellow-500" />
             Đánh giá từ người thuê ({reviews.length})
           </h2>
@@ -578,6 +593,7 @@ export default function PropertyDetailPage() {
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
 

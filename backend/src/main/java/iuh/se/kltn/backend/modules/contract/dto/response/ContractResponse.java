@@ -58,4 +58,7 @@ public class ContractResponse {
 
     // 🏷️ Vai trò của người đang xem trong hợp đồng này (Dùng cho Lịch sử thuê)
     private String userRole;
+    private Integer tenantReputationScore;
+    private String tenantKycStatus;
+    private String cancelReason;
 }

@@ -97,15 +97,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/reset-password-gg")
-    public ResponseEntity<?> resetPasswordNoNeedOTP(@RequestBody ResetPasswordRequest request) {
-        try {
-            authService.resetPasswordNoNeedOTP(request.getEmail(), request.getNewPassword());
-            return ResponseEntity.ok("Đổi mật khẩu thành công!");
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
-    }
+    // ❌ ĐÃ XÓA: resetPasswordNoNeedOTP — Lỗ hổng bảo mật nghiêm trọng (cho phép đổi MK không cần OTP)
 
 
     @PostMapping("/login")

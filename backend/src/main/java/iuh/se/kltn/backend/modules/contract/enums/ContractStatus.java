@@ -5,5 +5,6 @@ public enum ContractStatus {
     AWAITING_DEPOSIT,
     ACTIVE,
     EXPIRED,
-    TERMINATED_EARLY
+    TERMINATED_EARLY,
+    CANCELLED
 }

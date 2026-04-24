@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, FileText, CalendarClock, LayoutDashboard, DoorOpen, Wallet, PieChart } from "lucide-react";
+import { Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/utils/cn";
+import { ROLE_NAV_ITEMS, type AppRole } from "@/config/navigation";
 
 /**
  * Mobile Bottom Navigation Bar — hiển thị khi màn hình nhỏ hơn md.
@@ -12,25 +13,19 @@ import { cn } from "@/utils/cn";
 export default function MobileBottomNav() {
   const location = useLocation();
   const { user } = useAuth();
-
-  const tenantNav = [
-    { to: "/tenant/dashboard", icon: LayoutDashboard, label: "Tổng quan" },
-    { to: "/properties",       icon: Search,          label: "Tìm phòng" },
-    { to: "/tenant/my-room",     icon: DoorOpen,        label: "Phòng trọ" },
-    { to: "/tenant/contracts",   icon: FileText,        label: "Hợp đồng" },
-    { to: "/tenant/appointments", icon: CalendarClock,   label: "Lịch hẹn" },
-  ];
-
-  const landlordNav = [
-    { to: "/landlord/dashboard",    icon: LayoutDashboard, label: "Tổng quan" },
-    { to: "/landlord/properties",   icon: Home,            label: "Khu trọ" },
-    { to: "/landlord/contracts",    icon: FileText,        label: "Hợp đồng" },
-    { to: "/landlord/finance",      icon: Wallet,          label: "Tài chính" },
-    { to: "/landlord/appointments", icon: CalendarClock,   label: "Lịch hẹn" },
-    { to: "/landlord/reports",      icon: PieChart,        label: "Báo cáo" },
-  ];
-
-  const navItems = user?.role === "LANDLORD" ? landlordNav : tenantNav;
+  const normalizedRole: AppRole = user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT';
+  const roleItems = ROLE_NAV_ITEMS[normalizedRole];
+  const navItems = (normalizedRole === 'TENANT'
+    ? [
+        { title: "Tìm phòng", path: "/properties", icon: Search, mobileLabel: "Tìm phòng" },
+        ...roleItems.filter(item => item.path !== "/tenant/rental-history"),
+      ]
+    : roleItems
+  ).map(item => ({
+    to: item.path,
+    icon: item.icon,
+    label: item.mobileLabel || item.title,
+  }));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]">

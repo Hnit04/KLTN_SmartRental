@@ -25,6 +25,7 @@ import { cn } from "@/utils/cn";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Input } from "@/components/ui/Input";
+import StatusBadge from "@/components/shared/StatusBadge";
 
 type TabType = 'ONGOING' | 'PAST';
 
@@ -88,15 +89,15 @@ export default function RentalHistoryPage() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'ACTIVE':
-        return { label: 'Đang hiệu lực', color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2 };
+        return { label: 'Đang hiệu lực', tone: 'success' as const, icon: CheckCircle2 };
       case 'EXPIRED':
-        return { label: 'Đã hết hạn', color: 'bg-gray-100 text-gray-600 border-gray-200', icon: Clock };
+        return { label: 'Đã hết hạn', tone: 'neutral' as const, icon: Clock };
       case 'TERMINATED_EARLY':
-        return { label: 'Kết thúc sớm', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: AlertCircle };
+        return { label: 'Kết thúc sớm', tone: 'warning' as const, icon: AlertCircle };
        case 'PENDING_SIGNATURE':
-        return { label: 'Chờ ký tên', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: HelpCircle };
+        return { label: 'Chờ ký tên', tone: 'info' as const, icon: HelpCircle };
       default:
-        return { label: status, color: 'bg-gray-100 text-gray-700 border-gray-200', icon: HelpCircle };
+        return { label: status, tone: 'neutral' as const, icon: HelpCircle };
     }
   };
 
@@ -247,9 +248,9 @@ export default function RentalHistoryPage() {
                       <div className="flex justify-between items-start">
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                             <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border", statusCfg.color)}>
-                               <StatusIcon className="h-3 w-3" />
-                               {statusCfg.label}
+                             <span className="inline-flex items-center gap-1.5">
+                               <StatusIcon className="h-3 w-3 text-muted-foreground" />
+                               <StatusBadge label={statusCfg.label} tone={statusCfg.tone} className="text-[10px] font-black uppercase tracking-widest" />
                              </span>
                              <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border", roleCfg.color)}>
                                {roleCfg.label}

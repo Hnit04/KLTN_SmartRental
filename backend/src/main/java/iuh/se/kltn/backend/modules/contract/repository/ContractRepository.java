@@ -23,7 +23,16 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
 
+    @Query("SELECT DISTINCT c FROM Contract c " +
+           "LEFT JOIN c.bills b " +
+           "WHERE c.room.property.landlord.id = :landlordId " +
+           "AND (c.status = 'ACTIVE' " +
+           "  OR (c.status IN ('EXPIRED', 'TERMINATED_EARLY', 'CANCELLED') " +
+           "      AND b.status IN ('UNPAID', 'PENDING', 'LATE'))) ")
+    List<Contract> findBillingContractsByLandlordId(@Param("landlordId") Long landlordId);
+
     List<Contract> findByStatusAndCreatedAtBefore(ContractStatus status, LocalDateTime time);
+    List<Contract> findByStatusAndSignDateBefore(ContractStatus status, LocalDateTime time);
     
     // Tìm hợp đồng ACTIVE đã hết hạn
     List<Contract> findByStatusAndEndDateBefore(ContractStatus status, java.time.LocalDate endDate);

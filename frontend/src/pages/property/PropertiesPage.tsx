@@ -120,16 +120,43 @@ export default function PropertiesPage() {
     !isAvailableOnly // Count as active filter if user manually UNCHECKS it (since default is true)
   ].filter(Boolean).length;
 
+  const activeFilters = [
+    searchTerm ? { key: "search", label: `Tu khoa: ${searchTerm}`, onClear: () => setSearchTerm("") } : null,
+    selectedCity !== "Tất cả" ? { key: "city", label: `Khu vuc: ${selectedCity}`, onClear: () => setSelectedCity("Tất cả") } : null,
+    maxPrice < 20000000
+      ? {
+          key: "price",
+          label: `Toi da: ${new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(maxPrice)}`,
+          onClear: () => setMaxPrice(20000000),
+        }
+      : null,
+    selectedAmenities.length > 0
+      ? { key: "amenities", label: `Tien ich: ${selectedAmenities.length}`, onClear: () => setSelectedAmenities([]) }
+      : null,
+    sortBy !== "default" ? { key: "sort", label: "Da sap xep", onClear: () => setSortBy("default") } : null,
+    !isAvailableOnly ? { key: "availability", label: "Hien ca da het phong", onClear: () => setIsAvailableOnly(true) } : null,
+  ].filter(Boolean) as { key: string; label: string; onClear: () => void }[];
+
+  const resetFilters = () => {
+    setMaxPrice(20000000);
+    setSelectedAmenities([]);
+    setSearchTerm("");
+    setSelectedCity("Tất cả");
+    setSortBy("default");
+    setIsAvailableOnly(true);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-20">
+    <div className="min-h-screen bg-background pb-20 space-y-6">
       {/* --- HEADER & FILTER --- */}
-      <div className="bg-white border-b sticky top-16 z-30 shadow-sm px-4 py-4">
-        <div className="container mx-auto max-w-7xl">
+      <div className="sticky top-16 z-30">
+        <div className="page-shell pt-3">
+          <div className="section-card bg-card/95 p-4 shadow-sm backdrop-blur md:p-5">
           <div className="flex flex-col lg:flex-row justify-between items-end lg:items-center gap-4">
             
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Tìm phòng trọ</h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <h1 className="page-title text-foreground">Tìm phòng trọ</h1>
+              <p className="page-subtitle">
                 {isLoading 
                   ? "Đang cập nhật dữ liệu..." 
                   : `Đang hiển thị ${filteredProperties.length} khu trọ đã duyệt`
@@ -142,7 +169,7 @@ export default function PropertiesPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input 
                   placeholder="Tìm theo khu vực, tên đường..." 
-                  className="pl-9 bg-gray-50 border-gray-200"
+                  className="pl-9 bg-muted/40 border-border"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -151,7 +178,7 @@ export default function PropertiesPage() {
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select 
-                  className="h-10 w-full sm:w-40 rounded-md border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-white transition-colors"
+                  className="h-10 w-full sm:w-40 rounded-lg border border-border bg-muted/40 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-background transition-colors"
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
                 >
@@ -165,7 +192,7 @@ export default function PropertiesPage() {
               <div className="relative">
                 <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select
-                  className="h-10 w-full sm:w-44 rounded-md border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-white transition-colors"
+                  className="h-10 w-full sm:w-44 rounded-lg border border-border bg-muted/40 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-background transition-colors"
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as any)}
                 >
@@ -192,6 +219,25 @@ export default function PropertiesPage() {
               </Button>
             </div>
           </div>
+
+          {activeFilters.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {activeFilters.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={filter.onClear}
+                  className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-foreground hover:bg-secondary/70"
+                >
+                  {filter.label}
+                  <X className="h-3 w-3" />
+                </button>
+              ))}
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={resetFilters}>
+                Xoa tat ca
+              </Button>
+            </div>
+          )}
 
           {showAdvanceFilters && (
             <div className="mt-6 pt-6 border-t animate-in slide-in-from-top-4 duration-300">
@@ -256,14 +302,7 @@ export default function PropertiesPage() {
               </div>
 
               <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
-                  <Button variant="ghost" size="sm" onClick={() => {
-                      setMaxPrice(20000000);
-                      setSelectedAmenities([]);
-                      setSearchTerm("");
-                      setSelectedCity("Tất cả");
-                      setSortBy("default");
-                      setIsAvailableOnly(true);
-                  }}>
+                  <Button variant="ghost" size="sm" onClick={resetFilters}>
                       Đặt lại tất cả
                   </Button>
                   <Button size="sm" onClick={() => setShowAdvanceFilters(false)}>
@@ -272,12 +311,13 @@ export default function PropertiesPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* --- AI RECOMMENDATIONS --- */}
       {recommendedRooms.length > 0 && (
-        <div className="container mx-auto max-w-7xl px-4 py-8 relative z-20">
+        <div className="page-shell relative z-20 py-8">
           <div className="flex items-center gap-3 border-b pb-4 mb-6">
             <div className="p-2 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-lg text-amber-600">
               <Sparkles className="h-6 w-6" />
@@ -329,8 +369,8 @@ export default function PropertiesPage() {
       )}
 
       {/* --- MAIN CONTENT --- */}
-      <div className="container mx-auto max-w-7xl px-4 py-8">
-        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2 flex justify-between items-center">
+      <div className="page-shell py-8">
+        <h2 className="text-xl font-bold mb-6 text-foreground border-b pb-2 flex justify-between items-center">
             <span>Khám Phá Khu Trọ Toàn Quốc</span>
             <div className="flex bg-gray-100 p-1 rounded-lg">
               <button 
@@ -396,7 +436,7 @@ export default function PropertiesPage() {
             </p>
             <Button 
               variant="outline" 
-              onClick={() => {setSearchTerm(""); setSelectedCity("Tất cả"); setMaxPrice(20000000); setSelectedAmenities([]); setSortBy("default");}}
+              onClick={resetFilters}
               className="mt-4 gap-2"
             >
               <X className="h-4 w-4" /> Xóa bộ lọc

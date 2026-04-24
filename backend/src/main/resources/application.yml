@@ -18,12 +18,18 @@ spring:
     hibernate:
       # Tự động cập nhật schema DB khi có thay đổi Entity
       ddl-auto: update
-    show-sql: true # Hiển thị câu lệnh SQL trong console
+    show-sql: true
     properties:
       hibernate:
-        # Dialect tối ưu cho MariaDB
         dialect: org.hibernate.dialect.MariaDBDialect
-        format_sql: true # Format SQL cho dễ đọc
+        format_sql: true
+        # Cấu hình Hibernate Envers (Audit Trail)
+        envers:
+          audit_table_suffix: _aud
+          revision_field_name: rev
+          revision_type_field_name: revtype
+          store_data_at_delete: true
+          audit_strategy: org.hibernate.envers.strategy.DefaultAuditStrategy
 
   # Cấu hình upload file (nếu cần dùng sau này)
   servlet:
@@ -57,29 +63,12 @@ blockchain:
 
   # Chain ID của Sepolia
   chain-id: ${BLOCKCHAIN_CHAIN_ID:11155111}
+
+  # Tỷ giá cố định VND/ETH
+  vnd-eth-rate: ${BLOCKCHAIN_VND_ETH_RATE:80000000}
 gemini:
   api:
     key: "${GEMINI_API_KEY:}"
-jpa:
-  hibernate:
-    ddl-auto: update
-  show-sql: true
-  properties:
-    hibernate:
-      dialect: org.hibernate.dialect.MariaDBDialect
-      format_sql: true
-      # --- CẤU HÌNH HIBERNATE ENVERS (THÊM VÀO ĐÂY) ---
-      envers:
-        # Hậu tố cho bảng audit (VD: users_aud)
-        audit_table_suffix: _aud
-        # Tên cột lưu ID phiên bản
-        revision_field_name: rev
-        # Tên cột lưu loại thay đổi (0: ADD, 1: MOD, 2: DEL)
-        revision_type_field_name: revtype
-        # Luôn lưu dữ liệu kể cả khi xóa
-        store_data_at_delete: true
-        # Bắt buộc ghi log ngay cả khi các trường không thay đổi giá trị (giúp audit chặt chẽ hơn)
-        audit_strategy: org.hibernate.envers.strategy.DefaultAuditStrategy
 brevo:
   api:
     key: "${BREVO_API_KEY:}"
@@ -88,3 +77,14 @@ brevo:
     name: "${BREVO_SENDER_NAME:SmartRental}"
 google:
   client-id: "${GOOGLE_CLIENT_ID:}"
+
+---
+# === PRODUCTION PROFILE ===
+spring:
+  config:
+    activate:
+      on-profile: production
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false

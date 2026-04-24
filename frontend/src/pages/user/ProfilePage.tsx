@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import {
   User, Mail, Phone, ShieldCheck, Wallet,
-  MapPin, Calendar, Edit3, CheckCircle2, X, Save,
-  MessageCircle, Camera, Lock
+  MapPin, Calendar, Edit3, X, Save,
+  MessageCircle, Camera, Lock, ArrowUpRight, ArrowDownRight, CircleDot, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { tenantPreferenceApi } from '@/api/tenantPreferenceApi';
 import type { TenantPreference } from '@/types/index';
 import { Lightbulb } from 'lucide-react';
+import StatusBadge from '@/components/shared/StatusBadge';
 
 // Khai báo global interface cho MetaMask
 declare global {
@@ -41,6 +42,7 @@ const ProfilePage = () => {
   const [reputationHistory, setReputationHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'ALL' | 'PLUS' | 'MINUS'>('ALL');
 
   // State Form đổi mật khẩu
   const [passwordForm, setPasswordForm] = useState({
@@ -68,6 +70,25 @@ const ProfilePage = () => {
     bankAccountHolder: '',
     bankQrUrl: '',
   });
+
+  const convertArrDateToString = (dateArr: any) => {
+    if (!Array.isArray(dateArr)) return dateArr;
+    const [year, month, day] = dateArr;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  const hasProfileChanges = user ? (
+    formData.fullName !== (user.fullName || '') ||
+    formData.phoneNumber !== (user.phoneNumber || '') ||
+    formData.zaloPhone !== (user.zaloPhone || '') ||
+    formData.dateOfBirth !== (user.dateOfBirth ? (Array.isArray(user.dateOfBirth) ? convertArrDateToString(user.dateOfBirth) : user.dateOfBirth) : '') ||
+    formData.currentAddress !== (user.currentAddress || '') ||
+    formData.cccdNumber !== (user.cccdNumber || '') ||
+    formData.bankName !== (user.bankName || '') ||
+    formData.bankAccountNumber !== (user.bankAccountNumber || '') ||
+    formData.bankAccountHolder !== (user.bankAccountHolder || '') ||
+    formData.bankQrUrl !== (user.bankQrUrl || '')
+  ) : false;
 
   // --- USE EFFECTS ---
   useEffect(() => {
@@ -109,12 +130,6 @@ const ProfilePage = () => {
       });
     }
   }, [isChangePasswordModalOpen]);
-
-  const convertArrDateToString = (dateArr: any) => {
-    if (!Array.isArray(dateArr)) return dateArr;
-    const [year, month, day] = dateArr;
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
 
   // --- HANDLERS ---
   const handleAvatarClick = () => fileInputRef.current?.click();
@@ -182,11 +197,38 @@ const ProfilePage = () => {
     }
   };
 
-  const handleKycFileChange = (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCloseEditModal = () => {
+    if (hasProfileChanges) {
+      const confirmed = window.confirm("Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?");
+      if (!confirmed) return;
+    }
+    setIsEditModalOpen(false);
+  };
+
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleKycFileChange = async (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setKycFiles(prev => ({ ...prev, [side]: file }));
       setKycPreviews(prev => ({ ...prev, [side]: URL.createObjectURL(file) }));
+
+      // Tự động quét AI nếu là mặt trước
+      if (side === 'front' && user && (user.kycAttempts || 0) < 3) {
+        try {
+          setIsScanning(true);
+          const extractedId = await userApi.extractKycInfo(file);
+          if (extractedId) {
+            setKycCCCD(extractedId);
+            toast.success("AI đã tự động trích xuất mã số CCCD!");
+          }
+        } catch (err: any) {
+          console.error("AI Scan error:", err);
+          // Không toast lỗi ở đây để tránh phiền, người dùng vẫn có thể nhập tay
+        } finally {
+          setIsScanning(false);
+        }
+      }
     }
   };
 
@@ -297,14 +339,34 @@ const ProfilePage = () => {
 
       if (!user) return <div className="p-10 text-center">Đang tải...</div>;
 
+      const filteredReputationHistory = reputationHistory.filter((item) => {
+        if (historyFilter === 'PLUS') return item.pointsChanged > 0;
+        if (historyFilter === 'MINUS') return item.pointsChanged < 0;
+        return true;
+      });
+
+      const groupedReputationHistory = filteredReputationHistory.reduce((acc, item) => {
+        const date = new Date(item.createdAt);
+        const monthKey = date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+        if (!acc[monthKey]) acc[monthKey] = [];
+        acc[monthKey].push(item);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      const getHistoryIcon = (item: any) => {
+        if (item.pointsChanged > 0) return <ArrowUpRight className="h-3.5 w-3.5 text-green-700" />;
+        if (item.pointsChanged < 0) return <ArrowDownRight className="h-3.5 w-3.5 text-red-700" />;
+        return <CircleDot className="h-3.5 w-3.5 text-gray-500" />;
+      };
+
       return (
-        <div className="space-y-6 relative pb-20">
+        <div className="page-shell space-y-5 md:space-y-6 relative pb-20">
 
           {/* BANNER & AVATAR */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
             <div className="h-32 bg-gradient-to-r from-primary/20 to-primary/5" />
             <div className="px-8 pb-8">
-              <div className="relative flex flex-col md:flex-row items-end gap-5 -mt-12">
+              <div className="relative flex flex-col md:flex-row md:items-end gap-5 -mt-12">
 
                 {/* Avatar */}
                 <div className="relative group">
@@ -329,33 +391,57 @@ const ProfilePage = () => {
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 mb-2">
-                  <h1 className="text-2xl font-bold text-gray-900">{user.fullName || user.username}</h1>
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <div className="flex-1 mb-2 space-y-2">
+                  <h1 className="page-title text-gray-900">{user.fullName || user.username}</h1>
+                  <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
                     <ShieldCheck className="h-4 w-4 text-green-500" />
-                    <span>
-                      Tài khoản {
-                        user.role === 'LANDLORD' ? 'Chủ cho thuê' :
-                          user.role === 'ADMIN' ? 'Quản trị viên' : 'Người thuê'
+                    <StatusBadge
+                      label={
+                        user.role === 'LANDLORD' ? 'Tài khoản Chủ cho thuê' :
+                          user.role === 'ADMIN' ? 'Tài khoản Quản trị viên' : 'Tài khoản Người thuê'
                       }
-                    </span>
+                      tone="info"
+                    />
                   </div>
                 </div>
 
                 {/* Buttons */}
-                <div className="flex gap-3 mb-2">
-                  <Button variant="outline" className="gap-2" onClick={() => setIsEditModalOpen(true)}>
+                <div className="flex w-full md:w-auto gap-2 sm:gap-3 mb-2">
+                  <Button variant="outline" className="gap-2 flex-1 md:flex-none" onClick={() => setIsEditModalOpen(true)}>
                     <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ
                   </Button>
                   <Button
                     variant="outline"
-                    className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50"
+                    className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 flex-1 md:flex-none"
                     onClick={() => setIsChangePasswordModalOpen(true)}
                   >
                     <Lock className="h-4 w-4" /> Đổi mật khẩu
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="section-card p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Trạng thái KYC</p>
+                <p className="text-sm font-semibold mt-1">Xác thực danh tính</p>
+              </div>
+              <StatusBadge
+                label={user.kycStatus}
+                tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'info' : 'warning'}
+              />
+            </div>
+            <div className="section-card p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Điểm uy tín</p>
+                <p className="text-sm font-semibold mt-1">Đánh giá hệ thống</p>
+              </div>
+              <StatusBadge
+                label={`${user.reputationScore}/100`}
+                tone={user.reputationScore >= 80 ? 'success' : user.reputationScore >= 60 ? 'warning' : 'danger'}
+              />
             </div>
           </div>
 
@@ -392,16 +478,17 @@ const ProfilePage = () => {
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái xác thực</p>
                     <div className="flex items-center gap-3">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${user.kycStatus === 'VERIFIED' ? 'bg-green-100 text-green-700' :
-                        user.kycStatus === 'PENDING' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                        }`}>
-                        {user.kycStatus === 'VERIFIED' && <CheckCircle2 className="h-3 w-3" />}
-                        {user.kycStatus}
-                      </div>
-                      {user.kycStatus !== 'VERIFIED' && (
+                      <StatusBadge
+                        label={user.kycStatus === 'VERIFIED' ? 'Đã xác minh' : user.kycStatus === 'PENDING' ? 'Đang chờ duyệt' : user.kycStatus === 'REJECTED' ? 'Bị từ chối' : 'Chưa xác thực'}
+                        tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'info' : 'warning'}
+                      />
+                      {user.kycStatus !== 'VERIFIED' && user.kycStatus !== 'PENDING' && (
                         <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setIsKycModalOpen(true)}>
                           Xác thực ngay
                         </Button>
+                      )}
+                      {user.kycStatus === 'PENDING' && (
+                        <span className="text-[10px] text-gray-400 italic">Hồ sơ đã được gửi cho Admin</span>
                       )}
                     </div>
                   </div>
@@ -498,14 +585,16 @@ const ProfilePage = () => {
           {/* MODAL CHỈNH SỬA HỒ SƠ */}
           {isEditModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b pb-4 mb-4">
+              <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between border-b p-5 bg-white shrink-0">
                   <h3 className="text-xl font-bold text-gray-900">Cập nhật hồ sơ</h3>
-                  <button onClick={() => setIsEditModalOpen(false)} className="rounded-full p-1 hover:bg-gray-100">
+                  <button onClick={handleCloseEditModal} className="rounded-full p-1 hover:bg-gray-100">
                     <X className="h-5 w-5 text-gray-500" />
                   </button>
                 </div>
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <form onSubmit={handleUpdateProfile} className="flex-1 overflow-y-auto p-5 space-y-6">
+                  <div className="section-card p-4">
+                    <p className="text-sm font-semibold text-foreground mb-3">Thông tin cá nhân</p>
                   <div className="space-y-2">
                     <Label htmlFor="fullName">Họ và tên</Label>
                     <Input id="fullName" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
@@ -526,15 +615,21 @@ const ProfilePage = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cccdNumber">Số CCCD / CMND</Label>
-                    <Input id="cccdNumber" value={formData.cccdNumber} onChange={(e) => setFormData({ ...formData, cccdNumber: e.target.value })} disabled={user.kycStatus === 'VERIFIED'} />
+                    <Input 
+                      id="cccdNumber" 
+                      value={formData.cccdNumber} 
+                      onChange={(e) => setFormData({ ...formData, cccdNumber: e.target.value })} 
+                      disabled={user.kycStatus === 'VERIFIED' || user.kycStatus === 'PENDING'} 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currentAddress">Địa chỉ hiện tại</Label>
                     <Input id="currentAddress" value={formData.currentAddress} onChange={(e) => setFormData({ ...formData, currentAddress: e.target.value })} />
                   </div>
+                  </div>
 
                   {/* Bank Info */}
-                  <div className="border-t pt-4 mt-2">
+                  <div className="section-card p-4">
                     <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1">🏦 Thông tin Ngân hàng (cho hoàn cọc)</p>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -593,9 +688,9 @@ const ProfilePage = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-                    <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
-                    <Button type="submit" isLoading={isSaving} className="gap-2">
+                  <div className="sticky bottom-0 z-10 -mx-5 -mb-5 border-t bg-white/95 backdrop-blur p-4 flex justify-end gap-3">
+                    <Button type="button" variant="ghost" onClick={handleCloseEditModal}>Hủy bỏ</Button>
+                    <Button type="submit" isLoading={isSaving} className="gap-2" disabled={!hasProfileChanges}>
                       <Save className="h-4 w-4" /> Lưu thay đổi
                     </Button>
                   </div>
@@ -692,15 +787,49 @@ const ProfilePage = () => {
                 </div>
 
                 <div className="p-6 space-y-6">
+                  {/* Thông báo tình trạng */}
+                  {user.kycStatus === 'REJECTED' && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                      <p className="text-sm font-bold text-red-700 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" /> Hồ sơ bị từ chối
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">Lý do: {user.kycNote || 'Thông tin không chính xác'}</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Lượt xác thực tự động</p>
+                      <p className="text-sm text-indigo-600 mt-1">
+                        {user.kycAttempts && user.kycAttempts >= 3 
+                          ? "Bạn đã hết lượt tự động. Hồ sơ mới sẽ được Admin duyệt thủ công." 
+                          : `Còn lại ${3 - (user.kycAttempts || 0)}/3 lượt dùng AI.`}
+                      </p>
+                    </div>
+                    {user.kycAttempts !== undefined && user.kycAttempts < 3 && (
+                      <div className="h-10 w-10 rounded-full border-4 border-white bg-indigo-200 flex items-center justify-center font-bold text-indigo-700">
+                        {3 - user.kycAttempts}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="kycCCCD">Số CCCD / CMND <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="kycCCCD">
+                      Số CCCD / CMND <span className="text-red-500">*</span>
+                      {isScanning && <span className="ml-2 text-indigo-600 text-[10px] animate-pulse"> đang sử dụng AI quét ảnh...</span>}
+                    </Label>
                     <Input
                       id="kycCCCD"
                       value={kycCCCD}
                       onChange={(e) => setKycCCCD(e.target.value)}
-                      placeholder="Nhập chính xác số trên thẻ"
+                      placeholder={isScanning ? "Đang trích xuất..." : "Nhập chính xác số trên thẻ"}
+                      disabled={isScanning}
                     />
-                    <p className="text-[11px] text-muted-foreground">Hệ thống sẽ tự động đối chiếu số này với ảnh bạn tải lên.</p>
+                    <p className="text-[11px] text-muted-foreground italic">
+                      {user.kycAttempts && user.kycAttempts >= 3 
+                        ? "* Vui lòng tải ảnh rõ nét nhất để Admin dễ dàng đối soát." 
+                        : "* Hệ thống AI sẽ tự động điền khi bạn tải ảnh mặt trước lên."}
+                    </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
@@ -760,27 +889,63 @@ const ProfilePage = () => {
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={historyFilter === 'ALL' ? 'default' : 'outline'}
+                      onClick={() => setHistoryFilter('ALL')}
+                      className="h-7 text-xs"
+                    >
+                      Tất cả
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={historyFilter === 'PLUS' ? 'default' : 'outline'}
+                      onClick={() => setHistoryFilter('PLUS')}
+                      className="h-7 text-xs"
+                    >
+                      Tăng điểm
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={historyFilter === 'MINUS' ? 'default' : 'outline'}
+                      onClick={() => setHistoryFilter('MINUS')}
+                      className="h-7 text-xs"
+                    >
+                      Giảm điểm
+                    </Button>
+                  </div>
                   {isLoadingHistory ? (
                     <div className="text-center text-sm text-gray-500 py-10">Đang tải lịch sử...</div>
-                  ) : reputationHistory.length === 0 ? (
+                  ) : filteredReputationHistory.length === 0 ? (
                     <div className="text-center text-sm text-gray-400 py-10">Chưa có ghi nhận nào.</div>
                   ) : (
-                    reputationHistory.map((item, idx) => (
-                      <div key={idx} className="flex gap-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                        <div className="shrink-0 pt-1">
-                          {item.pointsChanged > 0 ? (
-                            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">
-                              +{item.pointsChanged}
+                    Object.entries(groupedReputationHistory).map(([month, items]) => (
+                      <div key={month} className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{month}</p>
+                        <div className="space-y-3">
+                          {(items as any[]).map((item: any, idx: number) => (
+                            <div key={`${month}-${idx}`} className="flex gap-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                              <div className="shrink-0 pt-1">
+                                {item.pointsChanged > 0 ? (
+                                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">
+                                    +{item.pointsChanged}
+                                  </div>
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-bold text-xs">
+                                    {item.pointsChanged}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-800 leading-snug flex items-center gap-1.5">
+                                  {getHistoryIcon(item)}
+                                  {item.description}
+                                </p>
+                                <p className="text-[11px] text-gray-400 mt-1">{new Date(item.createdAt).toLocaleString('vi-VN')}</p>
+                              </div>
                             </div>
-                          ) : (
-                            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-bold text-xs">
-                              {item.pointsChanged}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-800 leading-snug">{item.description}</p>
-                          <p className="text-[11px] text-gray-400 mt-1">{new Date(item.createdAt).toLocaleString('vi-VN')}</p>
+                          ))}
                         </div>
                       </div>
                     ))

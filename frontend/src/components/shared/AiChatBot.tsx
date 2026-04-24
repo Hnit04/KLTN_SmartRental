@@ -293,24 +293,21 @@ export default function AiChatBot() {
   const sendMessage = async (fullMsg: string, displayText?: string) => {
     if (!fullMsg.trim()) return;
 
-    const lowerMsg = fullMsg.toLowerCase();
-    const isAnomalyQuery = isLandlord && (lowerMsg.includes("phân tích điện nước bất thường") || lowerMsg.includes("điện nước bất thường") || lowerMsg.includes("chênh lệch"));
-    const isGeneralAnalysis = !isAnomalyQuery && (lowerMsg.includes("phân tích") || lowerMsg.includes("tư vấn") || lowerMsg.includes("ưu điểm") || lowerMsg.includes("nhược điểm") || lowerMsg.includes("lời khuyên"));
+    // Chuẩn hoá tin nhắn (NFC) để khớp chính xác các biến thể dấu tiếng Việt
+    const normalizedMsg = fullMsg.normalize('NFC').toLowerCase();
+    
+    const isAnomalyQuery = isLandlord && (normalizedMsg.includes("phân tích điện nước bất thường") || normalizedMsg.includes("điện nước bất thường") || normalizedMsg.includes("chênh lệch"));
+    const isGeneralAnalysis = !isAnomalyQuery && (normalizedMsg.includes("phân tích") || normalizedMsg.includes("tư vấn") || normalizedMsg.includes("ưu điểm") || normalizedMsg.includes("nhược điểm") || normalizedMsg.includes("lời khuyên"));
     
     // Kiểm tra xem câu hỏi có mang tính truy vấn dữ liệu không (hỏi giá, hỏi nợ, hoá đơn)
-    const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) && (
-        lowerMsg.includes("hoá đơn") || 
-        lowerMsg.includes("hóa đơn") ||
-        lowerMsg.includes("tiền") ||
-        lowerMsg.includes("nợ") ||
-        lowerMsg.includes("phòng") ||
-        lowerMsg.includes("hợp đồng") ||
-        lowerMsg.includes("gần") ||
-        lowerMsg.includes("khu vực") ||
-        lowerMsg.includes("quanh") ||
-        lowerMsg.includes("nearby") ||
-        lowerMsg.includes("landmark")
-    );
+    const dataKeywords = [
+        "hoá đơn", "hóa đơn", "bill", "tiền", "nợ", "phòng", "hợp đồng", "contract", 
+        "gần", "khu vực", "quanh", "nearby", "landmark", "lịch hẹn", "appointment",
+        "doanh thu", "revenue", "thanh toán", "trễ", "quá hạn", "phí"
+    ];
+    
+    const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) && 
+        dataKeywords.some(keyword => normalizedMsg.includes(keyword.normalize('NFC').toLowerCase()));
 
     // Hiển thị tin nhắn ngắn trong UI (nếu có displayText), nhưng gửi fullMsg cho AI
     const newMessage: Message = {
@@ -337,16 +334,13 @@ export default function AiChatBot() {
              replyText = error.response?.data?.message || "Xin lỗi, không phân tích được dữ liệu lúc này.";
          }
       } else if (isDataQuery) {
-        // Nếu là truy vấn dữ liệu, nhưng chưa đăng nhập
-        if (!isAuthenticated) {
-          replyText = "Dạ, để tra cứu các số liệu bảo mật (như hóa đơn, hợp đồng), bạn cần đăng nhập trước nhé!";
-        } else {
-          try {
-            const dataRes = await aiApi.queryData(userMsg);
-            replyText = dataRes.data;
-          } catch (error: any) {
-             replyText = error.response?.data?.message || "Xin lỗi, hệ thống truy xuất dữ liệu đang bận.";
-          }
+        // Gửi truy vấn dữ liệu cho cả GUEST và User. 
+        // Backend sẽ tự động chặn các bảng nhạy cảm (bills, contracts) cho GUEST.
+        try {
+          const dataRes = await aiApi.queryData(userMsg);
+          replyText = dataRes.data;
+        } catch (error: any) {
+          replyText = error.response?.data?.message || "Xin lỗi, hệ thống truy xuất dữ liệu đang bận.";
         }
       } else {
         // Chat thông thường (hỏi linh tinh, hỏi luật, phân tích phòng)
@@ -364,7 +358,7 @@ export default function AiChatBot() {
           id: (Date.now() + 1).toString(), 
           text: replyText, 
           sender: "ai",
-          hasReminderAction: isLandlord && isDataQuery && (lowerMsg.includes("nợ") || lowerMsg.includes("chưa đóng") || lowerMsg.includes("trễ"))
+          hasReminderAction: isLandlord && isDataQuery && (normalizedMsg.includes("nợ") || normalizedMsg.includes("chưa đóng") || normalizedMsg.includes("trễ"))
         },
       ]);
     } catch (error) {

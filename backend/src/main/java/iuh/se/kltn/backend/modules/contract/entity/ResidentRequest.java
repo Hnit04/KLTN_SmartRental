@@ -37,7 +37,7 @@ public class ResidentRequest {
     @Enumerated(EnumType.STRING)
     private iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType requestType = iuh.se.kltn.backend.modules.contract.enums.ResidentRequestType.ADD;
 
-    @Column(length = 20)
+    @Column(length = 50)
     @Enumerated(EnumType.STRING)
     private RequestStatus status = RequestStatus.PENDING;
 

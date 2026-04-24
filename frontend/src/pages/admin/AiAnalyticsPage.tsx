@@ -8,6 +8,7 @@ import {
   Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import StatusBadge from '@/components/shared/StatusBadge';
 
 interface CacheEntry {
   id: number;
@@ -281,7 +282,7 @@ export default function AiAnalyticsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between px-3 py-2 bg-violet-50 rounded-lg">
               <span className="text-sm font-medium text-violet-800">Large Language Model</span>
-              <span className="text-sm font-bold text-violet-900">Google Gemini 2.0 Flash</span>
+              <span className="text-sm font-bold text-violet-900">Google Gemini 2.5 Flash</span>
             </div>
             <div className="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-lg">
               <span className="text-sm font-medium text-blue-800">Embedding Model</span>
@@ -371,9 +372,7 @@ export default function AiAnalyticsPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-mono text-xs text-gray-400 font-semibold">#{entry.id}</span>
                         {!entry.isValid && (
-                          <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-100 text-red-700 border border-red-200">
-                            Cần dạy lại
-                          </span>
+                          <StatusBadge label="Cần dạy lại" tone="danger" className="text-[10px] uppercase font-bold" />
                         )}
                       </div>
                       <p className="text-sm font-semibold text-gray-900 leading-snug">

@@ -1,7 +1,8 @@
 // src/components/shared/PropertyCard.tsx
-import { Link, useNavigate } from "react-router-dom";
-import { MapPin, Zap, Droplets, Wifi, Home } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MapPin, Zap, Droplets, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import StatusBadge from "@/components/shared/StatusBadge";
 import type { Property } from "@/types/index";
 
 interface PropertyCardProps {
@@ -25,15 +26,15 @@ export default function PropertyCard({ data }: PropertyCardProps) {
   return (
     <div 
       onClick={() => navigate(`/properties/${data.id}`)}
-      className={`group bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-70 grayscale-[0.3]' : ''}`}
+      className={`group bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/30 transition-[box-shadow,border-color] duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-90' : ''}`}
     >
       {/* 1. Hình ảnh & Badge giá */}
-      <div className="relative h-52 overflow-hidden bg-gray-100">
+      <div className="relative h-48 overflow-hidden bg-gray-100">
         <img 
           src={thumbnail} 
           alt={data.name} 
           loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover will-change-transform group-hover:scale-[1.03] transition-transform duration-500"
         />
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
            <p className="text-white font-bold text-lg">
@@ -43,15 +44,18 @@ export default function PropertyCard({ data }: PropertyCardProps) {
         </div>
         
         {/* Badge số phòng trống */}
-        <div className={`absolute top-3 right-3 backdrop-blur-sm text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 ${data.availableRooms === 0 ? 'bg-red-500 text-white' : 'bg-white/90 text-black'}`}>
-          <Home className="h-3 w-3" />
-          {data.availableRooms && data.availableRooms > 0 ? `${data.availableRooms} phòng trống` : "Hết phòng"}
+        <div className="absolute top-3 right-3">
+          <StatusBadge
+            label={data.availableRooms && data.availableRooms > 0 ? `${data.availableRooms} phòng trống` : "Hết phòng"}
+            tone={data.availableRooms && data.availableRooms > 0 ? "success" : "danger"}
+            className="text-xs font-bold shadow-sm backdrop-blur-sm"
+          />
         </div>
       </div>
 
       {/* 2. Nội dung text */}
-      <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-bold text-lg text-foreground line-clamp-1 group-hover:text-primary transition-colors mb-1">
+      <div className="p-4 md:p-5 flex flex-col flex-1">
+        <h3 className="font-semibold text-lg text-foreground line-clamp-1 group-hover:text-primary transition-colors mb-1">
           {data.name}
         </h3>
 
@@ -63,7 +67,7 @@ export default function PropertyCard({ data }: PropertyCardProps) {
         </div>
 
         {/* Thông tin dịch vụ (Điện/Nước/Net) */}
-        <div className="grid grid-cols-3 gap-2 mb-4 bg-muted/50 p-2 rounded-lg">
+        <div className="grid grid-cols-3 gap-2 mb-4 bg-muted/40 p-2.5 rounded-xl border border-border/60">
           <div className="flex flex-col items-center text-xs text-muted-foreground">
             <Zap className="h-4 w-4 mb-1 text-yellow-500" />
             <span>{data.elecPrice ? `${data.elecPrice / 1000}k/kW` : "Free"}</span>
@@ -78,9 +82,9 @@ export default function PropertyCard({ data }: PropertyCardProps) {
           </div>
         </div>
 
-        <div className="mt-auto pt-3 border-t">
+        <div className="mt-auto pt-3 border-t border-border/70 min-h-[52px] flex items-end">
           <Button 
-            className="w-full transition-transform group-hover:scale-[1.02] flex items-center justify-center bg-white text-primary border border-primary/20 hover:bg-primary hover:text-white"
+            className="w-full h-10 rounded-xl flex items-center justify-center bg-background text-primary border border-primary/20 hover:bg-primary hover:text-primary-foreground"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/properties/${data.id}`);

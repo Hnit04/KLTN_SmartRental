@@ -6,9 +6,13 @@ import { UserNav } from "../shared/UserNav";
 import NotificationBell from "../shared/NotificationBell";
 import { useState, useEffect } from "react"; 
 import { ArrowUp, ShieldCheck, Globe, CreditCard } from "lucide-react";
+import { DASHBOARD_BY_ROLE, type AppRole } from "@/config/navigation";
 
 export default function PublicLayout() {
   const { isAuthenticated, user } = useAuth();
+  const normalizedRole: AppRole = user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT';
+  const dashboardPath = DASHBOARD_BY_ROLE[normalizedRole];
+  const dashboardLabel = normalizedRole === 'LANDLORD' ? 'Quản lý' : normalizedRole === 'ADMIN' ? 'Quản trị' : 'Của tôi';
   const [newsletter, setNewsletter] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
@@ -79,7 +83,7 @@ export default function PublicLayout() {
             
             {isAuthenticated && (
               <NavLink
-                to={user?.role === 'LANDLORD' ? '/landlord/dashboard' : '/tenant/dashboard'}
+                to={dashboardPath}
                 className={({ isActive }) => 
                   `flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full transition-colors ${
                     isActive 
@@ -89,7 +93,7 @@ export default function PublicLayout() {
                 }
               >
                 <LayoutDashboard className="h-3.5 w-3.5" />
-                {user?.role === 'LANDLORD' ? 'Quản lý' : 'Của tôi'}
+                {dashboardLabel}
               </NavLink>
             )}
           </nav>
@@ -174,13 +178,13 @@ export default function PublicLayout() {
               </p>
               {/* Social Links */}
               <div className="flex items-center gap-4">
-                <a href="#" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="Facebook">
+                <a href="https://facebook.com" target="_blank" rel="noreferrer" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="Facebook">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a href="#" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="LinkedIn">
+                <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="LinkedIn">
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a href="#" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="Twitter">
+                <a href="https://twitter.com" target="_blank" rel="noreferrer" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300" aria-label="Twitter">
                   <Twitter className="h-4 w-4" />
                 </a>
               </div>
@@ -194,8 +198,8 @@ export default function PublicLayout() {
               <ul className="space-y-4 text-sm">
                 <li className="group"><Link to="/properties" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">🏠 <span>Tìm phòng</span></Link></li>
                 <li className="group"><Link to="/top-landlords" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">🔥 <span>Bảng Xếp Hạng</span></Link></li>
-                <li className="group"><Link to="#" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">✨ <span>Tính năng</span></Link></li>
-                <li className="group"><Link to="#" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">💳 <span>Giá cước</span></Link></li>
+                <li className="group"><Link to="/help" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">✨ <span>Tính năng</span></Link></li>
+                <li className="group"><Link to="/terms" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">💳 <span>Giá cước</span></Link></li>
               </ul>
             </div>
 
@@ -208,7 +212,7 @@ export default function PublicLayout() {
                 <li className="group"><Link to="/help" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">📚 <span>Trung tâm trợ giúp</span></Link></li>
                 <li className="group"><Link to="/contact" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">💬 <span>Liên hệ</span></Link></li>
                 <li className="group"><Link to="/faq" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">❓ <span>FAQ</span></Link></li>
-                <li className="group"><Link to="#" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">🐛 <span>Báo lỗi</span></Link></li>
+                <li className="group"><Link to="/contact" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">🐛 <span>Báo lỗi</span></Link></li>
               </ul>
             </div>
 
@@ -220,7 +224,7 @@ export default function PublicLayout() {
               <ul className="space-y-4 text-sm">
                 <li className="group"><Link to="/privacy" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">🔒 <span>Chính sách bảo mật</span></Link></li>
                 <li className="group"><Link to="/terms" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">⚖️ <span>Điều khoản sử dụng</span></Link></li>
-                <li className="group"><Link to="#" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">📋 <span>Quy tắc cộng đồng</span></Link></li>
+                <li className="group"><Link to="/terms" className="text-slate-400 hover:text-white hover:translate-x-1 flex items-center gap-2 transition-all duration-300">📋 <span>Quy tắc cộng đồng</span></Link></li>
               </ul>
             </div>
 

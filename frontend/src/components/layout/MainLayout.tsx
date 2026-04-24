@@ -5,7 +5,7 @@ import MobileBottomNav from './MobileBottomNav';
 
 const MainLayout = () => {
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Sidebar cố định bên trái — chỉ hiện trên md+ */}
       <Sidebar />
 
@@ -14,8 +14,8 @@ const MainLayout = () => {
         <Header />
         
         {/* Main content — thêm pb-16 trên mobile để không bị MobileBottomNav che */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
-          <div className="max-w-7xl mx-auto animate-in fade-in zoom-in-95 duration-300">
+        <main className="flex-1 overflow-y-auto pb-20 pt-4 md:pb-6 md:pt-6">
+          <div className="page-shell animate-in fade-in zoom-in-95 duration-300">
             <Outlet /> 
           </div>
         </main>
@@ -27,4 +27,4 @@ const MainLayout = () => {
   );
 };
 
-export default MainLayout;
+export default MainLayout;

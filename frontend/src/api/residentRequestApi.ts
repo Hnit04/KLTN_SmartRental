@@ -24,6 +24,10 @@ export const residentRequestApi = {
     return axiosClient.get<ContractMemberResponse[]>(`/resident-requests/contract/${contractId}/members`);
   },
 
+  getMyInvitations: () => {
+    return axiosClient.get<ResidentRequestResponse[]>("/resident-requests/invitations/me");
+  },
+
   updateStatus: (requestId: number, status: string) => {
     return axiosClient.patch<ResidentRequestResponse>(`/resident-requests/${requestId}/status`, null, {
       params: { status }
