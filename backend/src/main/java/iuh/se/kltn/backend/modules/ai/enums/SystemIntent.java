@@ -11,5 +11,6 @@ public enum SystemIntent {
     VIEW_OCCUPANCY,         // Landlord
     VIEW_DEBTORS,           // Landlord
     VIEW_RISK,              // Landlord
+    LOCATION_SEARCH,        // Guest/Tenant
     UNKNOWN                 // Fallback
 }
