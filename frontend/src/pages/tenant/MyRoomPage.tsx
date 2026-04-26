@@ -161,23 +161,26 @@ export default function MyRoomPage() {
 
   if (!contract) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-6 bg-white rounded-3xl border-2 border-dashed border-gray-200 shadow-sm">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-          <DoorOpen className="h-10 w-10 text-gray-300" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900">Bạn chưa có phòng nào</h2>
-        <p className="text-gray-500 mt-2 max-w-sm">
-          Phòng bạn đã ký hợp đồng hoặc đang trong quá trình thực hiện sẽ xuất hiện tại đây.
-        </p>
-        <div className="mt-8 flex flex-col sm:flex-row gap-4">
-          <Link to="/properties">
-            <Button className="gap-2 px-8">
-              <Search className="h-4 w-4" /> Tìm kiếm phòng ngay
-            </Button>
-          </Link>
-          <Link to="/tenant/appointments">
-            <Button variant="outline" className="px-8">Lịch hẹn của tôi</Button>
-          </Link>
+      <div className="mx-auto max-w-5xl space-y-6 pb-10">
+        <InvitationsList onStatusChange={() => fetchRoomInfo()} />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-white rounded-3xl border-2 border-dashed border-gray-200 shadow-sm">
+          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+            <DoorOpen className="h-10 w-10 text-gray-300" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Bạn chưa có phòng nào</h2>
+          <p className="text-gray-500 mt-2 max-w-sm">
+            Phòng bạn đã ký hợp đồng, đang trong quá trình thực hiện hoặc lời mời vào ở sẽ xuất hiện tại đây.
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row gap-4">
+            <Link to="/properties">
+              <Button className="gap-2 px-8">
+                <Search className="h-4 w-4" /> Tìm kiếm phòng ngay
+              </Button>
+            </Link>
+            <Link to="/tenant/appointments">
+              <Button variant="outline" className="px-8">Lịch hẹn của tôi</Button>
+            </Link>
+          </div>
         </div>
       </div>
     );

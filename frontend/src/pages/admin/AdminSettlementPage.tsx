@@ -195,51 +195,65 @@ export default function AdminSettlementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredSettlements.map((s: LandlordSettlement) => (
-                <tr key={s.landlordId} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => setSelectedLandlord(s)}>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-                        {s.landlordName.charAt(0)}
+              {filteredSettlements.length > 0 ? (
+                filteredSettlements.map((s: LandlordSettlement) => (
+                  <tr key={s.landlordId} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => setSelectedLandlord(s)}>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+                          {s.landlordName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-700">{s.landlordName}</div>
+                          <div className="text-[11px] text-slate-400">{s.landlordEmail}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-bold text-slate-700">{s.landlordName}</div>
-                        <div className="text-[11px] text-slate-400">{s.landlordEmail}</div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 inline-block">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                           <Building2 size={14} className="text-slate-400" />
+                           {s.bankName} - {s.bankAccountNumber}
+                        </div>
+                        <div className="text-[10px] text-slate-500 ml-5 uppercase">{s.bankAccountHolder}</div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 inline-block">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                         <Building2 size={14} className="text-slate-400" />
-                         {s.bankName} - {s.bankAccountNumber}
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="text-xs text-slate-600 font-semibold">{s.totalRevenue.toLocaleString()} đ</div>
+                      <div className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded inline-block mt-1">
+                         {s.pendingItemCount} giao dịch
                       </div>
-                      <div className="text-[10px] text-slate-500 ml-5 uppercase">{s.bankAccountHolder}</div>
+                    </td>
+                    <td className="px-6 py-5 text-sm font-bold text-red-500">
+                      -{s.platformFee.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="text-lg font-black text-emerald-600">
+                        {s.finalPayoutAmount.toLocaleString()} đ
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                       <div className="flex justify-center">
+                          <button className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors">
+                             <ChevronRight size={20}/>
+                          </button>
+                       </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-400">
+                      <AlertCircle size={48} className="mb-3 text-slate-300" />
+                      <p className="text-base font-medium text-slate-600">Không có dữ liệu đối soát</p>
+                      <p className="text-sm mt-1">
+                        {viewMode === 'PENDING' ? 'Hiện tại không có khoản tiền nào cần thanh toán cho chủ trọ.' : 'Chưa có lịch sử thanh toán nào.'}
+                      </p>
                     </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="text-xs text-slate-600 font-semibold">{s.totalRevenue.toLocaleString()} đ</div>
-                    <div className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded inline-block mt-1">
-                       {s.pendingItemCount} giao dịch
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-sm font-bold text-red-500">
-                    -{s.platformFee.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="text-lg font-black text-emerald-600">
-                      {s.finalPayoutAmount.toLocaleString()} đ
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                     <div className="flex justify-center">
-                        <button className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors">
-                           <ChevronRight size={20}/>
-                        </button>
-                     </div>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -374,13 +388,16 @@ export default function AdminSettlementPage() {
               </div>
             </div>
             
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
               <button 
                 onClick={() => setQrData(null)}
                 className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95"
               >
-                Tôi đã quét và chuyển tiền
+                Đóng mã QR
               </button>
+              <p className="text-[10px] text-center text-slate-400 italic">
+                * Vui lòng bấm "Xác nhận đã Payout" ở màn hình sau khi chuyển khoản thành công.
+              </p>
             </div>
           </div>
         </div>
