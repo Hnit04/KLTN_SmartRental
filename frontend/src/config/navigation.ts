@@ -10,6 +10,7 @@ import {
   Database,
   CheckSquare,
   BrainCircuit,
+  ArrowRightLeft,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
     { title: "Quản lý người dùng", path: "/admin/users", icon: Users, mobileLabel: "Người dùng" },
     { title: "Logs Blockchain", path: "/admin/blockchain-logs", icon: Database, mobileLabel: "Blockchain" },
     { title: "Thống kê AI & NLP", path: "/admin/ai-analytics", icon: BrainCircuit, mobileLabel: "AI" },
+    { title: "Quyết toán & Đối soát", path: "/admin/settlements", icon: ArrowRightLeft, mobileLabel: "Quyết toán" },
   ],
 };
 

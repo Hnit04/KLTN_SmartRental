@@ -47,4 +47,9 @@ public class Bill {
     private Double additionalFee; // Phụ phí (rác, gửi xe, vệ sinh...)
     private Double discountAmount; // Giảm trừ
     private String note; // Ghi chú cho các khoản phát sinh
+
+    // ĐỐI SOÁT SEPAY
+    @Column(columnDefinition = "boolean default false")
+    private Boolean isSettledToLandlord;
+    private LocalDateTime settledAt;
 }

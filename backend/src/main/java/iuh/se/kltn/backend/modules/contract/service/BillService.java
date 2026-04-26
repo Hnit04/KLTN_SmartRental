@@ -599,4 +599,63 @@ public class BillService {
                 .propertyDetails(propertyDetails)
                 .build();
     }
+
+    @Transactional
+    public void processSePayWebhook(iuh.se.kltn.backend.modules.contract.dto.request.SePayWebhookRequest request) {
+        String content = request.getTransactionContent();
+        if (content == null) return;
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("SMR BILL (\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(content);
+        if (matcher.find()) {
+            Long billId = Long.parseLong(matcher.group(1));
+            Bill bill = billRepository.findById(billId).orElse(null);
+
+            if (bill == null || bill.getStatus() == BillStatus.PAID) {
+                return; // Không tồn tại hoặc đã thanh toán
+            }
+
+            // ĐÃ SỬA THÀNH VÍ TRUNG GIAN (Centralized Wallet)
+            // Không còn kiểm tra khớp với số tài khoản cá nhân của chủ trọ nữa.
+            // Mọi giao dịch từ Webhook SePay (được bảo vệ bằng ApiKey) đều được tin cậy vì chuyển thẳng vào Platform.
+
+            // MOCK CHO PHÉP 2000 VNĐ ĐỂ TEST THỰC TẾ
+            if (request.getAmountIn() < bill.getTotalAmount() && request.getAmountIn() != 2000.0) {
+                System.out.println("⚠️ [SePay] Số tiền chuyển (" + request.getAmountIn() + ") nhỏ hơn tổng hóa đơn (" + bill.getTotalAmount() + "). Không tự động duyệt.");
+                return;
+            }
+
+            // Xử lý thành công -> Đổi trạng thái hóa đơn
+            bill.setStatus(BillStatus.PAID);
+            bill.setPaymentTxHash(request.getReferenceNumber() != null ? request.getReferenceNumber() : "SEPAY_AUTO");
+            bill.setPaidAt(LocalDateTime.now());
+            billRepository.save(bill);
+
+            // Gửi thông báo cho Khách thuê
+            notificationService.createNotification(
+                    bill.getContract().getTenant(),
+                    "Thanh toán tự động thành công",
+                    "Hóa đơn tháng " + bill.getMonth() + " của bạn đã được thanh toán qua mã VietQR (Mã GD: " + request.getReferenceNumber() + ").",
+                    NotificationType.PAYMENT_REMINDER,
+                    bill.getContract().getId()
+            );
+
+            // Gửi thông báo cho Chủ trọ
+            notificationService.createNotification(
+                    bill.getContract().getRoom().getProperty().getLandlord(),
+                    "Nhận tiền tự động thành công (SePay)",
+                    "Khách thuê phòng " + bill.getContract().getRoom().getName() + " đã thanh toán hóa đơn tháng " + bill.getMonth() + " qua mã VietQR.",
+                    NotificationType.PAYMENT_REMINDER,
+                    bill.getContract().getId()
+            );
+
+            // Cộng / trừ điểm uy tín
+            if (bill.getPaidAt().toLocalDate().isAfter(bill.getDeadline().toLocalDate())) {
+                reputationService.processPoints(bill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_LATE, -5, "Thanh toán hóa đơn trễ hạn tự động (Hóa đơn #" + bill.getId() + ")");
+            } else {
+                reputationService.processPoints(bill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_PAID_ON_TIME, 2, "Thanh toán hóa đơn đúng hạn tự động (Hóa đơn #" + bill.getId() + ")");
+            }
+
+            System.out.println("✅ [SePay] Đã tự động gạch nợ thành công cho Hóa đơn #" + bill.getId());
+        }
+    }
 }

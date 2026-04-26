@@ -81,4 +81,9 @@ public class Contract {
 
     @org.hibernate.annotations.UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    // ĐỐI SOÁT SEPAY
+    @Column(columnDefinition = "boolean default false")
+    private Boolean isDepositSettledToLandlord;
+    private LocalDateTime depositSettledAt;
 }

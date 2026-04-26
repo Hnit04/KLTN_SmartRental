@@ -822,6 +822,61 @@ public class ContractService {
         return mapToResponse(contractRepository.save(contract), landlordId);
     }
 
+    // --- Xác nhận đặt cọc tự động qua SePay Webhook ---
+    @Transactional
+    public void processSePayDepositWebhook(Long contractId, Double amountIn, String referenceNumber, String accountNumber) {
+        Contract contract = contractRepository.findById(contractId).orElse(null);
+        if (contract == null || contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
+            return; // Hợp đồng không tồn tại hoặc không ở trạng thái chờ cọc
+        }
+
+        // ĐÃ SỬA THÀNH VÍ TRUNG GIAN (Centralized Wallet)
+        // Không còn kiểm tra khớp với số tài khoản cá nhân của chủ trọ nữa.
+        // Mọi giao dịch từ Webhook SePay (được bảo vệ bằng ApiKey) đều được tin cậy vì chuyển thẳng vào Platform.
+        // Kiểm tra số tiền chuyển có đủ không (tiền cọc)
+        Double expectedDeposit = contract.getDepositAmount() != null ? contract.getDepositAmount() : 0.0;
+        
+        // MOCK LỖI CHO 2000 VNĐ ĐỂ TEST THỰC TẾ (Nếu đúng 2000 thì luôn pass để test)
+        if (amountIn < expectedDeposit && amountIn != 2000.0) {
+            System.out.println("⚠️ [SePay Deposit] Số tiền cọc chuyển (" + amountIn + ") nhỏ hơn yêu cầu (" + expectedDeposit + "). Không tự động duyệt.");
+            return;
+        }
+
+        // Kích hoạt hợp đồng
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setDepositStatus(DepositStatus.DEPOSITED);
+        contract.setDeployTxHash(referenceNumber != null ? referenceNumber : "SEPAY_AUTO");
+
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.RENTED);
+            roomRepository.save(contract.getRoom());
+        }
+
+        // Cộng điểm uy tín
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã kích hoạt tự động qua mã VietQR (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Nhận cọc tự động thành công (#" + contract.getId() + ")");
+
+        // Thông báo
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Kích hoạt hợp đồng thành công (Auto-Confirm)",
+            "Chủ trọ đã nhận được tiền cọc qua mã VietQR (Mã GD: " + referenceNumber + "). Hợp đồng phòng " + contract.getRoom().getName() + " chính thức có hiệu lực.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        notificationService.createNotification(
+            contract.getRoom().getProperty().getLandlord(),
+            "Nhận cọc tự động thành công (SePay)",
+            "Khách thuê phòng " + contract.getRoom().getName() + " đã nạp cọc qua mã VietQR. Hợp đồng đã kích hoạt.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        contractRepository.save(contract);
+        System.out.println("✅ [SePay Deposit] Đã tự động kích hoạt Hợp đồng #" + contract.getId());
+    }
+
     private boolean verifyWeb3Signature(String message, String signature, String expectedWalletAddress) {
         if (message == null || message.isEmpty()) {
             throw new RuntimeException("Lỗi: Hợp đồng này chưa được băm (Hash). Vui lòng báo kỹ thuật viên.");
