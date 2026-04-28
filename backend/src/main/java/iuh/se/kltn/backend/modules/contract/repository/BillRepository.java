@@ -14,10 +14,10 @@ import java.util.Optional;
 
 @Repository
 public interface BillRepository extends JpaRepository<Bill, Long> {
-    List<Bill> findByContractId(Long contractId);
+    List<Bill> findByContractIdOrderByYearDescMonthDesc(Long contractId);
 
     // Tìm các hóa đơn chưa thanh toán của một hợp đồng
-    List<Bill> findByContractIdAndStatus(Long contractId, BillStatus status);
+    List<Bill> findByContractIdAndStatusOrderByYearDescMonthDesc(Long contractId, BillStatus status);
 
     Optional<Bill> findByContractIdAndMonthAndYear(Long contractId, Integer month, Integer year);
 

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { userApi } from '@/api/userApi';
 import { propertyApi } from '@/api/propertyApi';
 import { contractApi } from '@/api/contractApi';
+import { adminApi } from '@/api/adminApi';
 import { 
   Users, 
   Building, 
@@ -12,7 +13,8 @@ import {
   Search,
   Loader2,
   AlertCircle,
-  LayoutDashboard
+  LayoutDashboard,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -52,7 +54,15 @@ export default function SystemAdminDashboard() {
     },
   });
 
-  const isLoading = tenantsLoading || landlordsLoading || propsLoading || roomsLoading || contractsLoading;
+  const { data: pendingSettlements = [], isLoading: settlementsLoading } = useQuery({
+    queryKey: ['admin', 'settlements'],
+    queryFn: async () => {
+      const res = await adminApi.getPendingSettlements();
+      return (res as any).data || res;
+    },
+  });
+
+  const isLoading = tenantsLoading || landlordsLoading || propsLoading || roomsLoading || contractsLoading || settlementsLoading;
 
   // 2. Process Calculations
   const totalUsers = tenants.length + landlords.length;
@@ -96,6 +106,15 @@ export default function SystemAdminDashboard() {
       color: "text-blue-600", 
       bg: "bg-blue-50",
       link: "/admin/blockchain-logs"
+    },
+    { 
+      title: "Cần đối soát", 
+      value: pendingSettlements.length, 
+      growth: `${pendingSettlements.length} chủ trọ`, 
+      icon: <ArrowRightLeft size={20}/>, 
+      color: "text-purple-600", 
+      bg: "bg-purple-50",
+      link: "/admin/settlements"
     },
   ];
 
@@ -223,12 +242,19 @@ export default function SystemAdminDashboard() {
                   <p className="text-sm text-amber-700">Hiện có <span className="font-bold text-lg">{pendingApprovals}</span> mục đang chờ bạn phê duyệt.</p>
                   <Link to="/admin/approvals" className="mt-2 block text-xs font-bold text-amber-900 underline">Đến trang phê duyệt →</Link>
                 </div>
-                
                 <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                   <p className="text-xs text-indigo-800 font-semibold uppercase tracking-wider mb-1">Xác thực danh tính</p>
                   <p className="text-sm text-indigo-700">Có <span className="font-bold text-lg">{pendingKYC}</span> hồ sơ KYC đang chờ kiểm tra thủ công.</p>
                   <Link to="/admin/users" className="mt-2 block text-xs font-bold text-indigo-900 underline">Kiểm tra ngay →</Link>
                 </div>
+
+                {pendingSettlements.length > 0 && (
+                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                    <p className="text-xs text-purple-800 font-semibold uppercase tracking-wider mb-1">Quyết toán tài chính</p>
+                    <p className="text-sm text-purple-700">Có <span className="font-bold text-lg">{pendingSettlements.length}</span> khoản thu hộ cần chuyển trả chủ trọ.</p>
+                    <Link to="/admin/settlements" className="mt-2 block text-xs font-bold text-purple-900 underline">Quyết toán ngay →</Link>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -15,6 +15,7 @@ import { cn } from "@/utils/cn";
 import { contractApi } from "@/api/contractApi";
 import { billApi } from "@/api/billApi";
 import { residentRequestApi } from "@/api/residentRequestApi";
+import { paymentApi } from "@/api/paymentApi";
 import { getSmartContract } from "@/utils/contractHelper";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -72,7 +73,10 @@ export default function ContractDetailPage() {
   const [selectedBillToPay, setSelectedBillToPay] = useState<any>(null);
   const [isNotifyingPayment, setIsNotifyingPayment] = useState(false);
 
-
+  // --- SEPAY DEPOSIT QR STATE ---
+  const [isDepositQrModalOpen, setIsDepositQrModalOpen] = useState(false);
+  const [depositQrData, setDepositQrData] = useState<any>(null);
+  const [isLoadingQr, setIsLoadingQr] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'INFO' | 'BILLS'>('INFO');
   const [bills, setBills] = useState<any[]>([]);
@@ -189,6 +193,10 @@ export default function ContractDetailPage() {
       if (activeTab === 'BILLS') {
         billApi.getBillsByContract(Number(id)).then(res => setBills(res.data));
       }
+      
+      // Đóng modal thanh toán cọc/bill nếu đang mở (vì tiền đã vào và trạng thái đã cập nhật)
+      setIsDepositQrModalOpen(false);
+      setIsTraditionalPaymentModalOpen(false);
     };
 
     window.addEventListener('app:refresh-data', handleRefresh);
@@ -238,6 +246,14 @@ export default function ContractDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    // Nếu hợp đồng đã được cọc thành công qua Polling hoặc WebSockets
+    if (contract?.depositStatus === 'DEPOSITED') {
+      setIsDepositQrModalOpen(false);
+      setIsSignModalOpen(false);
+    }
+  }, [contract?.depositStatus]);
+
+  useEffect(() => {
     if (activeTab === 'BILLS' && bills.length === 0 && id) {
       const fetchBills = async () => {
         setIsLoadingBills(true);
@@ -279,10 +295,6 @@ export default function ContractDetailPage() {
   };
 
   const handleSignContract = async () => {
-    if (user?.role === 'TENANT' && contract?.signMethod === 'TRADITIONAL' && !isDepositPaid) {
-      toast.warning("Vui lòng xác nhận đã thanh toán tiền cọc!");
-      return;
-    }
 
     setIsSigning(true);
     try {
@@ -515,22 +527,33 @@ export default function ContractDetailPage() {
     }
   };
 
-  const handleConfirmTraditionalDeposit = async () => {
-    setIsConfirmingDeposit(true);
+  const handleOpenDepositQrModal = async () => {
+    setIsLoadingQr(true);
+    setIsDepositQrModalOpen(true);
     try {
-      await contractApi.confirmTraditionalDeposit(Number(id));
-      toast.success("Đã xác nhận nhận cọc! Hợp đồng đã có hiệu lực.");
-      fetchContractData();
+      const res = await paymentApi.getContractQrCode(Number(id));
+      setDepositQrData(res.data);
     } catch (error: any) {
-      toast.error("Lỗi xác nhận cọc.");
+      toast.error(error.response?.data?.message || "Không thể tạo mã QR lúc này.");
+      setIsDepositQrModalOpen(false);
     } finally {
-      setIsConfirmingDeposit(false);
+      setIsLoadingQr(false);
     }
   };
 
-  const openTraditionalPaymentModal = (bill: any) => {
+
+  const [billQrData, setBillQrData] = useState<any>(null);
+
+  const openTraditionalPaymentModal = async (bill: any) => {
     setSelectedBillToPay(bill);
     setIsTraditionalPaymentModalOpen(true);
+    setBillQrData(null);
+    try {
+      const res = await paymentApi.getBillQrCode(bill.id);
+      setBillQrData(res.data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Không thể tạo mã QR lúc này.");
+    }
   };
 
   const handleNotifyTraditionalPayment = async () => {
@@ -1611,14 +1634,16 @@ export default function ContractDetailPage() {
                         </Button>
                       )}
 
-                      {user?.role === 'LANDLORD' && contract.signMethod === 'TRADITIONAL' && (
-                        <Button
-                          className="w-full gap-2 bg-green-600 hover:bg-green-700 h-11"
-                          onClick={handleConfirmTraditionalDeposit}
-                          isLoading={isConfirmingDeposit}
-                        >
-                          <CheckCircle className="w-4 h-4" /> Xác nhận đã nhận cọc (Tiền mặt/CK)
-                        </Button>
+                      {user?.role === 'TENANT' && contract.signMethod === 'TRADITIONAL' && (
+                        <div className="flex flex-col gap-3">
+                          <Button
+                            className="w-full gap-2 bg-blue-600 hover:bg-blue-700 h-11 shadow-lg shadow-blue-200"
+                            onClick={handleOpenDepositQrModal}
+                            isLoading={isLoadingQr}
+                          >
+                            <QrCode className="w-4 h-4" /> Thanh toán Cọc (Mã VietQR)
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1953,49 +1978,15 @@ export default function ContractDetailPage() {
                 </div>
               )}
 
-              {/* Phần yêu cầu thanh toán cọc cho KHÁCH THUÊ */}
-              {user?.role === 'TENANT' && contract.depositStatus !== 'DEPOSITED' && (
+              {/* Phần yêu cầu thanh toán cọc cho KHÁCH THUÊ (Chỉ BLOCKCHAIN) */}
+              {user?.role === 'TENANT' && contract.depositStatus !== 'DEPOSITED' && contract.signMethod === 'BLOCKCHAIN' && (
                 <div className="mt-4 p-4 rounded-xl border-2 border-orange-200 bg-orange-50 space-y-3">
                   <h4 className="font-bold text-orange-900 flex items-center gap-2">
                     💰 Cần Thanh toán Cọc: {contract.depositAmount?.toLocaleString()}đ
                   </h4>
-                  {contract.signMethod === 'BLOCKCHAIN' ? (
-                    <p className="text-xs text-orange-800 leading-relaxed">
-                      Khi bấm "Ký Web3 ngay", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-xs text-orange-800 font-medium">Bạn vui lòng chuyển khoản cọc theo thông tin sau và xác nhận bên dưới:</p>
-                      <div className="bg-white p-3 rounded-lg border border-orange-200 text-xs shadow-sm flex gap-4 items-center">
-                        {contract.landlordBankQrUrl && (
-                          <div className="shrink-0 relative group rounded-lg overflow-hidden border border-gray-100 shadow-sm w-24 h-24">
-                            <img
-                              src={contract.landlordBankQrUrl}
-                              alt="Mã QR Thanh Toán"
-                              className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="text-gray-500 mb-1 uppercase font-bold text-[10px]">Tài khoản thụ hưởng</p>
-                          <p className="font-bold text-gray-800">{contract.landlordBankName || 'Đang cập nhật'}</p>
-                          <p className="font-mono text-lg text-primary my-1">{contract.landlordBankAccountNumber || 'Chưa cung cấp STK'}</p>
-                          <p className="font-semibold text-gray-700">{contract.landlordBankAccountHolder || contract.landlordName}</p>
-                        </div>
-                      </div>
-                      <label className="flex items-start gap-2 cursor-pointer mt-2 group bg-white/50 p-2 rounded border border-orange-200/50">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                          checked={isDepositPaid}
-                          onChange={(e) => setIsDepositPaid(e.target.checked)}
-                        />
-                        <span className="text-xs text-gray-800 font-bold group-hover:text-black">
-                          Tôi xác nhận đã chuyển khoản thành công Tiền cọc trên.
-                        </span>
-                      </label>
-                    </div>
-                  )}
+                  <p className="text-xs text-orange-800 leading-relaxed">
+                    Khi bấm "Ký Web3 ngay", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
+                  </p>
                 </div>
               )}
 
@@ -2214,48 +2205,42 @@ export default function ContractDetailPage() {
 
       {/* --- MODAL THANH TOÁN TRUYỀN THỐNG (Khách Thuê) --- */}
       {isTraditionalPaymentModalOpen && selectedBillToPay && contract && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 p-6 flex flex-col items-center">
+            <button
+              onClick={() => setIsTraditionalPaymentModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
               Thanh toán Hóa đơn tháng {selectedBillToPay.month}/{selectedBillToPay.year}
             </h2>
-
-            <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 mb-6 relative overflow-hidden group">
-              {contract?.landlordBankQrUrl ? (
-                <div className="mb-4 flex justify-center">
-                  <img src={contract?.landlordBankQrUrl} alt="Mã QR Chuyển Khoản" className="w-40 h-40 object-contain rounded-lg shadow-sm border border-orange-200 bg-white p-2" />
+            <p className="text-sm text-gray-500 mb-6 text-center">Quét mã QR dưới đây để thanh toán. Hệ thống sẽ <strong className="text-green-600">tự động chốt hóa đơn</strong> ngay sau khi nhận được tiền.</p>
+            
+            {billQrData ? (
+              <div className="flex flex-col items-center">
+                <div className="p-2 bg-white rounded-2xl shadow-sm border border-gray-100">
+                  <img src={billQrData.qrUrl} alt="VietQR" className="w-64 h-64 object-contain rounded-xl" />
                 </div>
-              ) : (
-                <div className="absolute top-0 right-0 p-2 opacity-10"><QrCode className="h-24 w-24 text-orange-600" /></div>
-              )}
-              <p className="text-sm text-orange-800 font-medium mb-2">Thông tin tài khoản ngân hàng của Chủ trọ:</p>
-              <div className="space-y-1 relative z-10">
-                <p className="text-xs text-gray-500">Ngân hàng:</p>
-                <p className="font-bold text-gray-900">{contract?.landlordBankName || "Chưa cập nhật"}</p>
-                <p className="text-xs text-gray-500 mt-2">Số tài khoản:</p>
-                <p className="font-mono text-xl font-bold tracking-wider text-orange-700 bg-white inline-block px-2 py-1 rounded border border-orange-200">{contract?.landlordBankAccountNumber || "Chưa cập nhật"}</p>
-                <p className="text-xs text-gray-500 mt-2">Chủ tài khoản:</p>
-                <p className="font-bold text-gray-900 uppercase">{contract?.landlordBankAccountHolder || "Chưa cập nhật"}</p>
-
-                <div className="pt-3 mt-3 border-t border-orange-200/50">
-                  <p className="text-xs text-gray-500">Số tiền cần chuyển:</p>
-                  <p className="text-2xl font-black text-red-600">{Number(selectedBillToPay?.totalAmount).toLocaleString('vi-VN')}đ</p>
-                  <p className="text-xs text-gray-500 mt-2">Nội dung chuyển khoản (gợi ý):</p>
-                  <p className="font-mono text-sm bg-white p-2 rounded text-gray-800 border border-orange-100 font-medium">THANH TOAN TIEN PHONG {contract?.roomName} THANG {selectedBillToPay?.month}</p>
+                <div className="mt-6 space-y-2 text-center">
+                  <p className="text-sm text-gray-500">Số tiền cần thanh toán:</p>
+                  <p className="text-3xl font-black text-primary">{Number(billQrData.amount).toLocaleString('vi-VN')}đ</p>
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg font-mono text-sm font-bold border border-orange-100">
+                    Nội dung CK: {billQrData.addInfo}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="flex gap-3 justify-end mt-4">
-              <Button variant="outline" onClick={() => setIsTraditionalPaymentModalOpen(false)}>Quay lại</Button>
-              <Button
-                onClick={handleNotifyTraditionalPayment}
-                isLoading={isNotifyingPayment}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-              >
-                Tôi đã chuyển khoản thành công
-              </Button>
+            ) : (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            )}
+            
+            <div className="w-full mt-6 flex justify-center items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin text-green-500" />
+              Đang chờ thanh toán tự động...
             </div>
           </div>
         </div>
@@ -2322,6 +2307,50 @@ export default function ContractDetailPage() {
                   Xác nhận xóa
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────── MODAL THANH TOÁN CỌC VIETQR ────── */}
+      {isDepositQrModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            onClick={() => setIsDepositQrModalOpen(false)}
+          />
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 p-6 flex flex-col items-center">
+            <button
+              onClick={() => setIsDepositQrModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanh toán Tiền Cọc</h2>
+            <p className="text-sm text-gray-500 mb-6 text-center">Quét mã QR dưới đây để thanh toán. Hệ thống sẽ <strong className="text-green-600">tự động kích hoạt</strong> hợp đồng ngay sau khi nhận được tiền.</p>
+            
+            {depositQrData ? (
+              <div className="flex flex-col items-center">
+                <div className="p-2 bg-white rounded-2xl shadow-sm border border-gray-100">
+                  <img src={depositQrData.qrUrl} alt="VietQR" className="w-64 h-64 object-contain rounded-xl" />
+                </div>
+                <div className="mt-6 space-y-2 text-center">
+                  <p className="text-sm text-gray-500">Số tiền cọc:</p>
+                  <p className="text-3xl font-black text-primary">{Number(depositQrData.amount).toLocaleString('vi-VN')}đ</p>
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg font-mono text-sm font-bold border border-orange-100">
+                    Nội dung CK: {depositQrData.addInfo}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            )}
+            
+            <div className="w-full mt-6 flex justify-center items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin text-green-500" />
+              Đang chờ thanh toán...
             </div>
           </div>
         </div>

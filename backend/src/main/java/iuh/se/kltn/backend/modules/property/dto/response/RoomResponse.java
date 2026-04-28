@@ -18,6 +18,7 @@ public class RoomResponse {
     private PropertyStatus approvalStatus;
     private List<String> amenities;
     private List<String> images;
+    private List<String> panoramaImages;
     private Integer maxOccupants;
     private String propertyName;
     private String propertyAddress;

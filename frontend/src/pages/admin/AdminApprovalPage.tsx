@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { propertyApi } from '@/api/propertyApi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -7,10 +7,12 @@ import { toast } from 'sonner';
 import { 
   Loader2, CheckCircle, XCircle, Building, MapPin, ExternalLink, 
   ShieldCheck, AlertTriangle, ShieldAlert, ArrowUpDown, X, MessageSquare,
-  Home, DoorOpen
+  Home, DoorOpen, Eye
 } from 'lucide-react';
 import type { Property, Room } from '@/types/index';
 import { Link } from 'react-router-dom';
+
+const Room360Viewer = lazy(() => import('@/components/property/Room360Viewer'));
 
 type TabType = 'properties' | 'rooms';
 type SortType = 'newest' | 'score_asc' | 'score_desc';
@@ -27,6 +29,9 @@ export default function AdminApprovalPage() {
   const [rejectTarget, setRejectTarget] = useState<{ type: 'property' | 'room'; id: number; name: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
+
+  // Quick View Modal state
+  const [detailModalTarget, setDetailModalTarget] = useState<{ type: 'property' | 'room'; data: any } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -158,7 +163,7 @@ export default function AdminApprovalPage() {
   };
 
   // --- ACTION BUTTONS ---
-  const ActionButtons = ({ id, name, type }: { id: number; name: string; type: 'property' | 'room' }) => (
+  const ActionButtons = ({ id, name, type, item }: { id: number; name: string; type: 'property' | 'room', item: any }) => (
     <div className="flex flex-col gap-2">
       <Button 
         onClick={() => type === 'property' ? handleApproveProperty(id) : handleApproveRoom(id)}
@@ -175,13 +180,14 @@ export default function AdminApprovalPage() {
       >
         {submitting === id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="h-4 w-4 mr-2" /> Từ chối</>}
       </Button>
-      {type === 'property' && (
-        <Link to={`/properties/${id}`} target="_blank">
-          <Button variant="ghost" size="sm" className="w-full text-blue-600">
-            <ExternalLink className="h-4 w-4 mr-2" /> Xem chi tiết
-          </Button>
-        </Link>
-      )}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="w-full text-blue-600 bg-blue-50/50 hover:bg-blue-100"
+        onClick={() => setDetailModalTarget({ type, data: item })}
+      >
+        <Eye className="h-4 w-4 mr-2" /> Xem chi tiết
+      </Button>
     </div>
   );
 
@@ -287,7 +293,7 @@ export default function AdminApprovalPage() {
                         <AiScoreBadge score={p.safetyScore} reason={p.moderationReason} />
                       </div>
                       
-                      <ActionButtons id={p.id} name={p.name} type="property" />
+                      <ActionButtons id={p.id} name={p.name} type="property" item={p} />
                     </div>
                   </div>
                 </Card>
@@ -344,10 +350,18 @@ export default function AdminApprovalPage() {
                           </p>
                         )}
 
+                        {r.panoramaImages && r.panoramaImages.length > 0 && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-md border border-cyan-200">
+                              🌐 {r.panoramaImages.length} ảnh 360°
+                            </span>
+                          </div>
+                        )}
+
                         <AiScoreBadge score={r.safetyScore} reason={r.moderationReason} />
                       </div>
                       
-                      <ActionButtons id={r.id} name={r.name} type="room" />
+                      <ActionButtons id={r.id} name={r.name} type="room" item={r} />
                     </div>
                   </div>
                 </Card>
@@ -355,6 +369,136 @@ export default function AdminApprovalPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* DETAIL MODAL */}
+      {detailModalTarget && (
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 md:p-8 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b shrink-0 bg-gray-50/50">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                {detailModalTarget.type === 'property' ? <Building className="h-6 w-6 text-primary" /> : <Home className="h-6 w-6 text-primary" />}
+                Chi tiết {detailModalTarget.type === 'property' ? 'khu trọ' : 'phòng'}: {detailModalTarget.data.name}
+              </h3>
+              <button onClick={() => setDetailModalTarget(null)} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {/* Ảnh thường */}
+              {detailModalTarget.data.images && detailModalTarget.data.images.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Hình ảnh</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {detailModalTarget.data.images.map((img: string, i: number) => (
+                      <img key={i} src={img} alt="Preview" className="w-full aspect-video object-cover rounded-lg border shadow-sm" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 360 Viewer */}
+              {detailModalTarget.type === 'room' && detailModalTarget.data.panoramaImages && detailModalTarget.data.panoramaImages.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <span className="bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full text-xs font-bold">360°</span> Virtual Tour
+                  </h4>
+                  <Suspense fallback={<div className="h-64 bg-slate-100 animate-pulse rounded-xl" />}>
+                    <Room360Viewer images={detailModalTarget.data.panoramaImages} height="350px" />
+                  </Suspense>
+                </div>
+              )}
+
+              {/* Thông tin */}
+              <div className="bg-gray-50 p-4 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-4">
+                {detailModalTarget.type === 'property' ? (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-500">Địa chỉ</p>
+                      <p className="font-medium text-sm">{detailModalTarget.data.address}, {detailModalTarget.data.district}, {detailModalTarget.data.city}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Chi phí dịch vụ (Điện/Nước/Internet)</p>
+                      <p className="font-medium text-sm">{detailModalTarget.data.elecPrice?.toLocaleString() || 0}đ / {detailModalTarget.data.waterPrice?.toLocaleString() || 0}đ / {detailModalTarget.data.internetPrice?.toLocaleString() || 0}đ</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-500">Giá thuê & Diện tích</p>
+                      <p className="font-medium text-sm text-primary">{detailModalTarget.data.price?.toLocaleString()}đ <span className="text-gray-500 font-normal">/ {detailModalTarget.data.area}m²</span></p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Loại phòng</p>
+                      <p className="font-medium text-sm">{detailModalTarget.data.type || 'N/A'}</p>
+                    </div>
+                    {detailModalTarget.data.amenities && detailModalTarget.data.amenities.length > 0 && (
+                      <div className="col-span-1 md:col-span-2">
+                        <p className="text-xs text-gray-500 mb-1">Tiện ích</p>
+                        <div className="flex flex-wrap gap-2">
+                          {detailModalTarget.data.amenities.map((a: string, i: number) => (
+                            <span key={i} className="bg-white border text-xs px-2 py-1 rounded">{a}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Mô tả */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Mô tả</h4>
+                <div className="text-sm text-gray-600 bg-white border p-4 rounded-xl whitespace-pre-line leading-relaxed">
+                  {detailModalTarget.data.description || <span className="italic text-gray-400">Không có mô tả</span>}
+                </div>
+              </div>
+
+              {/* AI Score */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Kết quả kiểm duyệt AI</h4>
+                <AiScoreBadge score={detailModalTarget.data.safetyScore} reason={detailModalTarget.data.moderationReason} />
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t bg-gray-50 shrink-0 flex items-center justify-between gap-4">
+              <div className="text-xs text-gray-500 italic">
+                Xem kỹ thông tin và kết quả AI trước khi duyệt.
+              </div>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  className="border-red-200 text-red-600 hover:bg-red-50 min-w-[120px]"
+                  disabled={submitting === detailModalTarget.data.id}
+                  onClick={() => {
+                    openRejectDialog(detailModalTarget.type, detailModalTarget.data.id, detailModalTarget.data.name);
+                    setDetailModalTarget(null);
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" /> Từ chối
+                </Button>
+                <Button 
+                  className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
+                  disabled={submitting === detailModalTarget.data.id}
+                  onClick={async () => {
+                    if (detailModalTarget.type === 'property') {
+                      await handleApproveProperty(detailModalTarget.data.id);
+                    } else {
+                      await handleApproveRoom(detailModalTarget.data.id);
+                    }
+                    setDetailModalTarget(null);
+                  }}
+                >
+                  {submitting === detailModalTarget.data.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-2" /> Duyệt tin</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* REJECT DIALOG */}

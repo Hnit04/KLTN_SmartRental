@@ -7,10 +7,12 @@ import PropertyCard from "@/features/property/components/PropertyCard";
 import PropertyMap from "@/features/property/components/PropertyMap";
 import RoomCard from "@/features/property/components/RoomCard";
 import { propertyApi } from "@/api/propertyApi";
+import { useAuth } from "@/context/AuthContext";
 import type { Property, Room } from "@/types/index";
 import { toast } from "sonner";
 
 export default function PropertiesPage() {
+  const { isAuthenticated } = useAuth();
   // --- STATE ---
   const [properties, setProperties] = useState<Property[]>([]);
   const [page, setPage] = useState(0);
@@ -324,10 +326,13 @@ export default function PropertiesPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
-                Phòng Gợi Ý Từ AI
+                {isAuthenticated ? "Phòng Gợi Ý Cho Bạn" : "Phòng Trọ Nổi Bật"}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Dựa trên sở thích của bạn, AI đã chọn ra {recommendedRooms.length} phòng tối ưu nhất.
+                {isAuthenticated 
+                  ? `Dựa trên sở thích của bạn, AI đã chọn ra ${recommendedRooms.length} phòng tối ưu nhất.`
+                  : `Khám phá ${recommendedRooms.length} phòng trọ được đánh giá cao nhất bởi cộng đồng.`
+                }
               </p>
             </div>
           </div>

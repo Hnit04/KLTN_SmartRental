@@ -195,8 +195,8 @@ export default function BillManagePage() {
     const nElec = Number(newElec);
     const nWater = Number(newWater);
 
-    if (nElec < selectedContract.oldElecIndex) return toast.error('Số điện mới không được nhỏ hơn số cũ!');
-    if (nWater < selectedContract.oldWaterIndex) return toast.error('Số nước mới không được nhỏ hơn số cũ!');
+    if (!isMeterReset && nElec < selectedContract.oldElecIndex) return toast.error('Số điện mới không được nhỏ hơn số cũ!');
+    if (!isMeterReset && nWater < selectedContract.oldWaterIndex) return toast.error('Số nước mới không được nhỏ hơn số cũ!');
 
     setIsSubmitting(true);
     try {
@@ -369,9 +369,9 @@ export default function BillManagePage() {
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Phòng {contract.roomName}</h3>
                   <p className="text-sm text-gray-500">{contract.tenantName}</p>
-                  <p className="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block border border-primary/10">
+                  <Link to="/landlord/contracts" className="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block border border-primary/10 hover:bg-primary/10 transition-colors">
                     Hợp đồng #{contract.id}
-                  </p>
+                  </Link>
                 </div>
                 {contract.billStatus === 'UNBILLED' && <StatusBadge label="Chưa chốt" tone="danger" />}
                 {contract.billStatus === 'PENDING' && <StatusBadge label="Chờ đóng" tone="warning" />}
@@ -655,11 +655,11 @@ export default function BillManagePage() {
                         <span className="font-medium text-gray-800">Tiền điện</span>
                         <span className="text-xs text-gray-500">
                           {viewingContract.oldElecIndex} ➔ {viewingContract.newElecIndex} 
-                          ({Math.max(0, (viewingContract.newElecIndex || 0) - viewingContract.oldElecIndex)} kWh x {formatCurrency(viewingContract.elecPrice).replace('đ','')})
+                          ({(() => { const o = viewingContract.oldElecIndex; const n = viewingContract.newElecIndex || 0; return n >= o ? n - o : (10000 - o) + n; })()} kWh x {formatCurrency(viewingContract.elecPrice).replace('đ','')})
                         </span>
                     </div>
                     <span className="font-semibold mt-1">
-                        {formatCurrency(Math.max(0, (viewingContract.newElecIndex || 0) - viewingContract.oldElecIndex) * viewingContract.elecPrice)}
+                        {formatCurrency((() => { const o = viewingContract.oldElecIndex; const n = viewingContract.newElecIndex || 0; const used = n >= o ? n - o : (10000 - o) + n; return used * viewingContract.elecPrice; })())}
                     </span>
                  </div>
 
@@ -668,11 +668,11 @@ export default function BillManagePage() {
                         <span className="font-medium text-gray-800">Tiền nước</span>
                         <span className="text-xs text-gray-500">
                           {viewingContract.oldWaterIndex} ➔ {viewingContract.newWaterIndex} 
-                          ({Math.max(0, (viewingContract.newWaterIndex || 0) - viewingContract.oldWaterIndex)} m³ x {formatCurrency(viewingContract.waterPrice).replace('đ','')})
+                          ({(() => { const o = viewingContract.oldWaterIndex; const n = viewingContract.newWaterIndex || 0; return n >= o ? n - o : (1000 - o) + n; })()} m³ x {formatCurrency(viewingContract.waterPrice).replace('đ','')})
                         </span>
                     </div>
                     <span className="font-semibold mt-1">
-                        {formatCurrency(Math.max(0, (viewingContract.newWaterIndex || 0) - viewingContract.oldWaterIndex) * viewingContract.waterPrice)}
+                        {formatCurrency((() => { const o = viewingContract.oldWaterIndex; const n = viewingContract.newWaterIndex || 0; const used = n >= o ? n - o : (1000 - o) + n; return used * viewingContract.waterPrice; })())}
                     </span>
                  </div>
 
