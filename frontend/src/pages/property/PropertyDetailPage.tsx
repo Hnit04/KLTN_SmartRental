@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
+import LoginRequiredModal from "@/components/shared/LoginRequiredModal";
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
@@ -43,6 +44,9 @@ export default function PropertyDetailPage() {
   const [meetTime, setMeetTime] = useState("");
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginModalConfig, setLoginModalConfig] = useState({ title: "", message: "" });
+  const [showFullPhone, setShowFullPhone] = useState(false);
 
   // --- FETCH DATA ---
   // --- FETCH DATA ---
@@ -91,15 +95,43 @@ export default function PropertyDetailPage() {
   }, [id]);
 
   // --- HANDLERS ---
+  const maskPhone = (phone: string) => {
+    if (!phone) return "";
+    if (showFullPhone || isAuthenticated) return phone;
+    return phone.substring(0, phone.length - 3) + "xxx";
+  };
+
+  const handleShowPhone = (action: "call" | "zalo") => {
+    if (!isAuthenticated) {
+      setLoginModalConfig({
+        title: action === "call" ? "Xem số điện thoại" : "Chat Zalo",
+        message: `Vui lòng đăng nhập để ${action === "call" ? "liên hệ trực tiếp" : "nhắn tin Zalo"} cho chủ nhà.`
+      });
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setShowFullPhone(true);
+  };
+
   const handleCall = () => {
     const phone = (property as any)?.landlordPhone;
     if (!phone) return toast.error("Chủ nhà chưa cập nhật số điện thoại liên hệ.");
+    
+    if (!isAuthenticated && !showFullPhone) {
+      handleShowPhone("call");
+      return;
+    }
     window.location.href = `tel:${phone}`;
   };
 
   const handleZalo = () => {
     const phone = (property as any)?.landlordPhone;
     if (!phone) return toast.error("Chủ nhà chưa cập nhật số điện thoại Zalo.");
+    
+    if (!isAuthenticated && !showFullPhone) {
+      handleShowPhone("zalo");
+      return;
+    }
     window.open(`https://zalo.me/${phone}`, '_blank');
   };
 
@@ -131,8 +163,11 @@ export default function PropertyDetailPage() {
 
   const handleOpenBookingModal = (room: Room) => {
     if (!isAuthenticated) {
-      toast.error("Vui lòng đăng nhập để đặt lịch xem phòng!");
-      navigate("/login");
+      setLoginModalConfig({
+        title: "Đặt lịch xem phòng",
+        message: "Bạn cần đăng nhập để đặt lịch hẹn và trao đổi với chủ nhà."
+      });
+      setIsLoginModalOpen(true);
       return;
     }
     if (user?.role === 'LANDLORD') {
@@ -353,7 +388,8 @@ export default function PropertyDetailPage() {
                    
                    <div className="space-y-3">
                      <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 h-11 text-base shadow-md shadow-green-200" onClick={handleCall}>
-                        <Phone className="h-4 w-4" /> Gọi điện ngay
+                        <Phone className="h-4 w-4" /> 
+                        {(!isAuthenticated && !showFullPhone) ? maskPhone((property as any).landlordPhone) : "Gọi điện ngay"}
                      </Button>
                      <Button variant="outline" className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 h-11" onClick={handleZalo}>
                         <MessageSquare className="h-4 w-4" /> Chat qua Zalo
@@ -661,6 +697,13 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       )}
+      {/* ===== LOGIN REQUIRED MODAL ===== */}
+      <LoginRequiredModal 
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        title={loginModalConfig.title}
+        message={loginModalConfig.message}
+      />
     </div>
   );
 }

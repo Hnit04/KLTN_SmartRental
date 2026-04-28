@@ -63,6 +63,8 @@ public class ContractService {
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
 
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    private boolean mockAmountOverride;
     @Autowired
     public ContractService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -286,13 +288,12 @@ public class ContractService {
 
         for (int i = 5; i >= 0; i--) {
             java.time.LocalDate date = now.minusMonths(i);
+            java.time.LocalDate startOfMonth = date.with(java.time.temporal.TemporalAdjusters.firstDayOfMonth());
             java.time.LocalDate endOfMonth = date.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
             
-            // Count contracts active during this month
-            long occupied = activeContracts.stream().filter(c -> 
-                (c.getStartDate().isBefore(endOfMonth) || c.getStartDate().isEqual(endOfMonth)) &&
-                (c.getEndDate() == null || c.getEndDate().isAfter(date) || c.getEndDate().isEqual(date))
-            ).count();
+            // 🔍 Fix: Query all contracts that were active during this specific month
+            // A contract was active if its startDate <= endOfMonth AND (endDate is null OR endDate >= startOfMonth)
+            long occupied = contractRepository.countActiveDuringPeriod(landlordId, startOfMonth, endOfMonth);
             
             double rate = totalRoomsCount > 0 ? ((double) occupied / totalRoomsCount) * 100 : 0;
             trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
@@ -836,8 +837,8 @@ public class ContractService {
         // Kiểm tra số tiền chuyển có đủ không (tiền cọc)
         Double expectedDeposit = contract.getDepositAmount() != null ? contract.getDepositAmount() : 0.0;
         
-        // MOCK LỖI CHO 2000 VNĐ ĐỂ TEST THỰC TẾ (Nếu đúng 2000 thì luôn pass để test)
-        if (amountIn < expectedDeposit && amountIn != 2000.0) {
+        // MOCK: Nếu mock=true, cho phép 2000 VNĐ pass. Nếu mock=false, kiểm tra số tiền thật.
+        if (amountIn < expectedDeposit && !(mockAmountOverride && amountIn == 2000.0)) {
             System.out.println("⚠️ [SePay Deposit] Số tiền cọc chuyển (" + amountIn + ") nhỏ hơn yêu cầu (" + expectedDeposit + "). Không tự động duyệt.");
             return;
         }
@@ -859,16 +860,16 @@ public class ContractService {
         // Thông báo
         notificationService.createNotification(
             contract.getTenant(),
-            "Kích hoạt hợp đồng thành công (Auto-Confirm)",
-            "Chủ trọ đã nhận được tiền cọc qua mã VietQR (Mã GD: " + referenceNumber + "). Hợp đồng phòng " + contract.getRoom().getName() + " chính thức có hiệu lực.",
+            "Kích hoạt hợp đồng thành công",
+            "Tiền cọc phòng " + contract.getRoom().getName() + " đã được ghi nhận qua VietQR (Mã GD: " + referenceNumber + "). Hợp đồng chính thức có hiệu lực.",
             iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
             contract.getId()
         );
 
         notificationService.createNotification(
             contract.getRoom().getProperty().getLandlord(),
-            "Nhận cọc tự động thành công (SePay)",
-            "Khách thuê phòng " + contract.getRoom().getName() + " đã nạp cọc qua mã VietQR. Hợp đồng đã kích hoạt.",
+            "Khách thuê đã nạp cọc thành công",
+            "Khách thuê phòng " + contract.getRoom().getName() + " đã nạp cọc qua VietQR. Hợp đồng đã kích hoạt. Khoản cọc sẽ được chuyển đến bạn trong đợt đối soát tiếp theo.",
             iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
             contract.getId()
         );

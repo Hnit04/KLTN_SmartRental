@@ -28,6 +28,7 @@ public class RoomRequest {
 
     private List<String> amenities;
     private List<String> images;
+    private List<String> panoramaImages;
     private String defaultTerms;
     private String description;
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Edit, Users, MapPin, ShieldCheck, 
@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import type { Room, User, RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
-import { roomApi } from '@/api/roomApi'; 
+import { roomApi } from '@/api/roomApi';
+
+const Room360Viewer = lazy(() => import('@/components/property/Room360Viewer'));
 
 // Danh sách tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -72,6 +74,7 @@ export default function PropertyRoomDetailPage() {
     amenities: [] as string[],
     customAmenitiesInput: '',
     images: [] as string[],
+    panoramaImages: [] as string[],
     defaultTerms: ''
   });
 
@@ -79,6 +82,11 @@ export default function PropertyRoomDetailPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State upload ảnh 360
+  const [panoSelectedFiles, setPanoSelectedFiles] = useState<File[]>([]);
+  const [panoPreviewUrls, setPanoPreviewUrls] = useState<string[]>([]);
+  const panoFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (roomId) fetchRoomDetail();
@@ -137,6 +145,7 @@ export default function PropertyRoomDetailPage() {
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '),
       images: roomData.images || [],
+      panoramaImages: roomData.panoramaImages || [],
       defaultTerms: roomData.defaultTerms || ''
     });
   };
@@ -146,6 +155,8 @@ export default function PropertyRoomDetailPage() {
     prepareEditForm(room);
     setSelectedFiles([]);
     setPreviewUrls([]);
+    setPanoSelectedFiles([]);
+    setPanoPreviewUrls([]);
     setShowEditModal(true);
   };
 
@@ -194,6 +205,28 @@ export default function PropertyRoomDetailPage() {
     }));
   };
 
+  // === Xử lý ảnh 360 ===
+  const handlePanoImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const totalCurrent = formData.panoramaImages.length + panoSelectedFiles.length;
+      const remaining = 5 - totalCurrent;
+      if (remaining <= 0) { toast.warning('Tối đa 5 ảnh 360°!'); return; }
+      const filesArray = Array.from(e.target.files).filter(f => f.size <= 10 * 1024 * 1024).slice(0, remaining);
+      setPanoSelectedFiles(prev => [...prev, ...filesArray]);
+      setPanoPreviewUrls(prev => [...prev, ...filesArray.map(f => URL.createObjectURL(f))]);
+    }
+    if (panoFileInputRef.current) panoFileInputRef.current.value = '';
+  };
+
+  const removePanoSelectedFile = (idx: number) => {
+    setPanoSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+    setPanoPreviewUrls(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeOldPanoImage = (idx: number) => {
+    setFormData(prev => ({ ...prev, panoramaImages: prev.panoramaImages.filter((_, i) => i !== idx) }));
+  };
+
   // ==================== AI TẠO MÔ TẢ ====================
   const handleGenerateAI = async () => {
     if (!formData.name || !formData.area || !formData.price) {
@@ -235,6 +268,14 @@ export default function PropertyRoomDetailPage() {
         newUrls = (uploadRes as any).data || uploadRes;
       }
 
+      // Upload ảnh 360
+      let newPanoUrls: string[] = [];
+      if (panoSelectedFiles.length > 0) {
+        toast.info("Đang tải ảnh 360° lên...");
+        const panoUploadRes = await propertyApi.uploadImages(panoSelectedFiles);
+        newPanoUrls = (panoUploadRes as any).data || panoUploadRes;
+      }
+
       const parsedCustomAmenities = formData.customAmenitiesInput
         .split(',')
         .map(item => item.trim())
@@ -253,6 +294,7 @@ export default function PropertyRoomDetailPage() {
         description: formData.description,
         amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
+        panoramaImages: [...formData.panoramaImages, ...newPanoUrls],
         defaultTerms: formData.defaultTerms
       };
 
@@ -413,6 +455,29 @@ export default function PropertyRoomDetailPage() {
               </div>
             )}
           </div>
+
+          {/* 360 Viewer */}
+          {room.panoramaImages && room.panoramaImages.length > 0 && (
+            <div className="bg-white rounded-2xl border p-5">
+              <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <span className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
+                    <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
+                  </svg>
+                </span>
+                Xem phòng 360°
+                <span className="text-[10px] font-bold bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">Virtual Tour</span>
+              </h3>
+              <Suspense fallback={
+                <div className="h-[350px] bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-cyan-500" />
+                </div>
+              }>
+                <Room360Viewer images={room.panoramaImages} height="350px" />
+              </Suspense>
+            </div>
+          )}
 
           {/* Mô tả & Điều khoản */}
           <div className="bg-white rounded-2xl border p-6 space-y-6">
@@ -813,6 +878,52 @@ export default function PropertyRoomDetailPage() {
                           >
                             <X className="h-3 w-3" />
                           </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Ảnh 360 */}
+                <div className="border-t pt-4 mt-2">
+                  <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                    🌐 Ảnh 360° (Virtual Tour)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Tải lên ảnh panorama 360 độ. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB.
+                  </p>
+                  <div 
+                    onClick={() => panoFileInputRef.current?.click()} 
+                    className="border-2 border-dashed border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer group"
+                  >
+                    <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
+                        <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-cyan-700">Chọn ảnh 360°</span>
+                    <input type="file" multiple accept="image/*" ref={panoFileInputRef} onChange={handlePanoImageChange} className="hidden" />
+                  </div>
+
+                  {(formData.panoramaImages.length > 0 || panoPreviewUrls.length > 0) && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                      {formData.panoramaImages.map((url, idx) => (
+                        <div key={`pano-old-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border border-cyan-200 bg-cyan-50">
+                          <img src={url} alt={`pano-${idx}`} className="w-full h-full object-cover" />
+                          <div className="absolute top-1 left-1">
+                            <span className="text-[9px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">360°</span>
+                          </div>
+                          <button type="button" onClick={() => removeOldPanoImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                      {panoPreviewUrls.map((url, idx) => (
+                        <div key={`pano-new-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border-2 border-dashed border-cyan-400 bg-cyan-50/50">
+                          <img src={url} alt={`pano-preview-${idx}`} className="w-full h-full object-cover opacity-80" />
+                          <div className="absolute top-1 left-1">
+                            <span className="text-[9px] font-bold bg-cyan-500 text-white px-1.5 py-0.5 rounded">Mới</span>
+                          </div>
+                          <button type="button" onClick={() => removePanoSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
                         </div>
                       ))}
                     </div>

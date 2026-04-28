@@ -43,6 +43,10 @@ public class PaymentController {
     @Value("${sepay.platform.account-name:TRAN CONG TINH}")
     private String platformAccountName;
 
+    // Toggle mock: true = dùng 2000đ để test, false = dùng số tiền thật (PRODUCTION)
+    @Value("${sepay.mock.amount-override:true}")
+    private boolean mockAmountOverride;
+
     @GetMapping("/bill/{billId}/qr-code")
     public ResponseEntity<?> getVietQrCode(@PathVariable Long billId) {
         Bill bill = billRepository.findById(billId)
@@ -57,8 +61,10 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Chủ trọ chưa cấu hình thông tin ngân hàng"));
         }
 
-        // MOCK CHO PHÉP 2000 VNĐ ĐỂ TEST THỰC TẾ
-        String amount = bill.getTotalAmount().longValue() > 0 ? "2000" : "0";
+        // Nếu mock=true: dùng 2000đ để test. Nếu mock=false: dùng số tiền thật (PRODUCTION)
+        String amount = mockAmountOverride 
+            ? (bill.getTotalAmount().longValue() > 0 ? "2000" : "0")
+            : String.valueOf(bill.getTotalAmount().longValue());
         String addInfo = "SMR BILL " + billId;
         String encodedAddInfo = java.net.URLEncoder.encode(addInfo, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
         String encodedAccountName = accountName != null ? java.net.URLEncoder.encode(accountName, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20") : "";
@@ -92,8 +98,10 @@ public class PaymentController {
         // Tạo URL ảnh VietQR cho tiền cọc
         Double depositAmount = contract.getDepositAmount() != null ? contract.getDepositAmount() : 0.0;
         
-        // MOCK CHO VIỆC TEST: Ghi đè số tiền thành 2,000 VNĐ để test trải nghiệm thực tế
-        String amount = depositAmount > 0 ? "2000" : "0";
+        // Nếu mock=true: dùng 2000đ để test. Nếu mock=false: dùng số tiền thật (PRODUCTION)
+        String amount = mockAmountOverride
+            ? (depositAmount > 0 ? "2000" : "0")
+            : String.valueOf(depositAmount.longValue());
         
         String addInfo = "SMR DEPOSIT " + contractId;
         String encodedAddInfo = java.net.URLEncoder.encode(addInfo, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");

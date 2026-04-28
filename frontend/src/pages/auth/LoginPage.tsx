@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,6 +12,8 @@ import { jwtDecode } from "jwt-decode";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
   const { login } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -96,9 +98,13 @@ export default function LoginPage() {
       });
 
       setTimeout(() => {
-        if (user.role === 'ADMIN') navigate("/admin/dashboard");
-        else if (user.role === 'LANDLORD') navigate("/landlord/dashboard");
-        else navigate("/tenant/dashboard");
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else {
+          if (user.role === 'ADMIN') navigate("/admin/dashboard");
+          else if (user.role === 'LANDLORD') navigate("/landlord/dashboard");
+          else navigate("/tenant/dashboard");
+        }
       }, 1500);
     } catch (error: any) {
       console.error("Lỗi đăng nhập:", error?.response?.data);
@@ -149,10 +155,14 @@ export default function LoginPage() {
     });
 
     setTimeout(() => {
-      const role = response.user?.role;
-      if (role === 'ADMIN') navigate("/admin/dashboard");
-      else if (role === 'LANDLORD') navigate("/landlord/dashboard");
-      else navigate("/tenant/dashboard");
+      if (redirectUrl) {
+        navigate(redirectUrl);
+      } else {
+        const role = response.user?.role;
+        if (role === 'ADMIN') navigate("/admin/dashboard");
+        else if (role === 'LANDLORD') navigate("/landlord/dashboard");
+        else navigate("/tenant/dashboard");
+      }
     }, 800);
 
   } catch (error: any) {

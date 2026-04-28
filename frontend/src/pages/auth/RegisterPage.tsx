@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { authApi } from "../../api/authApi";
 import type { RegisterRequest } from "../../types/index";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -78,7 +80,8 @@ export default function RegisterPage() {
     try {
       await authApi.verifyOtp({ email: formData.email, code: otpCode });
       toast.success("Kích hoạt tài khoản thành công!");
-      navigate("/login");
+      const loginTarget = redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login";
+      navigate(loginTarget);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Mã OTP không đúng");
     } finally {
@@ -205,7 +208,10 @@ export default function RegisterPage() {
         
         <div className="text-center text-sm text-gray-600 pt-4 border-t border-gray-200/60 mt-6">
           Đã có tài khoản?{" "}
-          <Link to="/login" className="font-bold text-primary hover:text-primary-700 hover:underline transition-colors">
+          <Link 
+            to={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} 
+            className="font-bold text-primary hover:text-primary-700 hover:underline transition-colors"
+          >
             Đăng nhập ngay
           </Link>
         </div>

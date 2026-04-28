@@ -52,8 +52,9 @@ import ScrollToTop from "./components/shared/ScrollToTop";
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
+  return isAuthenticated ? <Outlet /> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} />;
 };
 
 // 2. PublicRoute (chặn login/register khi đã đăng nhập)

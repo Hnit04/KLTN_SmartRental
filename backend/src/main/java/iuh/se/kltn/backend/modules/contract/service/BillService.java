@@ -48,6 +48,8 @@ public class BillService {
     @Autowired
     private BlockchainService blockchainService;
 
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    private boolean mockAmountOverride;
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
 
@@ -173,7 +175,7 @@ public class BillService {
 
     // Lấy danh sách hóa đơn của Hợp đồng
     public List<BillResponse> getBillsByContract(Long contractId) {
-        return billRepository.findByContractId(contractId).stream()
+        return billRepository.findByContractIdOrderByYearDescMonthDesc(contractId).stream()
                 .map(bill -> {
                     Property property = bill.getContract().getRoom().getProperty();
                     Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
@@ -583,7 +585,7 @@ public class BillService {
             int totalRooms = pBills.get(0).getContract().getRoom().getProperty().getRooms().size();
             double rev = pBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
             
-            propertyDetails.add(new AnnualReportResponse.PropertyRevenueDTO(name, totalRooms, rev, "stable"));
+            propertyDetails.add(new AnnualReportResponse.PropertyRevenueDTO(entry.getKey(), name, totalRooms, rev, "stable"));
             if (rev > maxPropRev) {
                 maxPropRev = rev;
                 bestProp = name;
@@ -618,8 +620,8 @@ public class BillService {
             // Không còn kiểm tra khớp với số tài khoản cá nhân của chủ trọ nữa.
             // Mọi giao dịch từ Webhook SePay (được bảo vệ bằng ApiKey) đều được tin cậy vì chuyển thẳng vào Platform.
 
-            // MOCK CHO PHÉP 2000 VNĐ ĐỂ TEST THỰC TẾ
-            if (request.getAmountIn() < bill.getTotalAmount() && request.getAmountIn() != 2000.0) {
+            // MOCK: Nếu mock=true, cho phép 2000 VNĐ pass. Nếu mock=false, kiểm tra số tiền thật.
+            if (request.getAmountIn() < bill.getTotalAmount() && !(mockAmountOverride && request.getAmountIn() == 2000.0)) {
                 System.out.println("⚠️ [SePay] Số tiền chuyển (" + request.getAmountIn() + ") nhỏ hơn tổng hóa đơn (" + bill.getTotalAmount() + "). Không tự động duyệt.");
                 return;
             }
@@ -633,8 +635,8 @@ public class BillService {
             // Gửi thông báo cho Khách thuê
             notificationService.createNotification(
                     bill.getContract().getTenant(),
-                    "Thanh toán tự động thành công",
-                    "Hóa đơn tháng " + bill.getMonth() + " của bạn đã được thanh toán qua mã VietQR (Mã GD: " + request.getReferenceNumber() + ").",
+                    "Thanh toán hóa đơn thành công",
+                    "Hóa đơn tháng " + bill.getMonth() + " của bạn đã được ghi nhận thanh toán qua VietQR (Mã GD: " + request.getReferenceNumber() + "). Khoản tiền sẽ được chuyển đến Chủ trọ trong đợt đối soát tiếp theo.",
                     NotificationType.PAYMENT_REMINDER,
                     bill.getContract().getId()
             );
@@ -642,8 +644,8 @@ public class BillService {
             // Gửi thông báo cho Chủ trọ
             notificationService.createNotification(
                     bill.getContract().getRoom().getProperty().getLandlord(),
-                    "Nhận tiền tự động thành công (SePay)",
-                    "Khách thuê phòng " + bill.getContract().getRoom().getName() + " đã thanh toán hóa đơn tháng " + bill.getMonth() + " qua mã VietQR.",
+                    "Khách thuê đã thanh toán hóa đơn",
+                    "Khách thuê phòng " + bill.getContract().getRoom().getName() + " đã thanh toán hóa đơn tháng " + bill.getMonth() + " qua VietQR. Khoản tiền sẽ được chuyển đến bạn trong đợt đối soát tiếp theo.",
                     NotificationType.PAYMENT_REMINDER,
                     bill.getContract().getId()
             );

@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
+import LoginRequiredModal from "@/components/shared/LoginRequiredModal";
+import { lazy, Suspense } from "react";
+
+const Room360Viewer = lazy(() => import("@/components/property/Room360Viewer"));
 
 export default function RoomDetailPage() {
   const { id } = useParams();
@@ -33,6 +37,9 @@ export default function RoomDetailPage() {
   const [meetTime, setMeetTime] = useState("");
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginModalConfig, setLoginModalConfig] = useState({ title: "", message: "" });
+  const [showFullPhone, setShowFullPhone] = useState(false);
 
   const [searchParams] = useSearchParams();
   const actionQuery = searchParams.get("action");
@@ -70,8 +77,11 @@ export default function RoomDetailPage() {
 
   const handleBooking = async () => {
     if (!isAuthenticated) {
-      toast.error("Vui lòng đăng nhập để đặt lịch xem phòng!");
-      navigate("/login");
+      setLoginModalConfig({
+        title: "Đặt lịch xem phòng",
+        message: "Bạn cần đăng nhập để đặt lịch hẹn và nhận thông báo xác nhận từ chủ nhà."
+      });
+      setIsLoginModalOpen(true);
       return;
     }
     if (user?.role === "LANDLORD") {
@@ -150,6 +160,36 @@ export default function RoomDetailPage() {
 
   const formatPrice = (n: number) => 
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+
+  const maskPhone = (phone: string) => {
+    if (!phone) return "";
+    if (showFullPhone || isAuthenticated) return phone;
+    return phone.substring(0, phone.length - 3) + "xxx";
+  };
+
+  const handleShowPhone = () => {
+    if (!isAuthenticated) {
+      setLoginModalConfig({
+        title: "Xem số điện thoại",
+        message: "Vui lòng đăng nhập để xem thông tin liên hệ đầy đủ của chủ nhà."
+      });
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setShowFullPhone(true);
+  };
+
+  const handleRentNow = () => {
+    if (!isAuthenticated) {
+      setLoginModalConfig({
+        title: "Thuê phòng ngay",
+        message: "Đăng nhập để tiến hành tạo hợp đồng thuê trực tuyến một cách nhanh chóng và an toàn."
+      });
+      setIsLoginModalOpen(true);
+      return;
+    }
+    navigate(`/tenant/contracts/create?roomId=${room?.id}`);
+  };
 
   // Text cho nút Đặt lịch
   const getBookingButtonText = () => {
@@ -274,6 +314,29 @@ export default function RoomDetailPage() {
             ) : (
               <div className="h-64 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
                 Chưa có ảnh phòng
+              </div>
+            )}
+
+            {/* 360 VIEWER */}
+            {room.panoramaImages && room.panoramaImages.length > 0 && (
+              <div className="bg-white rounded-2xl border p-5 shadow-sm">
+                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
+                      <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
+                    </svg>
+                  </span>
+                  Xem phòng 360°
+                  <span className="text-[10px] font-bold bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">Virtual Tour</span>
+                </h3>
+                <Suspense fallback={
+                  <div className="h-[420px] bg-slate-100 rounded-xl flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-cyan-500" />
+                  </div>
+                }>
+                  <Room360Viewer images={room.panoramaImages} />
+                </Suspense>
               </div>
             )}
 
@@ -440,11 +503,11 @@ export default function RoomDetailPage() {
                   {getBookingButtonText()}
                 </Button>
 
-                {isAvailable && isAuthenticated && user?.role !== "LANDLORD" && (
+                {isAvailable && user?.role !== "LANDLORD" && (
                   <Button
                     variant="outline"
                     className="w-full h-11 gap-2 text-green-700 border-green-200 hover:bg-green-50"
-                    onClick={() => navigate(`/tenant/contracts/create?roomId=${room.id}`)}
+                    onClick={handleRentNow}
                   >
                     <FileSignature className="h-4 w-4" />
                     Thuê ngay
@@ -471,15 +534,28 @@ export default function RoomDetailPage() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                      onClick={() => window.location.href = `tel:${(room as any).landlordPhone}`}
+                      onClick={() => {
+                        if (!isAuthenticated && !showFullPhone) {
+                          handleShowPhone();
+                        } else {
+                          window.location.href = `tel:${(room as any).landlordPhone}`;
+                        }
+                      }}
                     >
-                      <Phone className="h-3.5 w-3.5" /> Gọi điện
+                      <Phone className="h-3.5 w-3.5" /> 
+                      {(!isAuthenticated && !showFullPhone) ? maskPhone((room as any).landlordPhone) : "Gọi điện"}
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-                      onClick={() => window.open(`https://zalo.me/${(room as any).landlordPhone}`, "_blank")}
+                      onClick={() => {
+                        if (!isAuthenticated && !showFullPhone) {
+                          handleShowPhone();
+                        } else {
+                          window.open(`https://zalo.me/${(room as any).landlordPhone}`, "_blank");
+                        }
+                      }}
                     >
                       <MessageSquare className="h-3.5 w-3.5" /> Zalo
                     </Button>
@@ -560,6 +636,13 @@ export default function RoomDetailPage() {
           </div>
         </div>
       )}
+      {/* ===== LOGIN REQUIRED MODAL ===== */}
+      <LoginRequiredModal 
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        title={loginModalConfig.title}
+        message={loginModalConfig.message}
+      />
     </div>
   );
 }
