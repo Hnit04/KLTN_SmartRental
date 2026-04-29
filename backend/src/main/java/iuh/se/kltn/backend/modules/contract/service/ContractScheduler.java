@@ -97,7 +97,7 @@ public class ContractScheduler {
 
             // Thông báo cho cả 2 bên
             notificationService.createNotification(contract.getTenant(), "Hợp đồng bị hủy", 
-                "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do quá hạn 24h nạp cọc. Bạn bị trừ 10 điểm uy tín.", 
+                "Hợp đồng phòng " + (room != null ? room.getName() : "") + " đã bị hủy tự động do quá hạn 24h nạp cọc. Bạn bị trừ 10 điểm uy tín.", 
                 iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
             
             notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 

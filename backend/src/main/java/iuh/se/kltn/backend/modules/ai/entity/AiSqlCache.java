@@ -22,12 +22,14 @@ public class AiSqlCache {
     @Column(name = "generated_sql", length = 1000)
     private String generatedSql;
 
+    @Builder.Default
     @Column(name = "type", length = 20)
     private String type = "SQL"; // "SQL" or "FAQ"
 
     @Column(name = "answer", columnDefinition = "TEXT")
     private String answer;
 
+    @Builder.Default
     @Column(name = "is_valid")
     private boolean isValid = true;
 }

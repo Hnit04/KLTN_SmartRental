@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Collection;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -25,7 +24,6 @@ import java.util.HashMap;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import iuh.se.kltn.backend.modules.ai.service.AnomalyAi;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -252,6 +250,7 @@ public class AiController {
             // Clean up backticks if any
             aiResultString = aiResultString.replace("```json", "").replace("```", "").trim();
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> draftedReminders = objectMapper.readValue(aiResultString, List.class);
 
             // Gộp thông tin tenantId và roomName lại cho Client dễ hiển thị

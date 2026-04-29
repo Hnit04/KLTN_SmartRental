@@ -15,7 +15,7 @@ import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
 import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 import iuh.se.kltn.backend.common.enums.Role;
-import org.modelmapper.ModelMapper;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +31,7 @@ public class ResidentRequestService {
     @Autowired private ContractRepository contractRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ContractMemberRepository contractMemberRepository;
-    @Autowired private ModelMapper modelMapper;
+
     @Autowired private NotificationService notificationService;
 
     @Transactional

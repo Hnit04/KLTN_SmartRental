@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '@/api/authApi';
+import { authApi } from '@/api/authApi';
 import { useAuth } from '@/context/AuthContext';
 
 export const useLogin = () => {
@@ -40,7 +40,7 @@ export const useLogin = () => {
         password: formData.password
       };
 
-      const response = await login(payload);
+      const response = await authApi.login(payload);
       contextLogin(response);
 
       // Redirect theo role

@@ -19,7 +19,7 @@ public class CloudinaryService {
 
     // 1. Hàm gốc: Thêm tham số folderName để tái sử dụng linh hoạt
     public String uploadImage(MultipartFile file, String folderName) throws IOException {
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(),
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(),
                 ObjectUtils.asMap(
                         "folder", folderName,
                         "resource_type", "auto"
@@ -47,7 +47,7 @@ public class CloudinaryService {
 
     // 4. Hàm Upload RIÊNG TƯ (Dành cho KYC)
     public String uploadPrivateImage(MultipartFile file, String folderName) throws IOException {
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(),
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(),
                 ObjectUtils.asMap(
                         "folder", folderName,
                         "resource_type", "auto",

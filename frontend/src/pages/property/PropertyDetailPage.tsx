@@ -34,7 +34,7 @@ export default function PropertyDetailPage() {
 
   // --- STATE FILTER PHÒNG ---
   const [roomSortBy, setRoomSortBy] = useState<"default" | "price_asc" | "price_desc" | "area_asc">("default");
-  const [roomStatusFilter, setRoomStatusFilter] = useState<"ALL" | "AVAILABLE" | "RESERVED" | "RENTED">("ALL");
+  const [roomStatusFilter, setRoomStatusFilter] = useState<"ALL" | "AVAILABLE" | "RESERVED" | "RENTED" | "MAINTENANCE">("ALL");
   const [showRoomFilter, setShowRoomFilter] = useState(false);
 
   // --- STATE CHO MODAL ĐẶT LỊCH ---

@@ -2,11 +2,11 @@ package iuh.se.kltn.backend.modules.user.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.user.dto.request.*;
-import iuh.se.kltn.backend.modules.user.dto.response.LoginResponse;
+
 import iuh.se.kltn.backend.modules.user.dto.response.LoginResponseGoogle;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.service.AuthService;
-import iuh.se.kltn.backend.modules.user.service.EmailService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,8 +24,7 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    @Autowired
-    private EmailService emailService;
+
 
     // API Đăng ký
     @PostMapping("/register")

@@ -1,0 +1,1079 @@
+﻿BỘ CÔNG THƯƠNG
+TRƯỜNG ĐẠI HỌC CÔNG NGHIỆP TP.HCM
+KHOA CÔNG NGHỆ THÔNG TIN
+TRẦN CÔNG TÍNH
+TRẦN NGỌC HƯNG
+SMARTRENTAL: HỆ THỐNG TÌM KIẾM VÀ QUẢN LÝ THUÊ PHÒNG TRỌ TÍCH HỢP BLOCKCHAIN VÀ AI
+Ngành: Kỹ Thuật Phần Mềm
+Giảng viên hướng dẫn: ThS Đặng Thị Thu Hà
+TP.HỒ CHÍ MINH, THÁNG 1 NĂM 2026
+MINISTRY OF INDUSTRY AND TRADE
+INDUSTRIAL UNIVERSITY OF HO CH MINH CITY 
+FACULTY OF INFORMATION TECHNOLOGY
+TRAN CONG TINH
+TRAN NGOC HUNG
+SMARTRENTAL: A RENTAL PROPERTY SEARCH AND MANAGEMENT SYSTEM INTEGRATING BLOCKCHAIN AND AI.
+Major: Software Engineering
+Supervisor: Dang Thi Thu Ha, MSc
+HO CHI MINH CITY, JANUARY 2026
+PHỤ LỤC
+LỜI MỞ ĐẦU1
+CHƯƠNG 1: GIỚI THIỆU3
+1.1 Tổng quan3
+1.2 Mục tiêu đề tài3
+1.3 Phạm vi đề tài4
+1.4 Mô tả yêu cầu chức năng5
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT11
+2.1 Spring Boot Framework11
+2.1.1 Khái niệm11
+2.1.2 Các tính năng chính12
+2.2 Công nghệ Blockchain và Hợp đồng thông minh15
+2.2.2 Hợp đồng thông minh (Smart Contract)15
+2.2.3 Ngôn ngữ lập trình Solidity16
+2.2.4 Thư viện kết nối Web3j17
+2.3 Giải pháp mở rộng Polygon (Layer 2)17
+2.3.1 Khái niệm17
+2.3.2 Các tính năng chính (Phí thấp, tốc độ cao, tương thích EVM)18
+2.4 Trí tuệ nhân tạo (AI)19
+2.4.1 Hệ thống gợi ý và thuật toán Cosine Similarity19
+2.4.2 Công nghệ OCR trong định danh điện tử (eKYC)20
+2.4.3 Mô hình Ngôn ngữ lớn (LLM) và kỹ thuật Text-to-SQL20
+2.5 Thư viện ReactJS21
+2.5.1 Khái niệm21
+2.5.2 Các tính năng chính (Virtual DOM, Component-based)21
+2.6 Hệ quản trị Cơ sở dữ liệu MariaDB22
+2.6.1 Khái niệm22
+2.6.2 Các tính năng chính22
+2.7 Cơ chế xác thực JSON Web Token (JWT)23
+2.7.1 Khái niệm23
+2.7.2 Các tính năng chính (Stateless, Bảo mật)24
+2.8 Công nghệ hỗ trợ phát triển và triển khai hệ thống25
+2.8.1 Công nghệ Container (Docker)25
+2.8.1.1 Khái niệm25
+2.8.1.2 Các tính năng chính25
+2.8.2 Quản lý phiên bản mã nguồn (Git & GitHub)26
+2.8.2.1 Khái niệm26
+2.8.2.2 Các tính năng chính26
+2.8.3 Tích hợp và triển khai liên tục (CI/CD)27
+2.8.3.1 Khái niệm27
+2.8.3.2 Vai trò trong hệ thống Smart Rental27
+CHƯƠNG 3: PHÂN TÍCH29
+3.1 Mô hình UseCase tổng quát29
+3.2 Danh sách các tác nhân và mô tả29
+3.3 Danh sách UseCase chính và mô tả30
+3.4 Đặc tả và yêu cầu chức năng của UseCase31
+3.4.1 UC001 Thêm khu trọ31
+3.4.2 UC002 Tạo hợp đồng thuê33
+3.4.3 UC003 Gửi yêu cầu thêm người vào phòng trọ37
+3.4.4 UC004 Ký hợp đồng thuê trọ40
+3.5 Sơ đồ lớp43
+TÀI LIỆU THAM KHẢO44
+LỜI MỞ ĐẦU
+1. Lý do chọn đề tài
+Dưới tác động của đô thị hóa nhanh chóng, nhu cầu thuê trọ tại Việt Nam tăng vọt trong các năm gần đây, trọng điểm là các thành phố lớn như: Tp.Hồ Chí Minh, Hà Nội. Theo Báo Nhân dân(2025),"Sức nóng của mùa tựu trường đã đẩy nhu cầu tìm kiếm nhà trọ tăng đột biến 45%, từ đó kéo mức độ quan tâm chung của toàn thị trường cho thuê trong tháng 8/2025 tăng thêm 4% so với tháng 7"[1]. Tuy mức độ tìm kiếm phòng trọ tăng mạnh như vậy nhưng quy trình tìm kiếm và quản lý phòng trọ hiện nay vẫn còn khá nhiều “nút thắt” như: sự thiếu minh bạch về thông tin, gian lận hợp đồng, khó khăn trong việc tìm phòng phù hợp, quy trình rời rạc và quản lý thiếu hiệu quả.
+Để giải quyết những thách thức này, nhóm chúng tôi thực hiện đề tài” Hệ thống tìm kiếm và quản lý thuê phòng trọ tích hợp Blockchain và AI”. Thông qua việc kết hợp hai công nghệ tiên tiến là BlockChain và AI, hệ thống không những giúp người dùng tìm kiếm những phòng trọ phù hợp với bản thân, gia đình mà còn nâng cao độ tin cậy trong giao dịch, hợp đồng.
+Tình hình nghiên cứu
+Hiện tại ở Việt Nam, có rất nhiều website như Thuephongtro.com, Muonnha.com.vn chủ yếu chuyên về đăng tin, giúp người thuê dễ dàng tìm được phòng phù hợp. Tuy nhiên, các hệ thống này vẫn tồn tại những hạn chế lớn như thiếu tính xác thực thông tin, không minh bạch trong giao dịch và rủi ro về bảo mật dữ liệu người dùng.  
+Trước thực trạng đó, việc ứng dụng công nghệ Blockchain vào quản lý cho thuê phòng trọ mở ra một hướng đi mới đầy tiềm năng. Bằng cách sử dụng Hợp đồng thông minh (Smart Contracts), mọi thỏa thuận giữa chủ nhà và người thuê sẽ được mã hóa và thực thi tự động, đảm bảo tính pháp lý mà không cần bên trung gian.  
+Mọi dữ liệu về lịch sử thuê phòng, giá cả và tình trạng phòng đều được lưu trữ bằng BlockChain, ngăn chặn việc thay đổi thông tin trái phép. Điều này giúp người thuê tiếp cận được nguồn thông tin có tính xác thực cao, lịch sử minh bạch, đồng thời giúp các giao dịch tài chính (như đặt cọc, thanh toán hàng tháng) trở nên minh bạch, an toàn.
+Ý nghĩa khoa học và thực tiễn
+Về khoa học:
+Đề tài góp phần chứng minh khả năng áp dụng của Blockchain không chỉ trong lĩnh vực tài chính mà còn trong quản lý giao dịch dân sự, cụ thể là thị trường bất động sản cho thuê.
+- Nghiên cứu đóng góp vào việc thiết lập một mô hình dữ liệu phi tập trung, nơi niềm tin được đặt vào thuật toán và mã nguồn thay vì bên trung gian thứ ba.
+Về thực tiễn: 
+-Nhờ cơ chế xác thực của Blockchain, người thuê phòng sẽ không còn gặp tình trạng phòng đã cho thuê nhưng vẫn đăng tin, hoặc hình ảnh thực tế khác xa với quảng cáo.
+Mọi khoản thanh toán từ tiền đặt cọc đến tiền thuê hàng tháng đều được ghi lại rõ ràng. Hệ thống giúp giảm thiểu tối đa các tranh chấp giữa chủ nhà và người thuê liên quan đến việc bồi thường hoặc hoàn cọc.
+ CHƯƠNG 1: GIỚI THIỆU
+1.1 Tổng quan
+Hiện nay, hoạt động tìm kiếm và quản lý thuê phòng trọ tại Việt Nam chủ yếu dựa trên các phương pháp thủ công, các website thiếu liên kết. Các chủ nhà trọ phải quản lý phòng và khách thuê trọ bằng thủ công như sổ tay, giấy tờ, tiên tiến hơn thì dùng các ứng dụng như Excel, WPS Office khiến khối lượng công việc tăng đáng kể và không đủ tính chính xác, còn khách thuê trọ lại gặp vấn đề về độ uy tín của phòng trọ, sự minh bạch của hợp đồng khi tìm kiếm và thuê trọ.
+Sự ra đời của SmartRental đánh dấu một bước tiến mới trong việc số hóa và tối ưu hóa toàn bộ quy trình thuê trọ truyền thống. Nền tảng được thiết kế dựa trên sự liên kết từ hai phía (Chủ trọ và Khách thuê), hệ thống hỗ trợ từ bước tìm kiếm phòng trọ, lên lịch xem trọ, ký hợp đồng, thanh toán đến quản lý phòng trọ, hóa đơn.
+Điểm nổi bật của hệ thống là ứng dụng công nghệ Blockchain theo kiến trúc lai (Hybrid Architecture). Hệ thống sử dụng Blockchain để lưu trữ các mốc giao dịch tài chính quan trọng và mã băm (hash) xác thực của hợp đồng, đảm bảo tính toàn vẹn và chống chối bỏ, trong khi vẫn đảm bảo hiệu năng xử lý của hệ thống truyền thống. Tất cả các dữ liệu tài chính khi đã được ghi nhận sẽ đảm bảo tính minh bạch, chính xác và không thể bị sửa đổi trái phép. Điều này tạo ra một bằng chứng xác thực vĩnh viễn, giúp ngăn chặn lừa đảo và dễ dàng đối soát khi có tranh chấp xảy ra.
+Hệ thống được phát triển trên nền tảng Website, sử dụng ReactJS(Frontend) và SpringBoot(Backend)
+1.2 Mục tiêu đề tài
+Mục tiêu tổng quát: Phát triển hệ thống tìm kiếm và quản lý thuê phòng trọ, tích hợp trí tuệ nhân tạo(AI) để giải quyết rào cản về dữ liệu ban đầu, giúp kết nối hiệu quả giữa chủ trọ và người thuê, tăng tính xác thực, uy tín cho phòng trọ và nâng cao trải nghiệm người dùng
+Mục tiêu cụ thể:
+Về mặt nghiệp vụ
++ Minh bạch hóa hợp đồng: Số hóa quy trình ký kết hợp đồng thuê. Nội dung hợp đồng được mã hóa và lưu trữ dấu vết (hash) trên Blockchain, đảm bảo không thể bị chỉnh sửa trái phép.
++ Tự động hóa tài chính: Xây dựng Hệ thống gợi ý dựa trên hành vi người dùng và bộ lọc ưu tiên, kết hợp OCR để tự động hóa trích xuất thông tin giấy tờ tùy thân (eKYC).
++ Cơ chế đồng thuận: Hệ thống yêu cầu sự xác nhận của cả chủ trọ và người thuê đối với các nghiệp vụ quan trọng như gia hạn hợp đồng hoặc thay đổi giá thuê.
++ Chuẩn hóa tín nhiệm: Xây dựng hệ thống điểm uy tín dựa trên lịch sử hành vi thực tế của người dùng(xác nhận danh tính, ký hợp đồng, bình luận,.....), được lưu trữ và truy xuất minh bạch.
+Về mặt kỹ thuật
++ Nghiên cứu và ứng dụng nền tảng Blockchain Polygon (Layer 2) nhằm tối ưu hóa chi phí giao dịch so với mạng chính (Ethereum Mainnet).
++ Tích hợp AI để hỗ trợ gợi ý phòng trọ thông minh (Recommendation System) và định danh điện tử (eKYC).
++ Xây dựng hệ thống theo kiến trúc Monolith với Backend sử dụng Java Spring Boot và Frontend sử dụng ReactJS.
+1.3 Phạm vi đề tài
+Phạm vi nghiệp vụ
+- Đối tượng sử dụng: Chủ trọ, Khách thuê, Khách vãng lai, Quản trị viên (Admin).
+- Phạm vi nghiệp vụ: Bao gồm tìm kiếm phòng trọ thông minh, lên lịch xem trọ, ký hợp đồng điện tử, thanh toán trực tuyến, đăng tin cho thuê trọ, quản lý khách thuê, hóa đơn, hợp đồng, xử lý tài khoản vi phạm.
+1.3.2 Phạm vi kỹ thuật & công nghệ
+- Backend: Java Spring Boot 3.x, Spring Security (JWT), Hibernate/JPA.
+- Blockchain:
++ Mạng lưới: Polygon Amoy Testnet (EVM Compatible).
++ Smart Contract: Solidity v0.8.20.
++ Thư viện kết nối: Web3j.
+Frontend: ReactJS, TailwindCSS, Ethers.js 
+AI Service: OpenAI, AI – OCR (Tesseract).
+Cơ sở dữ liệu: MySQL.
+1.4 Mô tả yêu cầu chức năng
+Chức năng chung
+Đăng ký / Đăng nhập:
++ Hệ thống hỗ trợ người dùng đăng ký tài khoản mới và đăng nhập thông qua Email/Mật khẩu truyền thống.
++ Cung cấp cơ chế xác thực bảo mật (JWT) để bảo vệ phiên làm việc của người dùng.
++ Hỗ trợ liên kết tài khoản với địa chỉ Ví điện tử (MetaMask) để thực hiện các giao dịch trên Blockchain.
+Định danh điện tử (eKYC):
++ Người dùng tải lên ảnh chụp hai mặt của Căn cước công dân (CCCD).
++ Hệ thống tích hợp AI – OCR  để tự động trích xuất thông tin (Họ tên, Số CCCD, Ngày sinh, Quê quán) từ ảnh, giúp người dùng xác thực danh tính nhanh chóng mà không cần nhập liệu thủ công.
++ Trạng thái eKYC là điều kiện tiên quyết để thực hiện các giao dịch quan trọng như Ký hợp đồng hay Đăng tin cho thuê.
+- Quản lý điểm uy tín :
++ Hệ thống tự động tính toán và cập nhật điểm uy tín của người dùng dựa trên lịch sử hành vi thực tế (thanh toán đúng hạn/trễ hạn, hoàn thành hợp đồng, hủy ngang...).
++ Hiển thị huy hiệu uy tín (Vàng/Bạc/Đồng) công khai trên hồ sơ, giúp các bên tham gia đánh giá mức độ tin cậy của đối tác.
+- Thông báo:
++ Hệ thống tự động gửi thông báo thời gian thực đến người dùng qua ứng dụng và Email trong các trường hợp: Có hóa đơn mới, Nhắc nhở đóng tiền, Yêu cầu ký hợp đồng, hoặc Hợp đồng sắp hết hạn.
+1.4.2 Chức năng dành cho chủ trọ
+- Quản lý Khu trọ & Phòng trọ:
++ Thêm mới, cập nhật thông tin khu trọ và các phòng trọ chi tiết.
++ Tích hợp AI: Hỗ trợ chủ trọ tạo nội dung mô tả phòng chuyên nghiệp, hấp dẫn dựa trên các từ khóa (diện tích, tiện ích, vị trí) mà chủ trọ cung cấp.
++ Quản lý trạng thái phòng (Trống, Đang thuê, Đang bảo trì).
+- Quản lý Hợp đồng thuê:
++ Tạo mới hợp đồng thuê phòng với các điều khoản pháp lý.
++ Gửi yêu cầu gia hạn hợp đồng hoặc đề xuất điều chỉnh giá thuê.
++ Thực hiện thanh lý hợp đồng khi hết hạn.
++ Hoàn trả cọc tự động: Kích hoạt Smart Contract để tự động hoàn trả tiền cọc về ví người thuê sau khi trừ đi các chi phí phát sinh (nếu có), đảm bảo tính minh bạch.
+- Quản lý Tài chính & Hóa đơn:
++ Ghi nhận chỉ số điện, nước tiêu thụ hàng tháng.
++ Hệ thống tự động tính toán tổng tiền dựa trên đơn giá đã cấu hình và phát hành hóa đơn gửi tới người thuê.
++ Theo dõi trạng thái thanh toán của từng hóa đơn (Chưa thanh toán, Đã thanh toán, Quá hạn).
+- Quản lý Lịch hẹn:
++ Nhận thông báo khi có khách thuê đặt lịch xem phòng.
++ Duyệt hoặc từ chối yêu cầu xem phòng, kèm theo lý do hoặc đề xuất thời gian khác.
+- Thống kê & Báo cáo:
++ Dashboard trực quan thống kê tình trạng lấp đầy phòng trọ.
++ Báo cáo doanh thu, công nợ theo thời gian thực.
++ Thống kê lịch sử thanh toán của từng khách thuê để đánh giá năng lực tài chính.
++ Xuất báo cáo định kỳ ra định dạng PDF hoặc Excel để lưu trữ.
+1.4.3 Chức năng dành cho khách thuê
+1.4.3.1 Khách vãng lai
+- Tìm kiếm & Tra cứu:
++ Xem danh sách phòng trọ đang hiển thị công khai.
++ Tìm kiếm nâng cao theo nhiều tiêu chí: Vị trí (Quận/Huyện), Khoảng giá, Diện tích, Tiện ích.
++ Xem thông tin chi tiết phòng trọ (Hình ảnh, Mô tả, Giá dịch vụ).
++ Xem hồ sơ uy tín của chủ trọ và các đánh giá (Review) từ những người thuê trước đó.
+1.4.3.2 Người thuê đã đăng nhập
+- Đặt lịch:
++ Đặt lịch hẹn xem phòng trực tiếp với chủ trọ.
+- Giao dịch Blockchain:
++ Ký hợp đồng số: Xem nội dung hợp đồng và thực hiện ký xác nhận bằng Ví MetaMask. Mã băm (Hash) của hợp đồng sẽ được lưu trên Blockchain Polygon.
++ Thanh toán: Thanh toán tiền thuê nhà và hóa đơn điện nước hàng tháng bằng tiền mã hóa thông qua ví Blockchain.
++ Lưu ý: Các chức năng ký hợp đồng và thanh toán chỉ khả dụng khi tài khoản đã xác thực eKYC thành công.
+- Quản lý cá nhân:
++ Theo dõi trạng thái hợp đồng đang thuê.
++ Xem lịch sử thanh toán và các khoản phạt.
++ Gửi đánh giá, nhận xét về chất lượng phòng trọ và thái độ chủ nhà sau khi kết thúc hợp đồng.
+1.4.4 Chức năng dành cho quản trị viên
+- Quản lý Người dùng:
++ Xem danh sách toàn bộ người dùng (Chủ trọ, Khách thuê).
++ Theo dõi trạng thái xác thực danh tính (eKYC) của các tài khoản.
++ Thực hiện khóa hoặc mở khóa tài khoản khi phát hiện hành vi gian lận, lừa đảo hoặc vi phạm chính sách cộng đồng.
+- Quản lý Nội dung & Hệ thống:
++ Kiểm duyệt tin đăng phòng trọ mới: Đảm bảo nội dung lành mạnh, hình ảnh thực tế trước khi cho phép hiển thị công khai.
++ Quản lý danh mục hệ thống: Cập nhật danh sách tiện ích, khu vực địa lý.
++ Đăng tải các thông báo hệ thống, tin tức hoặc hướng dẫn sử dụng.
+- Giám sát Hợp đồng & Giao dịch:
++ Theo dõi tổng quan trạng thái các hợp đồng trên toàn hệ thống (Đang hiệu lực, Sắp hết hạn, Đã thanh lý).
++ Giám sát các luồng giao dịch thanh toán được ghi nhận trên Blockchain thông qua trình thám hiểm khối (Block Explorer). Lưu ý: Admin chỉ có quyền xem để giám sát, không có quyền can thiệp sửa đổi dữ liệu trên Blockchain.
+- Hỗ trợ & Xử lý tranh chấp:
++ Tiếp nhận các báo cáo vi phạm, khiếu nại từ người dùng.
++ Cung cấp các bằng chứng xác thực (Log hệ thống, Hash hợp đồng trên Blockchain) để hỗ trợ các bên giải quyết tranh chấp một cách công bằng.
+- Thống kê & Báo cáo hệ thống:
++ Thống kê số liệu tăng trưởng: Số lượng người dùng mới, số phòng trọ, số hợp đồng đã ký.
++ Thống kê tần suất giao dịch và dòng tiền lưu thông trên hệ thống.
++ Xuất các báo cáo tổng hợp phục vụ công tác quản lý và định hướng phát triển nền tảng.
+1.5 Quy tắc nghiệp vụ
+Công thức tính hóa đơn:
+- Trong đó:
++ Enew​: Chỉ số điện mới
++ Eold​: Chỉ số điện cũ
++ Pelec​: Đơn giá điện
++ Wnew​: Chỉ số nước mới
++ Wold​: Chỉ số nước cũ
++ Pwater​: Đơn giá nước
++ Sinternet​: Phí Internet cố định
++ Sservice​: Phí dịch vụ
++ Rrent​: Giá thuê phòng cơ bản
+Quy tắc tính Điểm uy tín:
+- Điểm uy tín ban đầu của khách thuê và chủ trọ: Reputation=50
+- Hệ thống phân cấp độ Uy tín:  0 ≤ Reputation ≤ 100
++ 0–29: Uy tín thấp
++ 30–69: Bình thường
++ 70–89: Tốt
++ 90–100: Rất tốt
+- Công thức tính dành cho Khách Thuê:
++ Hoàn thành xác thực danh tính điện tử (eKYC): +10 điểm
++ Liên kết ví Blockchain hợp lệ (MetaMask): +5 điểm
++ Ký hợp đồng thuê trọ thành công: +5 điểm / hợp đồng
++ Thanh toán hóa đơn đúng hạn: +2 điểm / hóa đơn
++ Gửi đánh giá hợp lệ sau khi kết thúc hợp đồng: +2 điểm
++ Thanh toán hóa đơn trễ hạn: −5 điểm / lần
++ Bị Smart Contract áp dụng phạt trễ hạn thanh toán: −10 điểm
++ Hủy hợp đồng trước thời hạn mà không có lý do chính đáng: −15 điểm
++ Bị chủ trọ báo cáo vi phạm và đã được Quản trị viên xác thực: −30 điểm
+- Công thức tính dành cho Chủ :
++ Hoàn thành xác thực danh tính điện tử (eKYC): +10 điểm
++ Liên kết ví Blockchain hợp lệ (MetaMask): +5 điểm
++ Ký hợp đồng thuê trọ thành công với khách thuê: +5 điểm / hợp đồng
++ Hoàn thành hợp đồng đúng hạn, không phát sinh tranh chấp: +10 điểm
++ Nhận đánh giá tích cực (≥ 4 sao) từ khách thuê sau khi kết thúc hợp đồng: +3 điểm / đánh giá
++ Hủy hợp đồng trước thời hạn mà không có lý do chính đáng: −15 điểm
++ Giữ tiền đặt cọc không hợp lý hoặc hoàn trả trễ hạn: −20 điểm
++ Bị khách thuê báo cáo vi phạm và đã được Quản trị viên xác thực: −30 điểm
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT
+2.1 Spring Boot Framework
+2.1.1 Khái niệm
+Spring Boot là một dự án mã nguồn mở quan trọng trong hệ sinh thái Spring (Spring Ecosystem), được phát triển nhằm đơn giản hóa quá trình xây dựng và triển khai các ứng dụng dựa trên Spring Framework. Spring Boot được giới thiệu lần đầu vào năm 2014 với mục tiêu khắc phục sự phức tạp trong cấu hình và triển khai các ứng dụng Spring truyền thống [2].
+Spring Boot hoạt động dựa trên nguyên lý cốt lõi quy ước hơn cấu hình (Convention over Configuration). Theo nguyên lý này, thay vì yêu cầu lập trình viên phải thiết lập nhiều tệp cấu hình XML hoặc Annotation phức tạp ngay từ giai đoạn khởi tạo dự án, Spring Boot cung cấp sẵn các cấu hình mặc định hợp lý cho hầu hết các trường hợp sử dụng phổ biến [3].
+Cơ chế cấu hình mặc định của Spring Boot cho phép các nhà phát triển nhanh chóng xây dựng các ứng dụng độc lập (stand-alone), sẵn sàng cho môi trường sản xuất (production-grade) mà không cần xử lý nhiều mã nguồn khuôn mẫu. Điều này góp phần rút ngắn thời gian phát triển, đồng thời hạn chế các lỗi cấu hình phát sinh trong quá trình xây dựng và vận hành hệ thống. Nhờ tính đơn giản và hiệu quả, Spring Boot được sử dụng rộng rãi trong việc phát triển các hệ thống backend hiện đại, đặc biệt là các ứng dụng RESTful và kiến trúc Microservices.
+Trong phạm vi đề tài Smart Rental, Spring Boot được sử dụng để xây dựng hệ thống Backend, đóng vai trò xử lý các nghiệp vụ cốt lõi như quản lý người dùng, hợp đồng thuê trọ và hóa đơn thanh toán, đồng thời làm cầu nối tích hợp giữa cơ sở dữ liệu truyền thống với các công nghệ hiện đại như Blockchain và AI.
+
+Hình 2.1. Sơ đồ kiến trúc tổng quan của ứng dụng Spring Boot theo mô hình Controller – Service – Repository
+(Nguồn: Tác giả xây dựng dựa trên Spring Boot Documentation [3])
+2.1.2 Các tính năng chính
+Theo tài liệu kỹ thuật chính thức từ Spring.io và các nghiên cứu của Walls (2016), Spring Boot cung cấp bốn trụ cột tính năng chính giúp tối ưu hóa quy trình phát triển phần mềm [2], [3]:
+- Tự động cấu hình (Auto-configuration)
+Tự động cấu hình là tính năng cốt lõi và quan trọng nhất của Spring Boot. Khi ứng dụng khởi động, Spring Boot sẽ tự động quét các thư viện (dependencies) có trong classpath và tiến hành cấu hình các Bean tương ứng dựa trên ngữ cảnh của ứng dụng. Cơ chế này được xây dựng dựa trên cấu hình có điều kiện (conditional configuration) và khả năng quét classpath của Spring Framework.
+- Ứng dụng độc lập và máy chủ nhúng (Standalone & Embedded Server)
+Khác với các ứng dụng Java Web truyền thống thường phải đóng gói dưới dạng file .WAR và triển khai trên các máy chủ ứng dụng cài đặt sẵn như WebLogic hoặc JBoss, Spring Boot tích hợp sẵn các máy chủ web nhẹ như Tomcat, Jetty hoặc Undertow. Nhờ đó, ứng dụng có thể được đóng gói thành một file .JAR duy nhất và chạy trực tiếp thông qua lệnh java -jar.
+Cơ chế này đặc biệt phù hợp với việc triển khai hệ thống trên nền tảng Container (Docker) và môi trường điện toán đám mây (Cloud), giúp đơn giản hóa quá trình triển khai, mở rộng và bảo trì hệ thống [4].
+- Quản lý phụ thuộc thông minh (Starter Dependencies)
+Spring Boot cung cấp các gói thư viện Starter nhằm gom nhóm các thư viện liên quan vào một dependency duy nhất. Điều này giúp đơn giản hóa việc quản lý phụ thuộc và hạn chế tối đa tình trạng xung đột phiên bản (Dependency Hell).
+Trong đề tài Smart Rental, các starter như spring-boot-starter-data-jpa và spring-boot-starter-security được sử dụng để tích hợp cơ sở dữ liệu và cơ chế bảo mật một cách nhất quán và hiệu quả. Nhờ cơ chế Starter, việc mở rộng hoặc thay đổi chức năng của hệ thống có thể được thực hiện nhanh chóng mà không ảnh hưởng lớn đến cấu trúc mã nguồn hiện có.
+- Tính năng sẵn sàng cho môi trường sản xuất (Production-ready features)
+Spring Boot cung cấp module Spring Actuator, cho phép giám sát và quản lý ứng dụng trong quá trình vận hành. Các thông tin như trạng thái sức khỏe hệ thống (Health Check), số liệu hiệu năng (Metrics) và các thông tin cấu hình có thể được truy xuất thông qua các endpoint HTTP, hỗ trợ hiệu quả cho công tác giám sát, bảo trì và vận hành hệ thống trong môi trường thực tế [3].
+
+Hình 2.2. Cơ chế hoạt động của Spring Boot Auto-configuration
+(Nguồn: Tác giả tổng hợp dựa trên Spring Boot Documentation [3])
+
+2.2 Công nghệ Blockchain và Hợp đồng thông minh
+2.2.1 Tổng quan về Blockchain
+Blockchain (chuỗi khối) là một công nghệ sổ cái phân tán (Distributed Ledger Technology – DLT), cho phép lưu trữ và chia sẻ dữ liệu dưới dạng các khối (block) được liên kết chặt chẽ với nhau thông qua các hàm băm mật mã (cryptographic hash) [5]. Mỗi khối trong chuỗi thường bao gồm tập hợp các giao dịch, dấu thời gian (timestamp) và mã băm của khối liền trước, từ đó hình thành một chuỗi dữ liệu liên tục và có tính toàn vẹn cao.
+Đặc điểm cốt lõi của Blockchain bao gồm tính phi tập trung, tính bất biến và tính minh bạch. Thay vì được quản lý bởi một máy chủ trung tâm, dữ liệu Blockchain được sao chép và xác thực bởi nhiều nút (node) trong mạng lưới. Khi một giao dịch được ghi nhận và xác thực thông qua cơ chế đồng thuận (consensus mechanism), dữ liệu đó gần như không thể bị chỉnh sửa hoặc xóa bỏ mà không bị toàn bộ mạng lưới phát hiện [5].
+Nhờ các đặc tính trên, Blockchain được xem là giải pháp hiệu quả để giải quyết bài toán niềm tin trong các hệ thống giao dịch phân tán. Trong phạm vi đề tài Smart Rental, công nghệ Blockchain được ứng dụng nhằm đảm bảo tính minh bạch và độ tin cậy cho các giao dịch liên quan đến hợp đồng thuê trọ, lịch sử thanh toán và các sự kiện pháp lý giữa chủ trọ và người thuê. Việc ghi nhận các thông tin quan trọng lên Blockchain góp phần hạn chế tranh chấp và tăng tính pháp lý cho hệ thống.
+2.2.2 Hợp đồng thông minh (Smart Contract)
+Hợp đồng thông minh (Smart Contract) là các chương trình máy tính được triển khai và thực thi trực tiếp trên nền tảng Blockchain, trong đó các điều khoản và quy tắc nghiệp vụ được mã hóa dưới dạng logic lập trình [6]. Khái niệm Smart Contract được Nick Szabo đề xuất lần đầu vào năm 1994 với mục tiêu tự động hóa việc thực thi hợp đồng mà không cần sự tham gia của bên trung gian.
+Về bản chất, Smart Contract hoạt động theo nguyên tắc “nếu – thì” (if–then). Khi các điều kiện được lập trình sẵn được thỏa mãn, hợp đồng sẽ tự động thực hiện các hành động tương ứng như xác nhận giao dịch, chuyển tài sản hoặc cập nhật trạng thái hợp đồng. Do được triển khai trên Blockchain, Smart Contract thừa hưởng các đặc tính quan trọng như tính bất biến, minh bạch và khả năng chống can thiệp trái phép.
+Trong hệ sinh thái Ethereum và các mạng Blockchain tương thích, Smart Contract được thực thi trên Máy ảo Ethereum (Ethereum Virtual Machine – EVM), đảm bảo rằng cùng một đoạn mã sẽ cho ra kết quả giống nhau trên mọi nút mạng trong hệ thống [7]. Mỗi Smart Contract sau khi được triển khai sẽ có một địa chỉ duy nhất (Contract Address), cho phép người dùng và các ứng dụng bên ngoài tương tác thông qua các giao dịch Blockchain.
+Trong hệ thống Smart Rental, Smart Contract đóng vai trò như một “trọng tài số”, chịu trách nhiệm quản lý vòng đời hợp đồng thuê trọ, ghi nhận các sự kiện quan trọng và tự động thực thi các quy tắc nghiệp vụ đã được các bên thỏa thuận, từ đó giảm thiểu rủi ro gian lận và nâng cao mức độ tin cậy giữa chủ trọ và người thuê.
+2.2.3 Ngôn ngữ lập trình Solidity
+Solidity là một ngôn ngữ lập trình bậc cao, kiểu tĩnh (statically typed), được thiết kế chuyên biệt để phát triển Smart Contract trên nền tảng Ethereum và các mạng tương thích EVM như Polygon [8]. Cú pháp của Solidity chịu ảnh hưởng từ các ngôn ngữ phổ biến như C++, JavaScript và Java, giúp lập trình viên dễ tiếp cận và triển khai ứng dụng.
+Solidity hỗ trợ nhiều khái niệm quan trọng như hợp đồng (contract), hàm (function), biến trạng thái (state variable), sự kiện (event) và bộ điều chỉnh (modifier), cho phép xây dựng các logic nghiệp vụ phức tạp một cách rõ ràng và có cấu trúc. Ngoài ra, ngôn ngữ này còn cung cấp các cơ chế kiểm soát truy cập và xử lý lỗi nhằm giảm thiểu các lỗ hổng bảo mật thường gặp trong Smart Contract.
+`Trong đề tài Smart Rental, Solidity được sử dụng để hiện thực các Smart Contract quản lý hợp đồng thuê trọ và các giao dịch liên quan, đảm bảo rằng các quy tắc nghiệp vụ được thực thi một cách tự động, nhất quán và minh bạch trên Blockchain.
+2.2.4 Thư viện kết nối Web3j
+Web3j là một thư viện Java mã nguồn mở, cho phép các ứng dụng Java và Spring Boot tương tác với Blockchain Ethereum và các mạng tương thích thông qua giao thức JSON-RPC [9]. Thư viện này cung cấp các API hỗ trợ gửi giao dịch, truy vấn dữ liệu Blockchain, triển khai và gọi hàm Smart Contract, cũng như quản lý ví điện tử.
+Một ưu điểm nổi bật của Web3j là khả năng tự động sinh các lớp Java từ giao diện ABI (Application Binary Interface) của Smart Contract. Nhờ đó, lập trình viên có thể thao tác với Smart Contract như với các đối tượng Java thông thường, giúp giảm đáng kể độ phức tạp khi tích hợp công nghệ Blockchain vào các hệ thống backend.
+Trong hệ thống Smart Rental, Web3j đóng vai trò là lớp trung gian kết nối giữa backend Spring Boot và mạng Blockchain (Polygon), cho phép hệ thống thực hiện các nghiệp vụ như tạo hợp đồng thuê, truy vấn trạng thái hợp đồng và ghi nhận giao dịch một cách an toàn, hiệu quả và có tính mở rộng cao.
+2.3 Giải pháp mở rộng Polygon (Layer 2)
+2.3.1 Khái niệm
+Polygon là một giải pháp mở rộng quy mô (scaling solution) cho Blockchain Ethereum, thuộc nhóm công nghệ Layer 2, được thiết kế nhằm khắc phục các hạn chế về hiệu năng và chi phí giao dịch của mạng Ethereum gốc (Layer 1) [9]. Polygon cung cấp một hạ tầng đa chuỗi (multi-chain framework) cho phép triển khai và vận hành các ứng dụng Blockchain với khả năng mở rộng cao, trong khi vẫn kế thừa mức độ bảo mật của Ethereum.
+Về mặt kiến trúc, Polygon hoạt động như một lớp trung gian giúp xử lý phần lớn các giao dịch ngoài chuỗi chính (off-chain hoặc side-chain), sau đó định kỳ ghi nhận trạng thái tổng hợp (checkpoint) lên mạng Ethereum. Cách tiếp cận này giúp giảm tải đáng kể cho mạng chính, đồng thời cải thiện tốc độ xử lý và giảm chi phí giao dịch cho người dùng.
+Nhờ khả năng mở rộng linh hoạt và hệ sinh thái phát triển mạnh, Polygon hiện được sử dụng rộng rãi trong các ứng dụng phi tập trung (Decentralized Applications – DApps), đặc biệt trong các lĩnh vực như tài chính phi tập trung (DeFi), trò chơi Blockchain (GameFi) và các hệ thống quản lý hợp đồng thông minh. Trong phạm vi đề tài Smart Rental, Polygon được lựa chọn làm nền tảng Blockchain nhằm đảm bảo tính khả thi khi triển khai hệ thống trong môi trường thực tế, nơi yêu cầu số lượng giao dịch lớn với chi phí thấp.
+2.3.2 Các tính năng chính (Phí thấp, tốc độ cao, tương thích EVM)
+- Phí giao dịch thấp
+Một trong những ưu điểm nổi bật của Polygon là mức phí giao dịch thấp so với mạng Ethereum gốc. Nhờ cơ chế xử lý giao dịch ngoài chuỗi chính và mô hình side-chain, chi phí cho mỗi giao dịch trên Polygon thường chỉ ở mức rất nhỏ, phù hợp với các hệ thống cần thực hiện nhiều giao dịch thường xuyên. Đặc điểm này giúp giảm gánh nặng chi phí cho người dùng cuối và tăng tính khả thi khi triển khai các ứng dụng Blockchain trong thực tế [9].
+- Tốc độ xử lý cao
+Polygon cung cấp tốc độ xử lý giao dịch vượt trội so với Layer 1, với khả năng xác nhận giao dịch trong thời gian ngắn và thông lượng cao. Điều này đặc biệt quan trọng đối với các hệ thống yêu cầu phản hồi nhanh và trải nghiệm người dùng mượt mà. Trong hệ thống Smart Rental, tốc độ xử lý cao của Polygon giúp các thao tác như tạo hợp đồng thuê, cập nhật trạng thái hợp đồng và ghi nhận thanh toán được thực hiện gần như tức thời.
+- Tương thích EVM
+Polygon hoàn toàn tương thích với Máy ảo Ethereum (Ethereum Virtual Machine – EVM), cho phép các Smart Contract được viết bằng Solidity trên Ethereum có thể triển khai và vận hành trực tiếp trên mạng Polygon mà không cần chỉnh sửa đáng kể. Nhờ tính tương thích này, các công cụ phát triển phổ biến như Remix, Hardhat, Truffle và các thư viện kết nối như Web3j có thể được sử dụng một cách nhất quán.
+Trong đề tài Smart Rental, tính tương thích EVM của Polygon giúp đơn giản hóa quá trình phát triển và tích hợp hệ thống Blockchain với backend Spring Boot, đồng thời đảm bảo khả năng mở rộng và di chuyển sang các mạng EVM khác trong tương lai khi cần thiết.
+2.4 Trí tuệ nhân tạo (AI)
+2.4.1 Mô hình Ngôn ngữ lớn (LLM) — Google Gemini
+2.4.1.1 Khái niệm Mô hình Ngôn ngữ lớn (LLM)
+Mô hình Ngôn ngữ lớn (Large Language Model — LLM) là một dạng mô hình học sâu được huấn luyện trước trên các tập dữ liệu văn bản quy mô lớn (large-scale datasets), bao gồm sách, tài liệu học thuật và dữ liệu từ Internet. Nhờ quá trình huấn luyện này, LLM có khả năng hiểu và sinh ngôn ngữ tự nhiên với mức độ gần với cách con người sử dụng ngôn ngữ.
+Nền tảng cốt lõi của các LLM hiện đại là kiến trúc Transformer, được đề xuất bởi Vaswani et al. (2017) [13]. Khác với các mô hình tuần tự như RNN hoặc LSTM, Transformer cho phép xử lý song song toàn bộ chuỗi dữ liệu đầu vào, từ đó cải thiện hiệu năng và khả năng học các mối quan hệ phụ thuộc dài hạn trong văn bản.
+Thành phần quan trọng nhất của Transformer là cơ chế Self-Attention (Tự chú ý), cho phép mô hình xác định mức độ quan trọng của từng từ (token) trong ngữ cảnh tổng thể [13]. Nhờ đó, mô hình có thể hiểu ý nghĩa của một từ dựa trên mối quan hệ với toàn bộ câu hoặc đoạn văn, thay vì chỉ dựa trên vị trí cục bộ.
+Các năng lực chính của LLM bao gồm khả năng hiểu và phân tích ngôn ngữ tự nhiên (Natural Language Understanding), sinh văn bản (Text Generation), sinh mã nguồn (Code Generation), cũng như xử lý đa phương thức (Multimodal Processing) ở các thế hệ mô hình mới.
+2.4.1.2 Mô hình Google Gemini và ứng dụng trong hệ thống
+Google Gemini là một dòng mô hình ngôn ngữ lớn đa phương thức (Native Multimodal LLM) được phát triển bởi Google DeepMind [14]. Điểm khác biệt quan trọng của Gemini là khả năng xử lý đa phương thức ngay từ tầng kiến trúc lõi, cho phép tiếp nhận và phân tích đồng thời dữ liệu văn bản và hình ảnh trong cùng một không gian biểu diễn vector (vector representation space).
+Khác với các hệ thống truyền thống cần sử dụng pipeline trung gian để chuyển đổi dữ liệu hình ảnh sang văn bản, Gemini có thể trực tiếp thực hiện suy luận chéo giữa các loại dữ liệu. Điều này giúp giảm độ phức tạp hệ thống và nâng cao hiệu quả xử lý.
+Trong hệ thống SmartRental, mô hình gemini-2.5-flash được lựa chọn làm thành phần xử lý trí tuệ nhân tạo trung tâm nhằm đáp ứng các tiêu chí về tốc độ phản hồi, chi phí vận hành và chất lượng suy luận. Phiên bản này phù hợp với các ứng dụng yêu cầu xử lý thời gian thực và tích hợp API ở quy mô hệ thống.
+Ngoài ra, Gemini cung cấp khả năng hỗ trợ tiếng Việt hiệu quả, API ổn định và dễ dàng tích hợp vào hệ thống backend sử dụng Java Spring Boot. Khả năng xử lý hình ảnh trực tiếp cũng giúp hệ thống không cần xây dựng thêm pipeline Computer Vision riêng biệt.
+Trong kiến trúc tổng thể của SmartRental, Gemini đóng vai trò là thành phần suy luận trung tâm (Core Reasoning Engine), cung cấp năng lực xử lý trí tuệ nhân tạo cho các AI Agent và hỗ trợ tự động hóa các quy trình nghiệp vụ.
+
+2.4.1 Framework tích hợp AI — LangChain4j
+2.4.1.1 Khái niệm và mục đích sử dụng
+LangChain4j là một framework mã nguồn mở được phát triển chuyên biệt cho hệ sinh thái Java và Spring Boot, nhằm đơn giản hóa quá trình tích hợp các Mô hình Ngôn ngữ Lớn (Large Language Model — LLM) vào các ứng dụng phần mềm. Framework này kế thừa ý tưởng từ LangChain (Python), nhưng được thiết kế lại để phù hợp với các nguyên tắc và chuẩn mực lập trình trong môi trường Java [15].
+LangChain4j cung cấp các tầng trừu tượng hóa (abstraction layers), cho phép lập trình viên tương tác với các mô hình AI thông qua các interface và đối tượng Java thuần, thay vì phải trực tiếp xử lý các yêu cầu HTTP, cấu trúc API hay phân tích dữ liệu JSON phức tạp từ các nhà cung cấp như Google Gemini, OpenAI hoặc Anthropic.
+Cách tiếp cận này giúp hệ thống đạt được:
+Tính rời rạc (loose coupling) giữa ứng dụng và nhà cung cấp AI
+Khả năng bảo trì và mở rộng cao
+Linh hoạt trong việc thay đổi mô hình hoặc nhà cung cấp trong tương lai
+2.4.1. Các thành phần cốt lõi trong hệ thống SmartRental
+Trong hệ thống SmartRental, toàn bộ cấu hình và tích hợp AI được quản lý tập trung thông qua lớp AiConfig.java. Các thành phần chính của LangChain4j được sử dụng bao gồm:
+ChatLanguageModel (Mô hình ngôn ngữ hội thoại):
+ Là thành phần giao tiếp trực tiếp với LLM, chịu trách nhiệm gửi prompt và nhận phản hồi. Trong hệ thống, thành phần này được hiện thực thông qua GoogleAiGeminiChatModel, cho phép kết nối với mô hình Gemini.
+Declarative AI Agent với @AiService:
+ Đây là cơ chế giúp chuyển đổi một interface Java thành một AI Agent. LangChain4j sử dụng cơ chế Proxy tại runtime để tự động sinh mã giao tiếp với mô hình. Quá trình ánh xạ giữa System Prompt, tham số đầu vào và kết quả đầu ra (structured output) được xử lý tự động, giúp giảm đáng kể lượng mã nguồn lặp lại.
+Kiến trúc RAG (Retrieval-Augmented Generation):
+ Để tăng khả năng hiểu ngữ cảnh và sử dụng tri thức nội bộ, hệ thống triển khai kiến trúc RAG với các thành phần sau:
+EmbeddingModel:
+ Sử dụng AllMiniLmL6V2EmbeddingModel để chuyển đổi văn bản thành vector ngữ nghĩa. Mô hình này chạy cục bộ dưới dạng ONNX, giúp giảm chi phí và độ trễ khi xử lý.
+EmbeddingStore:
+ Đóng vai trò như cơ sở dữ liệu vector, sử dụng InMemoryEmbeddingStore để lưu trữ và truy vấn các vector dựa trên độ tương đồng ngữ nghĩa.
+ContentRetriever:
+ Tự động truy xuất các nội dung liên quan từ EmbeddingStore để cung cấp ngữ cảnh bổ sung cho mô hình trước khi sinh phản hồi.
+ChatMemory (Quản lý ngữ cảnh hội thoại):
+ Khắc phục hạn chế “không trạng thái” của API LLM bằng cách lưu trữ lịch sử hội thoại. Hệ thống được cấu hình để ghi nhớ 10 tin nhắn gần nhất trong mỗi phiên, giúp duy trì tính liên tục và tự nhiên trong giao tiếp.
+2.4.1.3 Vai trò trong kiến trúc hệ thống
+Trong kiến trúc tổng thể của SmartRental, LangChain4j đóng vai trò là một tầng điều phối (orchestration layer), trung gian giữa logic nghiệp vụ của hệ thống và mô hình LLM.
+Thông qua LangChain4j, toàn bộ tương tác với AI được chuẩn hóa và tách biệt khỏi các thành phần nghiệp vụ. Điều này giúp hệ thống:
+Giảm độ phức tạp trong tích hợp AI
+Tăng khả năng tái sử dụng và mở rộng
+Dễ dàng thay thế hoặc nâng cấp mô hình trong tương lai
+Dựa trên framework này, hệ thống đã trừu tượng hóa LLM thành các AI Agent chuyên biệt dưới dạng interface Java, bao gồm:
+SqlGeneratorAi: Chuyển đổi ngôn ngữ tự nhiên thành câu lệnh SQL
+DataPresenterAi: Diễn giải và trình bày dữ liệu dưới dạng dễ hiểu
+SmartRentalAi: Hỗ trợ tìm kiếm và tư vấn thông tin phòng trọ
+LegalAdvisorAi: Phân tích và đánh giá các điều khoản hợp đồng
+CrawlerAi: Kiểm duyệt nội dung bài đăng trước khi công bố
+Việc phân tách thành các AI Agent độc lập không chỉ tuân thủ nguyên tắc Single Responsibility Principle, mà còn giúp hệ thống dễ dàng mở rộng và nâng cấp các chức năng AI trong tương lai.
+2.4.3 Khái niệm và mục đích sử dụng
+2.4.3.1 Khái niệm RAG
+Kỹ thuật Sinh văn bản tăng cường truy xuất (Retrieval-Augmented Generation — RAG) là một phương pháp lai (hybrid approach) trong lĩnh vực Trí tuệ Nhân tạo, kết hợp giữa hệ thống truy xuất thông tin (Information Retrieval) và năng lực sinh ngữ nghĩa của Mô hình Ngôn ngữ Lớn (LLM) [16].
+Khác với cách tiếp cận truyền thống — vốn chỉ dựa vào các tham số trọng số tĩnh đã được huấn luyện sẵn — RAG cho phép mô hình chủ động “tham khảo” các nguồn dữ liệu bên ngoài tại thời điểm suy luận (inference time). Kiến trúc này giải quyết hai hạn chế quan trọng của LLM:
+Hạn chế hiện tượng ảo giác (Hallucination):
+ Mô hình được định hướng sinh câu trả lời dựa trên dữ liệu thực tế (evidence-based), giảm thiểu việc tạo ra thông tin sai lệch.
+Vượt qua giới hạn tri thức (Knowledge Cutoff):
+ Hệ thống có thể cập nhật dữ liệu mới theo thời gian mà không cần tái huấn luyện (fine-tuning) mô hình.
+Quy trình hoạt động của RAG gồm ba giai đoạn chính:
+Nhúng dữ liệu (Embedding):
+ Chuyển đổi tài liệu văn bản thành vector số trong không gian ngữ nghĩa.
+Truy xuất ngữ nghĩa (Retrieval):
+ Biểu diễn câu hỏi của người dùng dưới dạng vector và tìm kiếm các đoạn văn có độ tương đồng cao bằng các độ đo như Cosine Similarity.
+Sinh phản hồi (Generation):
+ Sử dụng các đoạn văn được truy xuất làm ngữ cảnh (context) trong prompt để LLM sinh câu trả lời chính xác hơn. 
+2.4.3.2 Mô hình nhúng All-MiniLM-L6-V2
+Trong hệ thống SmartRental, giai đoạn embedding được thực hiện bằng mô hình all-MiniLM-L6-v2, thuộc họ Sentence Transformers.
+Mô hình này có kích thước nhỏ (khoảng 22MB) và được triển khai chạy cục bộ thông qua ONNX Runtime, tích hợp qua thư viện langchain4j-embeddings-all-minilm-l6-v2. Mô hình chuyển đổi văn bản thành các vector dày đặc (dense vectors) với kích thước 384 chiều.
+Việc lựa chọn mô hình này mang lại các lợi thế kỹ thuật:
+Độ trễ thấp (Low latency):
+ Không phát sinh độ trễ mạng do không cần gọi API bên ngoài.
+Tối ưu chi phí và bảo mật:
+ Hoạt động hoàn toàn cục bộ, không phát sinh chi phí và đảm bảo dữ liệu nội bộ không bị gửi ra ngoài hệ thống.
+2.4.3. Vai trò và kịch bản ứng dụng trong SmartRental
+Trong hệ thống SmartRental, RAG được áp dụng trong hai kịch bản chính:
+
+Kịch bản 1: AI Chatbot tư vấn nghiệp vụ (Domain-specific QA)
+Hệ thống xây dựng một luồng xử lý dữ liệu (ingestion pipeline) thông qua RagIngestionService:
+Tài liệu nội quy được tiền xử lý và chia nhỏ (chunking) thành các đoạn khoảng 300 ký tự
+Các đoạn văn được chuyển thành vector và lưu vào Vector Store
+Khi người dùng truy vấn, hệ thống áp dụng ngưỡng lọc (minScore = 0.7) để truy xuất các đoạn liên quan nhất
+Các đoạn này được đưa vào làm ngữ cảnh cho mô hình Gemini sinh câu trả lời
+Cách tiếp cận này giúp chatbot phản hồi dựa trên dữ liệu thực tế của hệ thống thay vì kiến thức tổng quát.
+
+Kịch bản 2: Semantic SQL Cache
+Hệ thống triển khai cơ chế bộ nhớ đệm ngữ nghĩa (semantic cache) thông qua AiOrchestratorService nhằm tối ưu hiệu năng:
+Mỗi truy vấn và câu lệnh SQL tương ứng được chuyển thành vector và lưu trữ
+Khi có truy vấn mới, hệ thống tính toán độ tương đồng ngữ nghĩa
+Nếu đạt ngưỡng (similarity ≥ 0.85), hệ thống tái sử dụng câu SQL đã có thay vì gọi lại mô hình
+Giải pháp này mang lại các lợi ích:
+Giảm số lần gọi API Gemini (tiết kiệm chi phí token)
+Tăng tốc độ phản hồi hệ thống
+Đảm bảo tính nhất quán trong truy vấn dữ liệu 
+2.4.4 Kỹ thuật Text-to-SQL và Kiến trúc Multi-Agent
+2.4.4.1 Khái niệm kỹ thuật Text-to-SQL
+Text-to-SQL là một phương pháp thuộc lĩnh vực Giao diện cơ sở dữ liệu bằng ngôn ngữ tự nhiên (Natural Language Interfaces to Databases — NLIDB), cho phép chuyển đổi các câu hỏi bằng ngôn ngữ tự nhiên thành các câu lệnh truy vấn SQL tương ứng [17].
+Trong nền tảng SmartRental, kỹ thuật này được triển khai thông qua việc sử dụng mô hình Gemini kết hợp với Prompt Engineering. Thay vì thực hiện tinh chỉnh (fine-tuning) mô hình với chi phí cao, hệ thống áp dụng phương pháp In-context Learning bằng cách cung cấp trực tiếp vào System Prompt các thông tin sau:
+Lược đồ cơ sở dữ liệu (database schema)
+Quan hệ giữa các bảng (foreign key)
+Các ràng buộc nghiệp vụ và quy tắc truy cập
+Cách tiếp cận này cho phép mô hình sinh ra các câu lệnh SQL phù hợp với ngữ cảnh, đồng thời giúp người dùng cuối (chủ trọ, khách thuê, quản trị viên) có thể khai thác dữ liệu mà không cần kiến thức về SQL.
+2.4.4.2 Kiến trúc điều phối đa tác tử (Multi-Agent Orchestrator)
+Để xử lý các luồng nghiệp vụ phức tạp một cách hiệu quả, hệ thống SmartRental áp dụng kiến trúc Multi-Agent Orchestrator. Trong đó, lớp AiOrchestratorService đóng vai trò là trung tâm điều phối (dispatcher), chịu trách nhiệm phân luồng và quản lý các tác vụ AI.
+Hệ thống bao gồm 5 AI Agent chuyên biệt:
+SqlGeneratorAi:
+ Tiếp nhận câu hỏi tự nhiên, kết hợp với lược đồ cơ sở dữ liệu và thông tin phân quyền (role) để sinh câu lệnh SQL chính xác.
+DataPresenterAi:
+ Đóng vai trò Natural Language Generation (NLG), chuyển đổi dữ liệu thô từ cơ sở dữ liệu thành câu trả lời tiếng Việt dễ hiểu.
+SmartRentalAi:
+ Trợ lý tổng hợp, kết hợp kỹ thuật RAG để tư vấn và giải đáp các thông tin liên quan đến hệ thống.
+LegalAdvisorAi:
+ Phân tích văn bản pháp lý, đánh giá hợp đồng và đề xuất điều chỉnh các điều khoản.
+CrawlerAi:
+ Thu thập và xử lý dữ liệu từ các nguồn bên ngoài, chuẩn hóa thành định dạng JSON có cấu trúc.
+2.4.4.3 Bộ nhớ đệm ngữ nghĩa và cơ chế Human-in-the-loop
+Quá trình sinh SQL từ LLM thường tiêu tốn nhiều tài nguyên và có độ trễ cao. Để tối ưu, hệ thống triển khai Semantic Cache kết hợp lưu trữ kép:
+Lưu trữ bền vững: SQL được lưu trong cơ sở dữ liệu quan hệ (MariaDB)
+Lưu trữ ngữ nghĩa: Câu hỏi tương ứng được nhúng thành vector và lưu trong Vector Store (RAM)
+Cơ chế hoạt động:
+Khi có truy vấn mới, hệ thống tính toán cosine similarity
+Nếu độ tương đồng ≥ 0.85 → Cache Hit, tái sử dụng SQL
+Ngược lại → gọi LLM để sinh SQL mới
+Cơ chế Human-in-the-loop (HITL):
+Quản trị viên có thể chỉnh sửa các câu SQL chưa chính xác
+Sau khi hiệu chỉnh, hệ thống cập nhật lại Vector Store
+Giúp hệ thống “học” và cải thiện theo thời gian
+Cách tiếp cận này giúp:
+Giảm chi phí sử dụng API
+Tăng tốc độ phản hồi
+Đảm bảo tính ổn định và chính xác lâu dài
+2.4.4. Chiến lược bảo mật đa tầng (Defense-in-depth)
+Việc sinh và thực thi SQL tự động tiềm ẩn nhiều rủi ro bảo mật. Do đó, hệ thống SmartRental áp dụng chiến lược bảo mật đa tầng gồm ba lớp:
+Tầng 1 — AI Validator:
+ System Prompt được thiết kế để yêu cầu mô hình từ chối các truy vấn ngoài phạm vi hoặc có dấu hiệu tấn công (prompt injection). Nếu phát hiện vi phạm, hệ thống trả về "UNAUTHORIZED".
+Tầng 2 — Application Validator (Java Regex):
+ Đóng vai trò như một lớp kiểm duyệt tại ứng dụng:
+Chặn các câu lệnh nguy hiểm: INSERT, UPDATE, DELETE, DROP
+Chỉ cho phép truy vấn SELECT
+Kiểm tra và đảm bảo sự tồn tại của các điều kiện ràng buộc như landlord_id, tenant_id
+Tầng 3 — Role-based Access Control (RBAC):
+ Áp dụng kiểm soát truy cập theo vai trò:
+Landlord: chỉ truy vấn dữ liệu thuộc quyền sở hữu
+Tenant: không truy cập dữ liệu tài chính của chủ trọ
+Guest: chỉ truy cập dữ liệu công khai
+Cơ chế nhiều lớp này đảm bảo an toàn dữ liệu và ngăn chặn các truy cập trái phép.
+2.4.5 Kỹ thuật Kiểm duyệt Nội dung Tự động (AI Content Moderation) và Phân tích Đa phương thức
+2.4.5.1 Khái niệm và bài toán thực tế
+Kiểm duyệt nội dung bằng AI (AI Content Moderation) là kỹ thuật ứng dụng các mô hình học máy (Machine Learning) nhằm tự động hóa quá trình rà soát, đánh giá và sàng lọc nội dung do người dùng tạo ra (User-Generated Content — UGC) trước khi được xuất bản công khai trên hệ thống.
+Trong lĩnh vực bất động sản và nền tảng thuê trọ, bài toán kiểm duyệt có mức độ rủi ro cao do tồn tại sự bất đối xứng thông tin (information asymmetry) giữa chủ trọ và khách thuê. Điều này có thể dẫn đến nhiều vấn đề như:
+Đăng tin không có thật (fake listing)
+Lừa đảo tiền cọc
+Hình ảnh không đúng với thực tế
+Nội dung mô tả sai lệch hoặc gây hiểu nhầm
+Do đó, việc áp dụng AI Moderation đóng vai trò như một lớp bảo vệ thông tin (information integrity layer), giúp:
+Đảm bảo độ tin cậy của dữ liệu
+Giảm tải công việc kiểm duyệt thủ công
+Tăng tính minh bạch và an toàn tài chính cho người dùng 
+2.4.5.2 Kỹ thuật phân tích đa phương thức (Multimodal Analysis)
+Các hệ thống kiểm duyệt truyền thống thường dựa trên lọc từ khóa (keyword-based filtering), dễ bị qua mặt và không thể xử lý nội dung hình ảnh. Để khắc phục hạn chế này, SmartRental sử dụng mô hình Gemini với khả năng phân tích đa phương thức (multimodal analysis).
+Kỹ thuật này cho phép mô hình xử lý đồng thời nhiều loại dữ liệu trong cùng một không gian biểu diễn (embedding space), bao gồm:
+Dữ liệu đầu vào (Input):
+Văn bản: tiêu đề, mô tả, thông tin giá
+Hình ảnh: tối đa 4 ảnh thực tế (dạng URL)
+Suy luận chéo (Cross-modal Reasoning):
+ Mô hình không chỉ phân tích riêng lẻ từng loại dữ liệu mà còn đánh giá tính nhất quán giữa văn bản và hình ảnh. Ví dụ:
+Phát hiện mâu thuẫn giữa mô tả “phòng cao cấp” và hình ảnh thực tế xuống cấp
+Phát hiện thông tin lừa đảo được ẩn trong hình ảnh
+Dữ liệu đầu ra (Structured Output):
+{
+ "isSafe": true,
+ "score": 85,
+ "reason": "Văn bản rõ ràng, hình ảnh phù hợp với mô tả"
+}
+Trong đó:
+isSafe: xác định nội dung hợp lệ hay không
+score: điểm đánh giá mức độ an toàn (0–100)
+reason: giải thích kết quả đánh giá 
+2.4.5.3 Quy trình tiền kiểm duyệt (Pre-moderation Pipeline) trong SmartRental
+Trong kiến trúc SmartRental, kiểm duyệt nội dung được thiết kế thành một pipeline tự động, do ModerationService đảm nhiệm và được tích hợp tại tầng Business Logic của PropertyService ngay khi người dùng tạo hoặc cập nhật bài đăng.
+Cơ chế đánh giá theo ngữ cảnh (Context-aware Criteria):
+Khu trọ (Property): không bắt buộc có giá cụ thể
+Phòng trọ (Room): bắt buộc có giá thuê, diện tích, tiền cọc
+Thông tin này được cung cấp cho AI thông qua System Prompt để đảm bảo đánh giá đúng theo nghiệp vụ.
+Cơ chế định tuyến theo điểm an toàn (Safety Score Thresholding):
+Dựa trên giá trị score (0–100), hệ thống tự động phân luồng:
+score ≥ 50:
+ → Bài đăng đạt ngưỡng an toàn
+
+
+score < 50 hoặc isSafe = false:
+ → Bài đăng bị đánh dấu rủi ro cao
+sau đó
+ → Chuyển sang trạng thái PENDING
+ → Quản trị viên thực hiện kiểm duyệt thủ công (manual review) dựa trên gợi ý về rủi ro của AI.
+Quản trị viên sẽ nhận được:
+Điểm đánh giá
+Lý do vi phạm (reason)
+ → Hỗ trợ ra quyết định nhanh và chính xác hơn
+
+2.4.6 Hệ thống gợi ý phòng trọ (Recommendation System)
+2.4.6.1 Khái niệm hệ thống gợi ý dựa trên nội dung (Content-based Recommendation)
+Hệ thống gợi ý (Recommendation System) là một lớp phần mềm được thiết kế nhằm giải quyết vấn đề quá tải thông tin (information overload), giúp người dùng nhanh chóng tiếp cận các sản phẩm hoặc dịch vụ phù hợp với nhu cầu cá nhân.
+Trong lĩnh vực tìm kiếm bất động sản, dữ liệu thường mang tính cấu trúc cao và tiêu chí lựa chọn của người dùng khá rõ ràng (ví dụ: khu vực, khoảng giá). Do đó, thay vì sử dụng phương pháp lọc cộng tác (Collaborative Filtering) vốn yêu cầu lượng lớn dữ liệu lịch sử, hệ thống SmartRental áp dụng phương pháp lọc dựa trên nội dung (Content-based Filtering) kết hợp với chấm điểm trọng số (Weighted Scoring).
+Phương pháp này hoạt động dựa trên cơ chế đối chiếu trực tiếp giữa:
+Hồ sơ sở thích của khách thuê (TenantPreference)
+Thuộc tính của phòng trọ (Room/Property Attributes)
+Thay vì sử dụng các kỹ thuật nhúng vector (vector embedding) hay tính Cosine Similarity, hệ thống xây dựng một đại lượng vô hướng gọi là điểm tương đồng (Match Score) dựa trên các luật nghiệp vụ (business rules). Cách tiếp cận này giúp hệ thống:
+Dễ triển khai và kiểm soát
+Phù hợp với dữ liệu có cấu trúc
+Có khả năng giải thích cao (Explainable AI)
+2.4.6.2 Mô hình tính điểm tương đồng (Match Score)
+huật toán tính điểm được xây dựng dưới dạng hàm tổng có trọng số, đánh giá trên ba tiêu chí chính trong quyết định thuê nhà. Tổng điểm tối đa tiệm cận 100, được phân bổ như sau:
+a. Tiêu chí khu vực (Location Score — tối đa 50 điểm):
+ Vị trí địa lý là yếu tố mang tính quyết định (hard constraint) trong bất động sản. Hệ thống sử dụng trường preferredLocation từ hồ sơ người dùng và thực hiện so khớp chuỗi (string matching) với các thuộc tính:
+city
+district
+address
+Mức độ khớp càng chi tiết thì điểm số càng cao, tối đa 50 điểm.
+
+b. Tiêu chí giá cả (Price Score — tối đa 30 điểm):
+ Thuật toán áp dụng cơ chế khớp mờ (fuzzy matching) để đánh giá sự phù hợp về giá:
+Khoảng ngân sách: [targetPriceMin, targetPriceMax]
+Cho phép biên độ dao động: ±20%
+Phòng nằm trong khoảng ngân sách sẽ đạt điểm tối đa (30 điểm). Điểm sẽ giảm dần theo hàm tuyến tính nếu giá nằm trong vùng sai số cho phép.
+
+. Tiêu chí tiện ích (Amenity Score — 5 điểm/tiện ích):
+ Tiện ích được xem là yếu tố mềm (soft constraint), được tính dựa trên phép giao tập hợp (set intersection) giữa:
+Danh sách tiện ích mong muốn
+Tiện ích thực tế của phòng
+Mỗi tiện ích trùng khớp được cộng thêm 5 điểm vào tổng điểm.
+
+Công thức tổng quát:
+Score = LocationScore (≤50) + PriceScore (≤30) + Σ (AmenityMatch × 5)
+
+
+2.4.6.3 Cơ chế xếp hạng và trả kết quả
+
+Quy trình gợi ý được kích hoạt tự động hoặc theo yêu cầu (On-demand). Hệ thống (thông qua RecommendationService) sẽ quét toàn bộ danh mục phòng trống, tính toán Match Score cho từng phòng dựa trên hồ sơ TenantPreference của người dùng đang đăng nhập. Sau đó, tập kết quả sẽ được sắp xếp giảm dần (Descending) theo điểm số. Thuật toán cắt cụm và trả về Top 10 phòng trọ có điểm tương đồng cao nhất, tối ưu hóa giao diện hiển thị và tăng tỷ lệ chuyển đổi (Conversion Rate) cho nền tảng.
+
+2.4.7 Công nghệ OCR trong định danh điện tử (eKYC)
+2.4.7.1 Khái niệm OCR và eKYC
+Nhận dạng Ký tự Quang học (Optical Character Recognition — OCR) là một công nghệ thị giác máy tính (Computer Vision) cho phép chuyển đổi hình ảnh chứa văn bản (từ tài liệu quét hoặc ảnh chụp) thành dữ liệu văn bản có thể mã hóa và xử lý bằng máy tính.
+Trong lĩnh vực công nghệ tài chính (Fintech) và các nền tảng giao dịch trực tuyến, OCR là thành phần cốt lõi trong quy trình Định danh Khách hàng Điện tử (electronic Know Your Customer — eKYC). Đối với hệ thống SmartRental, eKYC đóng vai trò quan trọng trong việc xác thực danh tính của cả chủ trọ và khách thuê, qua đó giúp ngăn chặn các hành vi giả mạo, lừa đảo và nâng cao độ tin cậy của nền tảng.
+2.4.7.2 Dịch vụ FPT.AI Vision OCR và ưu điểm công nghệ
+Thay vì sử dụng các thư viện mã nguồn mở như Tesseract OCR, hệ thống SmartRental tích hợp dịch vụ FPT.AI Vision OCR do FPT.AI cung cấp. Các công cụ OCR truyền thống thường gặp khó khăn khi xử lý tiếng Việt có dấu và các tài liệu có bố cục phức tạp như căn cước công dân hoặc hộ chiếu, đồng thời yêu cầu quá trình huấn luyện và tiền xử lý ảnh tương đối phức tạp.
+Ngược lại, FPT.AI OCR được xây dựng trên nền tảng học sâu (Deep Learning) và được tối ưu hóa cho dữ liệu giấy tờ tại Việt Nam, mang lại nhiều ưu điểm. Thứ nhất, mô hình được huấn luyện trên tập dữ liệu lớn gồm các loại giấy tờ như CCCD gắn chip, CMND, hộ chiếu và giấy phép lái xe, giúp tăng độ chính xác trong nhận dạng. Thứ hai, hệ thống hỗ trợ trích xuất thông tin có cấu trúc (structured extraction), tự động phân tách dữ liệu thành các trường cụ thể như số định danh, họ tên, ngày sinh, quê quán và địa chỉ. Cuối cùng, dịch vụ có độ chính xác cao và thời gian phản hồi nhanh nhờ hạ tầng xử lý trên nền tảng điện toán đám mây.
+2.4.7.3 Quy trình tích hợp và luồng xử lý eKYC trong SmartRental
+Việc tích hợp OCR vào hệ thống được thực hiện thông qua giao thức RESTful API với cơ chế xác thực bằng api-key. Toàn bộ quy trình được điều phối tại tầng backend thông qua lớp OcrService.java.
+Cụ thể, người dùng sẽ tải lên hình ảnh CCCD từ giao diện ứng dụng. Hình ảnh này được lưu trữ tạm thời trên dịch vụ Cloudinary để lấy URL hoặc được chuyển đổi sang định dạng Base64. Sau đó, hệ thống gửi một yêu cầu HTTP POST đến FPT.AI OCR API kèm theo khóa xác thực và dữ liệu hình ảnh.
+Kết quả trả về từ API là một đối tượng JSON chứa các trường thông tin đã được trích xuất. Lớp OcrService sẽ tiến hành phân tích dữ liệu này, sau đó tự động điền (auto-fill) vào biểu mẫu đăng ký để người dùng kiểm tra lại. Cuối cùng, dữ liệu được xác nhận sẽ được lưu trữ an toàn trong cơ sở dữ liệu của hệ thống.
+2.4.8 Thu thập dữ liệu Web (Web Crawling) với Jsoup
+2.4.8.1 Khái niệm Web Crawling và Web Scraping
+Web Crawling là kỹ thuật tự động duyệt qua các trang web nhằm thu thập dữ liệu theo một quy trình được lập trình sẵn. Thông thường, crawler sẽ truy cập vào các URL, phân tích nội dung trang và tiếp tục lần theo các liên kết để mở rộng phạm vi thu thập dữ liệu.
+Song song đó, Web Scraping là quá trình trích xuất các thông tin cụ thể từ nội dung HTML của trang web, chẳng hạn như tiêu đề, giá cả hoặc hình ảnh. Hai kỹ thuật này thường được sử dụng kết hợp trong các bài toán như thu thập dữ liệu huấn luyện cho hệ thống AI, nghiên cứu thị trường hoặc tổng hợp thông tin từ nhiều nguồn khác nhau.
+Tuy nhiên, việc thu thập dữ liệu web cần tuân thủ các nguyên tắc pháp lý và đạo đức, bao gồm việc kiểm tra tệp robots.txt, giới hạn tần suất truy cập để tránh gây quá tải cho máy chủ nguồn, và không khai thác dữ liệu vi phạm điều khoản sử dụng của website.
+2.4.8.2 Thư viện Jsoup
+Jsoup là một thư viện mã nguồn mở viết bằng Java, được sử dụng rộng rãi để phân tích (parse) và xử lý tài liệu HTML. Thư viện này cung cấp một API đơn giản, dễ sử dụng với cú pháp selector tương tự jQuery, giúp lập trình viên dễ dàng truy xuất các phần tử trong cây DOM.
+Bên cạnh khả năng phân tích HTML, Jsoup còn hỗ trợ kết nối HTTP để tải nội dung trang web, trích xuất dữ liệu văn bản hoặc thuộc tính của thẻ HTML, cũng như xử lý các biểu mẫu (form submission). Nhờ đó, Jsoup trở thành một công cụ hiệu quả cho việc xây dựng các hệ thống Web Crawling trong môi trường Java.
+2.4.8.3 Vai trò trong SmartRental — Giải quyết bài toán Cold Start
+Trong giai đoạn khởi đầu, hệ thống SmartRental đối mặt với bài toán Cold Start, khi chưa có đủ dữ liệu phòng trọ để cung cấp gợi ý cho người dùng. Điều này có thể làm giảm trải nghiệm ban đầu và ảnh hưởng đến khả năng thu hút người dùng mới.
+Để giải quyết vấn đề này, hệ thống sử dụng Jsoup để thu thập dữ liệu từ các website như phongtro123.com và nhatrovn.vn. Dữ liệu HTML thô sau khi thu thập sẽ được trích xuất các thông tin quan trọng như tiêu đề, giá thuê, diện tích và hình ảnh.
+Tiếp theo, dữ liệu này được chuyển qua thành phần CrawlerAi để chuẩn hóa về định dạng JSON thống nhất. Sau khi chuẩn hóa, hệ thống tiếp tục sử dụng ModerationService để đánh giá mức độ an toàn và độ tin cậy của nội dung trước khi lưu trữ vào cơ sở dữ liệu dưới dạng các thực thể Property và Room. Quy trình này giúp nhanh chóng xây dựng tập dữ liệu ban đầu, tạo nền tảng cho các chức năng tìm kiếm và gợi ý hoạt động hiệu quả.
+2.5 Công nghệ Frontend
+2.5.1 Thư viện ReactJS
+2.5.1.1 Khái niệm
+ReactJS là một thư viện JavaScript mã nguồn mở được thiết kế để xây dựng giao diện người dùng (UI) cho các ứng dụng web hiện đại. Được phát triển và duy trì bởi Meta (trước đây là Facebook) và cộng đồng các nhà phát triển, nó thường được sử dụng để tạo ra các giao diện có thể tái sử dụng thông qua các thành phần – các phần tử độc lập, có thể cấu hình và tái sử dụng trên các phần khác nhau của một ứng dụng. React sử dụng Virtual DOM để tối ưu hóa việc cập nhật giao diện người dùng, giúp ứng dụng phản hồi nhanh hơn khi dữ liệu thay đổi. Nhờ kiến ​​trúc dựa trên thành phần và cơ chế cập nhật hiệu quả, ReactJS là một trong những thư viện phổ biến nhất cho phát triển giao diện người dùng hiện nay, đặc biệt là trong các ứng dụng trang đơn (SPA).[10]
+2.5.1.2 Các tính năng chính (Virtual DOM, Component-based)
+ReactJS cung cấp nhiều tính năng quan trọng hỗ trợ việc xây dựng giao diện người dùng hiệu quả, trong đó nổi bật nhất là Virtual DOM và kiến trúc dựa trên Component (Component-based architecture).
+Virtual DOM là một cơ chế cho phép React tạo ra một bản sao nhẹ của DOM thật trong bộ nhớ. Khi trạng thái (state) hoặc dữ liệu của ứng dụng thay đổi, React sẽ cập nhật Virtual DOM trước, sau đó so sánh (diffing) với phiên bản trước để xác định chính xác những phần cần thay đổi. Chỉ các thành phần có sự khác biệt mới được cập nhật lên DOM thật, giúp giảm thiểu số lần thao tác trực tiếp với DOM và cải thiện đáng kể hiệu suất của ứng dụng, đặc biệt là với các ứng dụng có giao diện phức tạp và dữ liệu thay đổi thường xuyên (Meta Platforms, n.d.).
+Bên cạnh đó, ReactJS áp dụng mô hình phát triển dựa trên component, trong đó giao diện người dùng được chia nhỏ thành các thành phần độc lập, có thể tái sử dụng. Mỗi component quản lý logic và giao diện của riêng mình, giúp mã nguồn rõ ràng, dễ bảo trì và mở rộng. Cách tiếp cận này cho phép các lập trình viên xây dựng ứng dụng theo hướng mô-đun, tăng khả năng tái sử dụng mã và thuận tiện cho việc phát triển theo nhóm (ReactJS, n.d.).
+Nhờ sự kết hợp giữa Virtual DOM và kiến trúc component-based, ReactJS trở thành một trong những thư viện front-end phổ biến nhất hiện nay trong việc phát triển các ứng dụng web hiện đại và có khả năng mở rộng cao.[11]
+2.5.2 Framework CSS — TailwindCSS
+2.5.2.1 Khái niệm
+TailwindCSS là một framework CSS theo hướng utility-first, trong đó các kiểu dáng giao diện được xây dựng thông qua các lớp tiện ích có sẵn thay vì viết CSS riêng cho từng thành phần [19]. Cách tiếp cận này cho phép lập trình viên áp dụng trực tiếp các class như bg-blue-500, p-4, hoặc rounded-lg vào HTML để định nghĩa giao diện một cách nhanh chóng và trực quan.
+Khác với các framework truyền thống như Bootstrap, TailwindCSS không cung cấp sẵn các component hoàn chỉnh mà tập trung vào các lớp tiện ích nhỏ, giúp tăng tính linh hoạt và khả năng tùy biến giao diện. Ngoài ra, Tailwind còn hỗ trợ cơ chế tree-shaking để loại bỏ các class không sử dụng, từ đó giảm kích thước file CSS trong môi trường production [19].
+Bên cạnh đó, framework này tích hợp sẵn các tính năng quan trọng như thiết kế đáp ứng (responsive design), chế độ nền tối (dark mode) và các hiệu ứng chuyển động (animation), giúp đơn giản hóa quá trình xây dựng giao diện hiện đại [19].
+
+2.5.2.1 Vai trò trong SmartRental
+Trong hệ thống SmartRental, TailwindCSS được sử dụng để xây dựng toàn bộ giao diện phía frontend. Khi kết hợp với React, các lớp tiện ích của Tailwind cho phép tạo ra các component giao diện có tính tái sử dụng cao, đồng thời đảm bảo tính nhất quán về thiết kế trên toàn bộ hệ thống.
+Nhờ khả năng hỗ trợ responsive, giao diện ứng dụng có thể thích nghi tốt trên nhiều loại thiết bị khác nhau, từ máy tính để bàn đến điện thoại di động. Đồng thời, hệ thống cũng tận dụng cơ chế tùy biến thông qua tệp cấu hình tailwind.config.js để định nghĩa màu sắc, font chữ và các thành phần giao diện phù hợp với định hướng thiết kế của nền tảng.
+Việc sử dụng TailwindCSS không chỉ giúp rút ngắn thời gian phát triển mà còn nâng cao chất lượng trải nghiệm người dùng thông qua một giao diện hiện đại, linh hoạt và dễ bảo trì.
+2.5.3. Thư viện tương tác Blockchain — Ethers.js
+2.5.3.1 Khái niệm và đặc trưng kỹ thuật
+Ethers.js là một thư viện JavaScript mã nguồn mở, được thiết kế theo hướng tinh gọn và bảo mật nhằm hỗ trợ các ứng dụng phía máy khách (client-side) tương tác trực tiếp với mạng lưới Ethereum và các blockchain tương thích với Máy ảo Ethereum (EVM) [20].
+Trong kiến trúc của các ứng dụng phi tập trung (dApp), Ethers.js đóng vai trò như một cầu nối giữa giao diện web và mạng lưới blockchain. Thư viện này cung cấp hệ thống API toàn diện cho phép thiết lập kết nối an toàn với các ví điện tử như MetaMask thông qua lớp BrowserProvider, đồng thời hỗ trợ quản lý định danh và chữ ký số thông qua đối tượng Signer, đại diện cho tài khoản người dùng đang thực hiện giao dịch.
+Bên cạnh đó, Ethers.js cho phép khởi tạo và tương tác với các đối tượng Smart Contract trong môi trường JavaScript, bao gồm việc gọi các hàm thay đổi trạng thái (state-changing transactions) cũng như lắng nghe các sự kiện (event listening) phát sinh từ blockchain theo thời gian thực [20].
+2.5.3.2 Phân định vai trò kiến trúc: Ethers.js (Frontend) và Web3j (Backend)
+Trong các hệ thống Web3 hiện đại, một nguyên tắc quan trọng là không lưu trữ khóa riêng (private key) của người dùng trên máy chủ tập trung nhằm đảm bảo an toàn tài sản. Do đó, hệ thống SmartRental áp dụng nguyên tắc Separation of Concerns bằng cách phân tách rõ ràng vai trò giữa Ethers.js và Web3j.
+Ở tầng backend, Web3j (Java) được sử dụng để thực hiện các tác vụ như triển khai (deploy) hợp đồng thông minh, truy vấn dữ liệu on-chain và kiểm tra tính toàn vẹn của giao dịch. Ngược lại, ở tầng frontend, Ethers.js đóng vai trò là cổng giao dịch phi lưu ký (non-custodial gateway), cho phép người dùng ký và gửi giao dịch trực tiếp thông qua ví MetaMask.
+Cách tiếp cận này đảm bảo rằng hệ thống không nắm giữ tài sản của người dùng, đồng thời giảm thiểu rủi ro liên quan đến các cuộc tấn công vào máy chủ tập trung.
+2.5.3. Vai trò và kịch bản ứng dụng trong SmartRental
+Trong hệ thống SmartRental, Ethers.js được tích hợp trực tiếp vào giao diện người dùng nhằm xử lý các tác vụ liên quan đến giao dịch tài chính trên blockchain. Trước tiên, hệ thống sử dụng ethers.BrowserProvider để kết nối với ví MetaMask, từ đó xác định địa chỉ ví người dùng và trạng thái mạng lưới.
+Khi người dùng thực hiện đặt cọc phòng, ứng dụng sẽ gọi hàm contract.deposit() trên Smart Contract và gửi kèm một lượng ETH tương ứng. Số tiền này sẽ được khóa lại trong hợp đồng thông minh theo cơ chế escrow, đảm bảo tính minh bạch và an toàn cho cả hai bên.
+Đối với các hóa đơn phát sinh, hệ thống hỗ trợ thanh toán trực tiếp trên blockchain thông qua hàm contract.payBill(billId). Ngoài ra, đối với các hóa đơn được tạo từ hệ thống backend (Web2), người dùng có thể thực hiện thanh toán thông qua hàm contract.payExternalBill(backendBillId). Giao dịch này sẽ ghi nhận thông tin hóa đơn lên blockchain, từ đó backend có thể lắng nghe sự kiện và tự động cập nhật trạng thái thanh toán trong cơ sở dữ liệu.
+Việc tích hợp Ethers.js theo cách này giúp đảm bảo tính minh bạch, an toàn và đồng bộ giữa hệ thống Web2 và Web3 trong toàn bộ quy trình xử lý nghiệp vụ.
+2.6 Hệ quản trị Cơ sở dữ liệu MariaDB
+2.6.1 Khái niệm
+MariaDB là một hệ quản trị cơ sở dữ liệu quan hệ (RDBMS) mã nguồn mở, được phát triển như một nhánh (fork) của MySQL nhằm đảm bảo tính tự do, minh bạch và khả năng mở rộng lâu dài. MariaDB được xây dựng dựa trên mô hình cơ sở dữ liệu quan hệ, sử dụng ngôn ngữ truy vấn chuẩn SQL để thao tác và quản lý dữ liệu. Hệ quản trị này tương thích cao với MySQL, cho phép người dùng dễ dàng chuyển đổi mà không cần thay đổi đáng kể cấu trúc dữ liệu hay ứng dụng đang sử dụng. Nhờ hiệu năng cao, tính ổn định và khả năng mở rộng tốt, MariaDB được sử dụng rộng rãi trong các hệ thống web, ứng dụng doanh nghiệp và các nền tảng yêu cầu xử lý dữ liệu lớn [12].
+2.6.2 Các tính năng chính
+MariaDB cung cấp nhiều tính năng quan trọng đáp ứng nhu cầu lưu trữ và xử lý dữ liệu trong các hệ thống hiện đại:
+- Tương thích MySQL: MariaDB hỗ trợ hầu hết các API, lệnh SQL và công cụ của MySQL, giúp việc chuyển đổi hệ thống diễn ra nhanh chóng và thuận tiện.
+- Hiệu năng cao: MariaDB tích hợp nhiều storage engine như InnoDB, Aria, MyISAM và ColumnStore, cho phép tối ưu hiệu suất tùy theo từng loại ứng dụng và khối lượng dữ liệu.
+- Bảo mật: Hệ quản trị này cung cấp các cơ chế bảo mật như phân quyền người dùng chi tiết, mã hóa dữ liệu và xác thực truy cập, giúp bảo vệ dữ liệu khỏi các truy cập trái phép.
+- Khả năng mở rộng và sao lưu: MariaDB hỗ trợ replication, clustering và sao lưu dữ liệu, giúp hệ thống hoạt động ổn định và sẵn sàng mở rộng khi số lượng người dùng tăng.
+- Mã nguồn mở: Với giấy phép mã nguồn mở, MariaDB cho phép cộng đồng đóng góp và cải tiến liên tục, đồng thời giảm chi phí bản quyền cho doanh nghiệp và tổ chức (Wikipedia, n.d.).
+Nhờ những tính năng trên, MariaDB là một lựa chọn phổ biến cho các ứng dụng web, hệ thống quản lý dữ liệu và các dự án phần mềm yêu cầu cơ sở dữ liệu ổn định và hiệu quả.[12]
+2.7 Cơ chế xác thực JSON Web Token (JWT)
+2.7.1 Khái niệm
+JSON Web Token (JWT) là một chuẩn mở (open standard) theo RFC 7519, được sử dụng để truyền tải thông tin xác thực và phân quyền giữa các bên dưới dạng một đối tượng JSON nhỏ gọn và an toàn [12]. JWT thường được ứng dụng trong các hệ thống web hiện đại nhằm xác thực người dùng và bảo vệ các tài nguyên API theo mô hình phân tán.
+Về cấu trúc, một JWT bao gồm ba phần chính: Header, Payload và Signature, được mã hóa và ghép lại với nhau thông qua dấu chấm (.). Header chứa thông tin về thuật toán mã hóa, Payload lưu trữ các thông tin xác thực (claim) của người dùng, trong khi Signature được dùng để đảm bảo tính toàn vẹn và xác thực nguồn gốc của token.
+Trong các hệ thống backend dựa trên RESTful API, JWT thường được cấp sau khi người dùng đăng nhập thành công và được gửi kèm theo mỗi yêu cầu HTTP tiếp theo thông qua header Authorization. Nhờ cơ chế này, máy chủ có thể xác thực danh tính người dùng mà không cần lưu trữ trạng thái phiên làm việc (session) trên server.
+Trong phạm vi đề tài Smart Rental, JWT được sử dụng làm cơ chế xác thực chính cho hệ thống backend Spring Boot, đảm bảo việc truy cập các chức năng như quản lý hợp đồng, hóa đơn và giao dịch được thực hiện bởi đúng đối tượng và đúng quyền hạn.
+2.7.2 Các tính năng chính (Stateless, Bảo mật)
+- Tính không lưu trạng thái (Stateless)
+Một đặc điểm quan trọng của JWT là tính stateless, nghĩa là máy chủ không cần lưu trữ thông tin phiên đăng nhập của người dùng. Toàn bộ thông tin xác thực cần thiết đã được đóng gói bên trong token và được gửi kèm theo mỗi yêu cầu từ phía client.
+Cách tiếp cận này giúp giảm tải cho máy chủ, đồng thời tăng khả năng mở rộng của hệ thống, đặc biệt phù hợp với các kiến trúc Microservices và hệ thống phân tán. Trong hệ thống Smart Rental, việc sử dụng JWT cho phép các dịch vụ backend hoạt động độc lập và dễ dàng mở rộng mà không phụ thuộc vào cơ chế quản lý session tập trung.
+- Tính bảo mật
+JWT đảm bảo tính bảo mật thông qua cơ chế ký số (digital signature) bằng các thuật toán mã hóa như HMAC hoặc RSA. Chữ ký này giúp phát hiện các trường hợp token bị chỉnh sửa hoặc giả mạo trong quá trình truyền tải.
+Ngoài ra, JWT có thể thiết lập thời gian hết hạn (expiration time), giúp hạn chế rủi ro khi token bị lộ. Khi kết hợp với giao thức HTTPS và các cơ chế bảo mật của Spring Security, JWT mang lại một giải pháp xác thực an toàn và hiệu quả cho các hệ thống backend hiện đại.
+Trong đề tài Smart Rental, JWT được tích hợp cùng Spring Security nhằm kiểm soát truy cập theo vai trò người dùng, đảm bảo rằng chỉ những đối tượng được phân quyền hợp lệ mới có thể thực hiện các thao tác nghiệp vụ tương ứng trong hệ thống.
+2.8 Giao tiếp thời gian thực — WebSocket & STOMP
+2.8.1 Khái niệm WebSocket
+WebSocket là một giao thức truyền thông hai chiều (full-duplex) hoạt động trên một kết nối TCP duy nhất, được chuẩn hóa trong RFC 6455. Khác với mô hình HTTP truyền thống theo cơ chế request–response, WebSocket cho phép duy trì một kết nối liên tục giữa client và server, từ đó cả hai phía đều có thể chủ động gửi dữ liệu cho nhau mà không cần thiết lập lại kết nối [21].
+Nhờ đặc điểm này, WebSocket đặc biệt phù hợp với các ứng dụng yêu cầu cập nhật dữ liệu theo thời gian thực như hệ thống chat, thông báo (notification), hoặc các dashboard hiển thị dữ liệu động. Việc giảm thiểu overhead của việc thiết lập lại kết nối HTTP cũng giúp cải thiện hiệu năng và độ trễ của hệ thống.
+
+2.8.2 STOMP Protocol
+STOMP (Simple Text Oriented Messaging Protocol) là một giao thức nhắn tin dạng văn bản được thiết kế để hoạt động trên nền WebSocket, cung cấp một mô hình giao tiếp theo kiểu publish–subscribe [21]. Trong mô hình này, client có thể đăng ký (subscribe) vào các kênh như topic hoặc queue, và server sẽ gửi thông điệp đến đúng các client đã đăng ký.
+Trong hệ sinh thái Spring Boot, STOMP được tích hợp sẵn thông qua annotation @EnableWebSocketMessageBroker, cho phép xây dựng hệ thống message broker một cách dễ dàng. Thông thường, các endpoint có tiền tố /topic/... được sử dụng cho việc broadcast tới nhiều client, trong khi /user/queue/... được dùng để gửi thông điệp cá nhân hóa đến từng người dùng cụ thể.
+
+2.8.3 SockJS (Cơ chế dự phòng)
+SockJS là một thư viện JavaScript cung cấp cơ chế dự phòng (fallback) trong trường hợp trình duyệt hoặc môi trường mạng không hỗ trợ WebSocket thuần. Khi không thể thiết lập kết nối WebSocket, SockJS sẽ tự động chuyển sang các cơ chế thay thế như long-polling hoặc XHR streaming để đảm bảo duy trì khả năng giao tiếp giữa client và server [21].
+Spring Boot hỗ trợ tích hợp SockJS thông qua phương thức .withSockJS() khi đăng ký endpoint WebSocket, giúp tăng khả năng tương thích của hệ thống trên nhiều môi trường trình duyệt và mạng khác nhau.
+
+2.8.4 Vai trò trong SmartRental
+Trong hệ thống SmartRental, WebSocket kết hợp với STOMP được sử dụng để triển khai cơ chế thông báo thời gian thực cho người dùng. Backend sử dụng lớp SimpMessagingTemplate để gửi thông điệp đến các client thông qua phương thức convertAndSendToUser(), đảm bảo mỗi người dùng chỉ nhận được các thông báo liên quan đến mình.
+Các sự kiện được xử lý theo thời gian thực bao gồm: tạo hóa đơn mới, nhắc nhở thanh toán, yêu cầu ký hợp đồng và cảnh báo hợp đồng sắp hết hạn. Ở phía frontend, ứng dụng sử dụng thư viện @stomp/stompjs để thiết lập kết nối tới endpoint /ws và đăng ký nhận thông báo tại kênh /user/queue/notifications.
+Cơ chế này giúp hệ thống cung cấp trải nghiệm người dùng mượt mà và tức thời, đồng thời giảm tải cho các API polling truyền thống.
+2.9 Dịch vụ lưu trữ hình ảnh — Cloudinary
+2.9.1 Khái niệm
+Cloudinary là một nền tảng quản lý và phân phối tài nguyên đa phương tiện trên nền tảng đám mây (Cloud-based Media Management), cho phép lưu trữ, xử lý và phân phối hình ảnh hoặc video một cách hiệu quả [22]. Thông qua hệ thống API mạnh mẽ, Cloudinary hỗ trợ các chức năng như tải lên (upload), lưu trữ, biến đổi (transform) và phân phối nội dung thông qua mạng CDN (Content Delivery Network) toàn cầu.
+Một trong những ưu điểm nổi bật của Cloudinary là khả năng tự động tối ưu hóa hình ảnh, bao gồm nén dung lượng, chuyển đổi định dạng phù hợp với thiết bị và tạo các phiên bản ảnh khác nhau (như thumbnail) theo yêu cầu. Nhờ đó, hệ thống có thể cải thiện hiệu năng tải trang và trải nghiệm người dùng mà không cần xử lý thủ công tại phía server [22].
+2.9.2 Vai trò trong SmartRental
+Trong hệ thống SmartRental, Cloudinary được sử dụng làm giải pháp lưu trữ và quản lý toàn bộ hình ảnh thay vì lưu trữ cục bộ trên máy chủ. Đối với ảnh đại diện người dùng, hệ thống cung cấp chức năng uploadAvatar() để tải ảnh lên thư mục smart-rental/avatars trên Cloudinary và lưu lại URL trả về trong cơ sở dữ liệu.
+Đối với hình ảnh khu trọ và phòng trọ, hệ thống hỗ trợ tải lên nhiều ảnh cùng lúc thông qua hàm uploadImages(), sau đó hiển thị các hình ảnh này trên trang chi tiết nhằm cung cấp thông tin trực quan cho người dùng. Ngoài ra, Cloudinary còn được sử dụng trong quy trình eKYC khi lưu trữ ảnh hai mặt của CCCD, từ đó cung cấp URL cho dịch vụ FPT.AI OCR thực hiện trích xuất thông tin.
+Bên cạnh đó, hệ thống cũng áp dụng Cloudinary để lưu trữ ảnh chụp đồng hồ điện và nước nhằm xác minh chỉ số tiêu thụ, góp phần tăng tính minh bạch trong việc tính toán hóa đơn. Việc sử dụng Cloudinary giúp giảm tải cho server backend do không cần lưu trữ file ảnh trực tiếp, đồng thời tận dụng CDN toàn cầu để tăng tốc độ truy cập và đơn giản hóa quá trình triển khai thông qua các API sẵn có.
+2.10 Công nghệ hỗ trợ phát triển và triển khai hệ thống
+2.10.1 Công nghệ Container (Docker)
+2.10.1.1 Khái niệm
+Docker là một nền tảng mã nguồn mở hỗ trợ việc đóng gói, phân phối và triển khai ứng dụng dưới dạng các container. Container là các môi trường thực thi nhẹ, cô lập, bao gồm toàn bộ mã nguồn, thư viện và các phụ thuộc cần thiết để ứng dụng có thể chạy nhất quán trên nhiều môi trường khác nhau [13].
+Khác với công nghệ máy ảo truyền thống (Virtual Machine), Docker container chia sẻ chung nhân hệ điều hành (kernel) của máy chủ, từ đó giúp giảm đáng kể chi phí tài nguyên và thời gian khởi động. Docker cho phép các nhà phát triển xây dựng ứng dụng một lần và triển khai đồng nhất từ môi trường phát triển, kiểm thử cho đến môi trường sản xuất.
+Trong đề tài Smart Rental, Docker được sử dụng để đóng gói các thành phần của hệ thống backend Spring Boot, giúp quá trình triển khai và vận hành hệ thống trở nên linh hoạt, nhất quán và dễ kiểm soát.
+2.10.1.2 Các tính năng chính
+- Tính nhất quán môi trường
+Docker đảm bảo ứng dụng hoạt động đồng nhất trên mọi môi trường triển khai, tránh các lỗi phổ biến do khác biệt cấu hình giữa môi trường phát triển và môi trường sản xuất. Điều này đặc biệt quan trọng trong các hệ thống phức tạp có nhiều thành phần như Smart Rental.
+- Khả năng triển khai nhanh và linh hoạt
+Các container Docker có thời gian khởi động nhanh, cho phép hệ thống dễ dàng mở rộng hoặc thu hẹp tài nguyên theo nhu cầu sử dụng. Docker cũng hỗ trợ tích hợp với các công cụ CI/CD, giúp tự động hóa quá trình build, test và deploy ứng dụng.
+- Tách biệt và cô lập ứng dụng
+Mỗi container hoạt động trong một không gian độc lập, hạn chế sự xung đột giữa các ứng dụng hoặc dịch vụ khác nhau. Điều này giúp nâng cao tính ổn định và an toàn trong quá trình vận hành hệ thống.
+2.10.2 Quản lý phiên bản mã nguồn (Git & GitHub)
+2.10.2.1 Khái niệm
+Git là một hệ thống quản lý phiên bản phân tán (Distributed Version Control System – DVCS), được thiết kế nhằm theo dõi lịch sử thay đổi của mã nguồn trong suốt vòng đời phát triển phần mềm. Git cho phép nhiều lập trình viên cùng làm việc song song trên một dự án mà không gây xung đột dữ liệu [14].itHub là một nền tảng lưu trữ và quản lý mã nguồn dựa trên Git, cung cấp các dịch vụ hỗ trợ làm việc nhóm, kiểm soát phiên bản và quản lý dự án phần mềm trên môi trường trực tuyến. GitHub đóng vai trò như một kho mã nguồn trung tâm, giúp đồng bộ và chia sẻ mã nguồn giữa các thành viên trong nhóm phát triển.
+Trong đề tài Smart Rental, Git và GitHub được sử dụng để quản lý mã nguồn toàn bộ hệ thống, đảm bảo việc phát triển, chỉnh sửa và mở rộng phần mềm được kiểm soát chặt chẽ và có thể truy vết.
+2.10.2.2 Các tính năng chính
+- Quản lý lịch sử và truy vết thay đổi
+Git lưu lại toàn bộ lịch sử thay đổi của mã nguồn, cho phép dễ dàng theo dõi, so sánh và khôi phục các phiên bản trước khi cần thiết. Điều này giúp giảm thiểu rủi ro mất mát dữ liệu trong quá trình phát triển.
+- Hỗ trợ làm việc nhóm hiệu quả
+Git hỗ trợ cơ chế nhánh (branch) và gộp nhánh (merge), cho phép các thành viên phát triển các chức năng độc lập mà không ảnh hưởng đến mã nguồn chính. GitHub bổ sung các tính năng như Pull Request và Code Review, giúp nâng cao chất lượng mã nguồn và hiệu quả phối hợp nhóm.
+- Tích hợp công cụ phát triển và triển khai
+GitHub có khả năng tích hợp với nhiều công cụ khác như CI/CD, Docker và các nền tảng cloud, hỗ trợ tự động hóa quy trình xây dựng, kiểm thử và triển khai hệ thống. Điều này góp phần nâng cao hiệu suất phát triển và đảm bảo tính ổn định của hệ thống Smart Rental.
+2.10.3 Tích hợp và triển khai liên tục (CI/CD)
+2.10.3.1 Khái niệm
+CI/CD (Continuous Integration / Continuous Deployment) là một tập hợp các phương pháp và công cụ nhằm tự động hóa quá trình tích hợp, kiểm thử và triển khai phần mềm trong suốt vòng đời phát triển hệ thống. CI/CD giúp đảm bảo rằng các thay đổi trong mã nguồn được kiểm tra và tích hợp liên tục, từ đó giảm thiểu lỗi và rút ngắn thời gian đưa sản phẩm vào vận hành thực tế.
+Trong đó, Continuous Integration (CI) tập trung vào việc tự động hóa quá trình xây dựng (build) và kiểm thử ứng dụng mỗi khi có thay đổi mã nguồn. Continuous Deployment (CD) mở rộng quá trình này bằng cách tự động triển khai phiên bản đã được kiểm thử lên môi trường chạy thực tế hoặc môi trường tiền sản xuất.
+Với sự hỗ trợ của các nền tảng như GitHub Actions, CI/CD có thể được tích hợp trực tiếp vào hệ thống quản lý mã nguồn, cho phép kiểm soát và tự động hóa quy trình phát triển phần mềm một cách hiệu quả và nhất quán.
+2.10.3.2 Vai trò trong hệ thống Smart Rental
+Trong hệ thống Smart Rental, CI/CD đóng vai trò hỗ trợ quan trọng trong việc nâng cao chất lượng và tính ổn định của quá trình phát triển backend. Thông qua việc tích hợp CI/CD với GitHub, mỗi thay đổi trong mã nguồn đều có thể được tự động kiểm tra và đánh giá trước khi đưa vào nhánh chính của hệ thống.
+CI/CD giúp giảm thiểu rủi ro phát sinh lỗi do thay đổi mã nguồn đột ngột, đồng thời đảm bảo rằng các thành phần như backend Spring Boot và cấu hình Docker luôn được xây dựng và kiểm thử theo một quy trình thống nhất. Điều này đặc biệt hữu ích trong các hệ thống có nhiều thành phần tích hợp như Smart Rental, nơi backend phải đồng thời tương tác với cơ sở dữ liệu, Blockchain và các dịch vụ bên ngoài.
+Ngoài ra, việc áp dụng CI/CD còn tạo nền tảng thuận lợi cho việc mở rộng hệ thống trong tương lai, chẳng hạn như tự động hóa triển khai trên môi trường Cloud hoặc Container. Mặc dù trong phạm vi đề tài, CI/CD chủ yếu được sử dụng ở mức hỗ trợ quy trình phát triển, nhưng đây là một hướng tiếp cận phù hợp với xu hướng DevOps hiện đại và góp phần nâng cao tính chuyên nghiệp của hệ thống Smart Rental.
+CHƯƠNG 3: PHÂN TÍCH 
+3.1 Mô hình UseCase tổng quát
+Hình 3.1. Sơ đồ Use Case tổng quát của SmartRental
+3.2 Danh sách các tác nhân và mô tả
+Bảng 3.1 Danh sách tác nhân và mô tả
+STT
+Tác nhân
+Mô tả chức năng
+1
+Khách thuê
+Người có nhu cầu tìm kiếm phòng trọ, ở một mình hoặc ở gia đình, quản lý thông tin cá nhân, thanh toán và tra cứu hoá đơn trọ thuê.
+2
+Chủ trọ
+Người quản lý các khu trọ, phòng trọ, hợp đồng và thông tin người thuê. Chủ trọ có thể tạo hợp đồng thuê trọ, quản lý hoá đơn, đăng tin thuê trọ và thống kê tình trạng cho thuê.
+3
+Quản trị viên
+Người có thể kiểm soát các người dùng hệ thống, xử lý tài khoản vi phạm, xem Logs BlockChain. 
+4
+Khách vãng lai
+Người có thể tìm kiếm các phòng trọ, xem các bài đăng cho thuê trọ.
+3.3 Danh sách UseCase chính và mô tả
+Bảng 3.2 Danh sách Use Case và mô tả
+ID
+Tên Use Case
+Tác nhân
+Ghi chú
+UC001
+Xem và tải hợp đồng thuê trọ
+Khách vãng lai, khách thuê
+Xem và tải hợp đồng thuê trọ khi muốn xem hợp đồng của 1 phòng trọ
+UC002
+Cập nhật thông tin cá nhân
+Khách thuê, chủ trọ
+Cập nhật thông tin cá nhận khi có sự thay đổi
+UC003
+Lên lịch thuê trọ
+Khách thuê
+Lên lịch để xem phòng trọ trước khi quyết định thuê phòng trọ
+UC004
+Ký hợp đồng thuê trọ
+Khách thuê
+Ký hợp đồng thuê trọ sau khi đồng ý các điều khoản
+UC005
+Gửi yêu cầu thêm người vào phòng trọ
+Khách thuê
+Gửi yêu cầu thêm người ở ghép cho chủ trọ
+UC006
+Yêu cầu gia hạn hợp đồng
+Khách thuê
+Yêu cầu gia hạn thêm hợp đồng khi muốn thuê phòng tiếp
+UC007
+Yêu chấm dứt hợp đồng
+Khách thuê
+Yêu cầu chấm dứt hợp đồng khi không muốn thuê tiếp
+UC008
+Thanh toán hóa đơn
+Khách thuê
+Thanh toán hóa đơn khi đến tháng đóng tiền
+UC009
+Thêm khu trọ
+Chủ trọ
+Thêm khu trọ để cho thuê và quản lý
+UC010
+Thêm phòng trọ
+Chủ trọ
+Thêm phòng trọ để cho thuê và quản lý
+UC011
+Tạo hợp đồng thuê 
+Chủ trọ
+Tạo hợp đồng cho khách thuê
+UC012
+Cập nhật hợp đồng thuê 
+Chủ trọ
+Cập nhật các thông tin trên hợp đồng
+3.4 Đặc tả và yêu cầu chức năng của UseCase
+3.4.1 UC001 Xem và tải hợp đồng thuê trọ
+3.4.1.1 Đặc tả UC001
+Tên use case: Xem và tải hợp đồng thuê trọ
+Actor: Khách vãng lai, khách thuê
+Mô tả: Khách vãng lai và khách thuê có thể xem và tải hợp đồng thuê trọ của một phòng trọ cụ thể
+Precondition:  Đã tìm thấy phòng trọ cần xem và tải hợp đồng
+Postcondition: Xem được hợp đồng thuê trọ và tải hợp đồng về máy của khách vãng lai hoặc khách thuê
+Basic flow
+Actor
+System
+1. Click/Chọn vào phòng trọ cần xem và tải hợp đồng
+2. Hiển thị thông tin của phòng trọ bao gồm: hình ảnh, vị trí, diện tích, giá cả, mô tả phòng trọ, số tiền cọc, số điện thoại liên hệ, bình luận, các phòng trọ tương tự,….
+3. Click nút “Hợp đồng thuê trọ”
+4. Hiển thị thông tin hợp đồng và không có các thông tin của chủ trọ và khách thuê.
+5. Đọc hợp đồng và click nút tải về
+6. Tạo file hợp đồng(PDF)
+7. File hợp đồng được tải xuống thiết bị
+3.4.1.2 Sơ đồ
+3.4.2 UC002 Cập nhật thông tin cá nhân
+3.4.2.1 Đặc tả UC002
+Tên use case: Cập nhật thông tin cá nhân
+Actor: Chủ trọ, khách thuê
+Mô tả: Chủ trọ, khách thuê cập nhật lại các thông tin cá nhân khi có sự thay đổi, điều chỉnh
+Precondition:  Đã đăng nhập thành công
+Postcondition: Thông tin sau khi cập nhật sẽ được lưu lên hệ thống, và hiển thị lại thông tin đã thay đổi
+Basic flow
+Actor
+System
+1. Click/Chọn “Thông tin cá nhân”
+2. Hiển thị thông tin của người dùng bao gồm: Họ và tên, Cccd, số điện thoại, địa chỉ thường trú,…
+3. Thay đổi các thông tin cần thiết
+4. Click “Cập nhật thông tin”
+5. Hệ thống kiểm tra xem các thông tin đã đầy đủ chưa và tính hợp lệ của dữ liệu
+6. Cập nhật lại thông tin mới vào hệ thống
+7. Hiển thị thông báo” Cập nhật thành công”
+Alternate flow
+5.1 Nếu dữ liệu không đầy đủ hoặc không hợp lệ
+5.2 Hiển thị thông báo “Vui lòng kiểm tra tính hợp lệ của dữ liệu”.
+5.3 Quay lại bước 2
+3.4.2.2 Sơ đồ
+3.4.3 UC003 Lên lịch thuê trọ
+3.4.3.1 Đặc tả UC003
+Tên use case: Lên lịch thuê trọ
+Actor: Khách thuê
+Mô tả: Khách thuê lên lịch đi xem trọ cùng với chủ trọ
+Precondition:  1. Đã đăng nhập thành công
+                         2. Đã tìm thấy phòng trọ phù hợp
+Postcondition: Thông tin lịch hẹn sẽ được lưu và hiển thị bên chủ trọ với trạng thái chờ xác nhận.
+Basic flow
+Actor
+System
+1. Click/Chọn chức năng “Lên lịch xem trọ”
+2. Hệ thống hiển thị biểu mẫu để lên lịch xem trọ bao gồm: Ngày và giờ xem trọ, ghi chú,…
+3. Điền đầy đủ các thông tin ngày giờ, và lưu ý cho củ trọ. 
+4. Kiểm tra thông tin ngày giờ(Ngày và giờ xem trọ > Ngày và giờ hiện tại)  và nội dung ghi chú
+5. Hệ thống lưu thông tin lịch hẹn lại và hiển thị bên chủ trọ với trạng thái “PENDING”
+Alternate flow
+4.1 Nếu ngày và giờ xem trọ không lớn hơn ngày và giờ hiện tại.
+4.2. Hiển thị thông báo ”Ngày và giờ xem trọ phải lớn hơn ngày và giờ hiện tại”.
+4.3 Quay lại bước 2.
+3.4.3.2 Sơ đồ
+3.4.4 UC004 Ký hợp đồng thuê trọ
+3.4.4.1 Đặc tả UC004
+Tên use case: Ký hợp đồng thuê trọ
+Actor: Khách thuê 
+Mô tả: Khách thuê ký hợp đồng điện tử được tạo trước khi đã hoàn thành thỏa thuận.
+Precondition:  Chủ trọ đã tạo hợp đồng điện tử trước đó.
+Postcondition: Chữ ký sẽ được lưu vào CSDL và sẽ thêm vào hợp đồng. Khi đến ngày bắt đầu thì sẽ chuyển trạng thái hợp đồng thành “ACTIVE”
+Basic flow
+Actor
+System
+1. Chọn chức năng”Ký hợp đồng điện tử”
+2. Hiển thị hợp đồng với đầy đủ các thông tin, nội dung
+3. Chọn lấy mã OTP qua email để ký hợp đồng
+4. Gửi mã OTP qua email và thông báo”Mã OTP đã được gửi, vui lòng kiểm tra” và hiển thị ô nhập mã OTP
+5. Nhập mã OTP và ô xác thực
+6. Kiểm tra mã OTP
+7. Hiển thị ô ký tên 
+8. Ký vào ô chữ ký
+9. Chọn”Xác nhận” 
+10. Lưu chữ ký vào CSDL
+11. Hiển thị thông báo”Ký hợp đồng thành công”
+Alternate flow
+6.1 Nếu mã OTP không đúng
+6.2 Hiển thị thông báo”Mã OTP sai”.
+8.3 Quay lại bước 2
+3.4.4.2 Sơ đồ
+3.4.5 UC005 Gửi yêu cầu thêm người vào phòng trọ
+3.4.5.1 Đặc tả UC005
+Tên use case: Gửi yêu cầu thêm người vào phòng trọ
+Actor: Khách thuê
+Mô tả: Khách thuê gửi yêu cầu thêm người vào phòng trọ cho chủ trọ khi có nhu cầu.
+Precondition:  1. Khách thuê mới phải có tài khoản và đã có ví Metamask.
+                         2. Số khách thuê không được vượt quá quy định của phòng trọ.
+Postcondition: Yêu cầu sẽ được lưu và hiển thị bên chủ trọ với trạng thái chờ xác nhận.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Quản lý phòng trọ”
+2. Hệ thống hiển thị thông tin chi tiết phòng trọ và danh sách thành viên hiện đang cư trú trong phòng.
+3. Chọn chức năng “Yêu cầu thêm người”
+4. Kiểm tra số lượng khách thuê đã đủ chưa.
+5. Hiển thị biểu mẫu Thêm người ở ghép gồm các thông tin: Tên, Ngày sinh, Cccd, Cấp ngày, Nơi cấp, Số điện thoại, Hộ khẩu thường trú 
+6. Điền đầy đủ các thông tin cần thiết.
+7. Chọn “Xác nhận”
+8. Kiểm tra dữ liệu đã được nhập đầy đủ không
+9. Lưu yêu cầu vào hệ thống và hiển thị bên chủ trọ.
+10. Hiển thị thông báo “Tạo yêu cầu thêm người thành công”
+Alternate flow
+4.1 Nếu số lượng đã đạt tối đa.
+4.2 Hiển thị thông báo “Số lượng khách thuê của phòng này đã đạt tối đa”.
+4.3 Quay lại bước 2
+8.1 Nếu dữ liệu không đầy đủ
+8.2 Hiển thị thông báo”Vui lòng điền đầy đủ thông tin”.
+8.3 Quay lại bước 5
+3.4.5.2 Sơ đồ
+3.4.6 UC006 Yêu cầu gia hạn hợp đồng
+3.4.6.1 Đặc tả UC006
+Tên use case: Yêu cầu gia hạn hợp đồng
+Actor: Khách thuê
+Mô tả: Khách thuê gửi yêu cầu gia hạn hợp đồng thuê trọ cho chủ trọ khi có nhu cầu thuê tiếp.
+Precondition:  1. Khách thuê đã có hợp đồng thuê trọ.
+                         2. Ngày gửi yêu cầu phải trước 45 ngày trước khi kết thúc hợp đồng.
+                         3. Đang ở giao diện “Quản lý phòng trọ” 
+Postcondition: Yêu cầu sẽ được lưu và hiển thị bên chủ trọ với trạng thái chờ xác nhận.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Gia hạn hợp đồng”
+2. Hiển thị hợp đồng với đầy đủ các thông tin, nội dung
+3. Chọn lấy mã OTP qua email để ký hợp đồng
+4. Gửi mã OTP qua email và thông báo”Mã OTP đã được gửi, vui lòng kiểm tra” và hiển thị ô nhập mã OTP
+5. Nhập mã OTP và ô xác thực
+6. Kiểm tra mã OTP
+7. Hiển thị ô ký tên 
+8. Ký vào ô chữ ký
+9. Chọn”Xác nhận” 
+10. Kiểm tra sự trừng khớp giữ chữ ký cũ và chữ ký mới >= 70% 
+11. Hiển thị thông báo”Gửi yêu cầu thành công”
+Alternate flow
+6.1 Nếu mã OTP không đúng
+6.2 Hiển thị thông báo”Mã OTP sai”.
+8.3 Quay lại bước 2
+10.1 Nếu chữ ký cũ và chữ ký mới k khớp với nhau hơn 70%
+10.2 Hiển thị thông báo”Chữ ký không khớp”.
+10.3 Quay lại bước 2
+3.4.6.2 Sơ đồ
+3.4.7 UC007 Yêu cầu chấm dứt hợp đồng
+3.4.7.1 Đặc tả UC007
+Tên use case: Yêu cầu chấm dứt hợp đồng
+Actor: Khách thuê
+Mô tả: Khách thuê gửi yêu cầu chấm dứt hợp đồng thuê trọ cho chủ trọ khi không có nhu cầu thuê tiếp.
+Precondition:  1. Khách thuê đã có hợp đồng thuê trọ.
+                         2. Ngày gửi yêu cầu phải trước 45 ngày trước khi kết thúc hợp đồng.
+                         3. Đang ở giao diện “Quản lý phòng trọ”
+Postcondition: Yêu cầu sẽ được lưu và hiển thị bên chủ trọ.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Chấm dứt hợp đồng”
+2. Hiển thị hợp đồng với đầy đủ các thông tin, nội dung
+3. Chọn lấy mã OTP qua email để ký hợp đồng
+4. Gửi mã OTP qua email và thông báo”Mã OTP đã được gửi, vui lòng kiểm tra” và hiển thị ô nhập mã OTP
+5. Nhập mã OTP và ô xác thực
+6. Kiểm tra mã OTP
+7. Hiển thị ô ký tên 
+8. Ký vào ô chữ ký
+9. Chọn”Xác nhận” 
+10. Kiểm tra sự trừng khớp giữ chữ ký cũ và chữ ký mới >= 70% 
+11. Hiển thị thông báo”Gửi yêu cầu thành công”
+Alternate flow
+6.1 Nếu mã OTP không đúng
+6.2 Hiển thị thông báo”Mã OTP sai”.
+8.3 Quay lại bước 2
+10.1 Nếu chữ ký cũ và chữ ký mới k khớp với nhau hơn 70%
+10.2 Hiển thị thông báo”Chữ ký không khớp”.
+10.3 Quay lại bước 2
+3.4.7.2 Sơ đồ
+3.4.8 UC008 Thanh toán hóa đơn 
+3.4.8.1 Đặc tả UC008
+Tên use case: Thanh toán hóa đơn
+Actor: Khách thuê
+Mô tả: Khách thuê thanh toán hóa đơn khi đến ngày đóng tiền trong hợp đồng.
+Precondition:  1. Khách thuê đã có hợp đồng thuê trọ.
+                         2. Đang ở giao diện “Quản lý phòng trọ”
+Postcondition: Thông tin hóa đơn sẽ được lưu vào hệ thống, và không còn thông báo chưa đóng tiền trọ.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Thanh toán hóa đơn”
+2. Hiển thị thông tin hóa đơn trong tháng hiện tại bao gồm: Tiền trọ, tiền điện, tiền nước, tiền mạng, tổng tiền.
+3. Chọn “Thanh toán”
+4. Hiển thị mã QR
+5. Quét mã QR để thanh toán
+6. Hiển thị thông báo”Thanh toán thành công” .
+3.4.8.2 Sơ đồ
+3.4.9 UC009 Thêm khu trọ
+3.4.9.1 Đặc tả UC009
+Tên use case: Thêm khu trọ
+Actor: Chủ trọ
+Mô tả: Chức năng này cho phép chủ trọ tạo mới một khu trọ (tòa nhà/nhà nguyên căn) vào hệ thống để bắt đầu quản lý và thêm các phòng trọ con bên trong.
+Precondition:  1. Chủ trọ đăng nhập vào hệ thống.
+                         2. Tài khoản chủ trọ đang ở trạng thái hoạt động (không bị khóa).
+Postcondition: Thông tin khu trọ mới được lưu vào hệ thống.
+Basic flow
+Actor
+System
+1. Chọn chức năng "Quản lý khu trọ" trên thanh menu.
+ 2. Hệ thống hiển thị các khu trọ thuộc sở hữu của chủ trọ, nếu chưa có khu trọ hiển thị dòng chữ “Bạn chưa có khu trọ nào” .
+3. Chọn chức năng “Thêm khu trọ”
+4. Hiển thị biểu mẫu tạo khu trọ mới gồm:
+       - Tên khu trọ
+       - Địa chỉ chi tiết 
+      - Loại hình (
+      - Mô tả tổng quan
+      - Giá dịch vụ chung (Điện, Nước, Internet, Vệ sinh)
+      - Tiện ích chung (Thang máy, Hầm xe, Camera...)
+      - Hình ảnh tổng quan khu trọ.
+5. Nhập  các thông tin vào biểu mẫu
+6. Chọn nút “Tạo khu trọ”
+7. Kiểm tra dữ liệu đã được nhập đầy đủ không và tính hợp lệ của dữ liệu.
+8. Lưu khu trọ mới vào cơ sở dữ liệu
+9. Hiển thị thông báo “Thêm khu trọ thành công”
+Alternate flow
+7.1 Nếu dữ liệu không đầy đủ hoặc không hợp lệ
+7.2 Hiển thị thông báo “Vui lòng kiểm tra tính hợp lệ của dữ liệu”.
+7.3 Quay lại bước 4
+3.4.9.2 Sơ đồ
+3.4.10 UC010 Thêm khu trọ
+3.4.10.1 Đặc tả UC0010
+Tên use case: Thêm khu trọ
+Actor: Chủ trọ
+Mô tả: Chức năng này cho phép chủ trọ tạo mới một khu trọ (tòa nhà/nhà nguyên căn) vào hệ thống để bắt đầu quản lý và thêm các phòng trọ con bên trong.
+Precondition:  1. Chủ trọ đăng nhập vào hệ thống.
+                         2. Tài khoản chủ trọ đang ở trạng thái hoạt động (không bị khóa).
+                         3. Đang ở giao diện “Quản lý khu trọ”
+Postcondition: Thông tin khu trọ mới được lưu vào hệ thống.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Thêm phòng trọ”
+2. Hiển thị biểu mẫu tạo phòng trọ mới gồm:
+       - Tên phòng
+       - Giá phòng 
+      -Diện tích
+      - Tiện ích.
+- Hình ảnh tổng quan khu trọ.
+- Số lượng người tối đa.
+3. Nhập các thông tin vào biểu mẫu
+4. Chọn nút “Tạo khu trọ”
+5. Kiểm tra dữ liệu đã được nhập đầy đủ không và tính hợp lệ của dữ liệu.
+6. Lưu phòng trọ mới vào cơ sở dữ liệu
+7. Hiển thị thông báo “Thêm phòng trọ thành công”
+Alternate flow
+5.1 Nếu dữ liệu không đầy đủ hoặc không hợp lệ
+5.2 Hiển thị thông báo “Vui lòng kiểm tra tính hợp lệ của dữ liệu”.
+5.3 Quay lại bước 2
+3.4.10.2 Sơ đồ
+3.4.11 UC011 Tạo hợp đồng thuê
+3.4.11.1 Đặc tả UC0011
+Tên use case: Tạo hợp đồng thuê
+Actor: Chủ trọ
+Mô tả: Chức năng này cho phép chủ trọ tạo lập một hợp đồng thuê phòng điện tử sau khi đã đạt được thỏa thuận với khách thuê. 
+Precondition:  1. Chủ trọ đã đăng nhập vào hệ thống.
+                         2. Chủ trọ đã đồng ý với yêu cầu thuê trọ của khách thuê
+Postcondition: 1. Thông tin hợp đồng mới sẽ được lưu vào trong hệ thống với trạng thái “PENDING_SIGNATURE”.
+                          2. Hệ thống gửi thông báo yêu cầu ký hợp đồng đến tài khoản của khách thuê.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Tạo hợp đồng điện tử”
+2. Hệ thống hiển thị danh sách các yêu cầu thuê phòng 
+3. Chọn khách thuê cần tạo hợp đồng
+4. Chọn “Xác nhận”
+5. Hiển thị bản hợp đồng đã được điền các thông tin cơ bản của khách thuê và chủ trọ (CCCD, tên, địa chỉ ví, thông tin ).
+6. Điền các thông tin còn thiếu như: thời gian bắt đầu và kết thúc hợp đồng, giá thuê, tiền cọc, các điều khoản.
+7. Chọn “Tạo hợp đồng”
+8. Kiểm tra dữ liệu đã được nhập đầy đủ không
+9. Kiểm tra tính hợp lệ của dữ liệu (Ngày bắt đầu >= Ngày hiện tại và Ngày kết thúc > Ngày bắt đầu, số tiền cọc và tiền thuê không âm)
+10. Lưu hợp đồng mới vào CSDL với trạng thái “PENDING_SIGNATURE”
+11. Tạo 2 bản PDF để gửi cho bên khách thuê và chủ trọ.
+12. Thông báo tạo hợp đồng thành công
+Alternate flow
+8.1 Nếu dữ liệu không đầy đủ
+8.2 Hiển thị thông báo”Vui lòng điền đầy đủ thông tin”.
+8.3 Quay lại bước 5
+9.1 Nếu ngày bắt đầu nhỏ hơn ngày hiện tại hoặc lớn hơn ngày kết thúc hợp đồng.
+9.2. Hiển thị thông báo ”Ngày bắt đầu phải bằng hoặc sau ngày hôm nay” hoặc“Ngày bắt đầu phải trước ngày kết thúc hợp đồng”.
+8.3 Quay lại bước 5
+3.4.11.2 Sơ đồ
+3.4.12 UC012 Cập nhật hợp đồng thuê
+3.4.12.1 Đặc tả UC0012
+Tên use case: Cập nhật hợp đồng thuê
+Actor: Chủ trọ
+Mô tả: Chức năng này cho phép chủ trọ cập nhật hợp đồng thuê phòng điện tử. 
+Precondition:  1. Chủ trọ đã đăng nhập vào hệ thống.
+                         2. Chủ trọ đã đồng ý với yêu cầu thuê trọ của khách thuê
+Postcondition: 1. Thông tin hợp đồng mới sẽ được lưu vào trong hệ thống với trạng thái “PENDING_SIGNATURE”.
+                          2. Hệ thống gửi thông báo yêu cầu ký hợp đồng đến tài khoản của khách thuê.
+Basic flow
+Actor
+System
+1. Chọn chức năng “Tạo hợp đồng điện tử”
+2. Hệ thống hiển thị danh sách các yêu cầu thuê phòng 
+3. Chọn khách thuê cần tạo hợp đồng
+4. Chọn “Xác nhận”
+5. Hiển thị bản hợp đồng đã được điền các thông tin cơ bản của khách thuê và chủ trọ (CCCD, tên, địa chỉ ví, thông tin ).
+6. Điền các thông tin còn thiếu như: thời gian bắt đầu và kết thúc hợp đồng, giá thuê, tiền cọc, các điều khoản.
+7. Chọn “Tạo hợp đồng”
+8. Kiểm tra dữ liệu đã được nhập đầy đủ không
+9. Kiểm tra tính hợp lệ của dữ liệu (Ngày bắt đầu >= Ngày hiện tại và Ngày kết thúc > Ngày bắt đầu, số tiền cọc và tiền thuê không âm)
+10. Lưu hợp đồng mới vào CSDL với trạng thái “PENDING_SIGNATURE”
+11. Tạo 2 bản PDF để gửi cho bên khách thuê và chủ trọ.
+12. Thông báo tạo hợp đồng thành công
+Alternate flow
+8.1 Nếu dữ liệu không đầy đủ
+8.2 Hiển thị thông báo”Vui lòng điền đầy đủ thông tin”.
+8.3 Quay lại bước 5
+9.1 Nếu ngày bắt đầu nhỏ hơn ngày hiện tại hoặc lớn hơn ngày kết thúc hợp đồng.
+9.2. Hiển thị thông báo ”Ngày bắt đầu phải bằng hoặc sau ngày hôm nay” hoặc“Ngày bắt đầu phải trước ngày kết thúc hợp đồng”.
+8.3 Quay lại bước 5
+3.4.11.2 Sơ đồ
+3.5 Sơ đồ lớp
+Hình 3.2. Sơ đồ lớp tổng quát của SmartRental
+TÀI LIỆU THAM KHẢO
+Các tài liệu Tiếng Việt
+Các tài liệu Tiếng Anh
+[2] C. Walls, Spring Boot in Action. Manning Publications, 2016.
+[4] F. Gutierrez, Pro Spring Boot 2: An Authoritative Guide to Building Microservices, Web and Enterprise Applications, and Best Practices. Apress, 2018.
+[5] M. Swan, Blockchain: Blueprint for a New Economy. O’Reilly Media, 2015.
+Các tài liệu từ Internet
+[1] Nhân Dân. (2025, 18 tháng 9). Mùa tựu trường, nhà trọ “lên ngôi”. Báo Nhân Dân điện tử. https://nhandan.vn/mua-tuu-truong-nha-tro-len-ngoi-post908917.html?gidzl=PvHlDqZfJ7bfWsiuIVzBV6gEPJnI-4ToTDffDrBxHt9zYsWn3liS8Io8FszRgKjyAzfbEJGMH1PsG-T8SW
+[3] Spring.io, Spring Boot Documentation. [Online]. Available: https://docs.spring.io/spring-boot/docs/current/reference/html/. [Accessed: 10-Jan-2026].
+[6] N. Szabo, “Smart Contracts,” 1994. [Online]. Available: https://www.fon.hum.uva.nl/rob/Courses/InformationInSpeech/CDROM/Literature/LOTwinterschool2006/szabo.best.vwh.net/smart.contracts.html
+[7] Ethereum Foundation, Ethereum Virtual Machine (EVM). [Online]. Available: https://ethereum.org/en/developers/docs/evm/
+[8] Ethereum Foundation, Solidity Documentation. [Online]. Available: https://docs.soliditylang.org/
+[9] Web3j, Web3j Java Ethereum API. [Online]. Available: https://docs.web3j.io/
+[10]Priya, S. (2025, February 7). What is ReactJS? Medium. https://medium.com/@sudhapriyaofficial/what-is-reactjs-1ac3282a60cb
+[11] Meta Platforms, Inc. (n.d.). React – A JavaScript library for building user interfaces. https://react.dev/
+[12]MariaDB Foundation. (n.d.). MariaDB server documentation. https://mariadb.org/
