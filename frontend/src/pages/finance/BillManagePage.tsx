@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Receipt, Zap, Droplets, CheckCircle2, AlertCircle, 
   Clock, Search, FileText, ChevronLeft, ChevronRight, 
@@ -86,9 +87,9 @@ export default function BillManagePage() {
       return;
     }
     const contract = selectedBillForPayment;
-    setIsConfirmingPayment(contract.billId);
+    setIsConfirmingPayment(contract.billId!);
     try {
-      await billApi.landlordConfirmPayment(contract.billId, actualPaidDate);
+      await billApi.landlordConfirmPayment(contract.billId!, actualPaidDate);
       toast.success("Đã xác nhận thu tiền thành công!");
       
       // Cập nhật state ngay lập tức

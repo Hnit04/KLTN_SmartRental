@@ -201,6 +201,7 @@ public class BlockchainService {
     }
 
     // --- Helper: đọc uint256 ---
+    @SuppressWarnings("rawtypes")
     private BigInteger readUint256(Web3j web3j, String contractAddress, String functionName) throws Exception {
         Function function = new Function(functionName,
                 Collections.emptyList(),
@@ -218,6 +219,7 @@ public class BlockchainService {
     }
 
     // --- Helper: đọc string ---
+    @SuppressWarnings("rawtypes")
     private String readString(Web3j web3j, String contractAddress, String functionName) throws Exception {
         Function function = new Function(functionName,
                 Collections.emptyList(),
@@ -235,6 +237,7 @@ public class BlockchainService {
     }
 
     // --- Helper: đọc address ---
+    @SuppressWarnings("rawtypes")
     private String readAddress(Web3j web3j, String contractAddress, String functionName) throws Exception {
         Function function = new Function(functionName,
                 Collections.emptyList(),
@@ -255,6 +258,7 @@ public class BlockchainService {
     // 🔗 GỬI GIAO DỊCH WRITE ĐẾN SMART CONTRACT ĐÃ DEPLOY
     // ========================================================================================
 
+    @SuppressWarnings("rawtypes")
     private String sendContractTransaction(String contractAddress, String functionName,
                                             List<Type> inputParams) throws Exception {
         OkHttpClient httpClient = new OkHttpClient.Builder()

@@ -297,7 +297,6 @@ export default function LoginPage() {
                 shape="rectangular"
                 logo_alignment="left"
                 width="100%"
-                disabled={isLoading}
               />
             </div>
           </div>
