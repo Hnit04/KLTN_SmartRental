@@ -1,123 +1,45 @@
-# ============================================
-# SmartRental CI - Kiểm tra code tự động
-# 
-# LUỒNG HOẠT ĐỘNG:
-#   Push code → CI tự kiểm tra → Render/Vercel tự deploy
-#   (Render và Vercel đã có CD riêng, CI chỉ lo kiểm tra)
-#
-# PATH FILTER:
-#   Sửa backend/ → chỉ chạy backend job
-#   Sửa frontend/ → chỉ chạy frontend job
-# ============================================
-
 name: SmartRental CI
 
 on:
   push:
     branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
 
 env:
   JAVA_VERSION: '21'
   NODE_VERSION: '20'
 
 jobs:
-  # ==================== BACKEND ====================
-  backend-ci:
-    name: ☕ Backend - Build & Test
-    runs-on: ubuntu-latest
-
-    # Chỉ chạy khi có thay đổi trong folder backend/
-    if: |
-      github.event_name == 'pull_request' ||
-      contains(github.event.head_commit.modified, 'backend/') ||
-      contains(github.event.head_commit.added, 'backend/')
-
-    defaults:
-      run:
-        working-directory: backend
-
-    services:
-      mariadb:
-        image: mariadb:11
-        env:
-          MYSQL_ROOT_PASSWORD: testroot
-          MYSQL_DATABASE: smart_rental_test
-          MYSQL_CHARACTER_SET_SERVER: utf8mb4
-          MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: ☕ Setup Java ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: maven
-
-      - name: 🔨 Build & Test
-        run: mvn clean verify -B
-        env:
-          DB_URL: jdbc:mariadb://localhost:3306/smart_rental_test?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8mb4
-          DB_USERNAME: root
-          DB_PASSWORD: testroot
-          JWT_SECRET: ci-test-secret-key-must-be-at-least-32-characters-long
-          GEMINI_API_KEY: test-key-ci
-          BLOCKCHAIN_PRIVATE_KEY: ""
-          GOOGLE_CLIENT_ID: test-client-id
-
-      # Nếu CI pass → Render sẽ tự detect push trên main và deploy
-      - name: ✅ CI Passed
-        run: echo "Backend build & test thành công! Render sẽ tự deploy."
-
-  # ==================== FRONTEND ====================
   frontend-ci:
-    name: 🎨 Frontend - Lint & Build
     runs-on: ubuntu-latest
-
-    # Chỉ chạy khi có thay đổi trong folder frontend/
-    if: |
-      github.event_name == 'pull_request' ||
-      contains(github.event.head_commit.modified, 'frontend/') ||
-      contains(github.event.head_commit.added, 'frontend/')
-
     defaults:
       run:
         working-directory: frontend
 
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 📦 Setup Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: 📥 Install
+      - name: Install
         run: |
-          rm -f package-lock.json
-          npm i
+          rm -rf node_modules package-lock.json
+          npm install --include=optional
 
-      - name: 🔍 Lint
+      - name: Lint
         run: npm run lint
         continue-on-error: true
 
-      - name: 🏗️ Build
+      - name: Build
         run: npm run build
-
-      # Nếu CI pass → Vercel sẽ tự detect push trên main và deploy
-      - name: ✅ CI Passed
-        run: echo "Frontend build thành công! Vercel sẽ tự deploy."
