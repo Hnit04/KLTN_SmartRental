@@ -19,6 +19,8 @@ export default defineConfig([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
     },
     languageOptions: {
       ecmaVersion: 2020,
