@@ -21,6 +21,10 @@ export default defineConfig([
       ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
+      'no-empty': 'warn',
+      'prefer-const': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
     languageOptions: {
       ecmaVersion: 2020,
