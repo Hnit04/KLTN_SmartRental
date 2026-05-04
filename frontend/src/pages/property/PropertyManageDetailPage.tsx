@@ -639,7 +639,7 @@ export default function PropertyManageDetailPage() {
                     </Button>
                   )}
 
-                  {room.status === 'AVAILABLE' || room.availableFromDate ? (
+                  {(room.status === 'AVAILABLE' || room.availableFromDate) && room.status !== 'MAINTENANCE' ? (
                     <Link to={`/landlord/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                       <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
                         <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ

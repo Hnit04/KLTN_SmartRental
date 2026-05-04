@@ -315,12 +315,24 @@ public class ContractService {
             trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
         }
 
+        // ✅ Map chi tiết danh sách hợp đồng sắp hết hạn
+        List<DashboardInsightsResponse.ExpiringContractDTO> expiringDetails = expiring.stream()
+                .map(c -> new DashboardInsightsResponse.ExpiringContractDTO(
+                        c.getId(),
+                        c.getRoom() != null ? c.getRoom().getName() : "?",
+                        c.getTenant() != null ? c.getTenant().getFullName() : "?",
+                        c.getEndDate() != null ? c.getEndDate().toString() : null,
+                        c.getEndDate() != null ? java.time.temporal.ChronoUnit.DAYS.between(now, c.getEndDate()) : null
+                ))
+                .collect(Collectors.toList());
+
         return DashboardInsightsResponse.builder()
                 .projectedRevenue(projectedRevenue)
                 .opportunityCost(opportunityCost)
                 .expiringContractsCount(expiringCount)
                 .latePaymentRoomsCount(latePaymentRooms)
                 .occupancyTrend(trend)
+                .expiringContracts(expiringDetails)
                 .build();
     }
 
@@ -334,6 +346,14 @@ public class ContractService {
     // --- Admin: Lấy tất cả hợp đồng ---
     public List<ContractResponse> getAllContracts() {
         return contractRepository.findAll().stream().map(c -> mapToResponse(c, null)).collect(Collectors.toList());
+    }
+
+    // ✅ Lịch sử hợp đồng theo phòng (cho chủ trọ)
+    public List<ContractResponse> getRoomContractHistory(Long roomId) {
+        List<Contract> contracts = contractRepository.findByRoomIdOrderByStartDateDesc(roomId);
+        return contracts.stream()
+                .map(c -> mapToResponse(c, null))
+                .collect(Collectors.toList());
     }
 
     // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---

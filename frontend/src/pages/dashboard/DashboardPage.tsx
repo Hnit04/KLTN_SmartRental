@@ -303,13 +303,33 @@ export default function DashboardPage() {
             )}
 
             {insights?.expiringContractsCount > 0 && (
-              <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group">
-                <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-amber-900 group-hover:text-amber-600 transition-colors">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
-                  <p className="text-xs text-amber-700">Trong 30 ngày tới. Cần liên hệ khách sớm.</p>
-                </div>
-              </Link>
+              <div className="space-y-2">
+                <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group">
+                  <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-amber-900 group-hover:text-amber-600 transition-colors">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
+                    <p className="text-xs text-amber-700">Trong 30 ngày tới. Cần liên hệ khách sớm.</p>
+                  </div>
+                </Link>
+                {insights.expiringContracts?.slice(0, 3).map((c: any) => (
+                  <Link
+                    key={c.contractId}
+                    to={`/landlord/contracts/${c.contractId}`}
+                    className="flex items-center gap-3 p-2.5 bg-amber-50/50 rounded-lg border border-amber-50 hover:border-amber-200 transition-all ml-8 text-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-800">Phòng {c.roomName}</span>
+                      <span className="text-gray-400 mx-1">·</span>
+                      <span className="text-gray-500">{c.tenantName}</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      c.daysLeft <= 7 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      còn {c.daysLeft} ngày
+                    </span>
+                  </Link>
+                ))}
+              </div>
             )}
 
             {occupancyRate < 100 && (

@@ -3,13 +3,14 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Edit, Users, MapPin, ShieldCheck, 
   ShieldAlert, AlertTriangle, Loader2, Trash2, CheckSquare,
-  Sparkles, ScrollText, ImagePlus, X, Eye, EyeOff
+  Sparkles, ScrollText, ImagePlus, X, Eye, EyeOff, History, FileSignature
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import type { Room, User, RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
 import { roomApi } from '@/api/roomApi';
+import { contractApi } from '@/api/contractApi';
 
 const Room360Viewer = lazy(() => import('@/components/property/Room360Viewer'));
 
@@ -48,6 +49,8 @@ export default function PropertyRoomDetailPage() {
   const [tenants, setTenants] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [contractHistory, setContractHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // === State cho Modal Sửa Phòng ===
   const [showEditModal, setShowEditModal] = useState(false);
@@ -103,6 +106,17 @@ export default function PropertyRoomDetailPage() {
       const roomData = (roomRes as any).data || roomRes;
       setRoom(roomData);
       setTenants((tenantsRes as any).data || tenantsRes || []);
+
+      // Lấy lịch sử thuê phòng
+      try {
+        setHistoryLoading(true);
+        const historyRes = await contractApi.getRoomHistory(roomId!);
+        setContractHistory((historyRes as any).data || historyRes || []);
+      } catch {
+        // Không hiện lỗi, chỉ để trống
+      } finally {
+        setHistoryLoading(false);
+      }
     } catch (error: any) {
       toast.error('Không thể tải thông tin phòng');
       console.error(error);
@@ -392,7 +406,15 @@ export default function PropertyRoomDetailPage() {
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            {(room.status === 'AVAILABLE' || room.availableFromDate) && room.status !== 'MAINTENANCE' && (
+              <Link to={`/landlord/contracts/create?roomId=${roomId}`}>
+                <Button className="bg-green-600 hover:bg-green-700 text-white">
+                  <FileSignature className="h-4 w-4 mr-2" />
+                  {room.availableFromDate && room.status !== 'AVAILABLE' ? 'Tạo HĐ đặt trước' : 'Tạo HĐ mới'}
+                </Button>
+              </Link>
+            )}
             <Button onClick={handleOpenEdit} variant="outline">
               <Edit className="h-4 w-4 mr-2" /> Sửa thông tin
             </Button>
@@ -438,11 +460,16 @@ export default function PropertyRoomDetailPage() {
                   room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
                   room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
                   room.status === 'HIDDEN' ? 'bg-gray-500 text-white' :
+                  room.status === 'MAINTENANCE' ? 'bg-amber-500 text-white' :
+                  room.status === 'RENTED' && room.availableFromDate ? 'bg-orange-500 text-white' :
                   'bg-red-500 text-white'
                 }`}>
                   {room.status === 'AVAILABLE' ? 'Đang trống' : 
                    room.status === 'RESERVED' ? 'Đang giữ chỗ' : 
-                   room.status === 'HIDDEN' ? 'Đã ẩn' : 'Đã cho thuê'}
+                   room.status === 'HIDDEN' ? 'Đã ẩn' :
+                   room.status === 'MAINTENANCE' ? '🔧 Đang bảo trì' :
+                   room.status === 'RENTED' && room.availableFromDate ? `Sắp trống (${new Date(room.availableFromDate).toLocaleDateString('vi-VN')})` :
+                   'Đã cho thuê'}
                 </span>
               </div>
             </div>
@@ -620,6 +647,74 @@ export default function PropertyRoomDetailPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lịch sử thuê phòng */}
+          <div className="bg-white rounded-2xl border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <History className="h-5 w-5 text-indigo-500" /> Lịch sử thuê phòng
+              </h2>
+              <span className="text-sm text-gray-500">
+                {contractHistory.length} hợp đồng
+              </span>
+            </div>
+
+            {historyLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : contractHistory.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                Phòng chưa có hợp đồng nào
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {contractHistory.map((contract: any) => {
+                  const statusMap: Record<string, { label: string; color: string }> = {
+                    ACTIVE: { label: 'Đang hiệu lực', color: 'bg-green-100 text-green-700' },
+                    PENDING_SIGNATURE: { label: 'Chờ ký', color: 'bg-yellow-100 text-yellow-700' },
+                    AWAITING_DEPOSIT: { label: 'Chờ cọc', color: 'bg-blue-100 text-blue-700' },
+                    EXPIRED: { label: 'Đã hết hạn', color: 'bg-gray-100 text-gray-600' },
+                    TERMINATED_EARLY: { label: 'Chấm dứt sớm', color: 'bg-red-100 text-red-700' },
+                    CANCELLED: { label: 'Đã hủy', color: 'bg-gray-100 text-gray-500' },
+                  };
+                  const statusInfo = statusMap[contract.status] || { label: contract.status, color: 'bg-gray-100 text-gray-500' };
+
+                  return (
+                    <Link
+                      key={contract.id}
+                      to={`/landlord/contracts/${contract.id}`}
+                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition group"
+                    >
+                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                        #{contract.id}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate group-hover:text-primary transition-colors">
+                          {contract.tenantName || 'Khách thuê'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {contract.startDate ? new Date(contract.startDate).toLocaleDateString('vi-VN') : '?'}
+                          {' → '}
+                          {contract.endDate ? new Date(contract.endDate).toLocaleDateString('vi-VN') : 'Chưa rõ'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                        {contract.actualPrice && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {Number(contract.actualPrice).toLocaleString('vi-VN')}đ/tháng
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
