@@ -190,6 +190,7 @@ export interface Room {
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   safetyScore?: number;
   moderationReason?: string;
+  availableFromDate?: string;
 }
 
 // ==========================================

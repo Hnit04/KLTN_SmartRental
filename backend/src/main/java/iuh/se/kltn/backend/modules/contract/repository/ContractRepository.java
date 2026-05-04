@@ -23,6 +23,21 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
 
+    // ✅ Lấy hợp đồng ACTIVE hiện tại của một phòng
+    Optional<Contract> findFirstByRoomIdAndStatusOrderByEndDateDesc(Long roomId, ContractStatus status);
+
+    // ✅ Kiểm tra xem phòng có hợp đồng nào trong tương lai không
+    @Query("SELECT COUNT(c) > 0 FROM Contract c WHERE c.room.id = :roomId AND c.status IN ('ACTIVE', 'AWAITING_DEPOSIT', 'PENDING_SIGNATURE') AND c.startDate >= :date")
+    boolean existsFutureContract(@Param("roomId") Long roomId, @Param("date") LocalDate date);
+
+    // ✅ Kiểm tra phòng còn bất kỳ hợp đồng "sống" nào không (dùng trước khi nhả phòng)
+    @Query("SELECT COUNT(c) > 0 FROM Contract c WHERE c.room.id = :roomId AND c.id <> :excludeContractId AND c.status IN ('ACTIVE', 'AWAITING_DEPOSIT', 'PENDING_SIGNATURE')")
+    boolean existsOtherLiveContract(@Param("roomId") Long roomId, @Param("excludeContractId") Long excludeContractId);
+
+    // ✅ Lấy hợp đồng ACTIVE hiện tại (startDate <= today), tránh lấy nhầm Pre-booking
+    @Query("SELECT c FROM Contract c WHERE c.room.id = :roomId AND c.status = 'ACTIVE' AND c.startDate <= :today ORDER BY c.endDate DESC")
+    java.util.Optional<Contract> findCurrentActiveContractByRoomId(@Param("roomId") Long roomId, @Param("today") LocalDate today);
+
     @Query("SELECT DISTINCT c FROM Contract c " +
            "LEFT JOIN c.bills b " +
            "WHERE c.room.property.landlord.id = :landlordId " +
@@ -69,4 +84,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     long countActiveDuringPeriod(@Param("landlordId") Long landlordId, 
                                 @Param("startOfMonth") LocalDate startOfMonth, 
                                 @Param("endOfMonth") LocalDate endOfMonth);
+
+    // ✅ Lịch sử thuê phòng (tất cả hợp đồng từng ký cho phòng này)
+    List<Contract> findByRoomIdOrderByStartDateDesc(Long roomId);
 }

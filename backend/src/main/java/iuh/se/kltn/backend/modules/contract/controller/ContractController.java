@@ -64,6 +64,12 @@ public class ContractController {
         return ResponseEntity.ok(contractService.getRentalHistory(userId));
     }
 
+    // ✅ Lịch sử hợp đồng theo phòng (cho chủ trọ xem lịch sử thuê của phòng)
+    @GetMapping("/room/{roomId}/history")
+    public ResponseEntity<?> getRoomContractHistory(@PathVariable Long roomId) {
+        return ResponseEntity.ok(contractService.getRoomContractHistory(roomId));
+    }
+
     @GetMapping("/dashboard/insights")
     public ResponseEntity<DashboardInsightsResponse> getDashboardInsights(@AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(contractService.getDashboardInsights(currentUser.getId()));

@@ -79,6 +79,9 @@ public class ContractChangeService {
                     if (contract.getEndDate() != null && !newEnd.isAfter(contract.getEndDate())) {
                         throw new RuntimeException("Ngày gia hạn phải sau ngày kết thúc hiện tại (" + contract.getEndDate() + ")!");
                     }
+                    if (contractRepository.existsFutureContract(contract.getRoom().getId(), contract.getEndDate())) {
+                        throw new RuntimeException("Bạn không thể gia hạn vì phòng đã được khách khác đặt cọc cho kỳ tiếp theo do quá thời hạn ưu tiên gia hạn.");
+                    }
                 } catch (java.time.format.DateTimeParseException e) {
                     throw new RuntimeException("Ngày gia hạn không hợp lệ!");
                 }
@@ -165,7 +168,13 @@ public class ContractChangeService {
                             contract.setStatus(ContractStatus.TERMINATED_EARLY);
                             iuh.se.kltn.backend.modules.property.entity.Room room = contract.getRoom();
                             if (room != null && room.getStatus() != iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE) {
-                                room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                                // 🛡️ Kiểm tra Pre-booking trước khi nhả phòng
+                                boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                                if (hasOtherLive) {
+                                    room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.RESERVED);
+                                } else {
+                                    room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                                }
                             }
                         }
 
@@ -182,7 +191,13 @@ public class ContractChangeService {
                         contract.setStatus(ContractStatus.EXPIRED);
                         iuh.se.kltn.backend.modules.property.entity.Room room = contract.getRoom();
                         if (room != null && room.getStatus() != iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE) {
-                            room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                            // 🛡️ Kiểm tra Pre-booking trước khi nhả phòng
+                            boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                            if (hasOtherLive) {
+                                room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.RESERVED);
+                            } else {
+                                room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
+                            }
                         }
                     }
                     break;

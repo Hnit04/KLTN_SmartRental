@@ -76,11 +76,27 @@ public class ContractService {
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        Room room = roomRepository.findById(request.getRoomId())
+        Room room = roomRepository.findByIdForUpdate(request.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Phòng không tồn tại"));
 
         if (room.getStatus() != RoomStatus.AVAILABLE) {
-            throw new RuntimeException("Phòng này đã có người thuê hoặc đang bảo trì!");
+            if (room.getStatus() == RoomStatus.RENTED) {
+                Contract currentContract = contractRepository.findFirstByRoomIdAndStatusOrderByEndDateDesc(room.getId(), ContractStatus.ACTIVE).orElse(null);
+                if (currentContract != null && currentContract.getEndDate() != null) {
+                    long daysToExpiry = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), currentContract.getEndDate());
+                    if (daysToExpiry <= 15 && daysToExpiry >= 0) {
+                        if (request.getStartDate() != null && request.getStartDate().isBefore(currentContract.getEndDate())) {
+                            throw new RuntimeException("Khách cũ đang thuê đến ngày " + currentContract.getEndDate() + ". Bạn chỉ có thể đặt ngày bắt đầu từ ngày này trở đi.");
+                        }
+                    } else {
+                        throw new RuntimeException("Phòng này chưa đến thời hạn cho phép đặt trước (chỉ được đặt trước 15 ngày trước khi hết hạn).");
+                    }
+                } else {
+                    throw new RuntimeException("Phòng này đang có người thuê (không xác định ngày kết thúc).");
+                }
+            } else {
+                throw new RuntimeException("Phòng này đang có người thuê, giữ chỗ hoặc đang bảo trì!");
+            }
         }
 
         // ✅ KIỂM TRA: Tenant chỉ được thuê 1 phòng tại 1 thời điểm (Cho phép thuê gối đầu nếu HĐ cũ sắp hết)
@@ -185,8 +201,8 @@ public class ContractService {
             );
         }
 
-        // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ
-        if (room != null) {
+        // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ (nếu phòng đang trống)
+        if (room.getStatus() == RoomStatus.AVAILABLE) {
             room.setStatus(RoomStatus.RESERVED);
             roomRepository.save(room);
         }
@@ -299,12 +315,24 @@ public class ContractService {
             trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
         }
 
+        // ✅ Map chi tiết danh sách hợp đồng sắp hết hạn
+        List<DashboardInsightsResponse.ExpiringContractDTO> expiringDetails = expiring.stream()
+                .map(c -> new DashboardInsightsResponse.ExpiringContractDTO(
+                        c.getId(),
+                        c.getRoom() != null ? c.getRoom().getName() : "?",
+                        c.getTenant() != null ? c.getTenant().getFullName() : "?",
+                        c.getEndDate() != null ? c.getEndDate().toString() : null,
+                        c.getEndDate() != null ? java.time.temporal.ChronoUnit.DAYS.between(now, c.getEndDate()) : null
+                ))
+                .collect(Collectors.toList());
+
         return DashboardInsightsResponse.builder()
                 .projectedRevenue(projectedRevenue)
                 .opportunityCost(opportunityCost)
                 .expiringContractsCount(expiringCount)
                 .latePaymentRoomsCount(latePaymentRooms)
                 .occupancyTrend(trend)
+                .expiringContracts(expiringDetails)
                 .build();
     }
 
@@ -318,6 +346,14 @@ public class ContractService {
     // --- Admin: Lấy tất cả hợp đồng ---
     public List<ContractResponse> getAllContracts() {
         return contractRepository.findAll().stream().map(c -> mapToResponse(c, null)).collect(Collectors.toList());
+    }
+
+    // ✅ Lịch sử hợp đồng theo phòng (cho chủ trọ)
+    public List<ContractResponse> getRoomContractHistory(Long roomId) {
+        List<Contract> contracts = contractRepository.findByRoomIdOrderByStartDateDesc(roomId);
+        return contracts.stream()
+                .map(c -> mapToResponse(c, null))
+                .collect(Collectors.toList());
     }
 
     // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---
@@ -579,12 +615,12 @@ public class ContractService {
                     
                     String tenantWallet = contract.getTenantWalletSnapshot() != null ? contract.getTenantWalletSnapshot() : contract.getTenant().getWalletAddress();
                     if (tenantWallet == null || tenantWallet.isEmpty()) {
-                        tenantWallet = fallbackTenantWallet; // fallback
+                        throw new RuntimeException("Khách thuê chưa cấu hình địa chỉ ví Blockchain. Vui lòng yêu cầu khách thuê cập nhật hồ sơ trước khi triển khai hợp đồng!");
                     }
 
                     String landlordWallet = contract.getLandlordWalletSnapshot() != null ? contract.getLandlordWalletSnapshot() : contract.getRoom().getProperty().getLandlord().getWalletAddress();
                     if (landlordWallet == null || landlordWallet.isEmpty()) {
-                        landlordWallet = fallbackLandlordWallet; // fallback
+                        throw new RuntimeException("Chủ nhà chưa cấu hình địa chỉ ví Blockchain. Vui lòng cập nhật hồ sơ trước khi triển khai hợp đồng!");
                     }
 
                     long priceVal = (contract.getActualPrice() != null) ? contract.getActualPrice().longValue() : 0L;
@@ -736,6 +772,11 @@ public class ContractService {
             }
         } catch (Exception e) {
             System.err.println("⚠️ Lỗi kết thúc hợp đồng trên Blockchain: " + e.getMessage());
+        }
+
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.AVAILABLE);
+            roomRepository.save(contract.getRoom());
         }
 
         Contract saved = contractRepository.save(contract);
@@ -958,10 +999,16 @@ public class ContractService {
         contract.setCancelReason(reason);
         contractRepository.save(contract);
 
-        // 2. Giải phóng phòng về trạng thái AVAILABLE
+        // 🛡️ Vá lỗ hổng: Chỉ nhả phòng nếu đang RESERVED và không còn HĐ sống khác
         Room room = contract.getRoom();
-        room.setStatus(RoomStatus.AVAILABLE);
-        roomRepository.save(room);
+        if (room.getStatus() == RoomStatus.RESERVED) {
+            boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+            if (!hasOtherLive) {
+                room.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(room);
+            }
+        }
+        // Nếu phòng đang RENTED → không thay đổi (hợp đồng cũ vẫn đang chạy)
 
         // 3. Gửi thông báo cho khách thuê
         String displayReason = (reason != null && !reason.isEmpty()) ? " với lý do: " + reason : "";

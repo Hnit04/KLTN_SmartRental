@@ -89,8 +89,17 @@ export default function CreateContractPage() {
             
             const defaultText = roomData.defaultTerms || systemTemplate;
 
+            let initialStartDate = formData.startDate;
+            if (roomData.availableFromDate) {
+                const availDate = new Date(roomData.availableFromDate).toISOString().split('T')[0];
+                if (initialStartDate < availDate) {
+                    initialStartDate = availDate;
+                }
+            }
+
             setFormData(prev => ({
                 ...prev,
+                startDate: initialStartDate,
                 landlordRules: defaultText,
                 tenantRequests: ""
             }));
@@ -133,6 +142,17 @@ export default function CreateContractPage() {
           additionalTerms: combinedTerms,
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
+
+      // 🛡️ Kiểm tra Pre-booking: startDate phải >= availableFromDate
+      if (room.availableFromDate) {
+        const availDate = new Date(room.availableFromDate);
+        const startDate = new Date(formData.startDate);
+        if (startDate < availDate) {
+          toast.warning(`Phòng này sẽ trống từ ngày ${availDate.toLocaleDateString('vi-VN')}. Vui lòng chọn ngày bắt đầu từ ngày này trở đi!`);
+          setIsLoading(false);
+          return;
+        }
+      }
 
       if (existingContract && user?.role === 'TENANT') {
         if (!existingContract.endDate) {
@@ -277,6 +297,15 @@ export default function CreateContractPage() {
                       </div>
                     )}
 
+                    {room.status === 'RENTED' && room.availableFromDate && (
+                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-start gap-2 shadow-sm">
+                            <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <strong>Lưu ý:</strong> Phòng này hiện đang có người ở và sẽ trống vào ngày <strong>{new Date(room.availableFromDate).toLocaleDateString('vi-VN')}</strong>. Bạn bắt buộc phải chọn ngày bắt đầu từ ngày này trở đi.
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <Label>Ngày bắt đầu ở</Label>
                         <div className="relative">
@@ -284,6 +313,7 @@ export default function CreateContractPage() {
                             <Input 
                                 type="date" 
                                 className="pl-9"
+                                min={room.availableFromDate ? new Date(room.availableFromDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                                 value={formData.startDate}
                                 onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                             />

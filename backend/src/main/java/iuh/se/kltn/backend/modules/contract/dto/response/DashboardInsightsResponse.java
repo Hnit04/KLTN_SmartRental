@@ -20,11 +20,25 @@ public class DashboardInsightsResponse {
     // Danh sách lịch sử tỷ lệ lấp đầy (theo tháng)
     private List<OccupancyTrendDTO> occupancyTrend;
 
+    // ✅ Danh sách hợp đồng sắp hết hạn (chi tiết)
+    private List<ExpiringContractDTO> expiringContracts;
+
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
     public static class OccupancyTrendDTO {
         private String month;                  // "T01", "T02"...
         private Double rate;                   // 85.5%
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ExpiringContractDTO {
+        private Long contractId;
+        private String roomName;
+        private String tenantName;
+        private String endDate;
+        private Long daysLeft;
     }
 }
