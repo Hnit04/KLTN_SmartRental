@@ -201,13 +201,24 @@ public class ContractChangeService {
                         }
                     }
                     break;
-                case CHANGE_SIGN_METHOD: // ✅ THÊM ĐOẠN NÀY
+                case CHANGE_SIGN_METHOD:
                     contract.setSignMethod(ContractSignMethod.valueOf(req.getNewValue()));
                     contract.setIsTenantSigned(false);
                     contract.setIsLandlordSigned(false);
                     break;
                 case CHANGE_TERMS:
                     contract.setAdditionalTerms(req.getNewValue());
+                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        contract.setIsTenantSigned(false);
+                        contract.setIsLandlordSigned(false);
+                    }
+                    break;
+                case RENT_INCREASE:
+                    contract.setActualPrice(Double.parseDouble(req.getNewValue()));
+                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        contract.setIsTenantSigned(false);
+                        contract.setIsLandlordSigned(false);
+                    }
                     break;
             }
         } catch (Exception e) {
