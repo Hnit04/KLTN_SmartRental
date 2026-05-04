@@ -1543,9 +1543,11 @@ export default function ContractDetailPage() {
 
               <p className="font-bold text-lg mb-1">
                 {contract.status === 'ACTIVE' ? 'Đã có hiệu lực' :
-                  contract.status === 'AWAITING_DEPOSIT' ? 'Chờ nạp tiền cọc' : 
-                  contract.status === 'CANCELLED' ? (
-                    <span className="text-red-600">Đã bị từ chối/hủy</span>
+                  (contract.status === 'AWAITING_DEPOSIT' || (contract.isLandlordSigned && contract.isTenantSigned && contract.status === 'PENDING_SIGNATURE')) ? 'Chờ nạp tiền cọc' : 
+                  (contract.status === 'CANCELLED' || contract.status === 'EXPIRED') ? (
+                    <span className="text-red-600">Đã bị từ chối/hủy/Hết hạn</span>
+                  ) : contract.status === 'TERMINATED_EARLY' ? (
+                    <span className="text-orange-600">Đã kết thúc sớm</span>
                   ) : 'Đang chờ ký xác nhận'}
               </p>
 
@@ -1665,7 +1667,7 @@ export default function ContractDetailPage() {
 
               {contract.status === 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  {!pendingRequest && (
+                  {!pendingRequest && !changeRequests.some(r => r.type === 'TERMINATION' && r.status === 'ACCEPTED') && (
                     <Button
                       variant="outline"
                       className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
@@ -1819,7 +1821,7 @@ export default function ContractDetailPage() {
 
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-orange-500" /> Đề xuất chỉnh sửa
             </h2>
@@ -1851,7 +1853,7 @@ export default function ContractDetailPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="min-h-[220px] flex flex-col justify-start transition-all duration-300">
                 <Label>Giá trị mới đề xuất</Label>
 
                 {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
@@ -1881,7 +1883,7 @@ export default function ContractDetailPage() {
                     onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
                   />
                 ) : (
-                  <div className="space-y-3 mt-1">
+                  <div className="space-y-3 mt-1 flex-1">
                     <div className="flex flex-wrap gap-2">
                       {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
                         const isAdded = changeForm.newValue.includes(term);
@@ -1906,7 +1908,7 @@ export default function ContractDetailPage() {
                     </div>
                     <textarea
                       placeholder="Nhập nội dung mong muốn..."
-                      className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[150px] resize-y placeholder:text-gray-400"
+                      className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
                       value={changeForm.newValue}
                       onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
                     />
@@ -1916,6 +1918,56 @@ export default function ContractDetailPage() {
 
               <div>
                 <Label>Lý do đề xuất</Label>
+                
+                {/* 💡 Gợi ý lý do nhanh */}
+                <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
+                  {(() => {
+                    const presetReasons: Record<string, string[]> = {
+                      'TERMINATION': [
+                        'Công việc thay đổi/Chuyển chỗ làm',
+                        'Có việc gấp gia đình về quê',
+                        'Không còn phù hợp nhu cầu sử dụng',
+                        'Khách thuê vi phạm nội quy nhiều lần'
+                      ],
+                      'EXTENSION': [
+                        'Muốn tiếp tục thuê dài hạn',
+                        'Chưa tìm được chỗ ở mới, xin gia hạn thêm 1 tháng',
+                        'Công việc ổn định nên muốn thuê tiếp'
+                      ],
+                      'RENT_INCREASE': [
+                        'Điều chỉnh theo giá cả thị trường',
+                        'Mới bổ sung thêm nội thất/thiết bị mới',
+                        'Tình hình khó khăn, mong giảm giá'
+                      ],
+                      'CHANGE_TERMS': [
+                        'Xin phép được nuôi thú cưng nhỏ',
+                        'Bổ sung quyền lợi bảo trì máy lạnh',
+                        'Thêm người ở ghép'
+                      ],
+                      'CHANGE_SIGN_METHOD': [
+                        'Không rành Web3, xin đổi sang Xác nhận nhanh',
+                        'Muốn dùng Smart Contract cho an toàn'
+                      ]
+                    };
+                    return (presetReasons[changeForm.type] || []).map((reason, idx) => (
+                      <span
+                        key={idx}
+                        onClick={() => {
+                          const currentReason = changeForm.reason.trim();
+                          if (currentReason && !currentReason.endsWith(',')) {
+                            setChangeForm({ ...changeForm, reason: currentReason + ', ' + reason });
+                          } else {
+                            setChangeForm({ ...changeForm, reason: currentReason + reason });
+                          }
+                        }}
+                        className="text-[11px] px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-md cursor-pointer border border-gray-200 transition-colors"
+                      >
+                        + {reason}
+                      </span>
+                    ));
+                  })()}
+                </div>
+
                 <textarea
                   className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 min-h-[80px]"
                   placeholder="Giải thích lý do bạn muốn thay đổi..."
