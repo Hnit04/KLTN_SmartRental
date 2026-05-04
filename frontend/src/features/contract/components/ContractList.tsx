@@ -75,65 +75,102 @@ export default function ContractList() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex flex-col items-center justify-center py-24 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <span className="text-slate-500 font-medium text-sm mt-3">Đang tải danh sách hợp đồng...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="section-card p-3">
-          <p className="text-xs text-muted-foreground">Tổng hợp đồng</p>
-          <p className="text-xl font-bold text-foreground mt-1">{summary.total}</p>
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tổng hợp đồng</p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">{summary.total}</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 rounded-xl text-slate-700">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
         </div>
-        <div className="section-card p-3">
-          <p className="text-xs text-muted-foreground">Đang hiệu lực</p>
-          <p className="text-xl font-bold text-green-700 mt-1">{summary.active}</p>
+        
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-green-600">Đang hiệu lực</p>
+              <p className="text-2xl font-bold text-green-700 mt-2">{summary.active}</p>
+            </div>
+            <div className="p-2.5 bg-green-50 rounded-xl text-green-700">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
         </div>
-        <div className="section-card p-3">
-          <p className="text-xs text-muted-foreground">Chờ ký</p>
-          <p className="text-xl font-bold text-amber-700 mt-1">{summary.pending}</p>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Chờ ký</p>
+              <p className="text-2xl font-bold text-amber-700 mt-2">{summary.pending}</p>
+            </div>
+            <div className="p-2.5 bg-amber-50 rounded-xl text-amber-700">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
         </div>
-        <div className="section-card p-3">
-          <p className="text-xs text-muted-foreground">Kết thúc / Hủy</p>
-          <p className="text-xl font-bold text-gray-700 mt-1">{summary.ended}</p>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kết thúc / Hủy</p>
+              <p className="text-2xl font-bold text-slate-700 mt-2">{summary.ended}</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 rounded-xl text-slate-700">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* --- THANH CÔNG CỤ (TOOLBAR) --- */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+      {/* Toolbar Section */}
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Tìm theo tên phòng..." 
-            className="pl-10 bg-gray-50/50 border-gray-200"
+            className="pl-10 bg-slate-50/60 border-slate-200 h-11 w-full focus-visible:ring-indigo-500 rounded-xl text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select 
-              className="pl-9 pr-8 h-10 rounded-md border border-gray-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              className="pl-10 pr-9 h-11 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 cursor-pointer text-slate-700 font-medium"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang hiệu lực</option>
               <option value="PENDING_SIGNATURE">Chờ ký tên</option>
+              <option value="AWAITING_DEPOSIT">Chờ thanh toán</option>
+              <option value="ACTIVE">Đang hiệu lực</option>
               <option value="EXPIRED">Đã hết hạn</option>
-              <option value="TERMINATED_EARLY">Đã hủy</option>
+              <option value="TERMINATED_EARLY">Chấm dứt trước hạn</option>
+              <option value="CANCELLED">Đã hủy</option>
             </select>
           </div>
 
           <div className="relative">
-            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <ArrowUpDown className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select 
-              className="pl-9 pr-8 h-10 rounded-md border border-gray-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              className="pl-10 pr-9 h-11 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 cursor-pointer text-slate-700 font-medium"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
@@ -146,35 +183,51 @@ export default function ContractList() {
         </div>
       </div>
 
+      {/* Filter Chips */}
       {activeFilterChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 bg-slate-50/80 p-3.5 rounded-xl border border-dashed border-slate-200">
           {activeFilterChips.map(chip => (
-            <button
+            <span
               key={chip.key}
               onClick={chip.clear}
-              className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium hover:bg-secondary/70"
+              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/60 bg-indigo-50/40 px-3 py-1 text-xs font-medium text-indigo-700 cursor-pointer hover:bg-indigo-100 transition-colors"
             >
               {chip.label}
-              <X className="h-3 w-3" />
-            </button>
+              <X className="h-3.5 w-3.5 text-indigo-500 hover:text-indigo-700" />
+            </span>
           ))}
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={resetFilters}>Xóa bộ lọc</Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-200/50" 
+            onClick={resetFilters}
+          >
+            Xóa bộ lọc
+          </Button>
         </div>
       )}
 
-      {/* --- DANH SÁCH DẠNG HÀNG (LIST VIEW) --- */}
+      {/* Contract Items List Section */}
       <div className="space-y-3">
         {processedContracts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-            <FileText className="h-10 w-10 text-gray-300 mb-2" />
-            <h3 className="text-lg font-medium text-gray-900">
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 rounded-2xl bg-white shadow-sm">
+            <div className="p-4 bg-slate-50 rounded-2xl text-slate-300 mb-4 animate-pulse">
+              <FileText className="h-10 w-10" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">
               {contracts.length === 0 ? "Bạn chưa có hợp đồng nào" : "Không tìm thấy hợp đồng phù hợp"}
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {contracts.length === 0 ? "Hợp đồng mới sẽ xuất hiện tại đây khi được tạo." : "Hãy thử đổi từ khóa hoặc trạng thái lọc."}
+            <p className="text-sm text-slate-500 mt-1 max-w-xs text-center">
+              {contracts.length === 0 ? "Hợp đồng mới sẽ xuất hiện tại đây khi được tạo." : "Hãy thử thay đổi từ khóa hoặc trạng thái lọc để tìm kiếm."}
             </p>
             {contracts.length > 0 && (
-              <Button variant="outline" className="mt-3" onClick={resetFilters}>Đặt lại bộ lọc</Button>
+              <Button 
+                variant="outline" 
+                className="mt-5 rounded-xl border-slate-200 hover:bg-slate-50 text-xs px-4 py-2 h-9" 
+                onClick={resetFilters}
+              >
+                Đặt lại bộ lọc
+              </Button>
             )}
           </div>
         ) : (

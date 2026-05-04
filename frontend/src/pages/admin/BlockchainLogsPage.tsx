@@ -246,7 +246,7 @@ export default function BlockchainLogsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Blocks className="h-7 w-7 text-indigo-600" />
+            <Blocks className="h-7 w-7 text-primary" />
             Blockchain Logs & Audit
           </h1>
           <p className="text-sm text-gray-500 mt-1">Giám sát Smart Contract trên mạng Sepolia Testnet</p>
@@ -256,7 +256,7 @@ export default function BlockchainLogsPage() {
             variant="outline"
             onClick={handleFullAudit}
             disabled={auditRunning}
-            className="gap-2 border-violet-300 text-violet-700 hover:bg-violet-50"
+            className="gap-2 border-violet-300 text-primary hover:bg-violet-50"
           >
             {auditRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
             Kiểm toán Toàn hệ thống
@@ -272,7 +272,7 @@ export default function BlockchainLogsPage() {
         <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ScanSearch className="h-5 w-5 text-violet-600" />
+              <ScanSearch className="h-5 w-5 text-primary" />
               <h3 className="font-semibold text-gray-900">
                 {auditRunning ? 'Đang kiểm toán...' : 'Kiểm toán hoàn tất'}
               </h3>
@@ -317,17 +317,17 @@ export default function BlockchainLogsPage() {
 
       {/* === DASHBOARD METRICS === */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={<FileText className="h-5 w-5" />} label="Tổng Hợp đồng" value={totalContracts} color="indigo" />
-        <MetricCard icon={<Blocks className="h-5 w-5" />} label="On-Chain (Blockchain)" value={blockchainContracts.length} color="violet" sub={`${totalContracts ? Math.round(blockchainContracts.length / totalContracts * 100) : 0}% tổng số`} />
-        <MetricCard icon={<ShieldCheck className="h-5 w-5" />} label="Đang có hiệu lực" value={activeContracts.length} color="emerald" />
-        <MetricCard icon={<Landmark className="h-5 w-5" />} label="Tổng tiền cọc" value={`${(totalDeposit / 1_000_000).toFixed(1)}M`} color="amber" sub="VNĐ" />
+        <MetricCard icon={<FileText className="h-5 w-5 text-primary" />} label="Tổng Hợp đồng" value={totalContracts} color="indigo" />
+        <MetricCard icon={<Blocks className="h-5 w-5 text-primary" />} label="On-Chain (Blockchain)" value={blockchainContracts.length} color="violet" sub={`${totalContracts ? Math.round(blockchainContracts.length / totalContracts * 100) : 0}% tổng số`} />
+        <MetricCard icon={<ShieldCheck className="h-5 w-5 text-primary" />} label="Đang có hiệu lực" value={activeContracts.length} color="emerald" />
+        <MetricCard icon={<Landmark className="h-5 w-5 text-primary" />} label="Tổng tiền cọc" value={`${(totalDeposit / 1_000_000).toFixed(1)}M`} color="amber" sub="VNĐ" />
       </div>
 
       {/* === FILTER BAR === */}
       <div className="bg-white rounded-xl border shadow-sm p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex gap-2 flex-wrap">
           {(['all', 'blockchain', 'traditional'] as const).map(mode => (
-            <button key={mode} onClick={() => setFilterMode(mode)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${filterMode === mode ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+            <button key={mode} onClick={() => setFilterMode(mode)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${filterMode === mode ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
               {mode === 'all' ? '🗂 Tất cả' : mode === 'blockchain' ? '⛓ Blockchain' : '📄 Truyền thống'}
             </button>
           ))}
@@ -377,7 +377,7 @@ export default function BlockchainLogsPage() {
 
                   return (
                     <tr key={c.id} className="hover:bg-indigo-50/30 transition-colors group">
-                      <td className="px-4 py-3 font-mono font-bold text-indigo-600">#{c.id}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-primary">#{c.id}</td>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900">{c.roomName || '—'}</div>
                         <div className="text-xs text-gray-500 truncate max-w-[180px]">{c.landlordName || '—'}</div>
@@ -386,13 +386,13 @@ export default function BlockchainLogsPage() {
                       <td className="px-4 py-3">
                         <StatusBadge label={st.label} tone={st.tone} className="text-xs font-semibold" />
                         {c.signMethod === 'BLOCKCHAIN' && (
-                          <StatusBadge label="Web3" tone="info" className="ml-1.5 text-[10px] font-bold" />
+                          <StatusBadge label="Web3" tone="info" className="ml-1.5 text-[10px] font-bold text-primary" />
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {c.smartContractAddress ? (
                           <div className="flex items-center gap-1.5">
-                            <code className="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono text-gray-700">{shortenAddress(c.smartContractAddress)}</code>
+                            <code className="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono text-primary">{shortenAddress(c.smartContractAddress)}</code>
                             <button onClick={() => copyToClipboard(c.smartContractAddress)} title="Copy" className="text-gray-400 hover:text-indigo-600 transition"><Copy className="h-3.5 w-3.5" /></button>
                             <a href={`${ETHERSCAN_BASE}/address/${c.smartContractAddress}`} target="_blank" rel="noopener noreferrer" title="Xem trên Etherscan" className="text-gray-400 hover:text-indigo-600 transition"><ExternalLink className="h-3.5 w-3.5" /></a>
                           </div>
@@ -423,8 +423,8 @@ export default function BlockchainLogsPage() {
                               <StatusBadge label="Bất thường" tone="danger" className="text-xs font-semibold" />
                             </button>
                           ) : (
-                            <Button size="sm" variant="outline" onClick={() => handleVerify(c)} className="text-xs h-7 px-2 gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-                              <Hash className="h-3 w-3" /> Verify
+                            <Button size="sm" variant="outline" onClick={() => handleVerify(c)} className="text-xs h-7 px-2 gap-1 text-primary border-indigo-200 bg-indigo-50">
+                              <Hash className="h-3 w-3 text-primary" /> Verify
                             </Button>
                           )}
                         </div>

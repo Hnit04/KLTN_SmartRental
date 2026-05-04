@@ -16,6 +16,9 @@ export default function RegisterPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [otpCode, setOtpCode] = useState("");
 
+  // Trạng thái ẩn/hiện mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState<RegisterRequest>({
     username: "",
     password: "",
@@ -150,9 +153,37 @@ export default function RegisterPage() {
               <Input id="email" type="email" required value={formData.email} onChange={handleChange} placeholder="example@gmail.com" className="bg-white/50 focus:bg-white transition-colors rounded-xl" />
             </div>
 
+            {/* Trường Mật khẩu có ẩn/hiện */}
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-gray-700 font-semibold ml-1">Mật khẩu *</Label>
-              <Input id="password" type="password" required value={formData.password} onChange={handleChange} placeholder="••••••••" className="bg-white/50 focus:bg-white transition-colors rounded-xl" />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="bg-white/50 focus:bg-white transition-colors rounded-xl pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.224 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.776 0 8.774 3.162 10.066 7.5a10.474 10.474 0 01-1.392 2.688m-9.563-9.563l3.12 3.12m0 0a3.75 3.75 0 004.876 4.876l.001-.001m-7.997-3.119L14.7 14.7M3 3l18 18" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644 10.875 10.875 0 0118.928 0 1.012 1.012 0 010 .644 10.875 10.875 0 01-18.928 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1.5">

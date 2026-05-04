@@ -258,9 +258,9 @@ export default function SystemAdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-2xl shadow-lg text-white">
+            <div className="bg-primary p-6 rounded-2xl shadow-lg text-white">
               <h3 className="font-bold text-lg mb-2">Bảo mật & Blockchain</h3>
-              <p className="text-indigo-100 text-sm mb-4">Mọi hợp đồng đều được giám sát tính toàn vẹn thông qua Smart Contract trên mạng Sepolia.</p>
+              <p className="text-primary-100 text-sm mb-4">Mọi hợp đồng đều được giám sát tính toàn vẹn thông qua Smart Contract trên mạng Sepolia.</p>
               <Link to="/admin/blockchain-logs" className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold transition-all">
                 Kiểm tra Logs <ChevronRight size={16} />
               </Link>

@@ -12,15 +12,6 @@ import { billApi } from '@/api/billApi';
 import { roomApi } from '@/api/roomApi';
 import { contractApi } from '@/api/contractApi';
 
-// Dữ liệu Mock cho Biểu đồ Doanh thu (Sẽ thay bằng API sau nếu cần)
-const REVENUE_DATA = [
-  { name: 'T10/25', total: 45000000 },
-  { name: 'T11/25', total: 52000000 },
-  { name: 'T12/25', total: 48000000 },
-  { name: 'T01/26', total: 61000000 },
-  { name: 'T02/26', total: 59000000 },
-  { name: 'T03/26', total: 65000000 },
-];
 
 export default function DashboardPage() {
   const [thisMonthRevenue, setThisMonthRevenue] = useState<number>(0);
@@ -170,7 +161,7 @@ export default function DashboardPage() {
                 </h3>
               )}
             </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+            <div className="p-2 bg-blue-50 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-all">
               <Wallet className="h-5 w-5" />
             </div>
           </div>
@@ -205,7 +196,7 @@ export default function DashboardPage() {
                 {formatCurrency(insights?.projectedRevenue || 0)}
               </h3>
             </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+            <div className="p-2 bg-blue-50 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-all">
               <TrendingUp className="h-5 w-5" />
             </div>
           </div>

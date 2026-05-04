@@ -667,61 +667,6 @@ export default function PropertyManageDetailPage() {
                         )}
                       </div>
                     )}
-                  {/* NÚT BẢO TRÌ / HOÀN THÀNH BẢO TRÌ */}
-                  {room.status === 'MAINTENANCE' ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        openMaintenanceConfirm(room, 'complete');
-                      }}
-                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
-                    >
-                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-1.5" /> Hoàn thành
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        openMaintenanceConfirm(room, 'start');
-                      }}
-                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
-                    >
-                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Wrench className="h-4 w-4 mr-1.5" /> Bảo trì
-                        </>
-                      )}
-                    </Button>
-                  )}
-
-                  {(room.status === 'AVAILABLE' || room.availableFromDate) && room.status !== 'MAINTENANCE' ? (
-                    <Link to={`/landlord/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
-                        <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Link to={`/landlord/properties/${id}/rooms/${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
-                        <FileText className="h-4 w-4 mr-1.5" /> Chi tiết
-                      </Button>
-                    </Link>
-                  )}
-
                   <Button
                     variant="outline"
                     size="sm"

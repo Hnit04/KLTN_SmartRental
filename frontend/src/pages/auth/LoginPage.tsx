@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { toast } from "sonner";
-import { userApi } from "@/api/userApi"; 
-import { authApi} from "@/api/authApi";
+import { userApi } from "@/api/userApi";
+import { authApi } from "@/api/authApi";
 import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode"; 
+import { jwtDecode } from "jwt-decode";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -26,6 +26,9 @@ export default function LoginPage() {
   // Trạng thái modal thông báo khóa tài khoản
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
+  
+  // Trạng thái ẩn/hiện mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -57,8 +60,6 @@ export default function LoginPage() {
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays} ngày nữa`;
   };
-
-  
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -101,8 +102,8 @@ export default function LoginPage() {
         if (redirectUrl) {
           navigate(redirectUrl);
         } else {
-          if (user.role === 'ADMIN') navigate("/admin/dashboard");
-          else if (user.role === 'LANDLORD') navigate("/landlord/dashboard");
+          if (user.role === "ADMIN") navigate("/admin/dashboard");
+          else if (user.role === "LANDLORD") navigate("/landlord/dashboard");
           else navigate("/tenant/dashboard");
         }
       }, 1500);
@@ -132,51 +133,49 @@ export default function LoginPage() {
 
   // Xử lý đăng nhập Google thành công
   const handleGoogleSuccess = async (credentialResponse: any) => {
-  try {
-    const idToken = credentialResponse.credential;
-    if (!idToken) throw new Error("Không nhận được ID Token từ Google");
+    try {
+      const idToken = credentialResponse.credential;
+      if (!idToken) throw new Error("Không nhận được ID Token từ Google");
 
-    console.log("Google ID Token (first 50 chars):", idToken.substring(0, 50) + "...");
+      console.log("Google ID Token (first 50 chars):", idToken.substring(0, 50) + "...");
 
-    setIsLoading(true);
+      setIsLoading(true);
 
-    const response = await authApi.googleLogin({ idToken });
+      const response = await authApi.googleLogin({ idToken });
 
-    console.log("Backend trả về:", {
-      accessToken: response.accessToken?.substring(0, 20) + "...",
-      refreshToken: response.refreshToken?.substring(0, 20) + "...",
-      user: response.user?.email
-    });
+      console.log("Backend trả về:", {
+        accessToken: response.accessToken?.substring(0, 20) + "...",
+        refreshToken: response.refreshToken?.substring(0, 20) + "...",
+        user: response.user?.email,
+      });
 
-    await login(response);
+      await login(response);
 
-    toast.success("Đăng nhập Google thành công!", {
-      description: "Đang chuyển hướng..."
-    });
+      toast.success("Đăng nhập Google thành công!", {
+        description: "Đang chuyển hướng...",
+      });
 
-    setTimeout(() => {
-      if (redirectUrl) {
-        navigate(redirectUrl);
-      } else {
-        const role = response.user?.role;
-        if (role === 'ADMIN') navigate("/admin/dashboard");
-        else if (role === 'LANDLORD') navigate("/landlord/dashboard");
-        else navigate("/tenant/dashboard");
-      }
-    }, 800);
+      setTimeout(() => {
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else {
+          const role = response.user?.role;
+          if (role === "ADMIN") navigate("/admin/dashboard");
+          else if (role === "LANDLORD") navigate("/landlord/dashboard");
+          else navigate("/tenant/dashboard");
+        }
+      }, 800);
+    } catch (error: any) {
+      console.error("Lỗi toàn bộ quá trình Google Login:", error);
 
-  } catch (error: any) {
-    console.error("Lỗi toàn bộ quá trình Google Login:", error);
+      const errMsg =
+        error.response?.data?.error || error.message || "Xác thực Google thất bại";
 
-    const errMsg = error.response?.data?.error 
-      || error.message 
-      || "Xác thực Google thất bại";
-
-    toast.error(errMsg, { duration: 6000 });
-  } finally {
-    setIsLoading(false);
-  }
-};
+      toast.error(errMsg, { duration: 6000 });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleError = () => {
     toast.error("Đăng nhập Google bị hủy hoặc gặp lỗi.", { duration: 4000 });
@@ -224,10 +223,7 @@ export default function LoginPage() {
 
           <form className="space-y-6 mt-8" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label
-                htmlFor="username"
-                className="text-gray-700 font-semibold"
-              >
+              <Label htmlFor="username" className="text-gray-700 font-semibold">
                 Tên đăng nhập
               </Label>
               <Input
@@ -244,10 +240,7 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="password"
-                  className="text-gray-700 font-semibold"
-                >
+                <Label htmlFor="password" className="text-gray-700 font-semibold">
                   Mật khẩu
                 </Label>
                 <Link
@@ -257,15 +250,64 @@ export default function LoginPage() {
                   Quên mật khẩu?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="bg-white/50 focus:bg-white transition-colors"
-              />
+              
+              {/* Trường mật khẩu hỗ trợ ẩn/hiện */}
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="bg-white/50 focus:bg-white transition-colors pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? (
+                    // Icon Mắt gạch chéo
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.224 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.776 0 8.774 3.162 10.066 7.5a10.474 10.474 0 01-1.392 2.688m-9.563-9.563l3.12 3.12m0 0a3.75 3.75 0 004.876 4.876l.001-.001m-7.997-3.119L14.7 14.7M3 3l18 18"
+                      />
+                    </svg>
+                  ) : (
+                    // Icon Mắt bình thường
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 010-.644 10.875 10.875 0 0118.928 0 1.012 1.012 0 010 .644 10.875 10.875 0 01-18.928 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <Button
