@@ -1,6 +1,6 @@
 package iuh.se.kltn.backend.modules.property.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.se.kltn.backend.common.enums.Role;

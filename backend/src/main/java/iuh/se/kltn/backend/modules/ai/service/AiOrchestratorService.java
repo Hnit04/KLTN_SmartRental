@@ -66,7 +66,7 @@ public class AiOrchestratorService {
     @Autowired
     private PropertyRepository propertyRepository;
 
-    private static final double DEFAULT_RADIUS_KM = 3.0;
+
 
     /**
      * Tự động chạy khi Spring Boot khởi động.
@@ -416,7 +416,7 @@ public class AiOrchestratorService {
         }
 
         // 📝 Ghi log cho luồng Fallback trước khi đi xuống Legacy Pipeline
-        saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false);
+        saveActionLog(userId, role, question, predictedIntent, confidence, fallbackUsed, startTime, success);
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();
 

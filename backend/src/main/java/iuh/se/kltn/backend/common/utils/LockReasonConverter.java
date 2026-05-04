@@ -1,6 +1,6 @@
 package iuh.se.kltn.backend.common.utils;
 
-import iuh.se.kltn.backend.common.utils.JsonUtil;
+
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import java.util.List;

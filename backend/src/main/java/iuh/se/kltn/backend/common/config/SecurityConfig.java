@@ -106,6 +106,7 @@ public class SecurityConfig {
                             "/api/reviews/landlord/**"
                         ).permitAll()
                         .requestMatchers("/ws/**").permitAll() // ✅ Cho phép WebSocket handshake
+                        .requestMatchers(HttpMethod.POST, "/api/payments/sepay/webhook").permitAll() // ✅ Webhook luôn public
                         .requestMatchers(HttpMethod.POST, "/api/appointments/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll() // Xem ảnh
 

@@ -63,6 +63,8 @@ public class ContractService {
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
 
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    private boolean mockAmountOverride;
     @Autowired
     public ContractService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -286,13 +288,12 @@ public class ContractService {
 
         for (int i = 5; i >= 0; i--) {
             java.time.LocalDate date = now.minusMonths(i);
+            java.time.LocalDate startOfMonth = date.with(java.time.temporal.TemporalAdjusters.firstDayOfMonth());
             java.time.LocalDate endOfMonth = date.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
             
-            // Count contracts active during this month
-            long occupied = activeContracts.stream().filter(c -> 
-                (c.getStartDate().isBefore(endOfMonth) || c.getStartDate().isEqual(endOfMonth)) &&
-                (c.getEndDate() == null || c.getEndDate().isAfter(date) || c.getEndDate().isEqual(date))
-            ).count();
+            // 🔍 Fix: Query all contracts that were active during this specific month
+            // A contract was active if its startDate <= endOfMonth AND (endDate is null OR endDate >= startOfMonth)
+            long occupied = contractRepository.countActiveDuringPeriod(landlordId, startOfMonth, endOfMonth);
             
             double rate = totalRoomsCount > 0 ? ((double) occupied / totalRoomsCount) * 100 : 0;
             trend.add(new DashboardInsightsResponse.OccupancyTrendDTO("T" + String.format("%02d", date.getMonthValue()), rate));
@@ -820,6 +821,61 @@ public class ContractService {
         );
 
         return mapToResponse(contractRepository.save(contract), landlordId);
+    }
+
+    // --- Xác nhận đặt cọc tự động qua SePay Webhook ---
+    @Transactional
+    public void processSePayDepositWebhook(Long contractId, Double amountIn, String referenceNumber, String accountNumber) {
+        Contract contract = contractRepository.findById(contractId).orElse(null);
+        if (contract == null || contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
+            return; // Hợp đồng không tồn tại hoặc không ở trạng thái chờ cọc
+        }
+
+        // ĐÃ SỬA THÀNH VÍ TRUNG GIAN (Centralized Wallet)
+        // Không còn kiểm tra khớp với số tài khoản cá nhân của chủ trọ nữa.
+        // Mọi giao dịch từ Webhook SePay (được bảo vệ bằng ApiKey) đều được tin cậy vì chuyển thẳng vào Platform.
+        // Kiểm tra số tiền chuyển có đủ không (tiền cọc)
+        Double expectedDeposit = contract.getDepositAmount() != null ? contract.getDepositAmount() : 0.0;
+        
+        // MOCK: Nếu mock=true, cho phép 2000 VNĐ pass. Nếu mock=false, kiểm tra số tiền thật.
+        if (amountIn < expectedDeposit && !(mockAmountOverride && amountIn == 2000.0)) {
+            System.out.println("⚠️ [SePay Deposit] Số tiền cọc chuyển (" + amountIn + ") nhỏ hơn yêu cầu (" + expectedDeposit + "). Không tự động duyệt.");
+            return;
+        }
+
+        // Kích hoạt hợp đồng
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setDepositStatus(DepositStatus.DEPOSITED);
+        contract.setDeployTxHash(referenceNumber != null ? referenceNumber : "SEPAY_AUTO");
+
+        if (contract.getRoom() != null) {
+            contract.getRoom().setStatus(RoomStatus.RENTED);
+            roomRepository.save(contract.getRoom());
+        }
+
+        // Cộng điểm uy tín
+        reputationService.processPoints(contract.getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Hợp đồng đã kích hoạt tự động qua mã VietQR (#" + contract.getId() + ")");
+        reputationService.processPoints(contract.getRoom().getProperty().getLandlord(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.CONTRACT_SIGNED, 5, "Nhận cọc tự động thành công (#" + contract.getId() + ")");
+
+        // Thông báo
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Kích hoạt hợp đồng thành công",
+            "Tiền cọc phòng " + contract.getRoom().getName() + " đã được ghi nhận qua VietQR (Mã GD: " + referenceNumber + "). Hợp đồng chính thức có hiệu lực.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        notificationService.createNotification(
+            contract.getRoom().getProperty().getLandlord(),
+            "Khách thuê đã nạp cọc thành công",
+            "Khách thuê phòng " + contract.getRoom().getName() + " đã nạp cọc qua VietQR. Hợp đồng đã kích hoạt. Khoản cọc sẽ được chuyển đến bạn trong đợt đối soát tiếp theo.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+
+        contractRepository.save(contract);
+        System.out.println("✅ [SePay Deposit] Đã tự động kích hoạt Hợp đồng #" + contract.getId());
     }
 
     private boolean verifyWeb3Signature(String message, String signature, String expectedWalletAddress) {

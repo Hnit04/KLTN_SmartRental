@@ -201,7 +201,7 @@ public class EmailService {
         body.put("to", List.of(Map.of("email", toEmail)));
         body.put("subject", "[SmartRental] Nhắc nhở lịch hẹn sắp tới");
         LocalDateTime dateTime = LocalDateTime.parse(time);
-        DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE, dd/MM/yyyy", new Locale("vi", "VN"));
+        DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE, dd/MM/yyyy", Locale.of("vi", "VN"));
         String formattedTime = dateTime.format(displayFormatter);
 
         String html = String.format(

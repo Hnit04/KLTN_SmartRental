@@ -172,6 +172,7 @@ export interface Room {
   hasMezzanine?: boolean;
   hasBalcony?: boolean;
   images: string[];
+  panoramaImages?: string[];
   amenities: string[];
   description?: string;
   propertyId: number;

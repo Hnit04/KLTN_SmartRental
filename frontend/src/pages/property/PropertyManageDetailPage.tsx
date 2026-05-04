@@ -88,6 +88,7 @@ export default function PropertyManageDetailPage() {
     amenities: [] as string[], 
     customAmenitiesInput: '', 
     images: [] as string[],
+    panoramaImages: [] as string[],
     defaultTerms: ''
   });
 
@@ -95,6 +96,11 @@ export default function PropertyManageDetailPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- STATE UPLOAD ẢNH 360 ---
+  const [panoSelectedFiles, setPanoSelectedFiles] = useState<File[]>([]);
+  const [panoPreviewUrls, setPanoPreviewUrls] = useState<string[]>([]);
+  const panoFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (id) fetchData();
@@ -177,10 +183,13 @@ export default function PropertyManageDetailPage() {
       hasMezzanine: false, hasBalcony: false,
       maxOccupants: '',
       amenities: [], customAmenitiesInput: '', images: [],
+      panoramaImages: [],
       defaultTerms: '' 
     });
     setSelectedFiles([]); 
     setPreviewUrls([]);
+    setPanoSelectedFiles([]);
+    setPanoPreviewUrls([]);
     setShowModal(true);
   };
 
@@ -225,11 +234,14 @@ export default function PropertyManageDetailPage() {
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '), 
       images: [],
+      panoramaImages: [],
       defaultTerms: room.defaultTerms || '' 
     });
 
     setSelectedFiles([]); 
     setPreviewUrls([]);
+    setPanoSelectedFiles([]);
+    setPanoPreviewUrls([]);
     setShowModal(true);
     
     toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
@@ -261,10 +273,13 @@ export default function PropertyManageDetailPage() {
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '), 
       images: room.images || [],
+      panoramaImages: room.panoramaImages || [],
       defaultTerms: room.defaultTerms || '' 
     });
     setSelectedFiles([]); 
     setPreviewUrls([]);
+    setPanoSelectedFiles([]);
+    setPanoPreviewUrls([]);
     setShowModal(true);
   };
 
@@ -314,6 +329,36 @@ export default function PropertyManageDetailPage() {
     setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
   };
 
+  // --- XỬ LÝ ẢNH 360 ---
+  const handlePanoImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const totalCurrent = formData.panoramaImages.length + panoSelectedFiles.length;
+      const remaining = 5 - totalCurrent;
+      if (remaining <= 0) {
+        toast.warning('Tối đa 5 ảnh 360 độ mỗi phòng!');
+        return;
+      }
+      const filesArray = Array.from(e.target.files)
+        .filter(file => file.size <= 10 * 1024 * 1024)
+        .slice(0, remaining);
+      if (filesArray.length < Array.from(e.target.files).length) {
+        toast.warning('Một số ảnh quá lớn (>10MB) hoặc vượt giới hạn đã bị bỏ qua.');
+      }
+      setPanoSelectedFiles(prev => [...prev, ...filesArray]);
+      setPanoPreviewUrls(prev => [...prev, ...filesArray.map(f => URL.createObjectURL(f))]);
+    }
+    if (panoFileInputRef.current) panoFileInputRef.current.value = '';
+  };
+
+  const removePanoSelectedFile = (idx: number) => {
+    setPanoSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+    setPanoPreviewUrls(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeOldPanoImage = (idx: number) => {
+    setFormData(prev => ({ ...prev, panoramaImages: prev.panoramaImages.filter((_, i) => i !== idx) }));
+  };
+
   // --- TÍCH HỢP AI TẠO MÔ TẢ ---
   const handleGenerateAI = async () => {
     if (!formData.name || !formData.area || !formData.price) {
@@ -360,11 +405,20 @@ export default function PropertyManageDetailPage() {
     try {
       setIsSubmitting(true);
       
+      // Upload ảnh thường
       let newUrls: string[] = [];
       if (selectedFiles.length > 0) {
         toast.info("Đang tải ảnh lên...");
         const uploadRes = await propertyApi.uploadImages(selectedFiles);
         newUrls = (uploadRes as any).data || uploadRes;
+      }
+
+      // Upload ảnh 360
+      let newPanoUrls: string[] = [];
+      if (panoSelectedFiles.length > 0) {
+        toast.info("Đang tải ảnh 360° lên...");
+        const panoUploadRes = await propertyApi.uploadImages(panoSelectedFiles);
+        newPanoUrls = (panoUploadRes as any).data || panoUploadRes;
       }
 
       const parsedCustomAmenities = formData.customAmenitiesInput
@@ -385,6 +439,7 @@ export default function PropertyManageDetailPage() {
         description: formData.description,
         amenities: finalAmenities,
         images: [...formData.images, ...newUrls],
+        panoramaImages: [...formData.panoramaImages, ...newPanoUrls],
         defaultTerms: formData.defaultTerms 
       };
 
@@ -610,6 +665,47 @@ export default function PropertyManageDetailPage() {
                         )}
                       </div>
                     )}
+                  {/* NÚT BẢO TRÌ / HOÀN THÀNH BẢO TRÌ */}
+                  {room.status === 'MAINTENANCE' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        openMaintenanceConfirm(room, 'complete');
+                      }}
+                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
+                    >
+                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-1.5" /> Hoàn thành
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        openMaintenanceConfirm(room, 'start');
+                      }}
+                      disabled={isMaintenanceLoading && maintenanceRoomId === room.id}
+                    >
+                      {isMaintenanceLoading && maintenanceRoomId === room.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Wrench className="h-4 w-4 mr-1.5" /> Bảo trì
+                        </>
+                      )}
+                    </Button>
+                  )}
+
 
                   <Button
                     variant="outline"
@@ -807,7 +903,7 @@ export default function PropertyManageDetailPage() {
 
                 {/* Upload Ảnh */}
                 <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Phòng</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
                   <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
                     <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
                     <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
@@ -829,6 +925,61 @@ export default function PropertyManageDetailPage() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+
+                {/* Upload Ảnh 360 */}
+                <div className="border-t pt-4 mt-2">
+                  <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                    🌐 Ảnh 360° (Virtual Tour)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Tải lên ảnh panorama 360 độ để khách thuê có thể xem phòng 3D trực tuyến. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB.
+                  </p>
+
+                  <div 
+                    onClick={() => panoFileInputRef.current?.click()} 
+                    className="border-2 border-dashed border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer group"
+                  >
+                    <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
+                        <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-cyan-700">Chọn ảnh 360°</span>
+                    <span className="text-[11px] text-cyan-600/70 mt-0.5">Chụp bằng Google Street View, Panorama trên điện thoại...</span>
+                    <input type="file" multiple accept="image/*" ref={panoFileInputRef} onChange={handlePanoImageChange} className="hidden" />
+                  </div>
+
+                  {(formData.panoramaImages.length > 0 || panoPreviewUrls.length > 0) && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                      {formData.panoramaImages.map((url, idx) => (
+                        <div key={`pano-old-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border border-cyan-200 bg-cyan-50">
+                          <img src={url} alt={`pano-${idx}`} className="w-full h-full object-cover" />
+                          <div className="absolute top-1 left-1">
+                            <span className="text-[9px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">360°</span>
+                          </div>
+                          <button type="button" onClick={() => removeOldPanoImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                      {panoPreviewUrls.map((url, idx) => (
+                        <div key={`pano-new-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border-2 border-dashed border-cyan-400 bg-cyan-50/50">
+                          <img src={url} alt={`pano-preview-${idx}`} className="w-full h-full object-cover opacity-80" />
+                          <div className="absolute top-1 left-1">
+                            <span className="text-[9px] font-bold bg-cyan-500 text-white px-1.5 py-0.5 rounded">Mới</span>
+                          </div>
+                          <button type="button" onClick={() => removePanoSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {formData.panoramaImages.length === 0 && panoPreviewUrls.length === 0 && (
+                    <p className="text-[11px] text-cyan-600 mt-2 flex items-start gap-1 bg-cyan-50 p-2.5 rounded-md border border-cyan-100">
+                      <span className="flex-shrink-0">💡</span>
+                      <span><strong>Mẹo:</strong> Mở ứng dụng Camera → chế độ Panorama → quay tròn 360°. Hoặc dùng app Google Street View để chụp ảnh cầu 360 chuyên nghiệp.</span>
+                    </p>
                   )}
                 </div>
               </form>

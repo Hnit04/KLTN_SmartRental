@@ -78,6 +78,14 @@ brevo:
 google:
   client-id: "${GOOGLE_CLIENT_ID:}"
 
+sepay:
+  webhook:
+    token: "${SEPAY_WEBHOOK_TOKEN:}"
+  platform:
+    bank-name: "${SEPAY_PLATFORM_BANK_NAME:MB}"
+    account-number: "${SEPAY_PLATFORM_ACCOUNT_NUMBER:0326829327}"
+    account-name: "${SEPAY_PLATFORM_ACCOUNT_NAME:TRAN CONG TINH}"
+
 ---
 # === PRODUCTION PROFILE ===
 spring:

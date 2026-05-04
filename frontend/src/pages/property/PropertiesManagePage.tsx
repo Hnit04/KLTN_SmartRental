@@ -33,15 +33,15 @@ export default function PropertiesManagePage() {
   const getPropertyStatusBadge = (status?: string) => {
     switch (status) {
       case 'PENDING':
-        return <StatusBadge label="Cho duyet" tone="warning" className="text-[10px] font-bold uppercase" />;
+        return <StatusBadge label="Chờ duyệt" tone="warning" className="text-[10px] font-bold uppercase" />;
       case 'APPROVED':
-        return <StatusBadge label="Da duyet" tone="success" className="text-[10px] font-bold uppercase" />;
+        return <StatusBadge label="Đã duyệt" tone="success" className="text-[10px] font-bold uppercase" />;
       case 'REJECTED':
-        return <StatusBadge label="Bi tu choi" tone="danger" className="text-[10px] font-bold uppercase" />;
+        return <StatusBadge label="Bị từ chối" tone="danger" className="text-[10px] font-bold uppercase" />;
       case 'HIDDEN':
-        return <StatusBadge label="Dang an" tone="neutral" className="text-[10px] font-bold uppercase" />;
+        return <StatusBadge label="Đang ẩn" tone="neutral" className="text-[10px] font-bold uppercase" />;
       default:
-        return <StatusBadge label={status || 'Khong ro'} tone="neutral" className="text-[10px] font-bold uppercase" />;
+        return <StatusBadge label={status || 'Không rõ'} tone="neutral" className="text-[10px] font-bold uppercase" />;
     }
   };
 

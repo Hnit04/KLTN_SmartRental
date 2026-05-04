@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/Button';
 import { billApi } from '@/api/billApi';
 import { contractApi } from '@/api/contractApi';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 export default function ReportsPage() {
   const [year, setYear] = useState('2026');
   const [data, setData] = useState<any>(null);
   const [insights, setInsights] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,7 +70,7 @@ export default function ReportsPage() {
               <option value="2024">Năm 2024</option>
             </select>
           </div>
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => toast.info("Tính năng xuất Excel đang được phát triển.")}>
+          <Button variant="outline" className="flex items-center gap-2 opacity-60 cursor-not-allowed" disabled title="Tính năng đang phát triển">
             <Download className="h-4 w-4" /> Xuất báo cáo
           </Button>
         </div>
@@ -221,31 +223,31 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-               {data?.propertyDetails?.map((item: any) => (
-                 <tr key={item.name} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-900">{item.name}</td>
-                    <td className="px-6 py-4 text-center text-gray-600">{item.totalRooms}</td>
-                    <td className="px-6 py-4 text-right font-bold text-primary">{item.revenue?.toLocaleString()}đ</td>
-                    <td className="px-6 py-4">
-                       <div className="flex justify-center">
-                        {item.trend === 'up' ? (
-                          <span className="flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
-                            <ArrowUpRight className="h-3 w-3 mr-1" /> Tăng
-                          </span>
-                        ) : (
-                          <span className="flex items-center text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                             Ổn định
-                          </span>
-                        )}
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <Button variant="ghost" size="sm" className="text-gray-400 hover:text-primary">
-                          <FileText className="h-4 w-4" />
-                       </Button>
-                    </td>
-                 </tr>
-               ))}
+                {data?.propertyDetails?.map((item: any) => (
+                  <tr key={item.name} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => item.propertyId && navigate(`/landlord/properties/${item.propertyId}`)}>
+                     <td className="px-6 py-4 font-bold text-gray-900">{item.name}</td>
+                     <td className="px-6 py-4 text-center text-gray-600">{item.totalRooms}</td>
+                     <td className="px-6 py-4 text-right font-bold text-primary">{item.revenue?.toLocaleString()}đ</td>
+                     <td className="px-6 py-4">
+                        <div className="flex justify-center">
+                         {item.trend === 'up' ? (
+                           <span className="flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+                             <ArrowUpRight className="h-3 w-3 mr-1" /> Tăng
+                           </span>
+                         ) : (
+                           <span className="flex items-center text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              Ổn định
+                           </span>
+                         )}
+                        </div>
+                     </td>
+                     <td className="px-6 py-4 text-right">
+                        <Button variant="ghost" size="sm" className="text-gray-400 hover:text-primary">
+                           <FileText className="h-4 w-4" />
+                        </Button>
+                     </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
           {(!data?.propertyDetails || data.propertyDetails.length === 0) && (

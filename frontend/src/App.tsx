@@ -44,6 +44,7 @@ import UserManagementPage from "./pages/admin/UserManagementPage";
 import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import AiAnalyticsPage from "./pages/admin/AiAnalyticsPage";
+import AdminSettlementPage from "./pages/admin/AdminSettlementPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
@@ -51,8 +52,9 @@ import ScrollToTop from "./components/shared/ScrollToTop";
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
+  return isAuthenticated ? <Outlet /> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} />;
 };
 
 // 2. PublicRoute (chặn login/register khi đã đăng nhập)
@@ -173,6 +175,7 @@ function App() {
                 <Route path="users" element={<UserManagementPage />} />
                 <Route path="blockchain-logs" element={<BlockchainLogsPage />} />
                 <Route path="ai-analytics" element={<AiAnalyticsPage />} />
+                <Route path="settlements" element={<AdminSettlementPage />} />
               </Route>
             </Route> 
 
@@ -193,3 +196,4 @@ function App() {
 }
 
 export default App;
+//test ci cd

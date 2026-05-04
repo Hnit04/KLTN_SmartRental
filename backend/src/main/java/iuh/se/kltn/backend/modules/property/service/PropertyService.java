@@ -112,9 +112,12 @@ public class PropertyService {
             throw new RuntimeException("Bạn không phải chủ khu trọ này!");
         }
 
-        // KIỂM DUYỆT NỘI DUNG PHÒNG - Chỉ để gợi ý cho Admin
+        // KIỂM DUYỆT NỘI DUNG PHÒNG - Gộp ảnh thường + ảnh 360 để AI kiểm duyệt toàn bộ
+        List<String> allImages = new java.util.ArrayList<>();
+        if (request.getImages() != null) allImages.addAll(request.getImages());
+        if (request.getPanoramaImages() != null) allImages.addAll(request.getPanoramaImages());
         ModerationResult modResult = moderationService.checkContent(
-                "Phòng trọ", buildRoomContentCheck(request), request.getImages());
+                "Phòng trọ", buildRoomContentCheck(request), allImages);
         
         PropertyStatus aiStatus = PropertyStatus.PENDING;
 
@@ -125,6 +128,9 @@ public class PropertyService {
         room.setDescription(request.getDescription());
         room.setImages(JsonUtil.convertListToJson(request.getImages()));
         room.setAmenities(JsonUtil.convertListToJson(request.getAmenities()));
+        if (request.getPanoramaImages() != null) {
+            room.setPanoramaImages(JsonUtil.convertListToJson(request.getPanoramaImages()));
+        }
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
 
@@ -146,7 +152,7 @@ public class PropertyService {
 
     // LẤY DANH SÁCH NHÀ CỦA CHU TRO
     public List<PropertyResponse> getMyProperties(Long landlordId) {
-        return propertyRepository.findByLandlordId(landlordId).stream()
+        return propertyRepository.findByLandlordIdOrderByCreatedAtDesc(landlordId).stream()
                 .map(this::mapToPropertyResponse)
                 .collect(Collectors.toList());
     }
@@ -213,6 +219,7 @@ public class PropertyService {
         RoomResponse res = modelMapper.map(r, RoomResponse.class);
         res.setImages(JsonUtil.convertJsonToList(r.getImages()));
         res.setAmenities(JsonUtil.convertJsonToList(r.getAmenities()));
+        res.setPanoramaImages(JsonUtil.convertJsonToList(r.getPanoramaImages()));
         if (r.getProperty() != null) {
             res.setPropertyName(r.getProperty().getName());
         }

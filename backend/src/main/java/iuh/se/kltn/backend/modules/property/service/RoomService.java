@@ -58,6 +58,7 @@ public class RoomService {
         // Convert chuỗi JSON trong DB thành List Java
         res.setImages(JsonUtil.convertJsonToList(r.getImages()));
         res.setAmenities(JsonUtil.convertJsonToList(r.getAmenities()));
+        res.setPanoramaImages(JsonUtil.convertJsonToList(r.getPanoramaImages()));
 
         if (r.getProperty() != null) {
             res.setPropertyName(r.getProperty().getName());
@@ -91,9 +92,12 @@ public class RoomService {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + id));
 
-        // KIỂM DUYỆT NỘI DUNG - Chỉ để gợi ý cho Admin
+        // KIỂM DUYỆT NỘI DUNG - Gộp ảnh thường + ảnh 360 để AI kiểm duyệt toàn bộ
+        java.util.List<String> allImages = new java.util.ArrayList<>();
+        if (request.getImages() != null) allImages.addAll(request.getImages());
+        if (request.getPanoramaImages() != null) allImages.addAll(request.getPanoramaImages());
         ModerationResult modResult = moderationService
-                .checkContent("Phòng trọ", buildRoomContentCheck(request), request.getImages());
+                .checkContent("Phòng trọ", buildRoomContentCheck(request), allImages);
         
         PropertyStatus aiStatus = PropertyStatus.PENDING;
 
@@ -111,6 +115,9 @@ public class RoomService {
         }
         if (request.getImages() != null) {
             room.setImages(JsonUtil.convertListToJson(request.getImages()));
+        }
+        if (request.getPanoramaImages() != null) {
+            room.setPanoramaImages(JsonUtil.convertListToJson(request.getPanoramaImages()));
         }
 
         if (request.getDefaultTerms() != null) {

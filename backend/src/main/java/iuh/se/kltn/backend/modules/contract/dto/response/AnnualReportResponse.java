@@ -44,6 +44,7 @@ public class AnnualReportResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PropertyRevenueDTO {
+        private Long propertyId;
         private String name;
         private Integer totalRooms;
         private Double revenue;

@@ -156,10 +156,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Doanh thu tháng này - Dùng dữ liệu từ API */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <Link to="/landlord/reports" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-gray-500">Doanh thu (Tháng này)</p>
+              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Doanh thu (Tháng này)</p>
               {loading ? (
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">Đang tải...</h3>
               ) : error ? (
@@ -170,7 +170,7 @@ export default function DashboardPage() {
                 </h3>
               )}
             </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
               <Wallet className="h-5 w-5" />
             </div>
           </div>
@@ -194,28 +194,28 @@ export default function DashboardPage() {
               </>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Dự kiến thu (Tháng tới) */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <Link to="/landlord/reports" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-gray-500">Dự kiến thu (Tháng tới)</p>
+              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Dự kiến thu (Tháng tới)</p>
               <h3 className="text-2xl font-bold text-blue-600 mt-1">
                 {formatCurrency(insights?.projectedRevenue || 0)}
               </h3>
             </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
               <TrendingUp className="h-5 w-5" />
             </div>
           </div>
           <p className="mt-4 text-xs text-gray-400">
             Dựa trên các hợp đồng đang hiệu lực
           </p>
-        </div>
+        </Link>
 
         {/* Tiền thất thoát (Phòng trống) */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm border-l-4 border-l-red-500">
+        <Link to="/landlord/properties" className="bg-white p-6 rounded-2xl border shadow-sm border-l-4 border-l-red-500 hover:shadow-md transition-all group">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-gray-500 text-red-600">Thất thoát (Phòng trống)</p>
@@ -223,25 +223,25 @@ export default function DashboardPage() {
                 -{formatCurrency(insights?.opportunityCost || 0)}
               </h3>
             </div>
-            <div className="p-2 bg-red-50 rounded-lg text-red-600">
+            <div className="p-2 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
               <AlertCircle className="h-5 w-5" />
             </div>
           </div>
           <p className="mt-4 text-xs text-red-400 font-medium">
              Cần đẩy nhanh việc tìm khách thuê
           </p>
-        </div>
+        </Link>
 
         {/* Tỷ lệ lấp đầy */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <Link to="/landlord/properties" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-gray-500">Tỷ lệ lấp đầy</p>
+              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Tỷ lệ lấp đầy</p>
               <h3 className="text-2xl font-bold text-gray-900 mt-1">
                 {occupancyRate}%
               </h3>
             </div>
-            <div className="p-2 bg-green-50 rounded-lg text-green-600">
+            <div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all">
               <HomeIcon className="h-5 w-5" />
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
             </div>
             <span className="text-xs text-gray-400 font-medium">{occupiedRooms}/{totalRooms} phòng</span>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Phần còn lại giữ nguyên (biểu đồ + to-do list) */}
@@ -261,10 +261,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-gray-900">Biểu đồ doanh thu 6 tháng</h3>
-            <select className="text-sm border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring-primary">
-              <option>Năm nay</option>
-              <option>Năm ngoái</option>
-            </select>
+            <span className="text-sm text-gray-500 font-medium bg-gray-50 px-3 py-1.5 rounded-lg border">{new Date().getFullYear()}</span>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -296,43 +293,43 @@ export default function DashboardPage() {
 
           <div className="space-y-4 flex-1">
             {overdueCount > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
+              <Link to="/landlord/finance" className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-all group">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-red-900">{overdueCount} hóa đơn quá hạn</p>
+                  <p className="text-sm font-bold text-red-900 group-hover:text-red-600 transition-colors">{overdueCount} hóa đơn quá hạn</p>
                   <p className="text-xs text-red-700">Tổng cộng {overdueAmount.toLocaleString()}đ chưa thu hồi.</p>
                 </div>
-              </div>
+              </Link>
             )}
 
             {insights?.expiringContractsCount > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+              <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group">
                 <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-amber-900">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
+                  <p className="text-sm font-bold text-amber-900 group-hover:text-amber-600 transition-colors">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
                   <p className="text-xs text-amber-700">Trong 30 ngày tới. Cần liên hệ khách sớm.</p>
                 </div>
-              </div>
+              </Link>
             )}
 
             {occupancyRate < 100 && (
-              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <Link to="/landlord/properties" className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-all group">
                 <HomeIcon className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-blue-900">Phòng trống cần cho thuê</p>
+                  <p className="text-sm font-bold text-blue-900 group-hover:text-blue-600 transition-colors">Phòng trống cần cho thuê</p>
                   <p className="text-xs text-blue-700">Còn {totalRooms - occupiedRooms} phòng đang trống.</p>
                 </div>
-              </div>
+              </Link>
             )}
             
             {insights?.latePaymentRoomsCount > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+              <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100 hover:border-purple-300 transition-all group">
                 <Users className="h-5 w-5 text-purple-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-purple-900">{insights.latePaymentRoomsCount} phòng đóng tiền trễ</p>
+                  <p className="text-sm font-bold text-purple-900 group-hover:text-purple-600 transition-colors">{insights.latePaymentRoomsCount} phòng đóng tiền trễ</p>
                   <p className="text-xs text-purple-700">Cần có biện pháp nhắc nhở hoặc đánh giá uy tín.</p>
                 </div>
-              </div>
+              </Link>
             )}
           </div>
 

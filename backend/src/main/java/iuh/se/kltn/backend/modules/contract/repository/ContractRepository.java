@@ -18,7 +18,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findByTenantId(Long tenantId);
 
     Optional<Contract> findTopByRoomIdOrderByStartDateDesc(Long roomId);
-    @Query("SELECT c FROM Contract c WHERE c.room.property.landlord.id = :landlordId")
+    @Query("SELECT c FROM Contract c WHERE c.room.property.landlord.id = :landlordId ORDER BY c.createdAt DESC")
     List<Contract> findContractsByLandlordId(@Param("landlordId") Long landlordId);
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
@@ -28,7 +28,8 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
            "WHERE c.room.property.landlord.id = :landlordId " +
            "AND (c.status = 'ACTIVE' " +
            "  OR (c.status IN ('EXPIRED', 'TERMINATED_EARLY', 'CANCELLED') " +
-           "      AND b.status IN ('UNPAID', 'PENDING', 'LATE'))) ")
+           "      AND b.status IN ('UNPAID', 'PENDING', 'LATE'))) " +
+           "ORDER BY c.createdAt DESC")
     List<Contract> findBillingContractsByLandlordId(@Param("landlordId") Long landlordId);
 
     List<Contract> findByStatusAndCreatedAtBefore(ContractStatus status, LocalDateTime time);
@@ -58,5 +59,14 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findAllRentalHistoryByUserId(@Param("userId") Long userId);
 
     // ✅ Tìm hợp đồng sắp hết hạn của chủ trọ
-    List<Contract> findByRoom_Property_Landlord_IdAndStatusAndEndDateBetween(Long landlordId, ContractStatus status, java.time.LocalDate start, java.time.LocalDate end);
+    List<Contract> findByRoom_Property_Landlord_IdAndStatusAndEndDateBetween(Long landlordId, ContractStatus status, LocalDate start, LocalDate end);
+
+    @Query("SELECT COUNT(DISTINCT c) FROM Contract c " +
+           "WHERE c.room.property.landlord.id = :landlordId " +
+           "AND c.status NOT IN ('CANCELLED', 'PENDING_SIGNATURE', 'AWAITING_DEPOSIT') " +
+           "AND c.startDate <= :endOfMonth " +
+           "AND (c.endDate IS NULL OR c.endDate >= :startOfMonth)")
+    long countActiveDuringPeriod(@Param("landlordId") Long landlordId, 
+                                @Param("startOfMonth") LocalDate startOfMonth, 
+                                @Param("endOfMonth") LocalDate endOfMonth);
 }

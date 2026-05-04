@@ -48,6 +48,8 @@ public class BillService {
     @Autowired
     private BlockchainService blockchainService;
 
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    private boolean mockAmountOverride;
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
 
@@ -173,7 +175,7 @@ public class BillService {
 
     // Lấy danh sách hóa đơn của Hợp đồng
     public List<BillResponse> getBillsByContract(Long contractId) {
-        return billRepository.findByContractId(contractId).stream()
+        return billRepository.findByContractIdOrderByYearDescMonthDesc(contractId).stream()
                 .map(bill -> {
                     Property property = bill.getContract().getRoom().getProperty();
                     Double ePrice = bill.getContract().getElecPriceSnapshot() != null ? bill.getContract().getElecPriceSnapshot() : property.getElecPrice();
@@ -583,7 +585,7 @@ public class BillService {
             int totalRooms = pBills.get(0).getContract().getRoom().getProperty().getRooms().size();
             double rev = pBills.stream().filter(b -> b.getStatus() == BillStatus.PAID).mapToDouble(Bill::getTotalAmount).sum();
             
-            propertyDetails.add(new AnnualReportResponse.PropertyRevenueDTO(name, totalRooms, rev, "stable"));
+            propertyDetails.add(new AnnualReportResponse.PropertyRevenueDTO(entry.getKey(), name, totalRooms, rev, "stable"));
             if (rev > maxPropRev) {
                 maxPropRev = rev;
                 bestProp = name;
@@ -598,5 +600,64 @@ public class BillService {
                 .distribution(distribution)
                 .propertyDetails(propertyDetails)
                 .build();
+    }
+
+    @Transactional
+    public void processSePayWebhook(iuh.se.kltn.backend.modules.contract.dto.request.SePayWebhookRequest request) {
+        String content = request.getTransactionContent();
+        if (content == null) return;
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("SMR BILL (\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(content);
+        if (matcher.find()) {
+            Long billId = Long.parseLong(matcher.group(1));
+            Bill bill = billRepository.findById(billId).orElse(null);
+
+            if (bill == null || bill.getStatus() == BillStatus.PAID) {
+                return; // Không tồn tại hoặc đã thanh toán
+            }
+
+            // ĐÃ SỬA THÀNH VÍ TRUNG GIAN (Centralized Wallet)
+            // Không còn kiểm tra khớp với số tài khoản cá nhân của chủ trọ nữa.
+            // Mọi giao dịch từ Webhook SePay (được bảo vệ bằng ApiKey) đều được tin cậy vì chuyển thẳng vào Platform.
+
+            // MOCK: Nếu mock=true, cho phép 2000 VNĐ pass. Nếu mock=false, kiểm tra số tiền thật.
+            if (request.getAmountIn() < bill.getTotalAmount() && !(mockAmountOverride && request.getAmountIn() == 2000.0)) {
+                System.out.println("⚠️ [SePay] Số tiền chuyển (" + request.getAmountIn() + ") nhỏ hơn tổng hóa đơn (" + bill.getTotalAmount() + "). Không tự động duyệt.");
+                return;
+            }
+
+            // Xử lý thành công -> Đổi trạng thái hóa đơn
+            bill.setStatus(BillStatus.PAID);
+            bill.setPaymentTxHash(request.getReferenceNumber() != null ? request.getReferenceNumber() : "SEPAY_AUTO");
+            bill.setPaidAt(LocalDateTime.now());
+            billRepository.save(bill);
+
+            // Gửi thông báo cho Khách thuê
+            notificationService.createNotification(
+                    bill.getContract().getTenant(),
+                    "Thanh toán hóa đơn thành công",
+                    "Hóa đơn tháng " + bill.getMonth() + " của bạn đã được ghi nhận thanh toán qua VietQR (Mã GD: " + request.getReferenceNumber() + "). Khoản tiền sẽ được chuyển đến Chủ trọ trong đợt đối soát tiếp theo.",
+                    NotificationType.PAYMENT_REMINDER,
+                    bill.getContract().getId()
+            );
+
+            // Gửi thông báo cho Chủ trọ
+            notificationService.createNotification(
+                    bill.getContract().getRoom().getProperty().getLandlord(),
+                    "Khách thuê đã thanh toán hóa đơn",
+                    "Khách thuê phòng " + bill.getContract().getRoom().getName() + " đã thanh toán hóa đơn tháng " + bill.getMonth() + " qua VietQR. Khoản tiền sẽ được chuyển đến bạn trong đợt đối soát tiếp theo.",
+                    NotificationType.PAYMENT_REMINDER,
+                    bill.getContract().getId()
+            );
+
+            // Cộng / trừ điểm uy tín
+            if (bill.getPaidAt().toLocalDate().isAfter(bill.getDeadline().toLocalDate())) {
+                reputationService.processPoints(bill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_LATE, -5, "Thanh toán hóa đơn trễ hạn tự động (Hóa đơn #" + bill.getId() + ")");
+            } else {
+                reputationService.processPoints(bill.getContract().getTenant(), iuh.se.kltn.backend.modules.user.enums.ReputationAction.BILL_PAID_ON_TIME, 2, "Thanh toán hóa đơn đúng hạn tự động (Hóa đơn #" + bill.getId() + ")");
+            }
+
+            System.out.println("✅ [SePay] Đã tự động gạch nợ thành công cho Hóa đơn #" + bill.getId());
+        }
     }
 }
