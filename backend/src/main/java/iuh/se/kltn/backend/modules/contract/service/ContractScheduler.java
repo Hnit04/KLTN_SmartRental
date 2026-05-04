@@ -45,11 +45,14 @@ public class ContractScheduler {
             contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
             contractRepository.save(contract);
 
-            // Nhả phòng về AVAILABLE
+            // 🛡️ Vá lỗ hổng: Chỉ nhả phòng nếu không còn hợp đồng nào khác đang sống
             Room room = contract.getRoom();
             if (room != null && room.getStatus() == RoomStatus.RESERVED) {
-                room.setStatus(RoomStatus.AVAILABLE);
-                roomRepository.save(room);
+                boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                if (!hasOtherLive) {
+                    room.setStatus(RoomStatus.AVAILABLE);
+                    roomRepository.save(room);
+                }
             }
 
             // Thông báo cho cả 2 bên
@@ -83,11 +86,14 @@ public class ContractScheduler {
             contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.UNPAID);
             contractRepository.save(contract);
 
-            // Nhả phòng
+            // 🛡️ Vá lỗ hổng: Chỉ nhả phòng nếu không còn hợp đồng nào khác đang sống
             Room room = contract.getRoom();
             if (room != null) {
-                room.setStatus(RoomStatus.AVAILABLE);
-                roomRepository.save(room);
+                boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                if (!hasOtherLive) {
+                    room.setStatus(RoomStatus.AVAILABLE);
+                    roomRepository.save(room);
+                }
             }
 
             // Trừ điểm uy tín khách thuê
@@ -122,10 +128,16 @@ public class ContractScheduler {
             contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
             contractRepository.save(contract);
             
-            // Xử lý nhả phòng trống cho hệ thống
+            // 🛡️ Vá lỗ hổng: Kiểm tra Pre-booking trước khi nhả phòng
             Room room = contract.getRoom();
             if (room != null && room.getStatus() != RoomStatus.AVAILABLE) {
-                room.setStatus(RoomStatus.AVAILABLE);
+                boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                if (hasOtherLive) {
+                    // Có Pre-booking → giữ phòng RESERVED (hoặc RENTED nếu Pre-booking đã ACTIVE)
+                    room.setStatus(RoomStatus.RESERVED);
+                } else {
+                    room.setStatus(RoomStatus.AVAILABLE);
+                }
                 roomRepository.save(room);
             }
 
@@ -143,6 +155,42 @@ public class ContractScheduler {
         
         if (!expiredContracts.isEmpty()) {
             System.out.println("Đã kết thúc tự động " + expiredContracts.size() + " hợp đồng hết hạn.");
+        }
+    }
+
+    // 🔔 NHẮC NHỞ GIA HẠN HỢP ĐỒNG (Chạy hàng ngày lúc 8h sáng)
+    @Scheduled(cron = "0 0 8 * * ?")
+    @Transactional
+    public void sendRenewalReminders() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate in30Days = today.plusDays(30);
+        java.time.LocalDate in15Days = today.plusDays(15);
+
+        // Lấy hợp đồng ACTIVE sắp hết hạn trong 30 ngày
+        List<Contract> soonExpiring = contractRepository.findByStatusAndEndDateBefore(ContractStatus.ACTIVE, in30Days.plusDays(1));
+        
+        for (Contract contract : soonExpiring) {
+            if (contract.getEndDate() == null) continue;
+            long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(today, contract.getEndDate());
+            
+            // Chỉ gửi thông báo cho 2 mốc: đúng 30 ngày và đúng 15 ngày
+            if (daysLeft == 30) {
+                notificationService.createNotification(contract.getTenant(),
+                    "Nhắc nhở gia hạn hợp đồng",
+                    "Hợp đồng phòng " + contract.getRoom().getName() + " sẽ hết hạn sau 30 ngày (" + contract.getEndDate() + "). Vui lòng liên hệ chủ trọ để gia hạn nếu muốn ở tiếp.",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            } else if (daysLeft == 15) {
+                notificationService.createNotification(contract.getTenant(),
+                    "⚠️ Cảnh báo: Phòng sẽ được mở đặt trước",
+                    "Hợp đồng phòng " + contract.getRoom().getName() + " chỉ còn 15 ngày. Từ bây giờ người khác có thể đặt trước phòng này. Nếu bạn muốn ở tiếp, hãy gia hạn ngay.",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+                
+                // Thông báo chủ trọ
+                notificationService.createNotification(contract.getRoom().getProperty().getLandlord(),
+                    "Phòng sắp trống: " + contract.getRoom().getName(),
+                    "Hợp đồng phòng " + contract.getRoom().getName() + " của khách " + contract.getTenant().getFullName() + " sẽ hết hạn sau 15 ngày (" + contract.getEndDate() + "). Phòng đã được mở cho người khác đặt trước.",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            }
         }
     }
 }

@@ -71,5 +71,10 @@ export const contractApi = {
   },
   confirmTraditionalDeposit: (id: number | string) => {
     return axiosClient.post(`/contracts/${id}/confirm-traditional-deposit`);
+  },
+
+  // ✅ Lịch sử hợp đồng theo phòng
+  getRoomHistory: (roomId: number | string) => {
+    return axiosClient.get<Contract[]>(`/contracts/room/${roomId}/history`);
   }
 };

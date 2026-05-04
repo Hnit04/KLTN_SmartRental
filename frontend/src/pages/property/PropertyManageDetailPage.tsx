@@ -507,13 +507,15 @@ export default function PropertyManageDetailPage() {
                 {/* Trạng thái phòng */}
                 <span className={`absolute top-2 right-2 px-3 py-1 rounded-md text-xs font-bold shadow-sm flex items-center gap-1 ${
                   room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
+                  room.status === 'RENTED' && room.availableFromDate ? 'bg-orange-500 text-white' :
                   room.status === 'RENTED' ? 'bg-blue-600 text-white' :
                   room.status === 'MAINTENANCE' ? 'bg-orange-500 text-white' :
                   room.status === 'RESERVED' ? 'bg-amber-500 text-white' : 
                   'bg-gray-500 text-white'
                 }`}>
                   {room.status === 'AVAILABLE' && '🟢 Trống'}
-                  {room.status === 'RENTED' && '🔵 Đã thuê'}
+                  {room.status === 'RENTED' && room.availableFromDate && `Sắp trống (${new Date(room.availableFromDate).toLocaleDateString('vi-VN')})`}
+                  {room.status === 'RENTED' && !room.availableFromDate && '🔵 Đã thuê'}
                   {room.status === 'MAINTENANCE' && (
                     <>
                       <Wrench className="h-3.5 w-3.5" /> Đang bảo trì
@@ -706,6 +708,19 @@ export default function PropertyManageDetailPage() {
                     </Button>
                   )}
 
+                  {(room.status === 'AVAILABLE' || room.availableFromDate) && room.status !== 'MAINTENANCE' ? (
+                    <Link to={`/landlord/contracts/create?roomId=${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="w-full text-green-600 border-green-200 hover:bg-green-50">
+                        <FileSignature className="h-4 w-4 mr-1.5" /> Tạo HĐ
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to={`/landlord/properties/${id}/rooms/${room.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="w-full text-purple-600 border-purple-200 hover:bg-purple-50">
+                        <FileText className="h-4 w-4 mr-1.5" /> Chi tiết
+                      </Button>
+                    </Link>
+                  )}
 
                   <Button
                     variant="outline"
