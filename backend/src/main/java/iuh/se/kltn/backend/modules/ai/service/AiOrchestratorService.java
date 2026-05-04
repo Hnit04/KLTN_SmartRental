@@ -503,6 +503,7 @@ public class AiOrchestratorService {
 
         // 3. THỰC THI SQL
         try {
+            jdbcTemplate.setQueryTimeout(1); // Chặn DoS: Giới hạn 1 giây cho SQL sinh bởi AI
             List<Map<String, Object>> results = jdbcTemplate.queryForList(finalSql);
 
             if (matches.isEmpty()) {
@@ -546,6 +547,8 @@ public class AiOrchestratorService {
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
             return "Dạ, hệ thống đang gặp chút khó khăn khi tra cứu thông tin này. Bạn vui lòng thử lại sau nhé!";
+        } finally {
+            jdbcTemplate.setQueryTimeout(0); // Reset timeout về mặc định cho các nghiệp vụ khác
         }
     }
     // Admin: Thống kê AI NLP

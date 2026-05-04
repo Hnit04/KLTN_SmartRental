@@ -97,7 +97,8 @@ export default function RoomDetailPage() {
       toast.error("Phòng đã có người đặt cọc. Không thể đặt lịch xem.");
       return;
     }
-    if (!isAvailable) {
+    // 🛡️ Cho phép đặt lịch xem phòng sắp trống (Pre-booking)
+    if (!isAvailable && !room?.availableFromDate) {
       toast.error("Phòng hiện không còn trống.");
       return;
     }
@@ -188,6 +189,7 @@ export default function RoomDetailPage() {
       setIsLoginModalOpen(true);
       return;
     }
+    // 🛡️ Cho phép thuê ngay cho cả phòng trống và phòng sắp trống
     navigate(`/tenant/contracts/create?roomId=${room?.id}`);
   };
 
@@ -195,6 +197,7 @@ export default function RoomDetailPage() {
   const getBookingButtonText = () => {
     if (isMaintenance) return "Phòng đang bảo trì";
     if (isReserved) return "Đã có người đặt cọc";
+    if (!isAvailable && room?.availableFromDate) return `Đặt lịch xem (Sắp trống)`;
     if (!isAvailable) return "Phòng đã có người thuê";
     return "Đặt lịch xem phòng";
   };
@@ -383,6 +386,8 @@ export default function RoomDetailPage() {
                   <StatusBadge label="Đã có người đặt cọc" tone="warning" className="text-xs font-bold" />
                 ) : isMaintenance ? (
                   <StatusBadge label="Đang bảo trì" tone="warning" className="text-xs font-bold" />
+                ) : room.status === 'RENTED' && room.availableFromDate ? (
+                  <StatusBadge label={`Sắp trống ${new Date(room.availableFromDate).toLocaleDateString('vi-VN')}`} tone="warning" className="text-xs font-bold bg-orange-500 text-white border-none" />
                 ) : (
                   <StatusBadge label="Đã thuê" tone="neutral" className="text-xs font-bold" />
                 )}
@@ -496,21 +501,21 @@ export default function RoomDetailPage() {
 
                 <Button
                   className="w-full h-11 gap-2"
-                  disabled={!isAvailable || isReserved || isMaintenance}
+                  disabled={isReserved || isMaintenance || (!isAvailable && !room.availableFromDate)}
                   onClick={handleBooking}
                 >
                   <CalendarClock className="h-4 w-4" />
                   {getBookingButtonText()}
                 </Button>
 
-                {isAvailable && user?.role !== "LANDLORD" && (
+                {(isAvailable || room.availableFromDate) && user?.role !== "LANDLORD" && (
                   <Button
                     variant="outline"
                     className="w-full h-11 gap-2 text-green-700 border-green-200 hover:bg-green-50"
                     onClick={handleRentNow}
                   >
                     <FileSignature className="h-4 w-4" />
-                    Thuê ngay
+                    {room.availableFromDate && !isAvailable ? `Đặt trước phòng này` : 'Thuê ngay'}
                   </Button>
                 )}
 

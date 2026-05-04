@@ -31,6 +31,9 @@ public class RoomService {
     private RoomRepository roomRepository;
 
     @Autowired
+    private iuh.se.kltn.backend.modules.contract.repository.ContractRepository contractRepository;
+
+    @Autowired
     private ModelMapper modelMapper;
 
     @Autowired
@@ -77,6 +80,18 @@ public class RoomService {
         res.setApprovalStatus(r.getApprovalStatus());
         res.setSafetyScore(r.getSafetyScore());
         res.setModerationReason(r.getModerationReason());
+
+        if (r.getStatus() == RoomStatus.RENTED) {
+            // 🛡️ Dùng query lọc startDate <= today để tránh lấy nhầm Pre-booking
+            iuh.se.kltn.backend.modules.contract.entity.Contract currentContract = contractRepository.findCurrentActiveContractByRoomId(r.getId(), java.time.LocalDate.now()).orElse(null);
+            if (currentContract != null && currentContract.getEndDate() != null) {
+                long daysToExpiry = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), currentContract.getEndDate());
+                if (daysToExpiry <= 15 && daysToExpiry >= 0) {
+                    res.setAvailableFromDate(currentContract.getEndDate().toString());
+                }
+            }
+        }
+
         System.out.println(res);
         return res;
     }

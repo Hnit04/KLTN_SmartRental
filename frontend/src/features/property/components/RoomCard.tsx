@@ -52,9 +52,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
     setCurrImgIndex(prev => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  // ✅ KHÔI PHỤC HÀM "THUÊ NGAY"
   const handleRentNow = () => {
-    if (!isAvailable) return;
+    if (!isAvailable && !data.availableFromDate) return;
     // Điều hướng sang trang tạo hợp đồng, truyền ID phòng lên URL
     navigate(`/tenant/contracts/create?roomId=${data.id}`);
   };
@@ -74,7 +73,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   return (
     <>
       <div className={`group border rounded-2xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 
-        ${!isAvailable || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
+        ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
         <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={() => setIsDetailOpen(true)}>
@@ -126,6 +125,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               <StatusBadge label="Giữ chỗ" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : isMaintenance ? (
               <StatusBadge label="Đang bảo trì" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
+            ) : data.status === 'RENTED' && data.availableFromDate ? (
+              <StatusBadge label={`Sắp trống ${new Date(data.availableFromDate).toLocaleDateString('vi-VN')}`} tone="warning" className="text-[10px] font-bold uppercase tracking-wider bg-orange-500 text-white border-none" />
             ) : (
               <StatusBadge label="Đã thuê" tone="neutral" className="text-[10px] font-bold uppercase tracking-wider" />
             )}
@@ -212,8 +213,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
               <Button 
                   size="sm"
-                  className={`text-xs h-10 gap-1 rounded-xl ${(!isAvailable || isMaintenance) ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
-                  disabled={!isAvailable || isMaintenance}
+                  className={`text-xs h-10 gap-1 rounded-xl ${((!isAvailable && !data.availableFromDate) || isMaintenance) ? 'cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/90 text-white'}`}
+                  disabled={(!isAvailable && !data.availableFromDate) || isMaintenance}
                   onClick={(e) => {
                       e.stopPropagation();
                       if (onBookAppointment) {
@@ -223,7 +224,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                       }
                   }}
               >
-                  {isMaintenance ? "Đang bảo trì" : isAvailable ? (
+                  {isMaintenance ? "Đang bảo trì" : (isAvailable || data.availableFromDate) ? (
                       <>Đặt lịch xem <CalendarClock className="h-3.5 w-3.5 ml-0.5" /></>
                   ) : (
                       "Đã hết"
@@ -282,7 +283,9 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                         ? "Đang có người đợi ký HĐ"
                         : isMaintenance
                           ? "Đang bảo trì / Sửa chữa"
-                          : "Đang có người thuê"}
+                          : data.status === 'RENTED' && data.availableFromDate
+                            ? `Sắp trống (${new Date(data.availableFromDate).toLocaleDateString('vi-VN')})`
+                            : "Đang có người thuê"}
                   </p>
                 </div>
               </div>
@@ -308,7 +311,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   <Button
                     variant="outline"
                     className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50"
-                    disabled={!isAvailable || isMaintenance}
+                    disabled={(!isAvailable && !data.availableFromDate) || isMaintenance}
                     onClick={() => {
                       setIsDetailOpen(false);
                       if (onBookAppointment) {
@@ -323,7 +326,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
                   <Button
                     className="flex-1 bg-primary text-white hover:bg-primary/90 shadow-md"
-                    disabled={!isAvailable || isMaintenance}
+                    disabled={(!isAvailable && !data.availableFromDate) || isMaintenance}
                     onClick={handleRentNow}
                   >
                     <FileSignature className="h-4 w-4 mr-2" /> Thuê ngay

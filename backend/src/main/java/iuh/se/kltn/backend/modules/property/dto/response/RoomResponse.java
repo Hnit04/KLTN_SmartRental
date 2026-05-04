@@ -33,4 +33,5 @@ public class RoomResponse {
     private Integer safetyScore;
     private String moderationReason;
     private String description;
+    private String availableFromDate; // Thêm ngày dự kiến trống
 }
