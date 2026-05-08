@@ -49,6 +49,12 @@ import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 import ScrollToTop from "./components/shared/ScrollToTop";
+import FavoritesPage from "./pages/tenant/FavoritesPage";
+import { CompareProvider } from "./context/CompareContext";
+import { FavoritesProvider } from "./context/FavoritesContext";
+import CompareBar from "./components/property/CompareBar";
+import CompareRoomsModal from "./components/property/CompareRoomsModal";
+
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -102,7 +108,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <>
+    <FavoritesProvider>
+    <CompareProvider>
       <ScrollToTop />
       <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
@@ -160,6 +167,7 @@ function App() {
                 <Route path="dashboard" element={<TenantDashboardPage />} />
                 <Route path="my-room" element={<MyRoomPage />} />
                 <Route path="rental-history" element={<RentalHistoryPage />} />
+                <Route path="favorites" element={<FavoritesPage />} />
                 
                 {/* Hợp đồng & Lịch hẹn của khách thuê */}
                 <Route path="contracts" element={<ContractsPage />} />
@@ -190,8 +198,10 @@ function App() {
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
       {/* 🤖 GLOBAL AI CHATBOT */}
       <AiChatBot />
-    </>
-
+      <CompareBar />
+      <CompareRoomsModal />
+    </CompareProvider>
+    </FavoritesProvider>
   );
 }
 

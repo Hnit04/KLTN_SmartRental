@@ -130,4 +130,9 @@ public class User {
     private LocalDateTime verificationExpiry;
     @Column(name="is_enabled")
     private Boolean isEnabled = false;
-}
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_favorite_rooms", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "room_id")
+    private List<Long> favoriteRoomIds = new ArrayList<>();
+}

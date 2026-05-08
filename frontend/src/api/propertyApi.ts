@@ -57,4 +57,9 @@ export const propertyApi = {
   approveRoom: (id: number | string) => axiosClient.post(`/rooms/${id}/approve`),
   rejectRoom: (id: number | string, reason?: string) => 
     axiosClient.post(`/rooms/${id}/reject`, reason ? { reason } : {}),
+
+  // --- HÀM CHO PHÒNG YÊU THÍCH ---
+  toggleFavoriteRoom: (roomId: number | string) => axiosClient.post(`/favorites/rooms/${roomId}`),
+  getFavoriteRooms: () => axiosClient.get<Room[]>("/favorites/rooms"),
+  getFavoriteRoomIds: () => axiosClient.get<number[]>("/favorites/rooms/ids"),
 };

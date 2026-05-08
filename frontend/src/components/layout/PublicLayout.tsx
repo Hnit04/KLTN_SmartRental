@@ -1,18 +1,21 @@
 import { Outlet, Link, NavLink } from "react-router-dom"; // Sử dụng NavLink
 import { Button } from "../ui/Button";
-import { Home, Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, MapPin, Phone, CheckCircle2 } from "lucide-react";
+import { Home, Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, MapPin, Phone, CheckCircle2, Heart } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { UserNav } from "../shared/UserNav"; 
 import NotificationBell from "../shared/NotificationBell";
 import { useState, useEffect } from "react"; 
 import { ArrowUp, ShieldCheck, Globe, CreditCard } from "lucide-react";
 import { DASHBOARD_BY_ROLE, type AppRole } from "@/config/navigation";
+import { useFavorites } from "@/hooks/useFavorites";
 
 export default function PublicLayout() {
   const { isAuthenticated, user } = useAuth();
   const normalizedRole: AppRole = user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT';
   const dashboardPath = DASHBOARD_BY_ROLE[normalizedRole];
   const dashboardLabel = normalizedRole === 'LANDLORD' ? 'Quản lý' : normalizedRole === 'ADMIN' ? 'Quản trị' : 'Của tôi';
+  const { favoriteIds } = useFavorites();
+  const favCount = favoriteIds.length;
   const [newsletter, setNewsletter] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
@@ -101,6 +104,20 @@ export default function PublicLayout() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
+                {user?.role === 'TENANT' && (
+                  <Link
+                    to="/tenant/favorites"
+                    className="relative p-2 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+                    title="Phòng yêu thích"
+                  >
+                    <Heart className="h-5 w-5" />
+                    {favCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
+                        {favCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 <NotificationBell />
                 <div className="h-6 w-px bg-gray-200 hidden sm:block" />
                 <UserNav />

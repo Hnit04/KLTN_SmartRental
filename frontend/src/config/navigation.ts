@@ -11,6 +11,7 @@ import {
   CheckSquare,
   BrainCircuit,
   ArrowRightLeft,
+  Heart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
   TENANT: [
     { title: "Tổng quan", path: "/tenant/dashboard", icon: LayoutDashboard, mobileLabel: "Tổng quan" },
     { title: "Phòng trọ của tôi", path: "/tenant/my-room", icon: DoorOpen, mobileLabel: "Phòng trọ" },
+    { title: "Phòng yêu thích", path: "/tenant/favorites", icon: Heart, mobileLabel: "Yêu thích" },
     { title: "Hợp đồng của tôi", path: "/tenant/contracts", icon: FileText, mobileLabel: "Hợp đồng" },
     { title: "Lịch hẹn của tôi", path: "/tenant/appointments", icon: CalendarClock, mobileLabel: "Lịch hẹn" },
     { title: "Lịch sử thuê", path: "/tenant/rental-history", icon: History, mobileLabel: "Lịch sử" },

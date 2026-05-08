@@ -4,11 +4,14 @@ import {
   ArrowLeft, Maximize, Zap, Droplets, Wifi, CalendarClock,
   XCircle, Bot, Loader2, X, Phone, MessageSquare,
   MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn,
-  Share2, Heart, LayoutTemplate, Box, Users, Sofa, Tv, BedDouble, Car
+  Share2, Heart, LayoutTemplate, Box, Users, Sofa, Tv, BedDouble, Car,
+  GitCompareArrows
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useCompare } from "@/context/CompareContext";
 import type { Room } from "@/types/index";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +40,9 @@ export default function RoomDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+  
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { addToCompare, isInCompare } = useCompare();
 
   const [room, setRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -703,6 +709,36 @@ export default function RoomDetailPage() {
                     <Bot className="h-5 w-5 mr-2 text-[#A67C52]" />
                     Hỏi AI về phòng này
                   </Button>
+                  
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isFavorite(room.id) ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100 hover:text-red-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          setLoginModalConfig({
+                            title: "Yêu cầu đăng nhập",
+                            message: "Vui lòng đăng nhập để lưu phòng yêu thích!"
+                          });
+                          setIsLoginModalOpen(true);
+                          return;
+                        }
+                        toggleFavorite(room.id);
+                      }}
+                    >
+                      <Heart className={`h-4 w-4 mr-2 ${isFavorite(room.id) ? 'fill-current' : ''}`} />
+                      {isFavorite(room.id) ? 'Đã lưu' : 'Yêu thích'}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isInCompare(room.id) ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                      onClick={() => addToCompare(room as any)}
+                    >
+                      <GitCompareArrows className="h-4 w-4 mr-2" />
+                      So sánh
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="pt-5 border-t border-gray-100 space-y-3.5">

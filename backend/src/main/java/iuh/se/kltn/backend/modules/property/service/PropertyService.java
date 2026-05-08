@@ -219,7 +219,7 @@ public class PropertyService {
         return res;
     }
 
-    private RoomResponse mapToRoomResponse(Room r) {
+    public RoomResponse mapToRoomResponse(Room r) {
         RoomResponse res = modelMapper.map(r, RoomResponse.class);
         res.setImages(JsonUtil.convertJsonToList(r.getImages()));
         res.setAmenities(JsonUtil.convertJsonToList(r.getAmenities()));
