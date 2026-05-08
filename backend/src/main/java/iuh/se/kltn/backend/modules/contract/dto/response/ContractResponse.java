@@ -61,4 +61,5 @@ public class ContractResponse {
     private Integer tenantReputationScore;
     private String tenantKycStatus;
     private String cancelReason;
+    private Boolean isCompromised;
 }

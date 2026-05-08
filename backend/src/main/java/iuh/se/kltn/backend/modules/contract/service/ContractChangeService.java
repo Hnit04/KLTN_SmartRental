@@ -151,6 +151,10 @@ public class ContractChangeService {
             switch (req.getType()) {
                 case RENT_INCREASE:
                     contract.setActualPrice(Double.parseDouble(req.getNewValue()));
+                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        contract.setIsTenantSigned(false);
+                        contract.setIsLandlordSigned(false);
+                    }
                     break;
                 case EXTENSION:
                     contract.setEndDate(LocalDate.parse(req.getNewValue()));
@@ -213,13 +217,7 @@ public class ContractChangeService {
                         contract.setIsLandlordSigned(false);
                     }
                     break;
-                case RENT_INCREASE:
-                    contract.setActualPrice(Double.parseDouble(req.getNewValue()));
-                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
-                        contract.setIsTenantSigned(false);
-                        contract.setIsLandlordSigned(false);
-                    }
-                    break;
+
             }
         } catch (Exception e) {
             throw new RuntimeException("Lỗi định dạng dữ liệu (newValue không hợp lệ cho loại thay đổi này).");

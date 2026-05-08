@@ -298,6 +298,11 @@ export default function ContractDetailPage() {
 
     setIsSigning(true);
     try {
+      if (contract?.isCompromised) {
+        toast.error("Không thể ký hợp đồng đang bị cảnh báo bảo mật!");
+        setIsSigning(false);
+        return;
+      }
       let signature = "";
       if (contract?.signMethod === 'BLOCKCHAIN') {
         if (!window.ethereum) {
@@ -411,6 +416,10 @@ export default function ContractDetailPage() {
   };
 
   const handlePayWeb3 = async (bill: any) => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể thanh toán hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     if (!window.ethereum) {
       toast.error("Vui lòng cài đặt ví MetaMask để thanh toán!");
       return;
@@ -528,6 +537,10 @@ export default function ContractDetailPage() {
   };
 
   const handleOpenDepositQrModal = async () => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể nạp cọc hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     setIsLoadingQr(true);
     setIsDepositQrModalOpen(true);
     try {
@@ -545,6 +558,10 @@ export default function ContractDetailPage() {
   const [billQrData, setBillQrData] = useState<any>(null);
 
   const openTraditionalPaymentModal = async (bill: any) => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể thanh toán hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     setSelectedBillToPay(bill);
     setIsTraditionalPaymentModalOpen(true);
     setBillQrData(null);
@@ -760,6 +777,16 @@ export default function ContractDetailPage() {
           <p className="text-sm text-gray-500">Mã hợp đồng: #{contract.id} • {contract.roomName}</p>
         </div>
       </div>
+
+      {contract.isCompromised && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex gap-3 animate-in fade-in">
+          <AlertCircle className="w-6 h-6 flex-shrink-0 text-red-600" />
+          <div>
+            <h3 className="font-bold">⚠️ CẢNH BÁO BẢO MẬT</h3>
+            <p className="text-sm mt-1">Hợp đồng này bị phát hiện sai lệch dữ liệu so với gốc trên Blockchain. Vui lòng ngưng mọi giao dịch và liên hệ Admin ngay lập tức.</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex bg-white p-1 rounded-xl border shadow-sm w-fit">
         <button

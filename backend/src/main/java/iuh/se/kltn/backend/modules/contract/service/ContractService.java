@@ -490,6 +490,37 @@ public class ContractService {
             result.put("message", hasHash ? "Hash tồn tại trong DB" : "Không tìm thấy hash trong DB");
         }
 
+        // Cập nhật trạng thái isCompromised và gửi thông báo nếu phát hiện sai lệch
+        boolean isValid = Boolean.TRUE.equals(result.get("valid"));
+        if (!isValid && !Boolean.TRUE.equals(contract.getIsCompromised())) {
+            contract.setIsCompromised(true);
+            contractRepository.save(contract);
+            
+            // Thông báo cho Tenant
+            if (contract.getTenant() != null) {
+                notificationService.createNotification(
+                    contract.getTenant(),
+                    "CẢNH BÁO BẢO MẬT HỢP ĐỒNG",
+                    "Hợp đồng phòng " + (contract.getRoom() != null ? contract.getRoom().getName() : "") + " bị phát hiện sai lệch dữ liệu so với Blockchain. Vui lòng ngừng thanh toán và liên hệ Admin!",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                    contract.getId()
+                );
+            }
+            // Thông báo cho Landlord
+            if (contract.getRoom() != null && contract.getRoom().getProperty() != null && contract.getRoom().getProperty().getLandlord() != null) {
+                notificationService.createNotification(
+                    contract.getRoom().getProperty().getLandlord(),
+                    "CẢNH BÁO BẢO MẬT HỢP ĐỒNG",
+                    "Hợp đồng phòng " + contract.getRoom().getName() + " bị phát hiện sai lệch dữ liệu so với Blockchain. Vui lòng kiểm tra!",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                    contract.getId()
+                );
+            }
+        } else if (isValid && Boolean.TRUE.equals(contract.getIsCompromised())) {
+            contract.setIsCompromised(false);
+            contractRepository.save(contract);
+        }
+
         return result;
     }
 

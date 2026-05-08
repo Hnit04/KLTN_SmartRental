@@ -241,6 +241,7 @@ export interface Contract {
   tenantReputationScore?: number;
   tenantKycStatus?: string;
   cancelReason?: string;
+  isCompromised?: boolean;
 }
 
 // Payload để tạo hợp đồng

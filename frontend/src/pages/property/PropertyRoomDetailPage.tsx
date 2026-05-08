@@ -447,7 +447,7 @@ export default function PropertyRoomDetailPage() {
                 <img 
                   src={room.images[0]} 
                   alt={`Phòng ${room.name}`} 
-                  className="w-full h-full object-cover" 
+                  className={`w-full h-full ${room.images.length === 1 ? 'object-contain' : 'object-cover'}`} 
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl">
