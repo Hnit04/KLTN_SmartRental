@@ -359,7 +359,9 @@ export default function RoomDetailPage() {
               <span><ChevronRight className="h-3.5 w-3.5" /></span>
             </>
           )}
-          <span className="text-gray-800 font-medium">Phòng {room.name}</span>
+          <span className="text-gray-800 font-medium">
+            {room.name?.toLowerCase().includes('phòng') ? room.name : `Phòng ${room.name}`}
+          </span>
         </div>
 
         {/* MAIN CONTENT GRID */}
@@ -372,7 +374,9 @@ export default function RoomDetailPage() {
             <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">Phòng {room.name}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {room.name?.toLowerCase().includes('phòng') ? room.name : `Phòng ${room.name}`}
+                  </h1>
                   {room.type && (
                     <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[13px] font-semibold whitespace-nowrap">
                       {room.type === 'STUDIO' ? 'Phòng Studio' :

@@ -150,7 +150,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
         <div className="p-4 md:p-5 flex-1 flex flex-col">
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors truncate pr-2">
-              Phòng {data.name}
+              {data.name.toLowerCase().includes('phòng') ? data.name : `Phòng ${data.name}`}
             </h4>
             <span className="font-bold text-primary text-lg shrink-0">
               {formatPrice(data.price)}
@@ -250,7 +250,9 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             </div>
 
             <div className="p-6 overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
+              <h2 className="text-2xl font-bold mb-2">
+                {data.name.toLowerCase().includes('phòng') ? data.name : `Phòng ${data.name}`}
+              </h2>
               <p className="text-2xl text-primary font-bold mb-4">
                 {formatPrice(data.price)}
                 <span className="text-sm font-normal text-gray-500">/tháng</span>

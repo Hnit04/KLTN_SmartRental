@@ -189,6 +189,10 @@ public class PropertyService {
             res.setLandlordId(p.getLandlord().getId());
             res.setLandlordName(p.getLandlord().getFullName());
             res.setLandlordPhone(p.getLandlord().getPhoneNumber());
+            res.setLandlordAvatar(p.getLandlord().getAvatarUrl());
+            res.setLandlordEmail(p.getLandlord().getEmail());
+            res.setLandlordZalo(p.getLandlord().getZaloPhone());
+            res.setLandlordReputationScore(p.getLandlord().getReputationScore());
         }
 
         List<Room> rooms = p.getRooms();

@@ -7,6 +7,5 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^7.0.0",
     "hardhat": "^3.3.0"
-  },
-  "type": "commonjs"
+  }
 }

@@ -34,6 +34,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest;
 
 import org.web3j.crypto.Keys;
 import org.web3j.crypto.Sign;
@@ -41,6 +46,7 @@ import org.web3j.utils.Numeric;
 
 @Service
 public class ContractService {
+    private static final Logger log = LoggerFactory.getLogger(ContractService.class);
 
     @Autowired private ContractRepository contractRepository;
     @Autowired private RoomRepository roomRepository;
@@ -404,10 +410,22 @@ public class ContractService {
                 java.math.BigInteger dbDepositWei = java.math.BigInteger.valueOf(dbDeposit).multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
                 comparisons.add(createComparison("depositAmount", dbDepositWei.toString(), onChainDeposit.toString()));
 
-                // So sánh contractHash
+                // So sánh contractHash (ÁP DỤNG ADDENDUM PATTERN)
                 String onChainHash = (String) onChain.get("contractHash");
                 String dbHash = contract.getContractHash() != null ? contract.getContractHash() : "";
-                comparisons.add(createComparison("contractHash", dbHash, onChainHash));
+                java.util.Map<String, Object> hashComp = createComparison("contractHash", dbHash, onChainHash);
+                
+                if (!Boolean.TRUE.equals(hashComp.get("match"))) {
+                    // Mọi thay đổi hợp lệ đều làm mới mã Hash trong DB, nên nếu có bất kỳ request nào ACCEPTED
+                    // thì việc lệch Hash so với bản gốc trên Chain là "hợp lệ" (vì Blockchain giữ Hash gốc)
+                    boolean hasAnyAcceptedChange = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.ACCEPTED);
+                    if (hasAnyAcceptedChange) {
+                        hashComp.put("match", true);
+                        hashComp.put("modified", true);
+                        hashComp.put("addendum", "Mã Hash mới sau khi cập nhật Phụ lục hợp đồng");
+                    }
+                }
+                comparisons.add(hashComp);
 
                 // So sánh roomName
                 String onChainRoom = (String) onChain.get("roomName");
@@ -443,10 +461,31 @@ public class ContractService {
                 long dbStartDate = contract.getStartDate() != null ? contract.getStartDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
                 comparisons.add(createComparison("startDate", String.valueOf(dbStartDate), onChainStartDate.toString()));
 
-                // So sánh endDate
+                // So sánh endDate (ÁP DỤNG ADDENDUM PATTERN)
                 java.math.BigInteger onChainEndDate = (java.math.BigInteger) onChain.get("endDate");
                 long dbEndDate = contract.getEndDate() != null ? contract.getEndDate().atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC) : 0L;
-                comparisons.add(createComparison("endDate", String.valueOf(dbEndDate), onChainEndDate.toString()));
+                java.util.Map<String, Object> endDateComp = createComparison("endDate", String.valueOf(dbEndDate), onChainEndDate.toString());
+                
+                if (!Boolean.TRUE.equals(endDateComp.get("match"))) {
+                    // Kiểm tra có Phụ lục Gia hạn (EXTENSION) hoặc Chấm dứt sớm (TERMINATION) không
+                    java.util.List<ContractChangeRequest> dateAddendums = changeRequestRepository
+                            .findByContractIdAndStatus(id, RequestStatus.ACCEPTED);
+                    
+                    boolean hasDateAddendum = dateAddendums.stream()
+                            .anyMatch(r -> r.getType() == RequestType.EXTENSION || r.getType() == RequestType.TERMINATION);
+                            
+                    if (hasDateAddendum) {
+                        ContractChangeRequest latest = dateAddendums.stream()
+                                .filter(r -> r.getType() == RequestType.EXTENSION || r.getType() == RequestType.TERMINATION)
+                                .reduce((first, second) -> second).orElse(null);
+                                
+                        endDateComp.put("match", true); 
+                        endDateComp.put("modified", true);
+                        endDateComp.put("addendum", "Điều chỉnh theo Phụ lục #" + latest.getId() 
+                                + " (Loại: " + latest.getType() + ")");
+                    }
+                }
+                comparisons.add(endDateComp);
 
                 // So sánh latePenaltyPercent
                 java.math.BigInteger onChainLatePenaltyPercent = (java.math.BigInteger) onChain.get("latePenaltyPercent");
@@ -638,7 +677,7 @@ public class ContractService {
             // (Bỏ qua việc cộng điểm ở đây, sẽ cộng khi tiền cọc được xác nhận)
 
             if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN && (contract.getSmartContractAddress() == null || contract.getSmartContractAddress().isEmpty())) {
-                if (blockchainService.getPrivateKey() == null || blockchainService.getPrivateKey().isEmpty()) {
+                if (!blockchainService.isConfigured()) {
                     throw new RuntimeException("Cấu hình Blockchain (Private Key) đang trống! Không thể triển khai hợp đồng. Vui lòng liên hệ Admin.");
                 }
                 try {
@@ -770,6 +809,27 @@ public class ContractService {
             res.setTenantKycStatus(tenant.getKycStatus() != null ? tenant.getKycStatus().name() : "PENDING");
         }
         res.setActualPrice(contract.getActualPrice());
+
+        // 🔗 Fetch Blockchain Settlement Info
+        if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty() 
+            && contract.getStatus() == ContractStatus.ACTIVE) {
+            try {
+                var info = blockchainService.getSettlementInfo(
+                    contract.getSmartContractAddress(),
+                    contract.getRoom().getProperty().getLandlord().getWalletAddress(),
+                    contract.getTenant().getWalletAddress()
+                );
+                if (info != null) {
+                    res.setCurrentDeductionAmount(((java.math.BigInteger) info.get("deductionAmount")).doubleValue());
+                    res.setIsEarlyTerminationProposal((Boolean) info.get("isEarlyTermination"));
+                    res.setHasLandlordConsented((Boolean) info.get("landlordConsented"));
+                    res.setHasTenantConsented((Boolean) info.get("tenantConsented"));
+                    res.setIsProposalActive((Boolean) info.get("active"));
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi đọc thông tin quyết toán từ Blockchain cho hợp đồng #{}: {}", contract.getId(), e.getMessage());
+            }
+        }
         return res;
     }
 
@@ -798,7 +858,7 @@ public class ContractService {
         // 🔗 Kết thúc hợp đồng trên Blockchain (hoàn cọc full, deduction = 0)
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
-                blockchainService.endContractOnChain(contract.getSmartContractAddress(), 0L);
+                blockchainService.endContractOnChain(contract.getSmartContractAddress());
                 System.out.println("✅ Đã kết thúc hợp đồng trên Blockchain (hoàn cọc full)");
             }
         } catch (Exception e) {
@@ -995,7 +1055,7 @@ public class ContractService {
         return "0x" + Keys.getAddress(publicKey);
     }
 
-    private String calculateSHA256(String data) {
+    String calculateSHA256(String data) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] encodedhash = digest.digest(data.getBytes(StandardCharsets.UTF_8));
@@ -1050,6 +1110,82 @@ public class ContractService {
                 iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
                 contract.getId()
         );
+
+        return mapToResponse(contract, currentUserId);
+    }
+    // ========================================================================================
+    // 🔗 BLOCKCHAIN SETTLEMENT FLOW (Two-party consent)
+    // ========================================================================================
+
+    @Transactional
+    public ContractResponse proposeSettlement(Long contractId, Long currentUserId, iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest request) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (!contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId)) {
+            throw new RuntimeException("Chỉ Chủ trọ mới được đề xuất quyết toán!");
+        }
+
+        if (contract.getStatus() != ContractStatus.ACTIVE) {
+            throw new RuntimeException("Chỉ có thể quyết toán hợp đồng đang hoạt động!");
+        }
+
+        try {
+            blockchainService.proposeDeductionOnChain(
+                contract.getSmartContractAddress(),
+                request.getDeductionAmount(),
+                request.isEarlyTermination()
+            );
+            log.info("✅ Đã gửi đề xuất khấu trừ lên Blockchain cho HĐ #{}", contractId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi gửi đề xuất lên Blockchain: " + e.getMessage());
+        }
+
+        return mapToResponse(contract, currentUserId);
+    }
+
+    @Transactional
+    public ContractResponse consentSettlement(Long contractId, Long currentUserId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (!contract.getTenant().getId().equals(currentUserId)) {
+            throw new RuntimeException("Chỉ Khách thuê mới được chấp nhận quyết toán!");
+        }
+
+        try {
+            blockchainService.consentEndContractOnChain(contract.getSmartContractAddress());
+            log.info("✅ Khách thuê đã đồng ý quyết toán on-chain cho HĐ #{}", contractId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi gửi đồng thuận lên Blockchain: " + e.getMessage());
+        }
+
+        return mapToResponse(contract, currentUserId);
+    }
+
+    @Transactional
+    public ContractResponse executeSettlement(Long contractId, Long currentUserId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        // Backend gọi thực thi
+        try {
+            blockchainService.endContractOnChain(contract.getSmartContractAddress());
+            
+            // Cập nhật DB
+            contract.setStatus(ContractStatus.TERMINATED_EARLY); // Hoặc EXPIRED tùy isEarly
+            contract.setDepositStatus(DepositStatus.REFUNDED); // Đã giải ngân cọc (toán bộ hoặc 1 phần)
+            
+            if (contract.getRoom() != null) {
+                contract.getRoom().setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(contract.getRoom());
+            }
+            
+            contractRepository.save(contract);
+            log.info("✅ Hợp đồng #{} đã kết thúc hoàn toàn on-chain và off-chain", contractId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi thực thi kết thúc trên Blockchain: " + e.getMessage());
+        }
 
         return mapToResponse(contract, currentUserId);
     }

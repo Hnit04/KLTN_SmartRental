@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
 import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
+import iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest;
 
 import java.util.List;
 
@@ -221,6 +222,29 @@ public class ContractController {
         } catch (Exception e) {
             return ResponseEntity.status(400).body(java.util.Collections.singletonMap("message", e.getMessage()));
         }
+    }
+
+    // 💰 Quyết toán hợp đồng (Two-party consent)
+    @PostMapping("/{id}/settle/propose")
+    public ResponseEntity<?> proposeSettlement(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest request) {
+        return ResponseEntity.ok(contractService.proposeSettlement(id, currentUser.getId(), request));
+    }
+
+    @PostMapping("/{id}/settle/consent")
+    public ResponseEntity<?> consentSettlement(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(contractService.consentSettlement(id, currentUser.getId()));
+    }
+
+    @PostMapping("/{id}/settle/execute")
+    public ResponseEntity<?> executeSettlement(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(contractService.executeSettlement(id, currentUser.getId()));
     }
 
     private ResponseEntity<?> handleAiException(Exception e) {
