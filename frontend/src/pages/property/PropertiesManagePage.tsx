@@ -11,6 +11,8 @@ import { Card } from '@/components/ui/Card';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property } from '@/types/index';
+import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
+import { vipApi } from '@/api/vipApi';
 
 // Danh sách 63 tỉnh/thành phố Việt Nam
 const VIETNAM_CITIES = [
@@ -57,6 +59,11 @@ export default function PropertiesManagePage() {
   // --- STATE CẬP NHẬT TRẠNG THÁI (ẨN/HIỆN) ---
   const [statusConfirm, setStatusConfirm] = useState<Property | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // --- STATE CHO VIP LIMIT ---
+  const [vipLimit, setVipLimit] = useState<{
+    isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
+  }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
   
   const [formData, setFormData] = useState({
     name: '', city: '', district: '', address: '',
@@ -87,7 +94,28 @@ export default function PropertiesManagePage() {
   };
 
   // Mở modal Thêm mới
-  const handleOpenCreate = () => {
+  const handleOpenCreate = async () => {
+    try {
+      const res = await vipApi.getMyPlan();
+      const plan = (res as any).data || res;
+      
+      // Kiểm tra giới hạn khu trọ
+      if (plan.maxProperties !== -1 && plan.currentPropertyCount >= plan.maxProperties) {
+        setVipLimit({
+          isOpen: true,
+          limitType: 'PROPERTY',
+          currentTier: plan.tier,
+          currentCount: plan.currentPropertyCount,
+          maxAllowed: plan.maxProperties,
+          message: `Gói ${plan.tier} chỉ cho phép tạo tối đa ${plan.maxProperties} khu trọ.`
+        });
+        return; // Dừng lại, không mở modal
+      }
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra gói VIP:", error);
+      // Vẫn tiếp tục mở modal nếu lỗi để không chặn người dùng do lỗi mạng
+    }
+
     setEditingId(null);
     setFormData({ 
       name: '', city: '', district: '', address: '', 
@@ -339,8 +367,21 @@ export default function PropertiesManagePage() {
       setShowModal(false);
       fetchProperties(); 
     } catch (error: any) {
-      const msg = error.response?.data?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
-      toast.error(msg);
+      const errData = error.response?.data;
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+        setShowModal(false);
+        setVipLimit({
+          isOpen: true,
+          limitType: errData.limitType,
+          currentTier: errData.currentTier,
+          currentCount: errData.currentCount,
+          maxAllowed: errData.maxAllowed,
+          message: errData.message,
+        });
+      } else {
+        const msg = errData?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+        toast.error(msg);
+      }
       console.error(error);
     } finally {
       setIsSubmitting(false);
@@ -590,6 +631,17 @@ export default function PropertiesManagePage() {
           </div>
         </div>
       )}
+
+      {/* MODAL NHẮC NÂNG CẤP VIP */}
+      <UpgradePromptModal
+        isOpen={vipLimit.isOpen}
+        onClose={() => setVipLimit(prev => ({ ...prev, isOpen: false }))}
+        limitType={vipLimit.limitType}
+        currentTier={vipLimit.currentTier}
+        currentCount={vipLimit.currentCount}
+        maxAllowed={vipLimit.maxAllowed}
+        message={vipLimit.message}
+      />
     </div>
   );
 }

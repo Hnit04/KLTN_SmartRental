@@ -50,6 +50,7 @@ import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn c
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 import ScrollToTop from "./components/shared/ScrollToTop";
 import FavoritesPage from "./pages/tenant/FavoritesPage";
+import VipPlansPage from "./pages/landlord/VipPlansPage";
 import { CompareProvider } from "./context/CompareContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import CompareBar from "./components/property/CompareBar";
@@ -160,6 +161,7 @@ function App() {
                 <Route path="contracts/create" element={<CreateContractPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
                 <Route path="appointments" element={<AppointmentManagePage />} />
+                <Route path="vip" element={<VipPlansPage />} />
               </Route>
 
               {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}

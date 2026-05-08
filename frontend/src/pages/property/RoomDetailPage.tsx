@@ -35,6 +35,7 @@ const customMarkerIcon = new L.Icon({
 });
 
 const Room360Viewer = lazy(() => import("@/components/property/Room360Viewer"));
+import StreetViewVerification from "@/components/property/StreetViewVerification";
 
 export default function RoomDetailPage() {
   const { id } = useParams();
@@ -82,6 +83,7 @@ export default function RoomDetailPage() {
             const propData = (propRes as any).data || propRes;
             roomData.latitude = propData.latitude;
             roomData.longitude = propData.longitude;
+            roomData.propertyImages = propData.images;
           } catch (e) {
             console.error("Failed to load property coordinates", e);
           }
@@ -504,6 +506,17 @@ export default function RoomDetailPage() {
                 </div>
               </Suspense>
             </div>
+          </div>
+        )}
+
+        {/* STREET VIEW VERIFICATION */}
+        {((room as any)?.latitude && (room as any)?.longitude) && (
+          <div className="mb-10">
+            <StreetViewVerification
+              latitude={(room as any).latitude}
+              longitude={(room as any).longitude}
+              propertyAddress={room.propertyAddress || room.address || ''}
+            />
           </div>
         )}
 

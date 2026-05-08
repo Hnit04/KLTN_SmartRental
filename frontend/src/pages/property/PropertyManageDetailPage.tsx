@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
+import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
+import { vipApi } from '@/api/vipApi';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -75,6 +77,11 @@ export default function PropertyManageDetailPage() {
   // --- MODAL CẢNH BÁO KHÔNG ĐƯỢC BẢO TRÌ ---
   const [showCannotMaintenanceModal, setShowCannotMaintenanceModal] = useState(false);
   const [cannotMaintenanceRoom, setCannotMaintenanceRoom] = useState<{name: string; status: string} | null>(null);
+
+  // --- STATE CHO VIP LIMIT ---
+  const [vipLimit, setVipLimit] = useState<{
+    isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
+  }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
 
   const [formData, setFormData] = useState({
     name: '', 
@@ -175,7 +182,28 @@ export default function PropertyManageDetailPage() {
   };
 
   // --- MỞ MODAL THÊM PHÒNG ---
-  const handleOpenCreate = () => {
+  const handleOpenCreate = async () => {
+    try {
+      const res = await vipApi.getMyPlan();
+      const plan = (res as any).data || res;
+      
+      // Kiểm tra giới hạn phòng
+      if (plan.maxRoomsPerProperty !== -1 && rooms.length >= plan.maxRoomsPerProperty) {
+        setVipLimit({
+          isOpen: true,
+          limitType: 'ROOM',
+          currentTier: plan.tier,
+          currentCount: rooms.length,
+          maxAllowed: plan.maxRoomsPerProperty,
+          message: `Gói ${plan.tier} chỉ cho phép tạo tối đa ${plan.maxRoomsPerProperty} phòng trên mỗi khu trọ.`
+        });
+        return; // Dừng lại, không mở modal
+      }
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra gói VIP:", error);
+      // Tiếp tục mở modal nếu có lỗi mạng
+    }
+
     setEditingId(null);
     setFormData({ 
       name: '', price: '', area: '', description: '', 
@@ -453,8 +481,21 @@ export default function PropertyManageDetailPage() {
       
       setShowModal(false);
       fetchData(); 
-    } catch (error) {
-      toast.error(editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+    } catch (error: any) {
+      const errData = error?.response?.data;
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+        setShowModal(false);
+        setVipLimit({
+          isOpen: true,
+          limitType: errData.limitType,
+          currentTier: errData.currentTier,
+          currentCount: errData.currentCount,
+          maxAllowed: errData.maxAllowed,
+          message: errData.message,
+        });
+      } else {
+        toast.error(errData?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -464,6 +505,7 @@ export default function PropertyManageDetailPage() {
   if (!property) return <div className="text-center py-20">Không tìm thấy khu trọ.</div>;
 
   return (
+    <>
     <div className="space-y-6">
       {/* --- HEADER --- */}
       <div>
@@ -1118,5 +1160,17 @@ export default function PropertyManageDetailPage() {
         </div>
       )}
     </div>
+
+    {/* MODAL NHẮC NÂNG CẤP VIP */}
+    <UpgradePromptModal
+      isOpen={vipLimit.isOpen}
+      onClose={() => setVipLimit(prev => ({ ...prev, isOpen: false }))}
+      limitType={vipLimit.limitType}
+      currentTier={vipLimit.currentTier}
+      currentCount={vipLimit.currentCount}
+      maxAllowed={vipLimit.maxAllowed}
+      message={vipLimit.message}
+    />
+    </>
   );
 }

@@ -12,6 +12,7 @@ import {
   BrainCircuit,
   ArrowRightLeft,
   Heart,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
     { title: "Quản lý hợp đồng", path: "/landlord/contracts", icon: FileText, mobileLabel: "Hợp đồng" },
     { title: "Tài chính & Hóa đơn", path: "/landlord/finance", icon: Wallet, mobileLabel: "Tài chính" },
     { title: "Quản lý lịch hẹn", path: "/landlord/appointments", icon: CalendarClock, mobileLabel: "Lịch hẹn" },
+    { title: "⭐ Gói VIP", path: "/landlord/vip", icon: Crown, mobileLabel: "VIP" },
   ],
   ADMIN: [
     { title: "Quản trị hệ thống", path: "/admin/dashboard", icon: LayoutDashboard, mobileLabel: "Dashboard" },

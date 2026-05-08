@@ -10,6 +10,21 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService.VipLimitExceededException.class)
+    public ResponseEntity<?> handleVipLimitException(
+            iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService.VipLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                        "status", "error",
+                        "type", "VIP_LIMIT_EXCEEDED",
+                        "message", ex.getMessage(),
+                        "currentTier", ex.getCurrentTier(),
+                        "limitType", ex.getLimitType(),
+                        "currentCount", ex.getCurrentCount(),
+                        "maxAllowed", ex.getMaxAllowed()
+                ));
+    }
+
     @ExceptionHandler(ModerationException.class)
     public ResponseEntity<?> handleModerationException(ModerationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

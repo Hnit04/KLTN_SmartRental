@@ -31,6 +31,9 @@ public class PaymentController {
     @Autowired
     private ContractService contractService;
 
+    @Autowired
+    private iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService vipSubscriptionService;
+
     @Value("${sepay.webhook.token:}")
     private String sepayWebhookToken;
 
@@ -155,6 +158,14 @@ public class PaymentController {
                     Long contractId = Long.parseLong(depositMatcher.group(1));
                     contractService.processSePayDepositWebhook(contractId, request.getAmountIn(), request.getReferenceNumber(), request.getAccountNumber());
                     return ResponseEntity.ok(Map.of("success", true, "message", "Deposit Webhook processed"));
+                }
+
+                // Pattern VIP: "SMR VIP {orderId}"
+                java.util.regex.Matcher vipMatcher = java.util.regex.Pattern.compile("SMR VIP (\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(content);
+                if (vipMatcher.find()) {
+                    Long orderId = Long.parseLong(vipMatcher.group(1));
+                    vipSubscriptionService.processVipPayment(orderId, request.getAmountIn(), request.getReferenceNumber());
+                    return ResponseEntity.ok(Map.of("success", true, "message", "VIP Webhook processed"));
                 }
             }
 

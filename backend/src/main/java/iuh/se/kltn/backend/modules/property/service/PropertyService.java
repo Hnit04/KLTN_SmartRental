@@ -20,6 +20,7 @@ import iuh.se.kltn.backend.modules.ai.service.ModerationService;
 import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
 import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 
+import iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,8 @@ public class PropertyService {
     private ModerationService moderationService;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private VipSubscriptionService vipSubscriptionService;
 
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public) - CHỈ LẤY "APPROVED"
     public Page<PropertyResponse> getAllProperties(Pageable pageable) {
@@ -76,6 +79,12 @@ public class PropertyService {
 
         if (user.getRole() != Role.LANDLORD) {
             throw new RuntimeException("Chỉ chủ trọ mới được đăng bài!");
+        }
+
+        // KIỂM TRA GIỚI HẠN VIP
+        vipSubscriptionService.checkPropertyLimit(landlordId);
+        if (request.getImages() != null) {
+            vipSubscriptionService.checkPropertyImageLimit(landlordId, request.getImages().size());
         }
 
         // KIỂM DUYỆT NỘI DUNG (AI Moderation) - Chỉ để gợi ý cho Admin
@@ -110,6 +119,12 @@ public class PropertyService {
 
         if (!property.getLandlord().getId().equals(landlordId)) {
             throw new RuntimeException("Bạn không phải chủ khu trọ này!");
+        }
+
+        // KIỂM TRA GIỚI HẠN VIP
+        vipSubscriptionService.checkRoomLimit(landlordId, propertyId);
+        if (request.getImages() != null) {
+            vipSubscriptionService.checkRoomImageLimit(landlordId, request.getImages().size());
         }
 
         // KIỂM DUYỆT NỘI DUNG PHÒNG - Gộp ảnh thường + ảnh 360 để AI kiểm duyệt toàn bộ
