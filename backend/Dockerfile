@@ -19,6 +19,9 @@ RUN mvn package -DskipTests -B
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# Cài đặt thư viện C++ và glibc compatibility cho Alpine (Bắt buộc cho AI/ONNX)
+RUN apk add --no-cache libstdc++ gcompat libc6-compat
+
 # Tạo user non-root cho bảo mật
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
