@@ -277,7 +277,6 @@ export default function LoginPage() {
               text="signin_with"
               shape="rectangular"
               logo_alignment="left"
-              width="100%"
             />
           </motion.div>
 

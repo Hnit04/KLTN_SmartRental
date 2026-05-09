@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "http://13.228.75.30:8080/api/:match*"
+    },
+    {
+      "source": "/ws/:match*",
+      "destination": "http://13.228.75.30:8080/ws/:match*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
