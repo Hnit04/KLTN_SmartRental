@@ -51,7 +51,7 @@ function NotiIcon({ type }: { type: string }) {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -96,6 +96,8 @@ export default function NotificationBell() {
 
   // ── Init + polling 90s + WebSocket STOMP real-time
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     prevUnread.current = -1; // Lần đầu không toast
     fetchFull().then(() => { prevUnread.current = notifications.filter(n => !n.isRead).length; });
 
@@ -147,16 +149,18 @@ export default function NotificationBell() {
       stompClient.activate();
     }
 
+    return () => {
+      clearInterval(interval);
+      stompClient?.deactivate();
+    };
+  }, [isAuthenticated, fetchFull, pollUnreadCount]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-
-    return () => {
-      clearInterval(interval);
-      stompClient?.deactivate();
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // ── Actions
@@ -237,6 +241,8 @@ export default function NotificationBell() {
     { key: 'APPOINTMENT', label: 'Lịch hẹn', count: notifications.filter(n => APPOINTMENT_TYPES.includes(n.type)).length },
     { key: 'CONTRACT', label: 'Hợp đồng', count: notifications.filter(n => CONTRACT_TYPES.includes(n.type)).length },
   ];
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="relative" ref={dropdownRef}>
