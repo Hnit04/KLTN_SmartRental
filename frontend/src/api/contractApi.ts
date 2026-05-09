@@ -76,5 +76,16 @@ export const contractApi = {
   // ✅ Lịch sử hợp đồng theo phòng
   getRoomHistory: (roomId: number | string) => {
     return axiosClient.get<Contract[]>(`/contracts/room/${roomId}/history`);
+  },
+
+  // 💰 QUYẾT TOÁN HỢP ĐỒNG (Settlement)
+  proposeSettlement: (id: number | string, data: { deductionAmount: number, earlyTermination: boolean }) => {
+    return axiosClient.post<Contract>(`/contracts/${id}/settle/propose`, data);
+  },
+  consentSettlement: (id: number | string) => {
+    return axiosClient.post<Contract>(`/contracts/${id}/settle/consent`);
+  },
+  executeSettlement: (id: number | string) => {
+    return axiosClient.post<Contract>(`/contracts/${id}/settle/execute`);
   }
 };

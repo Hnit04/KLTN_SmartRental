@@ -61,6 +61,8 @@ public class Contract {
 
     private String cancelReason;
 
+    private Boolean isCompromised = false;
+
     private Boolean isTenantSigned = false;
     private Boolean isLandlordSigned = false;
     @Enumerated(EnumType.STRING)

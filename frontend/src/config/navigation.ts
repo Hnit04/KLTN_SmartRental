@@ -11,6 +11,9 @@ import {
   CheckSquare,
   BrainCircuit,
   ArrowRightLeft,
+  Heart,
+  Crown,
+  Flag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +36,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
   TENANT: [
     { title: "Tổng quan", path: "/tenant/dashboard", icon: LayoutDashboard, mobileLabel: "Tổng quan" },
     { title: "Phòng trọ của tôi", path: "/tenant/my-room", icon: DoorOpen, mobileLabel: "Phòng trọ" },
+    { title: "Phòng yêu thích", path: "/tenant/favorites", icon: Heart, mobileLabel: "Yêu thích" },
     { title: "Hợp đồng của tôi", path: "/tenant/contracts", icon: FileText, mobileLabel: "Hợp đồng" },
     { title: "Lịch hẹn của tôi", path: "/tenant/appointments", icon: CalendarClock, mobileLabel: "Lịch hẹn" },
     { title: "Lịch sử thuê", path: "/tenant/rental-history", icon: History, mobileLabel: "Lịch sử" },
@@ -43,6 +47,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
     { title: "Quản lý hợp đồng", path: "/landlord/contracts", icon: FileText, mobileLabel: "Hợp đồng" },
     { title: "Tài chính & Hóa đơn", path: "/landlord/finance", icon: Wallet, mobileLabel: "Tài chính" },
     { title: "Quản lý lịch hẹn", path: "/landlord/appointments", icon: CalendarClock, mobileLabel: "Lịch hẹn" },
+    { title: "⭐ Gói VIP", path: "/landlord/vip", icon: Crown, mobileLabel: "VIP" },
   ],
   ADMIN: [
     { title: "Quản trị hệ thống", path: "/admin/dashboard", icon: LayoutDashboard, mobileLabel: "Dashboard" },
@@ -51,6 +56,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
     { title: "Logs Blockchain", path: "/admin/blockchain-logs", icon: Database, mobileLabel: "Blockchain" },
     { title: "Thống kê AI & NLP", path: "/admin/ai-analytics", icon: BrainCircuit, mobileLabel: "AI" },
     { title: "Quyết toán & Đối soát", path: "/admin/settlements", icon: ArrowRightLeft, mobileLabel: "Quyết toán" },
+    { title: "Quản lý Báo cáo", path: "/admin/reports", icon: Flag, mobileLabel: "Báo cáo" },
   ],
 };
 

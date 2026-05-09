@@ -22,6 +22,8 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     Optional<Room> findByIdForUpdate(@Param("roomId") Long roomId);
 
     List<Room> findByPropertyId(Long propertyId);
+
+    long countByPropertyId(Long propertyId);
     
     List<Room> findByPropertyIdAndApprovalStatus(Long propertyId, iuh.se.kltn.backend.modules.property.enums.PropertyStatus approvalStatus);
 

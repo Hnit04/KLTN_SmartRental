@@ -71,3 +71,55 @@ export const payExternalBill = async (contractAddress: string, backendBillId: nu
     throw error;
   }
 };
+
+// 4. Đề xuất khấu trừ và kết thúc (Landlord)
+export const proposeDeduction = async (contractAddress: string, amountWei: string, isEarly: boolean) => {
+  try {
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.proposeDeduction(amountWei, isEarly);
+    await tx.wait();
+    return tx.hash;
+  } catch (error) {
+    console.error("Lỗi đề xuất khấu trừ:", error);
+    throw error;
+  }
+};
+
+// 5. Đồng ý kết thúc (Tenant)
+export const consentEndContract = async (contractAddress: string) => {
+  try {
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.consentEndContract();
+    await tx.wait();
+    return tx.hash;
+  } catch (error) {
+    console.error("Lỗi đồng ý kết thúc:", error);
+    throw error;
+  }
+};
+
+// 6. Thực thi kết thúc (Either or Backend)
+export const executeEndContract = async (contractAddress: string) => {
+  try {
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.endContract();
+    await tx.wait();
+    return tx.hash;
+  } catch (error) {
+    console.error("Lỗi thực thi kết thúc:", error);
+    throw error;
+  }
+};
+
+// 7. Rút tiền (Pull Payment)
+export const withdrawFunds = async (contractAddress: string) => {
+  try {
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.withdraw();
+    await tx.wait();
+    return tx.hash;
+  } catch (error) {
+    console.error("Lỗi rút tiền:", error);
+    throw error;
+  }
+};

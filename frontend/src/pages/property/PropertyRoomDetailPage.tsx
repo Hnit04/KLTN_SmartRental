@@ -13,6 +13,7 @@ import { roomApi } from '@/api/roomApi';
 import { contractApi } from '@/api/contractApi';
 
 const Room360Viewer = lazy(() => import('@/components/property/Room360Viewer'));
+import StreetViewVerification from '@/components/property/StreetViewVerification';
 
 // Danh sách tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -104,6 +105,17 @@ export default function PropertyRoomDetailPage() {
       ]);
 
       const roomData = (roomRes as any).data || roomRes;
+
+      try {
+        const propRes = await propertyApi.getDetail(propertyId!);
+        const propData = (propRes as any).data || propRes;
+        roomData.latitude = propData.latitude;
+        roomData.longitude = propData.longitude;
+        roomData.propertyImages = propData.images;
+      } catch (e) {
+        console.error("Failed to load property coordinates", e);
+      }
+
       setRoom(roomData);
       setTenants((tenantsRes as any).data || tenantsRes || []);
 
@@ -447,7 +459,7 @@ export default function PropertyRoomDetailPage() {
                 <img 
                   src={room.images[0]} 
                   alt={`Phòng ${room.name}`} 
-                  className="w-full h-full object-cover" 
+                  className={`w-full h-full ${room.images.length === 1 ? 'object-contain' : 'object-cover'}`} 
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl">
@@ -504,6 +516,15 @@ export default function PropertyRoomDetailPage() {
                 <Room360Viewer images={room.panoramaImages} height="350px" />
               </Suspense>
             </div>
+          )}
+
+          {/* STREET VIEW VERIFICATION */}
+          {((room as any)?.latitude && (room as any)?.longitude) && (
+            <StreetViewVerification
+              latitude={(room as any).latitude}
+              longitude={(room as any).longitude}
+              propertyAddress={room.propertyAddress || room.address || ''}
+            />
           )}
 
           {/* Mô tả & Điều khoản */}

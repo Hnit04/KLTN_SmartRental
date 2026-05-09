@@ -19,6 +19,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     Page<Property> findByStatus(PropertyStatus status, Pageable pageable);
     List<Property> findByStatus(PropertyStatus status);
 
+    long countByLandlordId(Long landlordId);
     /**
      * Tìm phòng trọ gần một tọa độ cho trước, sử dụng công thức Haversine.
      * - Chỉ lấy phòng AVAILABLE trong property APPROVED

@@ -61,4 +61,12 @@ public class ContractResponse {
     private Integer tenantReputationScore;
     private String tenantKycStatus;
     private String cancelReason;
+    private Boolean isCompromised;
+
+    // 🔗 Blockchain Settlement Info
+    private Double currentDeductionAmount;
+    private Boolean isEarlyTerminationProposal;
+    private Boolean hasLandlordConsented;
+    private Boolean hasTenantConsented;
+    private Boolean isProposalActive;
 }

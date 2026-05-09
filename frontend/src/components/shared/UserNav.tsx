@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, User, LayoutDashboard, ChevronDown, FileText, Home } from "lucide-react";
+import { LogOut, User, LayoutDashboard, ChevronDown, FileText, Home, Star } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Dropdown, DropdownItem, DropdownSeparator } from "../ui/DropdownMenu";
 
@@ -36,9 +36,15 @@ export function UserNav() {
   return (
     <Dropdown trigger={Trigger}>
       {/* Thông tin User */}
-      <div className="px-4 py-3">
-        <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
-        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+      <div className="px-4 py-3 bg-slate-50 rounded-t-xl border-b border-gray-100 relative overflow-hidden">
+        <p className="text-sm font-bold text-gray-900">{user.fullName}</p>
+        <p className="text-xs text-gray-500 truncate mb-2">{user.email}</p>
+        
+        {/* Điểm uy tín */}
+        <div className="flex items-center gap-1.5 mt-1 bg-white border border-yellow-200 px-2.5 py-1 w-fit rounded-lg shadow-sm">
+          <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+          <span className="text-[11px] font-bold text-yellow-700">Uy tín: {user.reputationScore ?? 100}</span>
+        </div>
       </div>
       
       <DropdownSeparator />

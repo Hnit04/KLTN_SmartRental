@@ -29,6 +29,10 @@ public class PropertyResponse {
 
     private String landlordName;
     private String landlordPhone;
+    private String landlordAvatar;
+    private String landlordEmail;
+    private String landlordZalo;
+    private Integer landlordReputationScore;
 
     private Double minPrice;
     private Double maxPrice;

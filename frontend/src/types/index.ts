@@ -150,6 +150,10 @@ export interface Property {
   landlordId?: number;
   landlordName?: string;
   landlordPhone?: string;
+  landlordAvatar?: string;
+  landlordEmail?: string;
+  landlordZalo?: string;
+  landlordReputationScore?: number;
   minPrice?: number;
   maxPrice?: number;
   totalRooms?: number;
@@ -241,6 +245,14 @@ export interface Contract {
   tenantReputationScore?: number;
   tenantKycStatus?: string;
   cancelReason?: string;
+  isCompromised?: boolean;
+
+  // Blockchain Settlement Info
+  currentDeductionAmount?: number;
+  isEarlyTerminationProposal?: boolean;
+  hasLandlordConsented?: boolean;
+  hasTenantConsented?: boolean;
+  isProposalActive?: boolean;
 }
 
 // Payload để tạo hợp đồng

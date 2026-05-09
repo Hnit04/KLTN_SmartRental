@@ -1,13 +1,18 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { 
   XCircle, Maximize,
   Eye, FileSignature, Image as ImageIcon, CalendarClock, Sparkles, Home, Layers, Sun, ChevronLeft, ChevronRight,
-  Wrench
+  Wrench, Heart, GitCompareArrows
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import StatusBadge from "@/components/shared/StatusBadge";
 import type { Room } from "@/types/index";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useCompare } from "@/context/CompareContext";
+import { useAuth } from "@/context/AuthContext";
+import LoginRequiredModal from "@/components/shared/LoginRequiredModal";
 
 interface RoomCardProps {
   data: Room;
@@ -16,8 +21,17 @@ interface RoomCardProps {
 
 export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [currImgIndex, setCurrImgIndex] = useState(0);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  // Hooks
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const { addToCompare, isInCompare, compareList } = useCompare();
+
+  const isFav = isFavorite(data.id);
+  const isComp = isInCompare(data.id);
 
   // 1. Kiểm tra trạng thái phòng
   const isAvailable = data.status === "AVAILABLE";
@@ -44,11 +58,13 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     setCurrImgIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     setCurrImgIndex(prev => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
@@ -76,7 +92,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
         ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
-        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={() => setIsDetailOpen(true)}>
+        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}>
           {images.length > 0 ? (
             <img 
               src={images[currImgIndex]} 
@@ -144,13 +160,48 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               )}
             </div>
           ) : null}
+
+          {/* --- NÚT TIM & NÚT SO SÁNH --- */}
+          <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
+            {/* Nếu đã có Status Badge, ta dời nó sang trái hoặc để nó bên dưới.
+                Tạm thời Status Badge ở dòng 121 đã chiếm top-3 right-3.
+                Tôi sẽ đổi chỗ nút Tim lên góc trái, và Status Badge sang góc phải. Hoặc đẩy Tim xuống.
+                Sửa lại: Tim ở top-3 right-3, Status Badge dời xuống top-12 right-3.
+                Vì Status Badge đã render ở trên, tôi sẽ đặt Tim ở top-12 right-3. */}
+          </div>
+          
+          <button
+            className={`absolute top-12 right-3 p-2 rounded-full backdrop-blur-md shadow-sm z-20 transition-all hover:scale-110 ${isFav ? 'bg-red-50 text-red-500' : 'bg-white/70 text-gray-500 hover:bg-white hover:text-red-500'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (!isAuthenticated) {
+                setIsLoginModalOpen(true);
+                return;
+              }
+              toggleFavorite(data.id);
+            }}
+          >
+            <Heart className={`h-4 w-4 ${isFav ? 'fill-current' : ''}`} />
+          </button>
+
+          <button
+            className={`absolute top-24 right-3 p-2 rounded-full backdrop-blur-md shadow-sm z-20 transition-all hover:scale-110 ${isComp ? 'bg-blue-50 text-blue-600' : 'bg-white/70 text-gray-500 hover:bg-white hover:text-blue-600'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              addToCompare(data);
+            }}
+          >
+            <GitCompareArrows className="h-4 w-4" />
+          </button>
         </div>
 
         {/* --- THÔNG TIN --- */}
         <div className="p-4 md:p-5 flex-1 flex flex-col">
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors truncate pr-2">
-              Phòng {data.name}
+              {data.name.toLowerCase().includes('phòng') ? data.name : `Phòng ${data.name}`}
             </h4>
             <span className="font-bold text-primary text-lg shrink-0">
               {formatPrice(data.price)}
@@ -206,7 +257,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   variant="outline" 
                   size="sm" 
                   className="text-xs h-10 hover:bg-primary/5 text-gray-600 hover:text-primary border-gray-200 transition-colors group/btn1 rounded-xl"
-                  onClick={() => setIsDetailOpen(true)}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}
               >
                   <Eye className="h-3.5 w-3.5 mr-1.5 group-hover/btn1:-translate-y-0.5 transition-transform" /> Chi tiết
               </Button>
@@ -217,6 +268,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   disabled={(!isAvailable && !data.availableFromDate) || isMaintenance}
                   onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       if (onBookAppointment) {
                           onBookAppointment();
                       } else {
@@ -235,9 +287,14 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
       </div>
 
       {/* --- MODAL CHI TIẾT PHÒNG --- */}
-      {isDetailOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
+      {isDetailOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={(e) => { e.stopPropagation(); setIsDetailOpen(false); }}
+        >
+          <div 
+            className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
 
             <div className="h-56 bg-gray-100 relative shrink-0">
               {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
@@ -250,7 +307,9 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             </div>
 
             <div className="p-6 overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-2">Phòng {data.name}</h2>
+              <h2 className="text-2xl font-bold mb-2">
+                {data.name.toLowerCase().includes('phòng') ? data.name : `Phòng ${data.name}`}
+              </h2>
               <p className="text-2xl text-primary font-bold mb-4">
                 {formatPrice(data.price)}
                 <span className="text-sm font-normal text-gray-500">/tháng</span>
@@ -343,8 +402,16 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
+
+      <LoginRequiredModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+        title="Yêu cầu đăng nhập" 
+        message="Vui lòng đăng nhập để lưu phòng yêu thích!" 
+      />
     </>
   );
 }
