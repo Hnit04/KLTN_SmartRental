@@ -175,7 +175,7 @@ contract RentalContract is ReentrancyGuard, Pausable {
     {
         require(depositedAmount == 0, "Already deposited");
         require(msg.value == depositAmount, "Wrong amount");
-        require(block.timestamp >= startDate, "Not started");
+        // require(block.timestamp >= startDate, "Not started"); // Cho phép đặt cọc sớm để giữ chỗ (Reservation)
         require(block.timestamp < endDate, "Expired");
 
         depositedAmount = msg.value;

@@ -8,6 +8,10 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import java.util.List;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,8 +40,8 @@ public class RoomReport {
     @Column(columnDefinition = "TEXT")
     private String details;
 
-    @Column(columnDefinition = "JSON")
-    private String evidenceUrls;
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<String> evidenceUrls;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

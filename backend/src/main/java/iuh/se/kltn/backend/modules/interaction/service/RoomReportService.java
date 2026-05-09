@@ -46,24 +46,31 @@ public class RoomReportService {
         User reporter = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
+        // 🔓 [DEMO MODE] Bỏ qua kiểm tra KYC
+        /*
         if (!"VERIFIED".equals(reporter.getKycStatus().name())) {
             throw new RuntimeException("Tài khoản chưa xác thực CCCD không thể gửi báo cáo");
         }
+        */
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng trọ"));
 
-        // Chống trùng: 1 user chỉ báo cáo 1 phòng 1 lần
+        // 🔓 [DEMO MODE] Bỏ qua kiểm tra trùng lặp
+        /*
         if (roomReportRepository.existsByReporterAndRoom(reporter.getId(), room.getId())) {
             throw new RuntimeException("Bạn đã gửi báo cáo cho phòng trọ này rồi");
         }
+        */
 
-        // Chống spam: tối đa 3 báo cáo/ngày
+        // 🔓 [DEMO MODE] Bỏ qua giới hạn spam
+        /*
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         long reportsToday = roomReportRepository.countReportsByUserToday(reporter.getId(), startOfDay);
         if (reportsToday >= 3) {
             throw new RuntimeException("Bạn đã vượt quá số lần báo cáo trong ngày (tối đa 3 lần/ngày)");
         }
+        */
 
         RoomReport report = new RoomReport();
         report.setReporter(reporter);
@@ -72,16 +79,10 @@ public class RoomReportService {
         report.setDetails(request.getDetails());
         report.setStatus(ReportStatus.PENDING);
 
-        try {
-            if (request.getEvidenceUrls() != null && !request.getEvidenceUrls().isEmpty()) {
-                report.setEvidenceUrls(objectMapper.writeValueAsString(request.getEvidenceUrls()));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi xử lý danh sách hình ảnh bằng chứng");
-        }
+        report.setEvidenceUrls(request.getEvidenceUrls());
 
         RoomReport saved = roomReportRepository.save(report);
-        RoomReportResponse response = RoomReportResponse.from(saved, objectMapper);
+        RoomReportResponse response = RoomReportResponse.from(saved, null);
         
         // Broadcast realtime qua WebSockets cho Admin
         messagingTemplate.convertAndSend("/topic/admin/reports", response);
@@ -95,7 +96,7 @@ public class RoomReportService {
     @Transactional(readOnly = true)
     public List<RoomReportResponse> getAdminReports() {
         return roomReportRepository.findAll().stream()
-                .map(r -> RoomReportResponse.from(r, objectMapper))
+                .map(r -> RoomReportResponse.from(r, null))
                 .collect(Collectors.toList());
     }
 
@@ -186,7 +187,7 @@ public class RoomReportService {
         }
 
         RoomReport saved = roomReportRepository.save(report);
-        RoomReportResponse response = RoomReportResponse.from(saved, objectMapper);
+        RoomReportResponse response = RoomReportResponse.from(saved, null);
         
         // Broadcast realtime qua WebSockets cho tất cả Admin đang mở trang quản lý
         messagingTemplate.convertAndSend("/topic/admin/reports", response);

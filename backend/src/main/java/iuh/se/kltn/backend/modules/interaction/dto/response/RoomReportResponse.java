@@ -3,8 +3,7 @@ package iuh.se.kltn.backend.modules.interaction.dto.response;
 import iuh.se.kltn.backend.modules.interaction.entity.RoomReport;
 import iuh.se.kltn.backend.modules.interaction.enums.ReportStatus;
 import lombok.Data;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,15 +44,7 @@ public class RoomReportResponse {
         response.setReason(report.getReason());
         response.setDetails(report.getDetails());
         
-        try {
-            if (report.getEvidenceUrls() != null && !report.getEvidenceUrls().isEmpty()) {
-                response.setEvidenceUrls(objectMapper.readValue(report.getEvidenceUrls(), new TypeReference<List<String>>() {}));
-            } else {
-                response.setEvidenceUrls(new ArrayList<>());
-            }
-        } catch (Exception e) {
-            response.setEvidenceUrls(new ArrayList<>());
-        }
+        response.setEvidenceUrls(report.getEvidenceUrls() != null ? report.getEvidenceUrls() : new java.util.ArrayList<>());
         
         response.setStatus(report.getStatus());
         response.setAdminNotes(report.getAdminNotes());

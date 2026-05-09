@@ -7,8 +7,23 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import java.util.stream.Collectors;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidationException(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "status", "error",
+                        "message", "Dữ liệu không hợp lệ: " + message
+                ));
+    }
 
     @ExceptionHandler(iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService.VipLimitExceededException.class)
     public ResponseEntity<?> handleVipLimitException(
