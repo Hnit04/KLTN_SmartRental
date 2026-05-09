@@ -85,6 +85,7 @@ public class ReviewService {
     }
 
     // Lấy toàn bộ Review của một chủ nhà (để hiển thị trên trang Chi tiết khu trọ)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ReviewResponse> getReviewsByLandlord(Long landlordId) {
         return reviewRepo.findByTargetIdOrderByCreatedAtDesc(landlordId)
                 .stream()
@@ -105,6 +106,7 @@ public class ReviewService {
                 review.getCreatedAt()
         );
     }
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ReviewResponse> getReviewsByProperty(Long propertyId) {
         return reviewRepo.findByContract_Room_Property_IdOrderByCreatedAtDesc(propertyId)
                 .stream()

@@ -45,6 +45,7 @@ public class RoomService {
     /**
      * Lấy chi tiết phòng theo ID
      */
+    @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long id) {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + id));
@@ -148,6 +149,7 @@ public class RoomService {
         return mapToRoomResponse(savedRoom);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Long> getRoomStatsForLandlord(Long landlordId) {
         Long totalRooms = roomRepository.countTotalRoomsByLandlord(landlordId);
         Long rentedRooms = roomRepository.countRentedRoomsByLandlord(landlordId);
@@ -161,6 +163,7 @@ public class RoomService {
     }
 
     // === ADMIN Duyệt phòng ===
+    @Transactional(readOnly = true)
     public List<RoomResponse> getPendingRooms() {
         return roomRepository.findByApprovalStatus(PropertyStatus.PENDING).stream()
                 .map(this::mapToRoomResponse)
@@ -210,6 +213,7 @@ public class RoomService {
             System.err.println("⚠️ Lỗi gửi notification phòng: " + e.getMessage());
         }
     }
+    @Transactional(readOnly = true)
     public List<UserProfileResponse> getTenantsByRoomId(Long roomId) {
         roomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));

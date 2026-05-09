@@ -169,12 +169,14 @@ public class ResidentRequestService {
         return mapToResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<ResidentRequestResponse> getRequestsByContract(Long contractId) {
         return residentRequestRepository.findByContractId(contractId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<ResidentRequestResponse> getRequestsByInvitee(Long inviteeId) {
         return residentRequestRepository.findByInviteeId(inviteeId).stream()
                 .filter(r -> r.getStatus() == RequestStatus.PENDING)
@@ -344,6 +346,7 @@ public class ResidentRequestService {
         return mapToResponse(updated);
     }
 
+    @Transactional(readOnly = true)
     public List<ContractMemberResponse> getMembersByContract(Long contractId) {
         return contractMemberRepository.findByContractIdAndLeftDateIsNull(contractId).stream()
                 .map(this::mapToMemberResponse)

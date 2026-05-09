@@ -40,6 +40,7 @@ public class UserService {
 
 
 
+    @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -51,6 +52,7 @@ public class UserService {
         return response;
     }
 
+    @Transactional(readOnly = true)
     public UserProfileResponse findByUsername(String username){
         User user= userRepository.findByUsername(username)
                 .orElseThrow(()-> new ResourceNotFoundException("User","id", username));
@@ -146,6 +148,7 @@ public class UserService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<UserProfileResponse> getAllByRole(Role role) {
         List<User> users = userRepository.findAllByRole(role);
         return users.stream()
@@ -153,6 +156,7 @@ public class UserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<UserProfileResponse> getTopLandlords(int limit) {
         List<User> topLandlords = userRepository.findTopUsersByRole(Role.LANDLORD, PageRequest.of(0, limit));
         return topLandlords.stream()
@@ -184,6 +188,7 @@ public class UserService {
     @Autowired
     private CloudinaryService cloudinaryService;
 
+    @Transactional(readOnly = true)
     public List<UserProfileResponse> getPendingKYCUsers() {
         return userRepository.findByKycStatus(KYCStatus.PENDING).stream()
                 .map(user -> {

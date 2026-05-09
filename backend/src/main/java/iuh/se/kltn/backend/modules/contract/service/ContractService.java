@@ -234,6 +234,7 @@ public class ContractService {
     }
 
     // --- 2. Lấy danh sách ---
+    @Transactional(readOnly = true)
     public List<ContractResponse> getMyContracts(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
@@ -248,6 +249,7 @@ public class ContractService {
     }
 
     // --- 2b. Lấy phòng hiện tại của người dùng (Chủ phòng HOẶC Thành viên) ---
+    @Transactional(readOnly = true)
     public ContractResponse getMyCurrentRoom(Long userId) {
         // Tìm các hợp đồng ACTIVE hoặc PENDING_SIGNATURE mà user là Tenant hoặc Member
         List<Contract> contracts = contractRepository.findCurrentContractsByUserId(
@@ -269,10 +271,12 @@ public class ContractService {
     }
 
     // --- 2c. Lấy TẤT CẢ lịch sử thuê của người dùng ---
+    @Transactional(readOnly = true)
     public List<Contract> findAllRentalHistoryByUserId(Long userId) {
         return contractRepository.findAllRentalHistoryByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
     public DashboardInsightsResponse getDashboardInsights(Long landlordId) {
         java.time.LocalDate now = java.time.LocalDate.now();
         java.time.LocalDate oneMonthLater = now.plusDays(30);
@@ -342,6 +346,7 @@ public class ContractService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<ContractResponse> getRentalHistory(Long userId) {
         List<Contract> contracts = findAllRentalHistoryByUserId(userId);
         return contracts.stream()
@@ -350,11 +355,13 @@ public class ContractService {
     }
 
     // --- Admin: Lấy tất cả hợp đồng ---
+    @Transactional(readOnly = true)
     public List<ContractResponse> getAllContracts() {
         return contractRepository.findAll().stream().map(c -> mapToResponse(c, null)).collect(Collectors.toList());
     }
 
     // ✅ Lịch sử hợp đồng theo phòng (cho chủ trọ)
+    @Transactional(readOnly = true)
     public List<ContractResponse> getRoomContractHistory(Long roomId) {
         List<Contract> contracts = contractRepository.findByRoomIdOrderByStartDateDesc(roomId);
         return contracts.stream()
@@ -363,6 +370,7 @@ public class ContractService {
     }
 
     // --- Admin: Xác minh tính toàn vẹn hợp đồng (Level 2 + 3) ---
+    @Transactional(readOnly = true)
     public java.util.Map<String, Object> verifyContract(Long id) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
@@ -572,6 +580,7 @@ public class ContractService {
         return comp;
     }
 
+    @Transactional(readOnly = true)
     public ContractResponse getContractById(Long id) {
         Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID: " + id));

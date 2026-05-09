@@ -174,6 +174,7 @@ public class BillService {
     }
 
     // Lấy danh sách hóa đơn của Hợp đồng
+    @Transactional(readOnly = true)
     public List<BillResponse> getBillsByContract(Long contractId) {
         return billRepository.findByContractIdOrderByYearDescMonthDesc(contractId).stream()
                 .map(bill -> {
@@ -284,6 +285,7 @@ public class BillService {
         return mapToResponse(saved, elecCost, waterCost, bill.getContract().getActualPrice());
     }
 
+    @Transactional(readOnly = true)
     public List<BillingStatusResponse> getBillingStatus(Long landlordId, int month, int year) {
         // 1. Lấy tất cả Hợp đồng đang ACTIVE HOẶC Đã kết thúc nhưng vẫn còn nợ bill
         List<Contract> activeContracts = contractRepository.findBillingContractsByLandlordId(landlordId);
@@ -352,6 +354,7 @@ public class BillService {
 
     // Trong BillService.java
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getRevenueThisMonthAndLastMonth(Long landlordId) {
         // Tháng hiện tại: 3/2026 (theo ngày hệ thống 16/03/2026)
         LocalDate now = LocalDate.now();
@@ -385,6 +388,7 @@ public class BillService {
         return result;
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getOverdueStats(Long landlordId) {
         Double overdueAmount = billRepository.sumOverdueAmountByLandlord(landlordId);
         Long overdueCount = billRepository.countOverdueBillsByLandlord(landlordId);
@@ -395,6 +399,7 @@ public class BillService {
 
         return stats;
     }
+    @Transactional(readOnly = true)
     public List<MonthlyRevenueResponse> getRevenueLast6Months(Long landlordId) {
         LocalDate now = LocalDate.now(); // hoặc dùng Clock nếu test
         int currentYear  = now.getYear();
@@ -415,6 +420,7 @@ public class BillService {
         );
     }
 
+    @Transactional(readOnly = true)
     public List<RevenueChartResponse> getRevenueLast6MonthsForChart(Long landlordId) {
         LocalDate now = LocalDate.now();
         List<RevenueChartResponse> chartData = new ArrayList<>();
@@ -535,6 +541,7 @@ public class BillService {
         return mapToResponse(savedBill, elecCost, waterCost, savedBill.getContract().getActualPrice());
     }
 
+    @Transactional(readOnly = true)
     public AnnualReportResponse getAnnualReport(Long landlordId, int year) {
         List<Bill> yearBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndYear(landlordId, year);
         List<Bill> prevYearBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndYear(landlordId, year - 1);

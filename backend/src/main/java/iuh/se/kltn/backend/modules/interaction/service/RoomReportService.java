@@ -92,6 +92,7 @@ public class RoomReportService {
     /**
      * Admin lấy danh sách tất cả báo cáo.
      */
+    @Transactional(readOnly = true)
     public List<RoomReportResponse> getAdminReports() {
         return roomReportRepository.findAll().stream()
                 .map(r -> RoomReportResponse.from(r, objectMapper))

@@ -136,6 +136,7 @@ public class ContractChangeService {
     }
 
     // 2. Lấy danh sách yêu cầu
+    @Transactional(readOnly = true)
     public List<ContractChangeRequest> getRequestsByContract(Long contractId) {
         return requestRepository.findByContractIdOrderByRequestDateDesc(contractId);
     }

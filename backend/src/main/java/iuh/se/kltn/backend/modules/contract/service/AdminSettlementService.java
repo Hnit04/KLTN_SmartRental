@@ -26,10 +26,12 @@ public class AdminSettlementService {
     @Autowired
     private ContractRepository contractRepository;
 
+    @Transactional(readOnly = true)
     public List<LandlordSettlementResponse> getPendingSettlements() {
         return calculateSettlements(false);
     }
 
+    @Transactional(readOnly = true)
     public List<LandlordSettlementResponse> getSettledHistory() {
         return calculateSettlements(true);
     }
@@ -98,6 +100,7 @@ public class AdminSettlementService {
     /**
      * Lấy chi tiết từng khoản (Hóa đơn/Tiền cọc) của 1 chủ trọ theo trạng thái đối soát
      */
+    @Transactional(readOnly = true)
     public List<SettlementItemDetail> getLandlordSettlementDetails(Long landlordId, boolean isSettled) {
         List<SettlementItemDetail> details = new ArrayList<>();
 
@@ -163,6 +166,7 @@ public class AdminSettlementService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getPayoutQrCode(Long landlordId) {
         LandlordSettlementResponse settlement = getPendingSettlements().stream()
                 .filter(s -> s.getLandlordId().equals(landlordId))

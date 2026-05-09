@@ -25,6 +25,7 @@ public class RecommendationService {
     @Autowired
     private TenantPreferenceService tenantPreferenceService;
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<RoomResponse> getRecommendedRoomsForTenant(Long tenantId) {
         TenantPreference pref = tenantPreferenceService.getPreference(tenantId);
         
