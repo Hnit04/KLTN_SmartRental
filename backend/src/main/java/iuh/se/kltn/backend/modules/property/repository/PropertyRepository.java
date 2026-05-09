@@ -13,10 +13,14 @@ import java.util.Map;
 
 @Repository
 public interface PropertyRepository extends JpaRepository<Property, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"landlord"})
     List<Property> findByLandlordIdOrderByCreatedAtDesc(Long landlordId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"landlord"})
     List<Property> findByLandlordUsername(String username);
     List<Property> findByDistrictContainingIgnoreCase(String district);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"landlord"})
     Page<Property> findByStatus(PropertyStatus status, Pageable pageable);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"landlord"})
     List<Property> findByStatus(PropertyStatus status);
 
     long countByLandlordId(Long landlordId);

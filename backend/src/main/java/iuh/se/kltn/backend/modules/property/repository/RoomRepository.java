@@ -21,14 +21,18 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT r FROM Room r WHERE r.id = :roomId")
     Optional<Room> findByIdForUpdate(@Param("roomId") Long roomId);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"property", "property.landlord"})
     List<Room> findByPropertyId(Long propertyId);
 
     long countByPropertyId(Long propertyId);
     
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"property", "property.landlord"})
     List<Room> findByPropertyIdAndApprovalStatus(Long propertyId, iuh.se.kltn.backend.modules.property.enums.PropertyStatus approvalStatus);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"property", "property.landlord"})
     List<Room> findByStatus(RoomStatus status);
     
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"property", "property.landlord"})
     List<Room> findByApprovalStatus(iuh.se.kltn.backend.modules.property.enums.PropertyStatus approvalStatus);
 
 
