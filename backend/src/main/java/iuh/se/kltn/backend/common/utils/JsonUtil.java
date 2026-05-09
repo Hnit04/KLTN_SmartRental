@@ -25,8 +25,12 @@ public class JsonUtil {
     public static List<String> convertJsonToList(String json) {
         try {
             if (json == null || json.isEmpty()) return Collections.emptyList();
+            if (!json.trim().startsWith("[")) {
+                // Hỗ trợ xử lý dữ liệu ngăn cách bằng dấu '|' từ CSV
+                return java.util.Arrays.asList(json.split("\\|"));
+            }
             return mapper.readValue(json, new TypeReference<List<String>>() {});
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             return Collections.emptyList();
         }
     }
