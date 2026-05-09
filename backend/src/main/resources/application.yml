@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -18,10 +18,10 @@ spring:
     hibernate:
       # Tự động cập nhật schema DB khi có thay đổi Entity
       ddl-auto: update
+    open-in-view: false
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         # Cấu hình Hibernate Envers (Audit Trail)
         envers:
