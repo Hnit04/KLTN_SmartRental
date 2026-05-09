@@ -1,14 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
 import { toast } from "sonner";
-import { userApi } from "@/api/userApi"; 
-import { authApi} from "@/api/authApi";
+import { userApi } from "@/api/userApi";
+import { authApi } from "@/api/authApi";
 import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode"; 
+import { motion } from "framer-motion";
+import { User, Lock, Eye, EyeOff, LogIn, AlertTriangle } from "lucide-react";
+import "./auth.css";
+
+const stagger = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,6 +30,7 @@ export default function LoginPage() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Trạng thái modal thông báo khóa tài khoản
   const [showLockedModal, setShowLockedModal] = useState(false);
@@ -58,8 +67,6 @@ export default function LoginPage() {
     return `${diffDays} ngày nữa`;
   };
 
-  
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -68,7 +75,6 @@ export default function LoginPage() {
 
     try {
       const user = await userApi.findByUsername(formData.username);
-      console.log("Thông tin user sau khi tìm kiếm:", user);
 
       if (user.locked === true || user.lockUntil !== null) {
         const timeLeft = calculateTimeRemaining(user.lockUntil);
@@ -132,51 +138,43 @@ export default function LoginPage() {
 
   // Xử lý đăng nhập Google thành công
   const handleGoogleSuccess = async (credentialResponse: any) => {
-  try {
-    const idToken = credentialResponse.credential;
-    if (!idToken) throw new Error("Không nhận được ID Token từ Google");
+    try {
+      const idToken = credentialResponse.credential;
+      if (!idToken) throw new Error("Không nhận được ID Token từ Google");
 
-    console.log("Google ID Token (first 50 chars):", idToken.substring(0, 50) + "...");
+      setIsLoading(true);
 
-    setIsLoading(true);
+      const response = await authApi.googleLogin({ idToken });
 
-    const response = await authApi.googleLogin({ idToken });
+      await login(response);
 
-    console.log("Backend trả về:", {
-      accessToken: response.accessToken?.substring(0, 20) + "...",
-      refreshToken: response.refreshToken?.substring(0, 20) + "...",
-      user: response.user?.email
-    });
+      toast.success("Đăng nhập Google thành công!", {
+        description: "Đang chuyển hướng..."
+      });
 
-    await login(response);
+      setTimeout(() => {
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else {
+          const role = response.user?.role;
+          if (role === 'ADMIN') navigate("/admin/dashboard");
+          else if (role === 'LANDLORD') navigate("/landlord/dashboard");
+          else navigate("/tenant/dashboard");
+        }
+      }, 800);
 
-    toast.success("Đăng nhập Google thành công!", {
-      description: "Đang chuyển hướng..."
-    });
+    } catch (error: any) {
+      console.error("Lỗi Google Login:", error);
 
-    setTimeout(() => {
-      if (redirectUrl) {
-        navigate(redirectUrl);
-      } else {
-        const role = response.user?.role;
-        if (role === 'ADMIN') navigate("/admin/dashboard");
-        else if (role === 'LANDLORD') navigate("/landlord/dashboard");
-        else navigate("/tenant/dashboard");
-      }
-    }, 800);
+      const errMsg = error.response?.data?.error
+        || error.message
+        || "Xác thực Google thất bại";
 
-  } catch (error: any) {
-    console.error("Lỗi toàn bộ quá trình Google Login:", error);
-
-    const errMsg = error.response?.data?.error 
-      || error.message 
-      || "Xác thực Google thất bại";
-
-    toast.error(errMsg, { duration: 6000 });
-  } finally {
-    setIsLoading(false);
-  }
-};
+      toast.error(errMsg, { duration: 6000 });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleError = () => {
     toast.error("Đăng nhập Google bị hủy hoặc gặp lỗi.", { duration: 4000 });
@@ -184,174 +182,153 @@ export default function LoginPage() {
 
   return (
     <>
-      <div
-        className="relative min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop')",
-        }}
-      >
-        {/* Lớp Overlay làm mờ (Blur) và tối màu */}
-        <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[6px]"></div>
+      <div className="auth-bg">
+        <div className="auth-bg-overlay" />
 
-        {/* Card Đăng nhập */}
-        <div className="relative w-full max-w-md space-y-8 bg-white/95 backdrop-blur-xl p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/40">
-          <div className="text-center space-y-2">
-            {/* Logo/Icon Thuê nhà */}
-            <div className="mx-auto bg-blue-50 text-primary w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+        <motion.div
+          className="auth-card"
+          variants={stagger}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Header */}
+          <motion.div className="auth-form-header" variants={fadeUp}>
+            <div className="auth-form-icon">
+              <LogIn size={24} />
+            </div>
+            <h1 className="auth-form-title">SmartRental</h1>
+            <p className="auth-form-desc">Tìm kiếm tổ ấm hoàn hảo của bạn</p>
+          </motion.div>
+
+          <form onSubmit={handleSubmit}>
+            {/* Username */}
+            <motion.div variants={fadeUp} style={{ marginBottom: "1rem" }}>
+              <label htmlFor="username" className="auth-label">Tên đăng nhập</label>
+              <div className="auth-input-group">
+                <User size={17} className="auth-input-icon" />
+                <input
+                  id="username"
+                  type="text"
+                  placeholder="Nhập tên đăng nhập"
+                  required
+                  value={formData.username}
+                  onChange={handleChange}
+                  autoFocus
+                  className="auth-input-field"
                 />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
-              SmartRental
-            </h1>
-            <p className="text-sm text-gray-500 font-medium">
-              Tìm kiếm tổ ấm hoàn hảo của bạn
-            </p>
-          </div>
+              </div>
+            </motion.div>
 
-          <form className="space-y-6 mt-8" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label
-                htmlFor="username"
-                className="text-gray-700 font-semibold"
-              >
-                Tên đăng nhập
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Nhập tên đăng nhập"
-                required
-                value={formData.username}
-                onChange={handleChange}
-                autoFocus
-                className="bg-white/50 focus:bg-white transition-colors"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="password"
-                  className="text-gray-700 font-semibold"
-                >
-                  Mật khẩu
-                </Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm font-semibold text-primary hover:text-primary-700 hover:underline transition-colors"
-                >
+            {/* Password */}
+            <motion.div variants={fadeUp} style={{ marginBottom: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label htmlFor="password" className="auth-label" style={{ marginBottom: 0 }}>Mật khẩu</label>
+                <Link to="/forgot-password" className="auth-link" style={{ fontSize: "0.78rem" }}>
                   Quên mật khẩu?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="bg-white/50 focus:bg-white transition-colors"
-              />
-            </div>
+              <div className="auth-input-group">
+                <Lock size={17} className="auth-input-icon" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="auth-input-field has-toggle"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="auth-input-toggle">
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+            </motion.div>
 
-            <Button
-              className="w-full bg-primary hover:bg-primary-700 text-white font-semibold py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]"
-              type="submit"
-              disabled={isLoading}
-            >
-              {isLoading ? "Đang xử lý..." : "Đăng nhập vào hệ thống"}
-            </Button>
+            {/* Submit */}
+            <motion.div variants={fadeUp} style={{ marginTop: "1.5rem" }}>
+              <button type="submit" disabled={isLoading} className="auth-submit-btn">
+                {isLoading ? (
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ animation: "auth-spin 1s linear infinite" }}>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="42" strokeLinecap="round" />
+                    </svg>
+                    Đang xử lý...
+                  </span>
+                ) : (
+                  "Đăng nhập vào hệ thống"
+                )}
+              </button>
+            </motion.div>
           </form>
 
-          {/* Phần phân cách và nút Google */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-white/95 px-4 text-gray-500">hoặc</span>
-              </div>
-            </div>
+          {/* Divider */}
+          <motion.div className="auth-divider" variants={fadeUp}>
+            <div className="auth-divider-line" />
+            <span className="auth-divider-text">hoặc</span>
+            <div className="auth-divider-line" />
+          </motion.div>
 
-            <div className="mt-6">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                theme="outline"
-                text="signin_with"
-                shape="rectangular"
-                logo_alignment="left"
-                width="100%"
-              />
-            </div>
-          </div>
+          {/* Google Login */}
+          <motion.div className="auth-google-wrapper" variants={fadeUp}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              theme="outline"
+              text="signin_with"
+              shape="rectangular"
+              logo_alignment="left"
+              width="100%"
+            />
+          </motion.div>
 
-          <div className="text-center text-sm text-gray-600 pt-4 border-t border-gray-200/60 mt-6">
+          {/* Footer */}
+          <motion.div className="auth-footer" variants={fadeUp}>
             Chưa có tài khoản?{" "}
-            <Link
-              to="/register"
-              className="font-bold text-primary hover:text-primary-700 hover:underline transition-colors"
-            >
-              Đăng ký ngay
-            </Link>
-          </div>
-        </div>
+            <Link to="/register" className="auth-link">Đăng ký ngay</Link>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Modal thông báo khóa tài khoản */}
       {showLockedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all">
-            <div className="p-6 flex items-center gap-3 border-b bg-red-50/50">
-              <div className="bg-red-100 text-red-600 p-2 rounded-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
+          <motion.div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="p-6 flex items-center gap-3 border-b" style={{ background: "hsl(0, 85%, 97%)" }}>
+              <div style={{ background: "hsl(0, 80%, 93%)", color: "hsl(0, 72%, 50%)", padding: "10px", borderRadius: "12px" }}>
+                <AlertTriangle size={22} />
               </div>
-              <h3 className="text-xl font-bold text-red-700">
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "hsl(0, 72%, 40%)" }}>
                 Tài khoản bị khóa
               </h3>
             </div>
 
-            <div className="p-6 whitespace-pre-line text-gray-700 font-medium leading-relaxed">
+            <div className="p-6 whitespace-pre-line text-gray-700 font-medium leading-relaxed" style={{ fontSize: "0.88rem" }}>
               {lockMessage}
             </div>
 
             <div className="p-5 border-t bg-gray-50 flex justify-end">
               <button
                 onClick={() => setShowLockedModal(false)}
-                className="px-6 py-2.5 bg-gray-800 text-white font-semibold rounded-xl hover:bg-gray-900 active:scale-95 transition-all shadow-sm"
+                style={{
+                  padding: "10px 24px",
+                  background: "hsl(20, 14%, 15%)",
+                  color: "white",
+                  fontWeight: 700,
+                  borderRadius: "12px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.88rem",
+                }}
               >
                 Đã hiểu
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </>
