@@ -5,8 +5,9 @@ import {
   XCircle, Bot, Loader2, X, Phone, MessageSquare,
   MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn,
   Share2, Heart, LayoutTemplate, Box, Users, Sofa, Tv, BedDouble, Car,
-  GitCompareArrows, Flag, ShieldCheck
+  GitCompareArrows, Flag
 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
 import { useAuth } from "@/context/AuthContext";

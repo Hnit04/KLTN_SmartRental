@@ -35,7 +35,7 @@ export default function AdminReportPage() {
     
     if (token) {
       stompClient = new StompClient({
-        brokerURL: 'ws://localhost:8080/ws',
+        brokerURL: `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '').replace('http', 'ws')}/ws`,
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
         onConnect: () => {

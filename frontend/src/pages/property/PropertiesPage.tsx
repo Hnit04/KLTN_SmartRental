@@ -40,7 +40,7 @@ export default function PropertiesPage() {
         // Chạy song song cả hai API
         const [propsRes, recRoomsRes] = await Promise.allSettled([
           propertyApi.getAll(page, 24),
-          page === 0 ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
+          (page === 0 && isAuthenticated) ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
         
         if (propsRes.status === "fulfilled") {

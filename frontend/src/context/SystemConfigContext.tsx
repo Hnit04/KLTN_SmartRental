@@ -17,13 +17,20 @@ export const SystemConfigProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   useEffect(() => {
     const fetchConfig = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
       try {
         const response = await configApi.getExchangeRate();
         if (response.data) {
           setConfig(response.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch system config:', error);
+      } catch (error: any) {
+        if (error.response?.status !== 403) {
+          console.error('Failed to fetch system config:', error);
+        }
       } finally {
         setIsLoading(false);
       }
