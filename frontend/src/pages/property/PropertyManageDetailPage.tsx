@@ -4,7 +4,7 @@ import {
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
   Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
   Trash2, AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users,
-  Wrench, CheckCircle
+  Wrench, CheckCircle, ChevronRight, ChevronLeft, Building
 } from 'lucide-react';
 import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
+import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
+import { vipApi } from '@/api/vipApi';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -55,6 +57,7 @@ export default function PropertyManageDetailPage() {
   const [aiTone, setAiTone] = useState<'SEO' | 'GENZ' | 'PRO'>('SEO');
   const [aiContentPreview, setAiContentPreview] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [roomStep, setRoomStep] = useState(1);
 
   // --- STATE XÓA PHÒNG ---
   const [deleteRoomConfirm, setDeleteRoomConfirm] = useState<Room | null>(null);
@@ -75,6 +78,11 @@ export default function PropertyManageDetailPage() {
   // --- MODAL CẢNH BÁO KHÔNG ĐƯỢC BẢO TRÌ ---
   const [showCannotMaintenanceModal, setShowCannotMaintenanceModal] = useState(false);
   const [cannotMaintenanceRoom, setCannotMaintenanceRoom] = useState<{name: string; status: string} | null>(null);
+
+  // --- STATE CHO VIP LIMIT ---
+  const [vipLimit, setVipLimit] = useState<{
+    isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
+  }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
 
   const [formData, setFormData] = useState({
     name: '', 
@@ -175,7 +183,28 @@ export default function PropertyManageDetailPage() {
   };
 
   // --- MỞ MODAL THÊM PHÒNG ---
-  const handleOpenCreate = () => {
+  const handleOpenCreate = async () => {
+    try {
+      const res = await vipApi.getMyPlan();
+      const plan = (res as any).data || res;
+      
+      // Kiểm tra giới hạn phòng
+      if (plan.maxRoomsPerProperty !== -1 && rooms.length >= plan.maxRoomsPerProperty) {
+        setVipLimit({
+          isOpen: true,
+          limitType: 'ROOM',
+          currentTier: plan.tier,
+          currentCount: rooms.length,
+          maxAllowed: plan.maxRoomsPerProperty,
+          message: `Gói ${plan.tier} chỉ cho phép tạo tối đa ${plan.maxRoomsPerProperty} phòng trên mỗi khu trọ.`
+        });
+        return; // Dừng lại, không mở modal
+      }
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra gói VIP:", error);
+      // Tiếp tục mở modal nếu có lỗi mạng
+    }
+
     setEditingId(null);
     setFormData({ 
       name: '', price: '', area: '', description: '', 
@@ -190,6 +219,7 @@ export default function PropertyManageDetailPage() {
     setPreviewUrls([]);
     setPanoSelectedFiles([]);
     setPanoPreviewUrls([]);
+    setRoomStep(1);
     setShowModal(true);
   };
 
@@ -242,6 +272,7 @@ export default function PropertyManageDetailPage() {
     setPreviewUrls([]);
     setPanoSelectedFiles([]);
     setPanoPreviewUrls([]);
+    setRoomStep(1);
     setShowModal(true);
     
     toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
@@ -280,6 +311,7 @@ export default function PropertyManageDetailPage() {
     setPreviewUrls([]);
     setPanoSelectedFiles([]);
     setPanoPreviewUrls([]);
+    setRoomStep(1);
     setShowModal(true);
   };
 
@@ -453,8 +485,21 @@ export default function PropertyManageDetailPage() {
       
       setShowModal(false);
       fetchData(); 
-    } catch (error) {
-      toast.error(editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+    } catch (error: any) {
+      const errData = error?.response?.data;
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+        setShowModal(false);
+        setVipLimit({
+          isOpen: true,
+          limitType: errData.limitType,
+          currentTier: errData.currentTier,
+          currentCount: errData.currentCount,
+          maxAllowed: errData.maxAllowed,
+          message: errData.message,
+        });
+      } else {
+        toast.error(errData?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -464,6 +509,7 @@ export default function PropertyManageDetailPage() {
   if (!property) return <div className="text-center py-20">Không tìm thấy khu trọ.</div>;
 
   return (
+    <>
     <div className="space-y-6">
       {/* --- HEADER --- */}
       <div>
@@ -687,16 +733,60 @@ export default function PropertyManageDetailPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
-              <h2 className="text-xl font-bold">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            <div className="px-6 py-4 border-b flex flex-col bg-gray-50 flex-shrink-0 relative">
+              <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
+              
+              {/* Stepper Header */}
+              <div className="flex items-center justify-between relative max-w-2xl mx-auto w-full">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 rounded-full z-0"></div>
+                <div 
+                  className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full z-0 transition-all duration-300" 
+                  style={{ width: `${((roomStep - 1) / 3) * 100}%` }}
+                ></div>
+                
+                <div className="relative z-10 flex flex-col items-center gap-1 cursor-pointer" onClick={() => setRoomStep(1)}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${roomStep >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
+                  <span className={`text-[10px] font-medium ${roomStep >= 1 ? 'text-primary' : 'text-gray-500'}`}>Cơ bản</span>
+                </div>
+                <div className="relative z-10 flex flex-col items-center gap-1 cursor-pointer" onClick={() => { if(formData.name && formData.area && formData.price) setRoomStep(2); else toast.warning('Điền đủ thông tin cơ bản trước') }}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${roomStep >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
+                  <span className={`text-[10px] font-medium ${roomStep >= 2 ? 'text-primary' : 'text-gray-500'}`}>Tiện ích</span>
+                </div>
+                <div className="relative z-10 flex flex-col items-center gap-1 cursor-pointer" onClick={() => { if(formData.name && formData.area && formData.price) setRoomStep(3); else toast.warning('Điền đủ thông tin cơ bản trước') }}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${roomStep >= 3 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>3</div>
+                  <span className={`text-[10px] font-medium ${roomStep >= 3 ? 'text-primary' : 'text-gray-500'}`}>Mô tả</span>
+                </div>
+                <div className="relative z-10 flex flex-col items-center gap-1 cursor-pointer" onClick={() => { if(formData.name && formData.area && formData.price) setRoomStep(4); else toast.warning('Điền đủ thông tin cơ bản trước') }}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${roomStep >= 4 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>4</div>
+                  <span className={`text-[10px] font-medium ${roomStep >= 4 ? 'text-primary' : 'text-gray-500'}`}>Hình ảnh</span>
+                </div>
+              </div>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">
-              <form id="room-form" onSubmit={handleSubmit} className="space-y-6">
+              <form id="room-form" onSubmit={(e) => {
+                e.preventDefault();
+                if (roomStep < 4) {
+                  if (roomStep === 1 && (!formData.name || !formData.area || !formData.price)) {
+                    toast.warning('Vui lòng điền đủ thông tin bắt buộc (*)');
+                    return;
+                  }
+                  setRoomStep(roomStep + 1);
+                } else {
+                  handleSubmit(e);
+                }
+              }} className="space-y-6">
                 
-                {/* Thông tin cơ bản */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* STEP 1: Thông tin cơ bản */}
+                {roomStep === 1 && (
+                  <div className="space-y-4 animate-in slide-in-from-right-4">
+                    <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-2">
+                      <h3 className="font-semibold text-blue-900 flex items-center gap-2 mb-1"><Building className="h-4 w-4" /> Thông tin Cơ bản</h3>
+                      <p className="text-xs text-blue-700">Thông tin cơ bản về phòng trọ.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tên phòng (VD: 101) *</label>
                     <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
@@ -757,10 +847,19 @@ export default function PropertyManageDetailPage() {
                       <span className="text-sm font-medium text-sky-800">Có ban công</span>
                     </label>
                   </div>
-                </div>
+                    </div>
+                  </div>
+                )}
 
-                {/* TIỆN ÍCH */}
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                {/* STEP 2: TIỆN ÍCH */}
+                {roomStep === 2 && (
+                  <div className="space-y-4 animate-in slide-in-from-right-4">
+                    <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 mb-2">
+                      <h3 className="font-semibold text-emerald-900 flex items-center gap-2 mb-1"><CheckSquare className="h-4 w-4" /> Tiện ích có sẵn</h3>
+                      <p className="text-xs text-emerald-700">Chọn các tiện ích đã được trang bị sẵn trong phòng.</p>
+                    </div>
+                    
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
                   </label>
@@ -789,10 +888,14 @@ export default function PropertyManageDetailPage() {
                       className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-primary outline-none text-sm bg-white" 
                     />
                   </div>
-                </div>
+                  </div>
+                  </div>
+                )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* AI Mô tả */}
+                {/* STEP 3: MÔ TẢ & NỘI QUY */}
+                {roomStep === 3 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-right-4">
+                    {/* AI Mô tả */}
                   <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col">
                     <div className="flex justify-between items-end mb-2 border-b border-purple-100 pb-2">
                       <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Copilot Viết Mô Tả</label>
@@ -859,10 +962,14 @@ export default function PropertyManageDetailPage() {
                     />
                     <p className="text-[11px] text-blue-600 mt-2 italic">Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê phòng này.</p>
                   </div>
-                </div>
+                  </div>
+                )}
 
-                {/* Upload Ảnh */}
-                <div className="border-t pt-4">
+                {/* STEP 4: HÌNH ẢNH */}
+                {roomStep === 4 && (
+                  <div className="space-y-6 animate-in slide-in-from-right-4">
+                    {/* Upload Ảnh */}
+                    <div className="border-t pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
                   <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
                     <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
@@ -942,14 +1049,33 @@ export default function PropertyManageDetailPage() {
                     </p>
                   )}
                 </div>
+                  </div>
+                )}
               </form>
             </div>
 
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 flex-shrink-0">
-              <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={isSubmitting}>Hủy</Button>
-              <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px]">
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? 'Lưu thay đổi' : 'Lưu phòng mới')}
-              </Button>
+            {/* Modal Footer Actions */}
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-between gap-3 flex-shrink-0">
+              {roomStep > 1 ? (
+                <Button type="button" variant="outline" onClick={() => setRoomStep(roomStep - 1)} disabled={isSubmitting}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Quay lại
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSubmitting} className="text-gray-500">
+                  Hủy bỏ
+                </Button>
+              )}
+              
+              {roomStep < 4 ? (
+                <Button type="submit" form="room-form" className="min-w-[120px] bg-primary">
+                  Tiếp tục <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px] bg-green-600 hover:bg-green-700">
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isSubmitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Hoàn tất & Tạo')}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -1122,5 +1248,17 @@ export default function PropertyManageDetailPage() {
         </div>
       )}
     </div>
+
+    {/* MODAL NHẮC NÂNG CẤP VIP */}
+    <UpgradePromptModal
+      isOpen={vipLimit.isOpen}
+      onClose={() => setVipLimit(prev => ({ ...prev, isOpen: false }))}
+      limitType={vipLimit.limitType}
+      currentTier={vipLimit.currentTier}
+      currentCount={vipLimit.currentCount}
+      maxAllowed={vipLimit.maxAllowed}
+      message={vipLimit.message}
+    />
+    </>
   );
 }

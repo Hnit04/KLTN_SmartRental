@@ -203,6 +203,18 @@ export default function NotificationBell() {
       case 'NEW_REVIEW':
         navigate(`/properties/${noti.referenceId}`);
         break;
+      case 'ROOM_UPDATED':
+        // Landlord: referenceId = propertyId → trang quản lý khu trọ
+        if (user?.role === 'LANDLORD') {
+          navigate(`/landlord/properties/${noti.referenceId}`);
+        } else {
+          navigate(`/rooms/${noti.referenceId}`);
+        }
+        break;
+      case 'SYSTEM':
+        // Tenant: referenceId = roomId → trang chi tiết phòng
+        navigate(`/rooms/${noti.referenceId}`);
+        break;
       default:
         break;
     }

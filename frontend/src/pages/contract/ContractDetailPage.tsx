@@ -16,7 +16,16 @@ import { contractApi } from "@/api/contractApi";
 import { billApi } from "@/api/billApi";
 import { residentRequestApi } from "@/api/residentRequestApi";
 import { paymentApi } from "@/api/paymentApi";
-import { getSmartContract } from "@/utils/contractHelper";
+import { 
+  getSmartContract, 
+  depositContract, 
+  payBill as web3PayBill, 
+  payExternalBill as web3PayExternalBill,
+  proposeDeduction as web3ProposeDeduction,
+  consentEndContract as web3ConsentEndContract,
+  executeEndContract as web3ExecuteEndContract,
+  withdrawFunds as web3WithdrawFunds
+} from "@/utils/contractHelper";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Bot } from "lucide-react";
@@ -98,6 +107,14 @@ export default function ContractDetailPage() {
 
   // Roommate / Resident requests
   const [members, setMembers] = useState<ContractMemberResponse[]>([]);
+
+  // --- SETTLEMENT STATE ---
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
+  const [settleForm, setSettleForm] = useState({ deductionAmount: 0, earlyTermination: false });
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [isConsenting, setIsConsenting] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [residentRequests, setResidentRequests] = useState<ResidentRequestResponse[]>([]);
   const [isUpdatingResident, setIsUpdatingResident] = useState(false);
 
@@ -298,6 +315,11 @@ export default function ContractDetailPage() {
 
     setIsSigning(true);
     try {
+      if (contract?.isCompromised) {
+        toast.error("Không thể ký hợp đồng đang bị cảnh báo bảo mật!");
+        setIsSigning(false);
+        return;
+      }
       let signature = "";
       if (contract?.signMethod === 'BLOCKCHAIN') {
         if (!window.ethereum) {
@@ -411,6 +433,10 @@ export default function ContractDetailPage() {
   };
 
   const handlePayWeb3 = async (bill: any) => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể thanh toán hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     if (!window.ethereum) {
       toast.error("Vui lòng cài đặt ví MetaMask để thanh toán!");
       return;
@@ -528,6 +554,10 @@ export default function ContractDetailPage() {
   };
 
   const handleOpenDepositQrModal = async () => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể nạp cọc hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     setIsLoadingQr(true);
     setIsDepositQrModalOpen(true);
     try {
@@ -545,6 +575,10 @@ export default function ContractDetailPage() {
   const [billQrData, setBillQrData] = useState<any>(null);
 
   const openTraditionalPaymentModal = async (bill: any) => {
+    if (contract?.isCompromised) {
+      toast.error("Không thể thanh toán hợp đồng đang bị cảnh báo bảo mật!");
+      return;
+    }
     setSelectedBillToPay(bill);
     setIsTraditionalPaymentModalOpen(true);
     setBillQrData(null);
@@ -609,7 +643,6 @@ export default function ContractDetailPage() {
       toast.error("Lỗi khi từ chối.");
     }
   };
-
   const handleCounterPropose = async (req: ContractChangeRequest) => {
     try {
       await contractApi.rejectChangeRequest(req.id);
@@ -622,6 +655,100 @@ export default function ContractDetailPage() {
       fetchContractData();
     } catch (error) {
       toast.error("Lỗi khi tạo thương lượng mới.");
+    }
+  };
+
+  const handleUpdateResidentStatus = async (requestId: number, status: 'APPROVED' | 'REJECTED') => {
+    setIsUpdatingResident(true);
+    try {
+      await residentRequestApi.updateStatus(requestId, status);
+      toast.success(status === 'APPROVED' ? "Đã phê duyệt thành công!" : "Đã từ chối yêu cầu.");
+      fetchContractData(true);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi xử lý yêu cầu");
+    } finally {
+      setIsUpdatingResident(false);
+    }
+  };
+
+  // --- SETTLEMENT HANDLERS ---
+  const handleProposeSettlement = async () => {
+    if (!contract || !contract.smartContractAddress) return;
+    if (settleForm.deductionAmount < 0) {
+      toast.error("Số tiền khấu trừ không hợp lệ!");
+      return;
+    }
+    
+    setIsSubmittingSettle(true);
+    try {
+      // 1. Propose on-chain
+      toast.info("Đang gửi đề xuất lên Blockchain...");
+      await web3ProposeDeduction(
+        contract.smartContractAddress, 
+        settleForm.deductionAmount.toString(), 
+        settleForm.earlyTermination
+      );
+      
+      // 2. Sync with Backend
+      await contractApi.proposeSettlement(Number(id), settleForm);
+      
+      toast.success("Đã gửi đề xuất quyết toán thành công!");
+      setIsSettleModalOpen(false);
+      fetchContractData(true);
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi đề xuất quyết toán");
+    } finally {
+      setIsSubmittingSettle(false);
+    }
+  };
+
+  const handleConsentSettlement = async () => {
+    if (!contract || !contract.smartContractAddress) return;
+    setIsConsenting(true);
+    try {
+      toast.info("Đang xác nhận đồng thuận lên Blockchain...");
+      await web3ConsentEndContract(contract.smartContractAddress);
+      
+      await contractApi.consentSettlement(Number(id));
+      
+      toast.success("Bạn đã đồng ý quyết toán thành công!");
+      fetchContractData(true);
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi đồng ý quyết toán");
+    } finally {
+      setIsConsenting(false);
+    }
+  };
+
+  const handleExecuteSettlement = async () => {
+    if (!contract || !contract.smartContractAddress) return;
+    setIsExecuting(true);
+    try {
+      toast.info("Đang thực thi kết thúc hợp đồng trên Blockchain...");
+      await web3ExecuteEndContract(contract.smartContractAddress);
+      
+      await contractApi.executeSettlement(Number(id));
+      
+      toast.success("Hợp đồng đã được kết thúc thành công! Tiền cọc đã được giải ngân.");
+      fetchContractData(true);
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi thực thi kết thúc");
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleWithdrawFunds = async () => {
+    if (!contract || !contract.smartContractAddress) return;
+    setIsWithdrawing(true);
+    try {
+      toast.info("Đang thực hiện rút tiền từ Smart Contract về ví...");
+      await web3WithdrawFunds(contract.smartContractAddress);
+      toast.success("Rút tiền thành công! Vui lòng kiểm tra ví MetaMask của bạn.");
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi rút tiền");
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -648,18 +775,7 @@ export default function ContractDetailPage() {
     }
   };
 
-  const handleUpdateResidentStatus = async (requestId: number, status: 'APPROVED' | 'REJECTED') => {
-    setIsUpdatingResident(true);
-    try {
-      await residentRequestApi.updateStatus(requestId, status);
-      toast.success(status === 'APPROVED' ? "Đã duyệt thành công!" : "Đã từ chối yêu cầu.");
-      fetchContractData(true);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Lỗi khi xử lý yêu cầu.");
-    } finally {
-      setIsUpdatingResident(false);
-    }
-  };
+
 
   const handleRequestRemoval = async (member: ContractMemberResponse) => {
     setSelectedMember(member);
@@ -760,6 +876,16 @@ export default function ContractDetailPage() {
           <p className="text-sm text-gray-500">Mã hợp đồng: #{contract.id} • {contract.roomName}</p>
         </div>
       </div>
+
+      {contract.isCompromised && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex gap-3 animate-in fade-in">
+          <AlertCircle className="w-6 h-6 flex-shrink-0 text-red-600" />
+          <div>
+            <h3 className="font-bold">⚠️ CẢNH BÁO BẢO MẬT</h3>
+            <p className="text-sm mt-1">Hợp đồng này bị phát hiện sai lệch dữ liệu so với gốc trên Blockchain. Vui lòng ngưng mọi giao dịch và liên hệ Admin ngay lập tức.</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex bg-white p-1 rounded-xl border shadow-sm w-fit">
         <button
@@ -1424,19 +1550,81 @@ export default function ContractDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Contract Address</span>
-                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
+                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline text-xs">
                       {contract.smartContractAddress.substring(0, 10)}...{contract.smartContractAddress.substring(38)}
                     </a>
                   </div>
-                  <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
-                    <span className="text-indigo-700">Tx Deploy Hash</span>
-                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/tx/${contract.deployTxHash}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline">
-                      {contract.deployTxHash?.substring(0, 10)}...
-                    </a>
+                  
+                  {/* QUYẾT TOÁN ON-CHAIN */}
+                  <div className="mt-6 pt-4 border-t border-indigo-200">
+                    <h4 className="text-sm font-bold text-indigo-900 mb-4 uppercase tracking-wider">Quyết toán & Kết thúc</h4>
+                    
+                    {contract.status === 'ACTIVE' ? (
+                      <div className="space-y-4">
+                        {contract.isProposalActive ? (
+                          <div className="bg-white rounded-xl p-4 border border-indigo-200 shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                               <div>
+                                  <p className="text-[10px] text-gray-400 font-bold uppercase">Số tiền đề xuất khấu trừ</p>
+                                  <p className="text-lg font-black text-rose-600">{contract.currentDeductionAmount?.toLocaleString()}đ</p>
+                               </div>
+                               <StatusBadge label={contract.isEarlyTerminationProposal ? 'Kết thúc sớm' : 'Đúng hạn'} tone="warning" />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                               <div className={cn("p-2 rounded-lg text-center border", contract.hasLandlordConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-100 text-gray-400")}>
+                                  <p className="text-[9px] font-bold uppercase">Chủ trọ</p>
+                                  <p className="text-xs font-bold">{contract.hasLandlordConsented ? 'Đã ký' : 'Chờ...'}</p>
+                               </div>
+                               <div className={cn("p-2 rounded-lg text-center border", contract.hasTenantConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-100 text-gray-400")}>
+                                  <p className="text-[9px] font-bold uppercase">Khách thuê</p>
+                                  <p className="text-xs font-bold">{contract.hasTenantConsented ? 'Đã ký' : 'Chờ...'}</p>
+                               </div>
+                            </div>
+
+                            {user?.role === 'TENANT' && !contract.hasTenantConsented && (
+                              <Button className="w-full bg-green-600 hover:bg-green-700 h-10" onClick={handleConsentSettlement} isLoading={isConsenting}>
+                                ✍️ Tôi đồng ý Quyết toán này
+                              </Button>
+                            )}
+
+                            {contract.hasLandlordConsented && contract.hasTenantConsented && (
+                              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-10" onClick={handleExecuteSettlement} isLoading={isExecuting}>
+                                🚀 Thực thi Kết thúc Hợp đồng
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          user?.role === 'LANDLORD' && (
+                            <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-11 shadow-md shadow-indigo-200" onClick={() => {
+                              setSettleForm({ deductionAmount: 0, earlyTermination: false });
+                              setIsSettleModalOpen(true);
+                            }}>
+                              💸 Bắt đầu Quyết toán & Trả phòng
+                            </Button>
+                          )
+                        )}
+                        {user?.role === 'TENANT' && !contract.isProposalActive && (
+                          <p className="text-xs text-indigo-600 italic text-center">Đang chờ Chủ trọ đề xuất quyết toán tiền cọc...</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-green-50 border border-green-100 rounded-xl">
+                          <p className="text-xs text-green-800 font-medium flex items-center gap-2">
+                             <CheckCircle className="w-4 h-4" /> Hợp đồng đã kết thúc on-chain.
+                          </p>
+                        </div>
+                        <Button variant="outline" className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-100 h-11" onClick={handleWithdrawFunds} isLoading={isWithdrawing}>
+                          💰 Rút tiền từ Contract về ví MetaMask
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
+
 
             {/* ═══ HOÀN CỌC (Deposit Refund) ═══ */}
             {contract && (contract.status === 'EXPIRED' || contract.status === 'TERMINATED_EARLY') && contract.depositStatus !== 'REFUNDED' && user?.role === 'LANDLORD' && (
@@ -1543,9 +1731,11 @@ export default function ContractDetailPage() {
 
               <p className="font-bold text-lg mb-1">
                 {contract.status === 'ACTIVE' ? 'Đã có hiệu lực' :
-                  contract.status === 'AWAITING_DEPOSIT' ? 'Chờ nạp tiền cọc' : 
-                  contract.status === 'CANCELLED' ? (
-                    <span className="text-red-600">Đã bị từ chối/hủy</span>
+                  (contract.status === 'AWAITING_DEPOSIT' || (contract.isLandlordSigned && contract.isTenantSigned && contract.status === 'PENDING_SIGNATURE')) ? 'Chờ nạp tiền cọc' : 
+                  (contract.status === 'CANCELLED' || contract.status === 'EXPIRED') ? (
+                    <span className="text-red-600">Đã bị từ chối/hủy/Hết hạn</span>
+                  ) : contract.status === 'TERMINATED_EARLY' ? (
+                    <span className="text-orange-600">Đã kết thúc sớm</span>
                   ) : 'Đang chờ ký xác nhận'}
               </p>
 
@@ -1665,7 +1855,7 @@ export default function ContractDetailPage() {
 
               {contract.status === 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  {!pendingRequest && (
+                  {!pendingRequest && !changeRequests.some(r => r.type === 'TERMINATION' && r.status === 'ACCEPTED') && (
                     <Button
                       variant="outline"
                       className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50"
@@ -1819,7 +2009,7 @@ export default function ContractDetailPage() {
 
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-orange-500" /> Đề xuất chỉnh sửa
             </h2>
@@ -1851,7 +2041,7 @@ export default function ContractDetailPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="min-h-[220px] flex flex-col justify-start transition-all duration-300">
                 <Label>Giá trị mới đề xuất</Label>
 
                 {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
@@ -1881,7 +2071,7 @@ export default function ContractDetailPage() {
                     onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
                   />
                 ) : (
-                  <div className="space-y-3 mt-1">
+                  <div className="space-y-3 mt-1 flex-1">
                     <div className="flex flex-wrap gap-2">
                       {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
                         const isAdded = changeForm.newValue.includes(term);
@@ -1906,7 +2096,7 @@ export default function ContractDetailPage() {
                     </div>
                     <textarea
                       placeholder="Nhập nội dung mong muốn..."
-                      className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[150px] resize-y placeholder:text-gray-400"
+                      className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
                       value={changeForm.newValue}
                       onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
                     />
@@ -1916,6 +2106,56 @@ export default function ContractDetailPage() {
 
               <div>
                 <Label>Lý do đề xuất</Label>
+                
+                {/* 💡 Gợi ý lý do nhanh */}
+                <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
+                  {(() => {
+                    const presetReasons: Record<string, string[]> = {
+                      'TERMINATION': [
+                        'Công việc thay đổi/Chuyển chỗ làm',
+                        'Có việc gấp gia đình về quê',
+                        'Không còn phù hợp nhu cầu sử dụng',
+                        'Khách thuê vi phạm nội quy nhiều lần'
+                      ],
+                      'EXTENSION': [
+                        'Muốn tiếp tục thuê dài hạn',
+                        'Chưa tìm được chỗ ở mới, xin gia hạn thêm 1 tháng',
+                        'Công việc ổn định nên muốn thuê tiếp'
+                      ],
+                      'RENT_INCREASE': [
+                        'Điều chỉnh theo giá cả thị trường',
+                        'Mới bổ sung thêm nội thất/thiết bị mới',
+                        'Tình hình khó khăn, mong giảm giá'
+                      ],
+                      'CHANGE_TERMS': [
+                        'Xin phép được nuôi thú cưng nhỏ',
+                        'Bổ sung quyền lợi bảo trì máy lạnh',
+                        'Thêm người ở ghép'
+                      ],
+                      'CHANGE_SIGN_METHOD': [
+                        'Không rành Web3, xin đổi sang Xác nhận nhanh',
+                        'Muốn dùng Smart Contract cho an toàn'
+                      ]
+                    };
+                    return (presetReasons[changeForm.type] || []).map((reason, idx) => (
+                      <span
+                        key={idx}
+                        onClick={() => {
+                          const currentReason = changeForm.reason.trim();
+                          if (currentReason && !currentReason.endsWith(',')) {
+                            setChangeForm({ ...changeForm, reason: currentReason + ', ' + reason });
+                          } else {
+                            setChangeForm({ ...changeForm, reason: currentReason + reason });
+                          }
+                        }}
+                        className="text-[11px] px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-md cursor-pointer border border-gray-200 transition-colors"
+                      >
+                        + {reason}
+                      </span>
+                    ));
+                  })()}
+                </div>
+
                 <textarea
                   className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 min-h-[80px]"
                   placeholder="Giải thích lý do bạn muốn thay đổi..."
@@ -2312,7 +2552,53 @@ export default function ContractDetailPage() {
         </div>
       )}
 
+      {/* ────── MODAL QUYẾT TOÁN HỢP ĐỒNG (BLOCKCHAIN) ────── */}
+      {isSettleModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => !isSubmittingSettle && setIsSettleModalOpen(false)} />
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-indigo-600 p-6 text-white text-center">
+              <LogOut className="h-10 w-10 mx-auto mb-2" />
+              <h2 className="text-xl font-bold">Quyết toán Hợp đồng</h2>
+              <p className="text-indigo-100 text-xs mt-1">Đề xuất khấu trừ tiền cọc on-chain</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label>Số tiền khấu trừ (VND)</Label>
+                <Input 
+                  type="number" 
+                  placeholder="Nhập số tiền muốn giữ lại từ tiền cọc"
+                  value={settleForm.deductionAmount}
+                  onChange={(e) => setSettleForm({...settleForm, deductionAmount: Number(e.target.value)})}
+                  max={contract?.depositAmount}
+                />
+                <p className="text-[10px] text-gray-500 italic">Tối đa: {contract?.depositAmount?.toLocaleString()}đ (Tổng tiền cọc)</p>
+              </div>
+              <div className="flex items-center gap-2 py-2">
+                <input 
+                  type="checkbox" 
+                  id="early-term" 
+                  checked={settleForm.earlyTermination}
+                  onChange={(e) => setSettleForm({...settleForm, earlyTermination: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <Label htmlFor="early-term" className="cursor-pointer">Chấm dứt hợp đồng trước hạn</Label>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-xs text-amber-800 leading-relaxed">
+                <p className="font-bold flex items-center gap-1 mb-1"><AlertCircle className="w-3 h-3" /> Lưu ý quan trọng:</p>
+                Sau khi bạn gửi đề xuất, Khách thuê cần <strong>ký xác nhận đồng ý</strong> trên Blockchain trước khi hợp đồng có thể kết thúc và tiền cọc được giải ngân.
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsSettleModalOpen(false)} disabled={isSubmittingSettle}>Hủy</Button>
+                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleProposeSettlement} isLoading={isSubmittingSettle}>Gửi đề xuất</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ────── MODAL THANH TOÁN CỌC VIETQR ────── */}
+
       {isDepositQrModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div

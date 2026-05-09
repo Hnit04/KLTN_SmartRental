@@ -45,10 +45,18 @@ import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import AiAnalyticsPage from "./pages/admin/AiAnalyticsPage";
 import AdminSettlementPage from "./pages/admin/AdminSettlementPage";
+import AdminReportPage from "./pages/admin/AdminReportPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 import ScrollToTop from "./components/shared/ScrollToTop";
+import FavoritesPage from "./pages/tenant/FavoritesPage";
+import VipPlansPage from "./pages/landlord/VipPlansPage";
+import { CompareProvider } from "./context/CompareContext";
+import { FavoritesProvider } from "./context/FavoritesContext";
+import CompareBar from "./components/property/CompareBar";
+import CompareRoomsModal from "./components/property/CompareRoomsModal";
+
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -102,7 +110,8 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
 
 function App() {
   return (
-    <>
+    <FavoritesProvider>
+    <CompareProvider>
       <ScrollToTop />
       <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
@@ -153,6 +162,7 @@ function App() {
                 <Route path="contracts/create" element={<CreateContractPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
                 <Route path="appointments" element={<AppointmentManagePage />} />
+                <Route path="vip" element={<VipPlansPage />} />
               </Route>
 
               {/* === KHU VỰC DÀNH RIÊNG CHO KHÁCH THUÊ (TENANT) === */}
@@ -160,6 +170,7 @@ function App() {
                 <Route path="dashboard" element={<TenantDashboardPage />} />
                 <Route path="my-room" element={<MyRoomPage />} />
                 <Route path="rental-history" element={<RentalHistoryPage />} />
+                <Route path="favorites" element={<FavoritesPage />} />
                 
                 {/* Hợp đồng & Lịch hẹn của khách thuê */}
                 <Route path="contracts" element={<ContractsPage />} />
@@ -176,6 +187,7 @@ function App() {
                 <Route path="blockchain-logs" element={<BlockchainLogsPage />} />
                 <Route path="ai-analytics" element={<AiAnalyticsPage />} />
                 <Route path="settlements" element={<AdminSettlementPage />} />
+                <Route path="reports" element={<AdminReportPage />} />
               </Route>
             </Route> 
 
@@ -190,8 +202,10 @@ function App() {
       <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
       {/* 🤖 GLOBAL AI CHATBOT */}
       <AiChatBot />
-    </>
-
+      <CompareBar />
+      <CompareRoomsModal />
+    </CompareProvider>
+    </FavoritesProvider>
   );
 }
 

@@ -14,8 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,8 @@ public class ContractChangeService {
     private final UserRepository userRepository;
     private final iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     private final iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+    private final BlockchainService blockchainService;
+    private final ContractService contractService;
 
     // 1. Gửi yêu cầu (Dành cho Tenant hoặc Landlord tùy logic)
     @Transactional
@@ -151,6 +156,10 @@ public class ContractChangeService {
             switch (req.getType()) {
                 case RENT_INCREASE:
                     contract.setActualPrice(Double.parseDouble(req.getNewValue()));
+                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        contract.setIsTenantSigned(false);
+                        contract.setIsLandlordSigned(false);
+                    }
                     break;
                 case EXTENSION:
                     contract.setEndDate(LocalDate.parse(req.getNewValue()));
@@ -201,14 +210,19 @@ public class ContractChangeService {
                         }
                     }
                     break;
-                case CHANGE_SIGN_METHOD: // ✅ THÊM ĐOẠN NÀY
+                case CHANGE_SIGN_METHOD:
                     contract.setSignMethod(ContractSignMethod.valueOf(req.getNewValue()));
                     contract.setIsTenantSigned(false);
                     contract.setIsLandlordSigned(false);
                     break;
                 case CHANGE_TERMS:
                     contract.setAdditionalTerms(req.getNewValue());
+                    if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
+                        contract.setIsTenantSigned(false);
+                        contract.setIsLandlordSigned(false);
+                    }
                     break;
+
             }
         } catch (Exception e) {
             throw new RuntimeException("Lỗi định dạng dữ liệu (newValue không hợp lệ cho loại thay đổi này).");
@@ -227,6 +241,54 @@ public class ContractChangeService {
                 iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
                 contract.getId()
         );
+
+        // 🔗 ĐỒNG BỘ LÊN BLOCKCHAIN (NẾU ĐÃ KÝ VÀ CÓ ĐỊA CHỈ SMART CONTRACT)
+        if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
+            try {
+                // 1. Tính toán lại mã Hash mới dựa trên các thay đổi
+                String termsForHash = contract.getAdditionalTerms() != null ? contract.getAdditionalTerms() : "";
+                String rawData = "CONTRACT-" + contract.getRoom().getId() + "-" + contract.getTenant().getId() + "-" + termsForHash + "-" + UUID.randomUUID();
+                String newHash = contractService.calculateSHA256(rawData);
+                contract.setContractHash(newHash);
+                contractRepository.save(contract);
+
+                // 2. Chuyển đổi dữ liệu sang định dạng Blockchain
+                BigInteger rentWei = BigInteger.valueOf(contract.getActualPrice().longValue());
+                BigInteger endTimestamp = BigInteger.valueOf(contract.getEndDate().atStartOfDay(ZoneOffset.UTC).toEpochSecond());
+                BigInteger elecWei = BigInteger.valueOf(contract.getElecPriceSnapshot().longValue());
+                BigInteger waterWei = BigInteger.valueOf(contract.getWaterPriceSnapshot().longValue());
+                BigInteger internetWei = BigInteger.valueOf(contract.getInternetPriceSnapshot().longValue());
+                BigInteger penaltyPercent = BigInteger.valueOf(contract.getLatePenaltyPercent().longValue());
+
+                // 3. Gọi BlockchainService để cập nhật on-chain
+                // 🛡️ KIỂM TRA RÀNG BUỘC: Blockchain chỉ cho phép tăng endDate (Gia hạn)
+                // Nếu là Chấm dứt sớm (endDate mới < endDate cũ), ta bỏ qua việc cập nhật trường endDate trên Chain
+                // để tránh lỗi Revert. Việc chấm dứt sẽ được thực hiện qua luồng Quyết toán (Settlement).
+                
+                java.math.BigInteger currentOnChainEndDate = (java.math.BigInteger) blockchainService.readContractData(contract.getSmartContractAddress()).get("endDate");
+                java.math.BigInteger finalEndDateToSync = endTimestamp;
+                
+                if (endTimestamp.compareTo(currentOnChainEndDate) < 0) {
+                    System.out.println("⚠️ Phát hiện rút ngắn thời hạn (Chấm dứt sớm). Bỏ qua việc đồng bộ trường endDate lên Blockchain.");
+                    finalEndDateToSync = currentOnChainEndDate; // Giữ nguyên ngày cũ trên Chain
+                }
+
+                blockchainService.updateContractOnChain(
+                        contract.getSmartContractAddress(),
+                        rentWei,
+                        finalEndDateToSync,
+                        elecWei,
+                        waterWei,
+                        internetWei,
+                        penaltyPercent,
+                        newHash
+                );
+                System.out.println("✅ Đã đồng bộ thay đổi hợp đồng #" + contract.getId() + " lên Blockchain");
+            } catch (Exception e) {
+                System.err.println("⚠️ Lỗi đồng bộ Blockchain khi thay đổi hợp đồng: " + e.getMessage());
+                // Không throw exception để tránh rollback DB nếu blockchain lỗi (có thể sync lại sau)
+            }
+        }
 
         return saved;
     }
