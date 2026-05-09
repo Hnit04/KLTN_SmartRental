@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { 
   XCircle, Maximize,
@@ -91,7 +92,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
         ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
-        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={(e) => { e.preventDefault(); setIsDetailOpen(true); }}>
+        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}>
           {images.length > 0 ? (
             <img 
               src={images[currImgIndex]} 
@@ -256,7 +257,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   variant="outline" 
                   size="sm" 
                   className="text-xs h-10 hover:bg-primary/5 text-gray-600 hover:text-primary border-gray-200 transition-colors group/btn1 rounded-xl"
-                  onClick={(e) => { e.preventDefault(); setIsDetailOpen(true); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}
               >
                   <Eye className="h-3.5 w-3.5 mr-1.5 group-hover/btn1:-translate-y-0.5 transition-transform" /> Chi tiết
               </Button>
@@ -286,9 +287,14 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
       </div>
 
       {/* --- MODAL CHI TIẾT PHÒNG --- */}
-      {isDetailOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]">
+      {isDetailOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={(e) => { e.stopPropagation(); setIsDetailOpen(false); }}
+        >
+          <div 
+            className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
 
             <div className="h-56 bg-gray-100 relative shrink-0">
               {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
@@ -396,7 +402,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <LoginRequiredModal 

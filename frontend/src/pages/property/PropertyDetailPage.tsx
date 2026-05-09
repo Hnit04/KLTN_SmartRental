@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   MapPin, ArrowLeft, Zap, Droplets, Wifi, ShieldCheck,
   User, Phone, MessageSquare, CalendarClock, X, Loader2, Star, Bot,
-  ChevronLeft, ChevronRight, ZoomIn, SlidersHorizontal
+  ChevronLeft, ChevronRight, ZoomIn, SlidersHorizontal, Home
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -461,16 +461,38 @@ export default function PropertyDetailPage() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  <Button className="w-full gap-2 bg-[#A67C52] hover:bg-[#8b6540] h-11 text-base shadow-md shadow-[#A67C52]/20 rounded-xl" onClick={handleCall}>
-                    <Phone className="h-4 w-4" />
-                    {(!isAuthenticated && !showFullPhone) ? maskPhone(property.landlordPhone || "") : "Gọi điện ngay"}
-                  </Button>
-                  <Button variant="outline" className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 h-11 rounded-xl" onClick={handleZalo}>
-                    <MessageSquare className="h-4 w-4" /> Chat qua Zalo
-                  </Button>
-                  <Button variant="outline" className="w-full gap-2 border-gray-200 text-gray-600 hover:bg-gray-50 h-11 rounded-xl shadow-sm" onClick={handleAskAI}>
-                    <Bot className="h-4 w-4" /> Hỏi AI về khu trọ này
-                  </Button>
+                  {user?.role === 'ADMIN' ? (
+                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-200">
+                      <p className="font-bold mb-1 flex items-center gap-1.5"><ShieldCheck className="h-4 w-4"/> Quản trị viên</p>
+                      <p className="text-[13px] text-blue-700">Chế độ xem quản trị. Bạn có thể xem thông tin nhưng không thể đặt phòng.</p>
+                      <Button className="w-full mt-3 gap-2 bg-blue-600 hover:bg-blue-700 h-10 text-sm shadow-sm" onClick={handleCall}>
+                        <Phone className="h-4 w-4" /> Gọi kiểm tra
+                      </Button>
+                    </div>
+                  ) : user?.role === 'LANDLORD' && user.id === property.landlordId ? (
+                    <div className="bg-[#A67C52]/10 text-[#A67C52] p-4 rounded-xl border border-[#A67C52]/20">
+                      <p className="font-bold mb-1 flex items-center gap-1.5"><Home className="h-4 w-4"/> Khu trọ của bạn</p>
+                      <p className="text-[13px] text-[#A67C52]/80">Đây là khu trọ do bạn quản lý. Bạn không thể tự đặt phòng của mình.</p>
+                      <Link to={`/landlord/properties/${property.id}`} className="block mt-3">
+                        <Button className="w-full gap-2 bg-[#A67C52] hover:bg-[#8b6540] text-white h-10 text-sm shadow-sm">
+                          Quản lý khu trọ này
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      <Button className="w-full gap-2 bg-[#A67C52] hover:bg-[#8b6540] h-11 text-base shadow-md shadow-[#A67C52]/20 rounded-xl" onClick={handleCall}>
+                        <Phone className="h-4 w-4" />
+                        {(!isAuthenticated && !showFullPhone) ? maskPhone(property.landlordPhone || "") : "Gọi điện ngay"}
+                      </Button>
+                      <Button variant="outline" className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 h-11 rounded-xl" onClick={handleZalo}>
+                        <MessageSquare className="h-4 w-4" /> Chat qua Zalo
+                      </Button>
+                      <Button variant="outline" className="w-full gap-2 border-gray-200 text-gray-600 hover:bg-gray-50 h-11 rounded-xl shadow-sm" onClick={handleAskAI}>
+                        <Bot className="h-4 w-4" /> Hỏi AI về khu trọ này
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -561,8 +583,8 @@ export default function PropertyDetailPage() {
             {filteredRooms.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {filteredRooms.map((room) => (
-                  <div key={room.id}>
-                    <Link to={`/rooms/${room.id}`} className="block transition-transform hover:scale-[1.01] active:scale-[0.99]">
+                  <div key={room.id} className="h-full">
+                    <Link to={`/rooms/${room.id}`} className="block h-full transition-transform hover:scale-[1.01] active:scale-[0.99]">
                       <RoomCard
                         data={room}
                         onBookAppointment={() => handleOpenBookingModal(room)}

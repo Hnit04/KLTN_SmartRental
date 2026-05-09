@@ -5,7 +5,7 @@ import {
   XCircle, Bot, Loader2, X, Phone, MessageSquare,
   MapPin, FileSignature, Sparkles, ChevronLeft, ChevronRight, ZoomIn,
   Share2, Heart, LayoutTemplate, Box, Users, Sofa, Tv, BedDouble, Car,
-  GitCompareArrows
+  GitCompareArrows, Flag, ShieldCheck
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { appointmentApi } from "@/api/appointmentApi";
@@ -36,6 +36,7 @@ const customMarkerIcon = new L.Icon({
 
 const Room360Viewer = lazy(() => import("@/components/property/Room360Viewer"));
 import StreetViewVerification from "@/components/property/StreetViewVerification";
+import ReportRoomModal from "@/components/property/ReportRoomModal";
 
 export default function RoomDetailPage() {
   const { id } = useParams();
@@ -64,6 +65,9 @@ export default function RoomDetailPage() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [distance, setDistance] = useState<string | null>(null);
+  
+  // Report modal
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const [searchParams] = useSearchParams();
   const actionQuery = searchParams.get("action");
@@ -279,6 +283,39 @@ export default function RoomDetailPage() {
     }
   };
 
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: room?.name,
+        text: `Xem phòng ${room?.name} trên SmartRental`,
+        url: window.location.href,
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success("Đã sao chép liên kết vào khay nhớ tạm!");
+    }
+  };
+
+  const handleReportClick = () => {
+    if (!isAuthenticated) {
+      setLoginModalConfig({
+        title: "Yêu cầu đăng nhập",
+        message: "Bạn cần đăng nhập để báo cáo phòng trọ này."
+      });
+      setIsLoginModalOpen(true);
+      return;
+    }
+    if (user?.role === "LANDLORD") {
+      toast.error("Tài khoản Chủ trọ không thể báo cáo phòng.");
+      return;
+    }
+    if (user?.kycStatus !== 'VERIFIED') {
+      toast.error("Tài khoản của bạn chưa xác thực CCCD. Vui lòng xác thực trước khi báo cáo để đảm bảo tính minh bạch.");
+      return;
+    }
+    setIsReportModalOpen(true);
+  };
+
   // Text cho nút Đặt lịch
   const getBookingButtonText = () => {
     if (isMaintenance) return "Phòng đang bảo trì";
@@ -371,6 +408,25 @@ export default function RoomDetailPage() {
             {room.name?.toLowerCase().includes('phòng') ? room.name : `Phòng ${room.name}`}
           </span>
         </div>
+
+        {/* ⚠️ BANNER CẢNH BÁO KHI PHÒNG BỊ ẨN / BẢO TRÌ */}
+        {isMaintenance && (
+          <div className="mb-6 bg-red-50 border-2 border-red-300 rounded-2xl p-5 flex items-start gap-4 animate-in fade-in">
+            <div className="bg-red-100 p-2.5 rounded-full shrink-0">
+              <XCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-red-800 mb-1">Phòng này hiện không khả dụng</h3>
+              <p className="text-sm text-red-700">
+                Phòng đang trong trạng thái bảo trì hoặc đã bị gỡ do vi phạm chính sách nền tảng. 
+                Các chức năng đặt lịch, báo cáo và liên hệ đã bị tạm dừng.
+              </p>
+              <Link to="/properties" className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-red-700 hover:text-red-900 underline underline-offset-2">
+                <ArrowLeft className="h-4 w-4" /> Quay lại tìm phòng khác
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* MAIN CONTENT GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
@@ -683,6 +739,32 @@ export default function RoomDetailPage() {
             <div className="sticky top-24 space-y-6">
 
               {/* BOOKING CARD */}
+              {user?.role === 'ADMIN' ? (
+                <div className="bg-blue-50 rounded-[24px] border-2 border-blue-200 p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-6 w-6 text-blue-600" />
+                    <p className="font-bold text-blue-800">Chế độ Quản trị viên</p>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Bạn đang xem phòng dưới quyền Quản trị viên để xác minh thông tin. Các chức năng đặt lịch, báo cáo và liên hệ đã bị ẩn.
+                  </p>
+                </div>
+              ) : isMaintenance ? (
+                <div className="bg-red-50 rounded-[24px] border-2 border-red-200 p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <XCircle className="h-6 w-6 text-red-500" />
+                    <p className="font-bold text-red-800">Phòng không khả dụng</p>
+                  </div>
+                  <p className="text-sm text-red-700">
+                    Phòng đang bảo trì hoặc đã bị gỡ do vi phạm. Các chức năng đặt lịch, liên hệ và thuê phòng đã bị tạm dừng.
+                  </p>
+                  <Link to="/properties" className="block">
+                    <Button className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl">
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Tìm phòng khác
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
               <div className="bg-white rounded-[24px] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 space-y-5">
                 <div className="pb-5 border-b border-gray-100 space-y-1">
                   <div className="flex items-end gap-1">
@@ -740,7 +822,7 @@ export default function RoomDetailPage() {
                       }}
                     >
                       <Heart className={`h-4 w-4 mr-2 ${isFavorite(room.id) ? 'fill-current' : ''}`} />
-                      {isFavorite(room.id) ? 'Đã lưu' : 'Yêu thích'}
+                      Yêu thích
                     </Button>
 
                     <Button
@@ -750,6 +832,24 @@ export default function RoomDetailPage() {
                     >
                       <GitCompareArrows className="h-4 w-4 mr-2" />
                       So sánh
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="h-11 border-gray-200 font-medium rounded-xl text-gray-700 hover:bg-gray-50 transition-all"
+                      onClick={handleShare}
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Chia sẻ
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="h-11 border-gray-200 font-medium rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                      onClick={handleReportClick}
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Báo cáo
                     </Button>
                   </div>
                 </div>
@@ -793,9 +893,10 @@ export default function RoomDetailPage() {
                   )}
                 </div>
               </div>
+              )}
 
-              {/* Liên hệ chủ nhà */}
-              {(room as any).landlordPhone && (
+              {/* Liên hệ chủ nhà (ẩn khi phòng MAINTENANCE hoặc chế độ ADMIN) */}
+              {!isMaintenance && user?.role !== 'ADMIN' && (room as any).landlordPhone && (
                 <div className="bg-white rounded-2xl border p-4 space-y-3">
                   <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Liên hệ chủ nhà</p>
                   <p className="font-bold text-gray-900">{room.landlordName || "Chủ nhà"}</p>
@@ -909,11 +1010,17 @@ export default function RoomDetailPage() {
         </div>
       )}
       {/* ===== LOGIN REQUIRED MODAL ===== */}
-      <LoginRequiredModal 
+      <LoginRequiredModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         title={loginModalConfig.title}
         message={loginModalConfig.message}
+      />
+
+      <ReportRoomModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        room={room}
       />
     </div>
   );

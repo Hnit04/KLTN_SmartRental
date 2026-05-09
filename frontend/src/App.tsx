@@ -45,6 +45,7 @@ import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import AiAnalyticsPage from "./pages/admin/AiAnalyticsPage";
 import AdminSettlementPage from "./pages/admin/AdminSettlementPage";
+import AdminReportPage from "./pages/admin/AdminReportPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
@@ -186,6 +187,7 @@ function App() {
                 <Route path="blockchain-logs" element={<BlockchainLogsPage />} />
                 <Route path="ai-analytics" element={<AiAnalyticsPage />} />
                 <Route path="settlements" element={<AdminSettlementPage />} />
+                <Route path="reports" element={<AdminReportPage />} />
               </Route>
             </Route> 
 
