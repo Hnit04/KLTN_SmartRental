@@ -1,6 +1,5 @@
 package iuh.se.kltn.backend.modules.interaction.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.se.kltn.backend.modules.interaction.dto.request.ResolveReportRequest;
 import iuh.se.kltn.backend.modules.interaction.dto.request.RoomReportRequest;
 import iuh.se.kltn.backend.modules.interaction.dto.response.RoomReportResponse;
@@ -32,7 +31,6 @@ public class RoomReportService {
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
     private final NotificationService notificationService;
-    private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -82,7 +80,7 @@ public class RoomReportService {
         report.setEvidenceUrls(request.getEvidenceUrls());
 
         RoomReport saved = roomReportRepository.save(report);
-        RoomReportResponse response = RoomReportResponse.from(saved, null);
+        RoomReportResponse response = RoomReportResponse.from(saved);
         
         // Broadcast realtime qua WebSockets cho Admin
         messagingTemplate.convertAndSend("/topic/admin/reports", response);
@@ -96,7 +94,7 @@ public class RoomReportService {
     @Transactional(readOnly = true)
     public List<RoomReportResponse> getAdminReports() {
         return roomReportRepository.findAll().stream()
-                .map(r -> RoomReportResponse.from(r, null))
+                .map(r -> RoomReportResponse.from(r))
                 .collect(Collectors.toList());
     }
 
@@ -187,7 +185,7 @@ public class RoomReportService {
         }
 
         RoomReport saved = roomReportRepository.save(report);
-        RoomReportResponse response = RoomReportResponse.from(saved, null);
+        RoomReportResponse response = RoomReportResponse.from(saved);
         
         // Broadcast realtime qua WebSockets cho tất cả Admin đang mở trang quản lý
         messagingTemplate.convertAndSend("/topic/admin/reports", response);

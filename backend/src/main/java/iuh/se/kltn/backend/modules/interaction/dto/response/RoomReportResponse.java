@@ -3,7 +3,6 @@ package iuh.se.kltn.backend.modules.interaction.dto.response;
 import iuh.se.kltn.backend.modules.interaction.entity.RoomReport;
 import iuh.se.kltn.backend.modules.interaction.enums.ReportStatus;
 import lombok.Data;
-import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,7 +25,7 @@ public class RoomReportResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static RoomReportResponse from(RoomReport report, ObjectMapper objectMapper) {
+    public static RoomReportResponse from(RoomReport report) {
         RoomReportResponse response = new RoomReportResponse();
         response.setId(report.getId());
         if (report.getReporter() != null) {
