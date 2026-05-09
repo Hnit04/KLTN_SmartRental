@@ -24,75 +24,88 @@ export default function ContractItem({ data }: ContractItemProps) {
   const renderStatus = (status: string) => {
     switch (status) {
       case 'ACTIVE':
-        return <StatusBadge label="Hiệu lực" tone="success" className="text-xs font-bold" />;
+        return <StatusBadge label="Hiệu lực" tone="success" className="text-xs font-semibold px-2.5 py-1" />;
+        
       case 'PENDING_SIGNATURE':
-        return <StatusBadge label="Chờ ký" tone="warning" className="text-xs font-bold" />;
+        return <StatusBadge label="Chờ ký" tone="warning" className="text-xs font-semibold px-2.5 py-1" />;
+        
+      case 'AWAITING_DEPOSIT':
+        return <StatusBadge label="Chờ thanh toán" tone="warning" className="text-xs font-semibold px-2.5 py-1" />;
+        
       case 'EXPIRED':
-        return <StatusBadge label="Hết hạn" tone="neutral" className="text-xs font-bold" />;
+        return <StatusBadge label="Hết hạn" tone="neutral" className="text-xs font-semibold px-2.5 py-1" />;
+        
+      case 'TERMINATED_EARLY':
+        return <StatusBadge label="Chấm dứt trước hạn" tone="danger" className="text-xs font-semibold px-2.5 py-1" />;
+        
+      case 'CANCELLED':
+        return <StatusBadge label="Đã hủy" tone="danger" className="text-xs font-semibold px-2.5 py-1" />;
+        
       default:
-        return <StatusBadge label="Đã hủy" tone="danger" className="text-xs font-bold" />;
+        return <StatusBadge label="Không xác định" tone="neutral" className="text-xs font-semibold px-2.5 py-1" />;
     }
   };
 
   return (
     <div 
-      className="group bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-xl hover:border-primary/40 transition-all cursor-pointer relative overflow-hidden"
+      className="group bg-white rounded-2xl border border-slate-200/60 p-5 md:p-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-primary transition-all duration-300 cursor-pointer relative overflow-hidden"
       onClick={() => {
         const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
         navigate(`${prefix}/contracts/${data.id}`);
       }}
     >
       {/* Hiệu ứng màu nền nhẹ khi hover */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/40 via-transparent to-transparent opacity-0 group-hover:opacity-500 transition-opacity duration-300" />
 
       <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
-        {/* Khối 1: Icon & Thông tin định danh (Cao hơn) */}
-        <div className="flex items-center gap-5 md:w-1/4">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300 shadow-sm">
-            <FileText className="h-8 w-8" />
+        {/* Khối 1: Icon & Thông tin định danh */}
+        <div className="flex items-center gap-4 md:w-1/4">
+          <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-primary shrink-0 transition-all duration-300 shadow-sm">
+            <FileText className="h-6 w-6" />
           </div>
           <div className="min-w-0 space-y-1">
-            <h3 className="text-lg font-extrabold text-gray-900 truncate leading-tight group-hover:text-primary transition-colors">
+            <h3 className="text-base font-bold text-primary truncate transition-colors">
               {data.roomName || `Phòng #${data.roomId}`}
             </h3>
-            <p className="text-[11px] text-gray-400 font-mono tracking-tighter bg-gray-100 w-fit px-2 py-0.5 rounded">
+            <span className="inline-block text-[10px] font-mono font-medium tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
               MÃ: {data.code || `#${data.id}`}
-            </p>
+            </span>
           </div>
         </div>
 
-        {/* Khối 2: Địa chỉ & Thời gian (Dãn dòng hơn) */}
-        <div className="flex flex-col gap-2.5 md:w-1/3 text-sm text-gray-600">
+        {/* Khối 2: Địa chỉ & Thời gian */}
+        <div className="flex flex-col gap-2.5 md:w-1/3 text-sm text-slate-600">
           <div className="flex items-start gap-2.5">
-            <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <span className="line-clamp-2 leading-relaxed font-medium">
+            <MapPin className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+            <span className="line-clamp-2 leading-relaxed text-slate-600 font-medium">
               {data.propertyAddress || "Địa chỉ đang cập nhật..."}
             </span>
           </div>
           <div className="flex items-center gap-2.5">
-            <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
-            <span className="font-medium italic text-gray-500">
+            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+            <span className="font-medium text-slate-500 text-[13px]">
               {formatDate(data.startDate)} — {formatDate(data.endDate)}
             </span>
           </div>
         </div>
 
-        {/* Khối 3: Giá thuê (To và rõ ràng) */}
+        {/* Khối 3: Giá thuê */}
         <div className="md:w-1/6 flex flex-col justify-center">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-            <Banknote className="w-3 h-3" />
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <Banknote className="w-3.5 h-3.5 text-slate-400" />
             <span>Giá thuê tháng</span>
           </div>
-          <p className="text-2xl font-black text-primary tracking-tight">
+          <p className="text-xl font-black text-slate-900 tracking-tight">
             {formatPrice(data.actualPrice || 0)}
           </p>
         </div>
 
-        {/* Khối 4: Trạng thái & Action */}
-        <div className="flex items-center justify-between md:w-1/4 md:justify-end gap-6 border-t md:border-t-0 pt-4 md:pt-0">
-          {renderStatus(data.status)}
-          <div className="h-10 w-10 rounded-xl border border-gray-200 flex items-center justify-center group-hover:bg-primary group-hover:border-primary group-hover:text-white transition-all shadow-sm">
-            <ChevronRight className="h-5 w-5" />
+        <div className="flex items-center justify-between md:w-1/4 md:justify-end gap-6 border-t border-slate-100/80 pt-4 md:pt-0 md:border-t-0">
+          <div className="flex items-center">
+            {renderStatus(data.status)}
+          </div>
+          <div className="h-9 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 transition-all duration-300 shadow-sm">
+            <ChevronRight className="h-4 w-4" />
           </div>
         </div>
       </div>

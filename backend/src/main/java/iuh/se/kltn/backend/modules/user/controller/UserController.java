@@ -31,9 +31,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -292,39 +290,55 @@ public class UserController {
 
         AuditReader auditReader = AuditReaderFactory.get(entityManager);
 
+        // Lấy tất cả revision của User, sắp xếp theo thời gian tăng dần để so sánh cặp
         @SuppressWarnings("unchecked")
         List<Object[]> revisions = auditReader.createQuery()
-                .forRevisionsOfEntity(User.class, false, true)  // true = selectEntitiesOnly, true = selectDeletedEntities
+                .forRevisionsOfEntity(User.class, false, true)
                 .add(AuditEntity.id().eq(userId))
+                .addOrder(AuditEntity.revisionNumber().asc()) // Quan trọng: Sắp xếp cũ -> mới để so sánh
                 .getResultList();
 
-        List<UserHistoryResponse> history = revisions.stream()
-                .map(row -> {
-                    User auditedUser = (User) row[0];                // phần tử 0: entity ở revision đó
-                    CustomRevisionEntity revInfo = (CustomRevisionEntity) row[1];  // phần tử 1: CustomRevisionEntity
+        List<UserHistoryResponse> filteredHistory = new ArrayList<>();
+        User previousState = null;
 
-                    UserHistoryResponse dto = modelMapper.map(auditedUser, UserHistoryResponse.class);
+        for (Object[] row : revisions) {
+            User currentState = (User) row[0];
+            CustomRevisionEntity revInfo = (CustomRevisionEntity) row[1];
+            // row[2] thường là RevisionType (ADD, MOD, DEL)
 
-                    if (revInfo != null) {
-                        dto.setModifiedBy(revInfo.getModifiedBy());
-                        dto.setModifiedByFullName(revInfo.getModifiedByFullName());
+            // Kiểm tra điều kiện:
+            // 1. Nếu là bản ghi đầu tiên (ADD) và tài khoản đang bị khóa
+            // 2. Hoặc nếu trạng thái isLocked thay đổi so với bản ghi trước đó
+            boolean isLockStatusChanged = (previousState == null && currentState.getIsLocked())
+                    || (previousState != null && previousState.getIsLocked() != currentState.getIsLocked());
 
-                        // Chuyển timestamp (millis since epoch) sang LocalDateTime
-                        Instant instant = Instant.ofEpochMilli(revInfo.getTimestamp());
-                        LocalDateTime modifiedAt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
-                        // Hoặc dùng múi giờ VN: ZoneId.of("Asia/Ho_Chi_Minh")
-                        dto.setModifiedAt(modifiedAt);
+            if (isLockStatusChanged) {
+                UserHistoryResponse dto = modelMapper.map(currentState, UserHistoryResponse.class);
 
-                        dto.setAuditRemark(revInfo.getAuditRemark());
-                    }
+                if (revInfo != null) {
+                    dto.setModifiedBy(revInfo.getModifiedBy());
+                    dto.setModifiedByFullName(revInfo.getModifiedByFullName());
 
-                    return dto;
-                })
-                .collect(Collectors.toList());
+                    Instant instant = Instant.ofEpochMilli(revInfo.getTimestamp());
+                    dto.setModifiedAt(LocalDateTime.ofInstant(instant, ZoneId.systemDefault()));
 
-         history.sort(Comparator.comparing(UserHistoryResponse::getModifiedAt).reversed());
+                    dto.setAuditRemark(revInfo.getAuditRemark());
 
-        return ResponseEntity.ok(history);
+                    // Thêm logic mô tả hành động (tùy chọn)
+                    String action = currentState.getIsLocked() ? "KHÓA TÀI KHOẢN" : "MỞ KHÓA TÀI KHOẢN";
+                    // Bạn có thể set action này vào một field trong DTO nếu có
+                }
+                filteredHistory.add(dto);
+            }
+
+            // Cập nhật trạng thái trước đó cho vòng lặp sau
+            previousState = currentState;
+        }
+
+        // Đảo ngược danh sách để hiển thị cái mới nhất lên đầu
+        Collections.reverse(filteredHistory);
+
+        return ResponseEntity.ok(filteredHistory);
     }
     @GetMapping("/userId")
     public Optional<User> findById(String username){

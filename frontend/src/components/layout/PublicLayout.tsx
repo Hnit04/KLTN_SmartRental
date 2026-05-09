@@ -74,9 +74,9 @@ export default function PublicLayout() {
             <NavLink to="/properties" className={navLinkClass}>
               Tìm phòng
             </NavLink>
-            <NavLink to="/top-landlords" className={navLinkClass}>
+            {/* <NavLink to="/top-landlords" className={navLinkClass}>
               🔥 Bảng Xếp Hạng
-            </NavLink>
+            </NavLink> */}
             <NavLink to="/contact" className={navLinkClass}>
               Liên hệ
             </NavLink>

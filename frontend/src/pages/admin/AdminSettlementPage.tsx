@@ -98,7 +98,7 @@ export default function AdminSettlementPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ArrowRightLeft className="text-indigo-600" />
+            <ArrowRightLeft className="text-primary" />
             Đối soát thu hộ & Quyết toán
           </h1>
           <p className="text-slate-500 text-sm mt-1">Quản lý dòng tiền trung gian và hoa hồng 3% từ chủ trọ</p>
@@ -110,7 +110,7 @@ export default function AdminSettlementPage() {
               onClick={() => { setViewMode('PENDING'); setSelectedLandlord(null); }}
               className={cn(
                 "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                viewMode === 'PENDING' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                viewMode === 'PENDING' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
               )}
             >
               Chờ thanh toán
@@ -119,7 +119,7 @@ export default function AdminSettlementPage() {
               onClick={() => { setViewMode('HISTORY'); setSelectedLandlord(null); }}
               className={cn(
                 "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                viewMode === 'HISTORY' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                viewMode === 'HISTORY' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
               )}
             >
               Lịch sử đã trả
@@ -156,13 +156,13 @@ export default function AdminSettlementPage() {
             <TrendingDown size={120} />
           </div>
           <p className="text-slate-500 text-sm font-medium mb-1">Hoa hồng Platform (3%)</p>
-          <h3 className="text-3xl font-bold text-indigo-600">{totalCommission.toLocaleString()} đ</h3>
-          <div className="flex items-center gap-1 text-indigo-400 text-xs font-bold mt-2">
+          <h3 className="text-3xl font-bold text-primary">{totalCommission.toLocaleString()} đ</h3>
+          <div className="flex items-center gap-1 text-primary text-xs font-bold mt-2">
              Lợi nhuận {viewMode === 'PENDING' ? 'dự kiến' : 'thực tế'}
           </div>
         </div>
 
-        <div className="bg-indigo-600 p-6 rounded-2xl shadow-lg shadow-indigo-200 relative overflow-hidden group">
+        <div className="bg-primary p-6 rounded-2xl shadow-lg shadow-indigo-200 relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-10 text-white group-hover:scale-110 transition-transform">
             <CreditCard size={120} />
           </div>
@@ -404,13 +404,13 @@ export default function AdminSettlementPage() {
       )}
 
       {/* Manual Notice - SAME */}
-      <div className="mt-8 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex gap-4">
-         <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+      <div className="mt-8 p-4 bg-primary-50 border border-primary-100 rounded-2xl flex gap-4">
+         <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm shrink-0">
             <AlertCircle size={24} />
          </div>
          <div>
-            <h4 className="font-bold text-indigo-900 text-sm">Hướng dẫn Quyết toán (Payout)</h4>
-            <p className="text-indigo-700 text-xs mt-1 leading-relaxed">
+            <h4 className="font-bold text-primary text-sm">Hướng dẫn Quyết toán (Payout)</h4>
+            <p className="text-primary text-xs mt-1 leading-relaxed">
               Hãy bấm vào từng dòng để kiểm tra chi tiết các hóa đơn trước khi chuyển tiền. 
               Sau khi đã chuyển tiền thật thành công qua App Ngân hàng, hãy bấm nút <b>Xác nhận Payout</b> để hệ thống gạch nợ.
             </p>

@@ -14,10 +14,8 @@ public class UserHistoryResponse {
     private boolean isLocked;
     private LocalDateTime lockUntil;
     private List<String> lockReason;
-    
-    // Thông tin audit
     private String modifiedBy;
     private String modifiedByFullName;
     private LocalDateTime modifiedAt;
-    private String auditRemark;      // nếu sau này bạn muốn ghi chú thêm
+    private String auditRemark;
 }

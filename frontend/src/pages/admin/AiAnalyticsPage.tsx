@@ -222,7 +222,7 @@ export default function AiAnalyticsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Brain className="h-7 w-7 text-violet-600" />
+            <Brain className="h-7 w-7 text-primary" />
             AI Analytics & NLP Monitoring
           </h1>
           <p className="text-sm text-gray-500 mt-1">Thống kê hệ thống ngôn ngữ tự nhiên (NLP) — Human-in-the-loop</p>
@@ -240,10 +240,10 @@ export default function AiAnalyticsPage() {
 
       {/* === METRICS === */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={<MessageSquareText className="h-5 w-5" />} label="Tổng câu hỏi đã học" value={data.totalQueries} color="violet" />
-        <MetricCard icon={<Zap className="h-5 w-5" />} label="Trả lời đúng (Valid)" value={data.validQueries} color="emerald" sub={`${cacheHitRate}% chính xác`} />
-        <MetricCard icon={<Shield className="h-5 w-5" />} label="Cần chú ý (Invalid)" value={data.invalidQueries} color="red" sub="AI sinh sai lệnh SQL" />
-        <MetricCard icon={<TrendingUp className="h-5 w-5" />} label="Tỉ lệ Semantic Hit" value={`${cacheHitRate}%`} color="blue" sub="Đỡ tốn Token LLM" />
+        <MetricCard icon={<MessageSquareText className="h-5 w-5 text-primary" />} label="Tổng câu hỏi đã học" value={data.totalQueries} color="violet" />
+        <MetricCard icon={<Zap className="h-5 w-5 text-primary" />} label="Trả lời đúng (Valid)" value={data.validQueries} color="emerald" sub={`${cacheHitRate}% chính xác`} />
+        <MetricCard icon={<Shield className="h-5 w-5 text-primary" />} label="Cần chú ý (Invalid)" value={data.invalidQueries} color="red" sub="AI sinh sai lệnh SQL" />
+        <MetricCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Tỉ lệ Semantic Hit" value={`${cacheHitRate}%`} color="blue" sub="Đỡ tốn Token LLM" />
       </div>
 
       {/* === CATEGORIES CHART + QUICK STATS === */}

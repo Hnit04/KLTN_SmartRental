@@ -84,11 +84,11 @@ export default function InvitationsList({ onStatusChange }: InvitationsListProps
                     <p className="font-bold text-gray-900">
                       {invite.requesterName} {invite.type === 'REMOVE' ? 'yêu cầu bạn rời khỏi phòng' : 'mời bạn vào ở cùng'}
                     </p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase border ${
+                    {/* <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase border ${
                       invite.type === 'REMOVE' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200'
                     }`}>
                       {invite.type === 'REMOVE' ? 'Rời phòng' : 'Vào ở'}
-                    </span>
+                    </span> */}
                   </div>
                   <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                     <Home className="h-3 w-3" /> Hợp đồng #{invite.contractId}
@@ -101,7 +101,6 @@ export default function InvitationsList({ onStatusChange }: InvitationsListProps
                 </div>
               </div>
             </div>
-            
             <div className="flex gap-2 mt-5">
               <Button 
                 className={`flex-1 h-10 rounded-xl gap-2 ${

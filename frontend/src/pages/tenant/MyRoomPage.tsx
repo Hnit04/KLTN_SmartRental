@@ -220,18 +220,18 @@ export default function MyRoomPage() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="section-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trang thai hop dong</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TRẠNG THÁI HỢP ĐỒNG</p>
           <p className="mt-1 text-sm font-semibold text-foreground">
-            {contract.status === 'ACTIVE' ? 'Dang hieu luc' : 'Dang cho ky/xac nhan'}
+            {contract.status === 'ACTIVE' ? 'Đang hiệu lực' : 'Đang chờ ký kết/xác nhận'}
           </p>
         </div>
         <div className="section-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hoa don can xu ly</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">{unpaidBills.length} hoa don</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">HOÁ ĐƠN CẦN XỬ LÝ</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{unpaidBills.length} hóa đơn</p>
         </div>
         <div className="section-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">So nguoi dang o</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">{members.length + 1} / {contract.maxOccupants || 'Khong gioi han'}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SỐ NGƯỜI ĐANG Ở</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{members.length + 1} / {contract.maxOccupants || 'Không giới hạn'}</p>
         </div>
       </div>
 
@@ -509,11 +509,6 @@ export default function MyRoomPage() {
                         <span className="text-[10px] font-bold uppercase">Chủ trọ tin cậy</span>
                     </div>
                     
-                    <div className="w-full space-y-3">
-                        <Button className="w-full h-11 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex gap-2">
-                           <FileText className="h-4 w-4 text-blue-500" /> Nhắn tin cho chủ trọ
-                        </Button>
-                    </div>
                 </div>
             </div>
 
@@ -532,19 +527,6 @@ export default function MyRoomPage() {
                 </div>
             </div>
 
-            {/* Quick action hỗ trợ */}
-            <button className="w-full bg-indigo-900 rounded-2xl p-6 text-white hover:bg-indigo-950 transition-all text-left group">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-white/10 rounded-lg group-hover:scale-110 transition-transform">
-                        <Info className="h-5 w-5 text-indigo-300" />
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
-                </div>
-                <h3 className="font-bold text-lg mb-1">Gửi yêu cầu hỗ trợ</h3>
-                <p className="text-xs text-indigo-300 leading-relaxed">
-                    Báo cáo hư hỏng, yêu cầu bảo trì hoặc khiếu nại về phòng trọ.
-                </p>
-            </button>
         </div>
       </div>
 

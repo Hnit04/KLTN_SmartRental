@@ -35,6 +35,9 @@ export default function LoginPage() {
   // Trạng thái modal thông báo khóa tài khoản
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
+  
+  // Trạng thái ẩn/hiện mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -107,8 +110,8 @@ export default function LoginPage() {
         if (redirectUrl) {
           navigate(redirectUrl);
         } else {
-          if (user.role === 'ADMIN') navigate("/admin/dashboard");
-          else if (user.role === 'LANDLORD') navigate("/landlord/dashboard");
+          if (user.role === "ADMIN") navigate("/admin/dashboard");
+          else if (user.role === "LANDLORD") navigate("/landlord/dashboard");
           else navigate("/tenant/dashboard");
         }
       }, 1500);

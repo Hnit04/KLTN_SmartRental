@@ -113,6 +113,9 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [otpCode, setOtpCode] = useState("");
 
+  // Trạng thái ẩn/hiện mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState<RegisterRequest>({
     username: "",
     password: "",
