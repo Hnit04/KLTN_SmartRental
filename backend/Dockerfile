@@ -43,4 +43,7 @@ USER spring:spring
 EXPOSE 8080
 
 # Start application (Dùng shell form để resolve environment variables)
-ENTRYPOINT java -Dspring.profiles.active=${SPRING_PROFILE:-default} -jar app.jar
+# Cấu hình tối ưu cho Render Free (512MB RAM): 
+# -Xms128m -Xmx256m: Giới hạn Heap an toàn để nhường RAM cho Native Memory (ONNX).
+# -XX:+UseSerialGC: Tiết kiệm tài nguyên nhất cho máy cấu hình thấp.
+ENTRYPOINT java -Xms128m -Xmx256m -XX:+UseSerialGC -Dspring.profiles.active=${SPRING_PROFILE:-default} -jar app.jar

@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
+import org.springframework.context.annotation.Lazy;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 @Configuration
 public class AiConfig {
@@ -37,6 +38,7 @@ public class AiConfig {
     }
 
     @Bean
+    @Lazy
     public EmbeddingModel embeddingModel() {
         return new AllMiniLmL6V2EmbeddingModel();
     }
@@ -46,6 +48,7 @@ public class AiConfig {
         return new InMemoryEmbeddingStore<>();
     }
     @Bean
+    @Lazy
     public ContentRetriever contentRetriever(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel) {
         return EmbeddingStoreContentRetriever.builder()
                 .embeddingStore(embeddingStore)
