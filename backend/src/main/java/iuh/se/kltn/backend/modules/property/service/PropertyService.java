@@ -54,6 +54,7 @@ public class PropertyService {
     private VipSubscriptionService vipSubscriptionService;
 
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public) - CHỈ LẤY "APPROVED"
+    @Transactional(readOnly = true)
     public Page<PropertyResponse> getAllProperties(Pageable pageable) {
         Page<Property> properties = propertyRepository.findByStatus(PropertyStatus.APPROVED, pageable);
         return properties.map(this::mapToPropertyResponse);
@@ -166,6 +167,7 @@ public class PropertyService {
     }
 
     // LẤY DANH SÁCH NHÀ CỦA CHU TRO
+    @Transactional(readOnly = true)
     public List<PropertyResponse> getMyProperties(Long landlordId) {
         return propertyRepository.findByLandlordIdOrderByCreatedAtDesc(landlordId).stream()
                 .map(this::mapToPropertyResponse)
@@ -173,6 +175,7 @@ public class PropertyService {
     }
 
     // LẤY DANH SÁCH NHÀ CỦA CHU TRO (DÙNG CHO PUBLIC)
+    @Transactional(readOnly = true)
     public List<PropertyResponse> getPropertiesByUsername(String username) {
         return propertyRepository.findByLandlordUsername(username).stream()
                 .map(this::mapToPropertyResponse)
@@ -180,6 +183,7 @@ public class PropertyService {
     }
 
     // LẤY DANH SÁCH PHÒNG CỦA 1 KHU TRỌ
+    @Transactional(readOnly = true)
     public List<RoomResponse> getRoomsByProperty(Long propertyId, Long currentUserId) {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại"));
@@ -245,6 +249,7 @@ public class PropertyService {
         return res;
     }
 
+    @Transactional(readOnly = true)
     public PropertyResponse getPropertyById(Long id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trọ với ID: " + id));
@@ -287,6 +292,7 @@ public class PropertyService {
     }
 
     // === ADMIN Duyệt tin ===
+    @Transactional(readOnly = true)
     public List<PropertyResponse> getPropertiesByStatus(PropertyStatus status) {
         return propertyRepository.findByStatus(status).stream()
                 .map(this::mapToPropertyResponse)
