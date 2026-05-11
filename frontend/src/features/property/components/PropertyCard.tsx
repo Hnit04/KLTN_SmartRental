@@ -26,7 +26,7 @@ export default function PropertyCard({ data }: PropertyCardProps) {
   return (
     <div 
       onClick={() => navigate(`/properties/${data.id}`)}
-      className={`group bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/30 transition-[box-shadow,border-color] duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-90' : ''}`}
+      className={`group bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/30 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-90' : ''}`}
     >
       {/* 1. Hình ảnh & Badge giá */}
       <div className="relative h-36 overflow-hidden bg-gray-100 sm:h-44 md:h-48">
@@ -34,7 +34,7 @@ export default function PropertyCard({ data }: PropertyCardProps) {
           src={thumbnail} 
           alt={data.name} 
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 will-change-transform group-hover:scale-[1.03]"
+          className="h-full w-full object-cover transition-transform duration-700 will-change-transform group-hover:scale-[1.04]"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-2 pt-6 sm:p-3 sm:pt-8">
            <p className="text-sm font-bold text-white sm:text-lg">
@@ -88,7 +88,7 @@ export default function PropertyCard({ data }: PropertyCardProps) {
 
         <div className="mt-auto flex min-h-[44px] items-end border-t border-border/70 pt-2 sm:min-h-[52px] sm:pt-3">
           <Button 
-            className="flex h-9 w-full items-center justify-center rounded-xl border border-primary/20 bg-background text-xs text-primary hover:bg-primary hover:text-primary-foreground sm:h-10 sm:text-sm"
+            className="flex h-9 w-full items-center justify-center rounded-xl border border-primary/20 bg-background text-xs text-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md transition-all duration-200 sm:h-10 sm:text-sm"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/properties/${data.id}`);

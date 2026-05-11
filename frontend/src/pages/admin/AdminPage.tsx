@@ -1,25 +1,27 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { userApi } from '@/api/userApi';
 import { propertyApi } from '@/api/propertyApi';
 import { contractApi } from '@/api/contractApi';
 import { adminApi } from '@/api/adminApi';
-import { 
-  Users, 
-  Building, 
-  ShieldCheck, 
+import {
+  Users,
+  Building,
+  ShieldCheck,
   FileText,
   ChevronRight,
   Search,
-  Loader2,
-  AlertCircle,
   LayoutDashboard,
-  ArrowRightLeft
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/utils/cn';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Input } from '@/components/ui/Input';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { StatKpiCard, DashboardPanel } from '@/components/dashboard';
 
 export default function SystemAdminDashboard() {
-  // 1. Fetch data from APIs
   const { data: tenants = [], isLoading: tenantsLoading } = useQuery({
     queryKey: ['users', 'TENANT'],
     queryFn: () => userApi.getUsersByRole('TENANT'),
@@ -62,164 +64,205 @@ export default function SystemAdminDashboard() {
     },
   });
 
-  const isLoading = tenantsLoading || landlordsLoading || propsLoading || roomsLoading || contractsLoading || settlementsLoading;
+  const isLoading =
+    tenantsLoading ||
+    landlordsLoading ||
+    propsLoading ||
+    roomsLoading ||
+    contractsLoading ||
+    settlementsLoading;
 
-  // 2. Process Calculations
   const totalUsers = tenants.length + landlords.length;
-  const pendingKYC = [...tenants, ...landlords].filter(u => u.kycStatus === 'PENDING').length;
+  const pendingKYC = [...tenants, ...landlords].filter((u) => u.kycStatus === 'PENDING').length;
   const pendingApprovals = pendingProperties.length + pendingRooms.length;
-  const activeContracts = (allContracts as any[]).filter(c => c.status === 'ACTIVE').length;
+  const activeContracts = (allContracts as any[]).filter((c) => c.status === 'ACTIVE').length;
 
-  const systemStats = [
-    { 
-      title: "Tổng Người dùng", 
-      value: totalUsers, 
-      growth: `+${tenants.length} khách, ${landlords.length} chủ`, 
-      icon: <Users size={20}/>, 
-      color: "text-indigo-600", 
-      bg: "bg-indigo-50",
-      link: "/admin/users"
+  const systemStats: {
+    title: string;
+    value: number;
+    badge: string;
+    icon: ReactNode;
+    iconClassName: string;
+    link: string;
+    badgeTone: 'warning' | 'neutral';
+  }[] = [
+    {
+      title: 'Tổng người dùng',
+      value: totalUsers,
+      badge: `+${tenants.length} khách · ${landlords.length} chủ`,
+      icon: <Users className="h-5 w-5" />,
+      iconClassName: 'text-indigo-600',
+      link: '/admin/users',
+      badgeTone: 'neutral',
     },
-    { 
-      title: "Tin đăng chờ duyệt", 
-      value: pendingApprovals, 
-      growth: `${pendingProperties.length} khu, ${pendingRooms.length} phòng`, 
-      icon: <Building size={20}/>, 
-      color: "text-amber-600", 
-      bg: "bg-amber-50",
-      link: "/admin/approvals"
+    {
+      title: 'Tin đăng chờ duyệt',
+      value: pendingApprovals,
+      badge: `${pendingProperties.length} khu · ${pendingRooms.length} phòng`,
+      icon: <Building className="h-5 w-5" />,
+      iconClassName: 'text-amber-600',
+      link: '/admin/approvals',
+      badgeTone: pendingApprovals > 0 ? 'warning' : 'neutral',
     },
-    { 
-      title: "Định danh chờ duyệt", 
-      value: pendingKYC, 
-      growth: "Cần xác thực KYC", 
-      icon: <ShieldCheck size={20}/>, 
-      color: "text-emerald-600", 
-      bg: "bg-emerald-50",
-      link: "/admin/users" 
+    {
+      title: 'Định danh chờ duyệt',
+      value: pendingKYC,
+      badge: 'KYC thủ công',
+      icon: <ShieldCheck className="h-5 w-5" />,
+      iconClassName: 'text-emerald-600',
+      link: '/admin/users',
+      badgeTone: pendingKYC > 0 ? 'warning' : 'neutral',
     },
-    { 
-      title: "Hợp đồng hiệu lực", 
-      value: activeContracts, 
-      growth: `${(allContracts as any[]).length} tổng số`, 
-      icon: <FileText size={20}/>, 
-      color: "text-blue-600", 
-      bg: "bg-blue-50",
-      link: "/admin/blockchain-logs"
+    {
+      title: 'Hợp đồng hiệu lực',
+      value: activeContracts,
+      badge: `${(allContracts as any[]).length} tổng số`,
+      icon: <FileText className="h-5 w-5" />,
+      iconClassName: 'text-sky-600',
+      link: '/admin/blockchain-logs',
+      badgeTone: 'neutral',
     },
-    { 
-      title: "Cần đối soát", 
-      value: pendingSettlements.length, 
-      growth: `${pendingSettlements.length} chủ trọ`, 
-      icon: <ArrowRightLeft size={20}/>, 
-      color: "text-purple-600", 
-      bg: "bg-purple-50",
-      link: "/admin/settlements"
+    {
+      title: 'Cần đối soát',
+      value: pendingSettlements.length,
+      badge: `${pendingSettlements.length} chủ trọ`,
+      icon: <ArrowRightLeft className="h-5 w-5" />,
+      iconClassName: 'text-violet-600',
+      link: '/admin/settlements',
+      badgeTone: pendingSettlements.length > 0 ? 'warning' : 'neutral',
     },
   ];
 
-  // Latest Landlords (Merchants)
-  const recentLandlords = [...landlords]
-    .sort((a, b) => b.id - a.id)
-    .slice(0, 5);
+  const recentLandlords = [...landlords].sort((a, b) => b.id - a.id).slice(0, 5);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 mb-4" />
-        <p className="text-slate-500 font-medium">Đang tải dữ liệu hệ thống...</p>
+      <div className="space-y-8 pb-10">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-72 rounded-lg" />
+          <Skeleton className="h-4 w-96 max-w-full rounded-md" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-[140px] rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Skeleton className="h-[320px] rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-[320px] rounded-2xl" />
+        </div>
+        <p className="text-center text-xs font-medium text-muted-foreground">Đang tải dữ liệu hệ thống…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex">
-      {/* Main Content */}
-      <main className="flex-1 p-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <LayoutDashboard className="text-indigo-600" />
-              Hệ thống Quản trị SmartRental
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">Tổng quan vận hành và kiểm duyệt Platform</p>
-          </div>
-          
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm nhanh..." 
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-64"
+    <div className="space-y-8 pb-10">
+      <PageHeader
+        title="Quản trị hệ thống"
+        description="Tổng quan vận hành, kiểm duyệt và rủi ro — một màn hình để nắm tình hình nhanh."
+        actions={
+          <div className="relative w-full min-w-0 sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Tìm kiếm nhanh…"
+              className="pl-9"
+              aria-label="Tìm kiếm nhanh (giao diện)"
+              readOnly
             />
           </div>
-        </div>
+        }
+      />
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-          {systemStats.map((s, i) => (
-            <Link key={i} to={s.link} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`${s.bg} ${s.color} p-3 rounded-xl group-hover:scale-110 transition-transform`}>{s.icon}</div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded ${s.value > 0 ? 'text-amber-600 bg-amber-50' : 'text-slate-400 bg-slate-50'}`}>
-                  {s.growth}
-                </span>
-              </div>
-              <p className="text-slate-500 text-sm font-medium">{s.title}</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{s.value}</h3>
-            </Link>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {systemStats.map((s, i) => (
+          <StatKpiCard
+            key={i}
+            to={s.link}
+            icon={s.icon}
+            iconClassName={s.iconClassName}
+            label={s.title}
+            value={s.value}
+            badge={
+              <span
+                className={cn(
+                  'rounded-md px-2 py-1 text-[10px] font-semibold leading-tight',
+                  s.badgeTone === 'warning'
+                    ? 'bg-amber-500/15 text-amber-950'
+                    : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {s.badge}
+              </span>
+            }
+          />
+        ))}
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Merchants Management (LEFT - 2/3) */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-800 text-lg">Chủ trọ mới gia nhập</h2>
-              <Link to="/admin/users" className="text-indigo-600 text-sm font-semibold flex items-center gap-1 hover:gap-2 transition-all">
-                Quản lý User <ChevronRight size={16}/>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
+          <DashboardPanel
+            title="Chủ trọ mới gia nhập"
+            description="Theo thứ tự đăng ký gần nhất"
+            action={
+              <Link
+                to="/admin/users"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors hover:gap-1.5"
+              >
+                Quản lý user <ChevronRight className="h-4 w-4" />
               </Link>
-            </div>
+            }
+          >
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/50 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead className="border-b border-border/60 bg-muted/35 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="px-6 py-4">Họ và tên</th>
-                    <th className="px-6 py-4">Liên hệ</th>
-                    <th className="px-6 py-4">Định danh (KYC)</th>
-                    <th className="px-6 py-4">Uy tín</th>
+                    <th className="px-5 py-3.5">Họ và tên</th>
+                    <th className="px-5 py-3.5">Liên hệ</th>
+                    <th className="px-5 py-3.5">KYC</th>
+                    <th className="px-5 py-3.5">Uy tín</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-border/60">
                   {recentLandlords.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic">Chưa có chủ trọ nào</td>
+                      <td colSpan={4} className="px-5 py-10 text-center text-sm italic text-muted-foreground">
+                        Chưa có chủ trọ nào
+                      </td>
                     </tr>
                   ) : (
                     recentLandlords.map((m, i) => (
-                      <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-slate-700">{m.fullName || m.username}</div>
-                          <div className="text-[10px] text-slate-400">ID: #{m.id}</div>
+                      <tr key={i} className="transition-colors hover:bg-muted/25">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-foreground">{m.fullName || m.username}</div>
+                          <div className="text-[10px] text-muted-foreground">ID #{m.id}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-slate-600 text-sm">{m.phoneNumber || '—'}</div>
-                          <div className="text-[11px] text-indigo-500">{m.email}</div>
+                        <td className="px-5 py-4">
+                          <div className="text-foreground/90">{m.phoneNumber || '—'}</div>
+                          <div className="text-xs text-primary">{m.email}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                            m.kycStatus === 'VERIFIED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                            m.kycStatus === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-400 border-slate-100'
-                          }`}>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              m.kycStatus === 'VERIFIED'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                : m.kycStatus === 'PENDING'
+                                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                  : 'border-border bg-muted/50 text-muted-foreground'
+                            }`}
+                          >
                             {m.kycStatus || 'Chưa nộp'}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className={`text-sm font-bold ${m.reputationScore >= 80 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                              {m.reputationScore}/100
-                            </div>
-                          </div>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`text-sm font-bold tabular-nums ${
+                              (m.reputationScore ?? 0) >= 80 ? 'text-emerald-600' : 'text-amber-600'
+                            }`}
+                          >
+                            {m.reputationScore ?? 0}/100
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -227,47 +270,70 @@ export default function SystemAdminDashboard() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </DashboardPanel>
+        </div>
 
-          {/* System Alerts / Actions (RIGHT - 1/3) */}
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <AlertCircle size={18} className="text-amber-500" />
-                Việc cần xử lý
-              </h3>
-              <div className="space-y-4">
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
-                  <p className="text-xs text-amber-800 font-semibold uppercase tracking-wider mb-1">Tin đăng chờ duyệt</p>
-                  <p className="text-sm text-amber-700">Hiện có <span className="font-bold text-lg">{pendingApprovals}</span> mục đang chờ bạn phê duyệt.</p>
-                  <Link to="/admin/approvals" className="mt-2 block text-xs font-bold text-amber-900 underline">Đến trang phê duyệt →</Link>
-                </div>
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                  <p className="text-xs text-indigo-800 font-semibold uppercase tracking-wider mb-1">Xác thực danh tính</p>
-                  <p className="text-sm text-indigo-700">Có <span className="font-bold text-lg">{pendingKYC}</span> hồ sơ KYC đang chờ kiểm tra thủ công.</p>
-                  <Link to="/admin/users" className="mt-2 block text-xs font-bold text-indigo-900 underline">Kiểm tra ngay →</Link>
-                </div>
-
-                {pendingSettlements.length > 0 && (
-                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
-                    <p className="text-xs text-purple-800 font-semibold uppercase tracking-wider mb-1">Quyết toán tài chính</p>
-                    <p className="text-sm text-purple-700">Có <span className="font-bold text-lg">{pendingSettlements.length}</span> khoản thu hộ cần chuyển trả chủ trọ.</p>
-                    <Link to="/admin/settlements" className="mt-2 block text-xs font-bold text-purple-900 underline">Quyết toán ngay →</Link>
-                  </div>
-                )}
+        <div className="space-y-5">
+          <DashboardPanel title="Việc cần xử lý" description="Ưu tiên kiểm duyệt và tài chính">
+            <div className="space-y-3 p-4 sm:p-5">
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900">Tin đăng chờ duyệt</p>
+                <p className="mt-1 text-sm text-amber-900/95">
+                  Có <span className="text-lg font-bold">{pendingApprovals}</span> mục đang chờ phê duyệt.
+                </p>
+                <Link
+                  to="/admin/approvals"
+                  className="mt-3 inline-flex text-xs font-bold text-amber-950 underline-offset-2 hover:underline"
+                >
+                  Đến trang phê duyệt →
+                </Link>
               </div>
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Xác thực danh tính</p>
+                <p className="mt-1 text-sm text-foreground/90">
+                  <span className="text-lg font-bold text-primary">{pendingKYC}</span> hồ sơ KYC chờ kiểm tra.
+                </p>
+                <Link
+                  to="/admin/users"
+                  className="mt-3 inline-flex text-xs font-bold text-primary underline-offset-2 hover:underline"
+                >
+                  Kiểm tra ngay →
+                </Link>
+              </div>
+              {pendingSettlements.length > 0 && (
+                <div className="rounded-xl border border-violet-200/80 bg-violet-50/90 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-violet-900">Quyết toán tài chính</p>
+                  <p className="mt-1 text-sm text-violet-900/95">
+                    <span className="text-lg font-bold">{pendingSettlements.length}</span> khoản thu hộ cần chuyển trả.
+                  </p>
+                  <Link
+                    to="/admin/settlements"
+                    className="mt-3 inline-flex text-xs font-bold text-violet-950 underline-offset-2 hover:underline"
+                  >
+                    Quyết toán ngay →
+                  </Link>
+                </div>
+              )}
             </div>
+          </DashboardPanel>
 
-            <div className="bg-primary p-6 rounded-2xl shadow-lg text-white">
-              <h3 className="font-bold text-lg mb-2">Bảo mật & Blockchain</h3>
-              <p className="text-primary-100 text-sm mb-4">Mọi hợp đồng đều được giám sát tính toàn vẹn thông qua Smart Contract trên mạng Sepolia.</p>
-              <Link to="/admin/blockchain-logs" className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold transition-all">
-                Kiểm tra Logs <ChevronRight size={16} />
-              </Link>
+          <div className="rounded-2xl border border-primary/25 bg-primary p-5 text-primary-foreground shadow-card sm:p-6">
+            <div className="mb-1 flex items-center gap-2">
+              <LayoutDashboard className="h-5 w-5 opacity-90" />
+              <h3 className="text-base font-bold">Bảo mật & Blockchain</h3>
             </div>
+            <p className="text-sm leading-relaxed text-primary-foreground/90">
+              Giám sát tính toàn vẹn hợp đồng qua smart contract (mạng thử nghiệm).
+            </p>
+            <Link
+              to="/admin/blockchain-logs"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary-foreground/15 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-primary-foreground/25"
+            >
+              Xem logs <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

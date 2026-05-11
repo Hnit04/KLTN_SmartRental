@@ -9,6 +9,9 @@ import {
 import { propertyApi } from '@/api/propertyApi';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property } from '@/types/index';
@@ -392,21 +395,52 @@ export default function PropertiesManagePage() {
     }
   };
 
-  if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (loading) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-56 rounded-lg" />
+            <Skeleton className="h-4 w-72 max-w-full rounded-md" />
+          </div>
+          <Skeleton className="h-10 w-40 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-[320px] rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Khu trọ của tôi</h1>
-          <p className="text-muted-foreground mt-1">Quản lý danh sách các tòa nhà, khu trọ</p>
-        </div>
-        <Button onClick={handleOpenCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Thêm Khu trọ</Button>
-      </div>
+    <div className="space-y-6 pb-10">
+      <PageHeader
+        title="Khu trọ của tôi"
+        description="Quản lý tòa nhà, khu trọ và truy cập nhanh vào từng danh sách phòng."
+        actions={
+          <Button onClick={handleOpenCreate} className="gap-2 shadow-soft">
+            <Plus className="h-4 w-4" /> Thêm khu trọ
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {properties.length === 0 ? (
+        <EmptyState
+          icon={Building}
+          title="Chưa có khu trọ"
+          description="Tạo khu trọ đầu tiên để thêm phòng và đăng tin cho khách thuê."
+          action={
+            <Button onClick={handleOpenCreate} className="gap-2 shadow-soft">
+              <Plus className="h-4 w-4" /> Thêm khu trọ
+            </Button>
+          }
+        />
+      ) : (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
         {properties.map((property) => (
-          <Card key={property.id} className={`overflow-hidden hover:shadow-md transition-shadow group relative flex flex-col ${property.status === 'HIDDEN' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
+          <Card key={property.id} className={`group relative flex flex-col overflow-hidden border-border/80 shadow-soft transition-all duration-200 hover:shadow-card ${property.status === 'HIDDEN' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
             {/* Nút sửa */}
             <button onClick={() => handleOpenEdit(property)} className="absolute top-2 right-10 z-10 bg-white/90 p-1.5 rounded-md shadow opacity-0 group-hover:opacity-100 transition hover:bg-blue-50 text-blue-600">
               <Edit className="h-4 w-4" />
@@ -460,12 +494,13 @@ export default function PropertiesManagePage() {
           </Card>
         ))}
       </div>
+      )}
 
       {/* MODAL THÊM / SỬA KHU TRỌ */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b flex flex-col bg-gray-50 flex-shrink-0 relative">
+            <div className="px-6 py-4 border-b flex flex-col bg-muted/40 flex-shrink-0 relative">
               <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
               <h2 className="text-xl font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật Khu trọ' : 'Thêm Khu trọ mới'}</h2>
               
@@ -654,7 +689,7 @@ export default function PropertiesManagePage() {
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-between gap-3 flex-shrink-0">
+            <div className="px-6 py-4 border-t bg-muted/40 flex justify-between gap-3 flex-shrink-0">
               {propStep > 1 ? (
                 <Button type="button" variant="outline" onClick={() => setPropStep(propStep - 1)} disabled={isSubmitting}>
                   <ChevronLeft className="h-4 w-4 mr-1" /> Quay lại

@@ -74,7 +74,7 @@ export default function CompareBar() {
           <Button 
             variant="outline" 
             size="sm"
-            className="h-9 text-xs text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-red-500 hover:border-red-200 px-3"
+            className="h-9 text-xs text-gray-500 border-gray-200 hover:bg-muted/40 hover:text-red-500 hover:border-red-200 px-3"
             onClick={clearCompare}
           >
             <X className="h-3.5 w-3.5 mr-1" /> Xóa

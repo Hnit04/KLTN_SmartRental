@@ -18,6 +18,15 @@ import {
   QrCode
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/utils/cn';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatKpiCard } from '@/components/dashboard';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
+import { Input } from '@/components/ui/Input';
+import { TableShell } from '@/components/ui/TableShell';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { DashboardPanel } from '@/components/dashboard';
 
 export default function AdminSettlementPage() {
   const queryClient = useQueryClient();
@@ -83,185 +92,173 @@ export default function AdminSettlementPage() {
   const totalCommission = settlements.reduce((acc: number, curr: LandlordSettlement) => acc + curr.platformFee, 0);
   const totalPayout = settlements.reduce((acc: number, curr: LandlordSettlement) => acc + curr.finalPayoutAmount, 0);
 
+  const settlementViewItems: SegmentItem[] = [
+    { id: 'PENDING', label: 'Chờ thanh toán' },
+    { id: 'HISTORY', label: 'Lịch sử đã trả' },
+  ];
+
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 mb-4" />
-        <p className="text-slate-500 font-medium">Đang tải dữ liệu đối soát...</p>
+      <div className="mx-auto max-w-[1200px] space-y-6 pb-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-72 rounded-lg" />
+            <Skeleton className="h-4 w-full max-w-md rounded-md" />
+          </div>
+          <Skeleton className="h-11 w-full max-w-xs rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-72 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-8">
-      {/* Header section - SAME */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ArrowRightLeft className="text-primary" />
-            Đối soát thu hộ & Quyết toán
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">Quản lý dòng tiền trung gian và hoa hồng 3% từ chủ trọ</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex bg-slate-200/50 p-1 rounded-xl mr-2">
-            <button 
-              onClick={() => { setViewMode('PENDING'); setSelectedLandlord(null); }}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                viewMode === 'PENDING' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              Chờ thanh toán
-            </button>
-            <button 
-              onClick={() => { setViewMode('HISTORY'); setSelectedLandlord(null); }}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                viewMode === 'HISTORY' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              Lịch sử đã trả
-            </button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-            <input 
-              type="text" 
-              placeholder="Tìm tên chủ trọ..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-64 shadow-sm"
+    <div className="mx-auto min-w-0 max-w-[1200px] space-y-6 pb-10">
+      <PageHeader
+        title="Đối soát thu hộ & quyết toán"
+        description="Theo dõi ví admin, phí 3% và payout cho chủ trọ — chọn dòng để xem chi tiết giao dịch trước khi xác nhận."
+        actions={
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <SegmentedControl
+              aria-label="Chế độ xem đối soát"
+              items={settlementViewItems}
+              value={viewMode}
+              onChange={(id) => {
+                setViewMode(id as 'PENDING' | 'HISTORY');
+                setSelectedLandlord(null);
+              }}
             />
+            <div className="relative w-full min-w-0 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" size={18} />
+              <Input
+                placeholder="Tìm tên hoặc email chủ trọ…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
-        </div>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <StatKpiCard
+          icon={<Wallet className="h-5 w-5" />}
+          iconClassName="text-emerald-600"
+          label={viewMode === 'PENDING' ? 'Tổng tiền thu hộ (ví admin)' : 'Tổng đã quyết toán'}
+          value={`${totalCollected.toLocaleString()} đ`}
+          description={viewMode === 'PENDING' ? 'Đã nhận qua MBBank' : 'Đã chuyển cho chủ trọ'}
+        />
+        <StatKpiCard
+          icon={<TrendingDown className="h-5 w-5" />}
+          iconClassName="text-primary"
+          label="Hoa hồng platform (3%)"
+          value={`${totalCommission.toLocaleString()} đ`}
+          description={viewMode === 'PENDING' ? 'Lợi nhuận dự kiến' : 'Lợi nhuận thực tế'}
+        />
+        <StatKpiCard
+          icon={<CreditCard className="h-5 w-5" />}
+          iconClassName="text-primary"
+          className="border-primary/25 bg-primary/[0.04]"
+          label={viewMode === 'PENDING' ? 'Cần chi trả (payout)' : 'Số chủ trọ trong kỳ'}
+          value={viewMode === 'PENDING' ? `${totalPayout.toLocaleString()} đ` : settlements.length}
+          description={viewMode === 'PENDING' ? `Cho ${settlements.length} chủ trọ` : 'Dữ liệu lưu trữ'}
+        />
       </div>
 
-      {/* Summary Stats - SAME */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-110 transition-transform">
-            <Wallet size={120} />
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">{viewMode === 'PENDING' ? 'Tổng tiền thu hộ (Ví Admin)' : 'Tổng tiền đã quyết toán'}</p>
-          <h3 className="text-3xl font-bold text-slate-900">{totalCollected.toLocaleString()} đ</h3>
-          <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold mt-2">
-             {viewMode === 'PENDING' ? 'Đã nhận qua MBBank' : 'Đã chuyển cho Chủ trọ'}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] opacity-5 text-indigo-600 group-hover:scale-110 transition-transform">
-            <TrendingDown size={120} />
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Hoa hồng Platform (3%)</p>
-          <h3 className="text-3xl font-bold text-primary">{totalCommission.toLocaleString()} đ</h3>
-          <div className="flex items-center gap-1 text-primary text-xs font-bold mt-2">
-             Lợi nhuận {viewMode === 'PENDING' ? 'dự kiến' : 'thực tế'}
-          </div>
-        </div>
-
-        <div className="bg-primary p-6 rounded-2xl shadow-lg shadow-indigo-200 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] opacity-10 text-white group-hover:scale-110 transition-transform">
-            <CreditCard size={120} />
-          </div>
-          <p className="text-white/80 text-sm font-medium mb-1">{viewMode === 'PENDING' ? 'Cần chi trả (Payout)' : 'Tổng số chủ trọ'}</p>
-          <h3 className="text-3xl font-bold text-white">{viewMode === 'PENDING' ? totalPayout.toLocaleString() : settlements.length} {viewMode === 'HISTORY' ? '' : 'đ'}</h3>
-          <div className="flex items-center gap-1 text-white/60 text-xs font-bold mt-2 text-wrap">
-             {viewMode === 'PENDING' ? `Cho ${settlements.length} chủ trọ` : 'Dữ liệu lưu trữ'}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Table section */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
-        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-          <h2 className="font-bold text-slate-800 text-lg">
-            {viewMode === 'PENDING' ? 'Danh sách chờ thanh toán' : 'Lịch sử đã quyết toán'}
-          </h2>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4">Chủ trọ</th>
-                <th className="px-6 py-4">Thông tin MBBank</th>
-                <th className="px-6 py-4">Chi tiết thu</th>
-                <th className="px-6 py-4">Phí (3%)</th>
-                <th className="px-6 py-4">Thực nhận</th>
-                <th className="px-6 py-4 text-center">Hành động</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredSettlements.length > 0 ? (
-                filteredSettlements.map((s: LandlordSettlement) => (
-                  <tr key={s.landlordId} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => setSelectedLandlord(s)}>
-                    <td className="px-6 py-5">
+      {filteredSettlements.length === 0 ? (
+        <EmptyState
+          icon={AlertCircle}
+          title="Không có dữ liệu đối soát"
+          description={
+            viewMode === 'PENDING'
+              ? 'Hiện không có khoản nào cần thanh toán cho chủ trọ.'
+              : 'Chưa có lịch sử thanh toán hoặc bộ lọc tìm kiếm không khớp.'
+          }
+        />
+      ) : (
+        <DashboardPanel
+          title={viewMode === 'PENDING' ? 'Danh sách chờ thanh toán' : 'Lịch sử đã quyết toán'}
+          description="Nhấn dòng để mở chi tiết giao dịch và QR chuyển khoản."
+        >
+          <TableShell className="rounded-none border-0 border-t-0 shadow-none bg-transparent">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 sm:px-6">Chủ trọ</th>
+                  <th className="px-4 py-3 sm:px-6">Thông tin MBBank</th>
+                  <th className="px-4 py-3 sm:px-6">Chi tiết thu</th>
+                  <th className="px-4 py-3 sm:px-6">Phí (3%)</th>
+                  <th className="px-4 py-3 sm:px-6">Thực nhận</th>
+                  <th className="px-4 py-3 text-center sm:px-6">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {filteredSettlements.map((s: LandlordSettlement) => (
+                  <tr
+                    key={s.landlordId}
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                    onClick={() => setSelectedLandlord(s)}
+                  >
+                    <td className="px-4 py-4 sm:px-6 sm:py-5">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
                           {s.landlordName.charAt(0)}
                         </div>
-                        <div>
-                          <div className="font-bold text-slate-700">{s.landlordName}</div>
-                          <div className="text-[11px] text-slate-400">{s.landlordEmail}</div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-foreground">{s.landlordName}</div>
+                          <div className="text-[11px] text-muted-foreground">{s.landlordEmail}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5">
-                      <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 inline-block">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                           <Building2 size={14} className="text-slate-400" />
-                           {s.bankName} - {s.bankAccountNumber}
+                    <td className="px-4 py-4 sm:px-6 sm:py-5">
+                      <div className="inline-block rounded-lg border border-border/60 bg-muted/30 p-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Building2 size={14} className="text-muted-foreground" />
+                          {s.bankName} - {s.bankAccountNumber}
                         </div>
-                        <div className="text-[10px] text-slate-500 ml-5 uppercase">{s.bankAccountHolder}</div>
+                        <div className="ml-5 text-[10px] uppercase text-muted-foreground">{s.bankAccountHolder}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-5">
-                      <div className="text-xs text-slate-600 font-semibold">{s.totalRevenue.toLocaleString()} đ</div>
-                      <div className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded inline-block mt-1">
-                         {s.pendingItemCount} giao dịch
+                    <td className="px-4 py-4 sm:px-6 sm:py-5">
+                      <div className="text-xs font-semibold text-foreground">{s.totalRevenue.toLocaleString()} đ</div>
+                      <div className="mt-1 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                        {s.pendingItemCount} giao dịch
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-sm font-bold text-red-500">
+                    <td className="px-4 py-4 text-sm font-bold text-destructive sm:px-6 sm:py-5">
                       -{s.platformFee.toLocaleString()}
                     </td>
-                    <td className="px-6 py-5">
-                      <div className="text-lg font-black text-emerald-600">
-                        {s.finalPayoutAmount.toLocaleString()} đ
+                    <td className="px-4 py-4 sm:px-6 sm:py-5">
+                      <div className="text-lg font-bold tabular-nums text-emerald-600">{s.finalPayoutAmount.toLocaleString()} đ</div>
+                    </td>
+                    <td className="px-4 py-4 sm:px-6 sm:py-5">
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-primary transition-colors hover:bg-primary/10"
+                          aria-label="Mở chi tiết"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
                       </div>
                     </td>
-                    <td className="px-6 py-5">
-                       <div className="flex justify-center">
-                          <button className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors">
-                             <ChevronRight size={20}/>
-                          </button>
-                       </div>
-                    </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-slate-400">
-                      <AlertCircle size={48} className="mb-3 text-slate-300" />
-                      <p className="text-base font-medium text-slate-600">Không có dữ liệu đối soát</p>
-                      <p className="text-sm mt-1">
-                        {viewMode === 'PENDING' ? 'Hiện tại không có khoản tiền nào cần thanh toán cho chủ trọ.' : 'Chưa có lịch sử thanh toán nào.'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </TableShell>
+        </DashboardPanel>
+      )}
 
       {/* DETAIL MODAL */}
       {selectedLandlord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div>
@@ -404,22 +401,18 @@ export default function AdminSettlementPage() {
       )}
 
       {/* Manual Notice - SAME */}
-      <div className="mt-8 p-4 bg-primary-50 border border-primary-100 rounded-2xl flex gap-4">
-         <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm shrink-0">
-            <AlertCircle size={24} />
-         </div>
-         <div>
-            <h4 className="font-bold text-primary text-sm">Hướng dẫn Quyết toán (Payout)</h4>
-            <p className="text-primary text-xs mt-1 leading-relaxed">
-              Hãy bấm vào từng dòng để kiểm tra chi tiết các hóa đơn trước khi chuyển tiền. 
-              Sau khi đã chuyển tiền thật thành công qua App Ngân hàng, hãy bấm nút <b>Xác nhận Payout</b> để hệ thống gạch nợ.
-            </p>
-         </div>
+      <div className="section-card flex gap-4 border-primary/20 bg-primary/[0.04] p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-primary shadow-soft">
+          <AlertCircle size={24} />
+        </div>
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">Hướng dẫn quyết toán (payout)</h4>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Bấm từng dòng để kiểm tra chi tiết hóa đơn trước khi chuyển tiền. Sau khi chuyển khoản thành công qua app ngân hàng, bấm{' '}
+            <span className="font-semibold text-foreground">Xác nhận đã Payout</span> để hệ thống gạch nợ.
+          </p>
+        </div>
       </div>
     </div>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

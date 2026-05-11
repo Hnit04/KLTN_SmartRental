@@ -95,16 +95,16 @@ const CountUpStat = ({ stat }: { stat: typeof stats[0] }) => {
   const suffix = stat.value.replace(/[0-9.,]/g, '');
 
   return (
-    <div className={`group relative rounded-2xl ${stat.bgColor} backdrop-blur-sm p-8 text-center border border-current/10 hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer`}>
-      <div className="flex justify-center mb-4">
-        <div className={`${stat.bgColor.replace('50', '100')} p-3 rounded-xl group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300`}>
-          <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
+    <div className="group relative rounded-2xl bg-card p-8 text-center border border-border/40 hover:shadow-card hover:-translate-y-1 transition-all duration-300 cursor-pointer">
+      <div className="flex justify-center">
+        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${stat.iconBg} transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}>
+          <stat.icon className={`h-7 w-7 stroke-[1.5] ${stat.iconColor}`} />
         </div>
       </div>
-      <div className="text-4xl font-black text-[#8B5E3C] mb-2 group-hover:scale-110 transition-transform duration-300">
+      <div className="text-4xl font-extrabold tracking-tight text-foreground mt-6 mb-2 transition-transform duration-300 group-hover:scale-105">
         {isDecimal ? count.toFixed(1) : count.toLocaleString()}{suffix}
       </div>
-      <div className="text-xs uppercase tracking-widest font-bold text-[#6D5D50]/70">{stat.label}</div>
+      <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">{stat.label}</div>
     </div>
   );
 };
@@ -133,10 +133,10 @@ const features = [
 ];
 
 const stats = [
-  { value: "10,000+", label: "Phòng trọ sẵn sàng", icon: MapPin, color: "blue", bgColor: "bg-blue-50", iconColor: "text-blue-600" },
-  { value: "5,000+", label: "Chủ trọ tin dùng", icon: Building2, color: "green", bgColor: "bg-green-50", iconColor: "text-green-600" },
-  { value: "50,000+", label: "Người thuê đã kết nối", icon: Users, color: "orange", bgColor: "bg-orange-50", iconColor: "text-orange-600" },
-  { value: "4.8/5", label: "Đánh giá hài lòng", icon: Star, color: "gold", bgColor: "bg-yellow-50", iconColor: "text-yellow-600" },
+  { value: "10,000+", label: "Phòng trọ sẵn sàng", icon: MapPin, iconBg: "bg-blue-500/10", iconColor: "text-blue-600" },
+  { value: "5,000+", label: "Chủ trọ tin dùng", icon: Building2, iconBg: "bg-green-500/10", iconColor: "text-green-600" },
+  { value: "50,000+", label: "Người thuê đã kết nối", icon: Users, iconBg: "bg-orange-500/10", iconColor: "text-orange-600" },
+  { value: "4.8/5", label: "Đánh giá hài lòng", icon: Star, iconBg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
 ];
 
 export default function App() {
@@ -155,15 +155,15 @@ export default function App() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row items-center gap-12">
             <div className="max-w-2xl text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#8B5E3C]/10 text-[#8B5E3C] text-sm font-semibold mb-6">
-                <Star className="h-4 w-4 fill-current" />
-                <span>Một trong số các nền tảng thuê phòng số 1 Việt Nam</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 text-primary text-xs uppercase tracking-[0.15em] font-bold mb-6 border border-primary/10 shadow-sm backdrop-blur-sm">
+                <Star className="h-3.5 w-3.5 fill-current" />
+                <span>Nền tảng thuê phòng số 1 Việt Nam</span>
               </div>
-              <h1 className="text-5xl font-extrabold tracking-tight text-[#2D1F15] sm:text-6xl lg:text-7xl leading-[1.1]">
+              <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl leading-[1.15]">
                 Nâng tầm trải nghiệm <br />
-                <span className="text-[#8B5E3C]">thuê phòng trọ</span>
+                <span className="text-primary">thuê phòng trọ</span>
               </h1>
-              <p className="mt-8 text-lg leading-relaxed text-[#6D5D50] max-w-xl mx-auto lg:mx-0">
+              <p className="mt-8 text-lg leading-relaxed text-muted-foreground max-w-xl mx-auto lg:mx-0">
                 Kết nối chủ trọ và người thuê thông qua công nghệ hiện đại.
                 Đơn giản hóa mọi thủ tục giấy tờ, thanh toán minh bạch và an toàn tuyệt đối.
               </p>
@@ -177,7 +177,7 @@ export default function App() {
                   </Link>
                 ) : null}
                 <Link to="/properties">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto bg-white/50 border-border/60 shadow-sm hover:bg-white hover:shadow-md transition-all duration-300">
                     Khám phá phòng trọ
                   </Button>
                 </Link>
@@ -185,28 +185,28 @@ export default function App() {
             </div>
 
             {/* Hero Image / Mockup Decoration */}
-            <div className="relative w-full max-w-lg lg:max-w-none lg:flex-1">
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl border-8 border-white">
+            <div className="relative w-full max-w-lg lg:max-w-none lg:flex-1 group cursor-default">
+              <div className="relative rounded-3xl overflow-hidden shadow-card border-8 border-white/80 transition-transform duration-500 group-hover:scale-[1.01]">
                 <img
                   src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800"
                   alt="Modern Apartment"
                   className="w-full h-[400px] object-cover"
                 />
-                <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-[#EBD9C8]">
+                <div className="absolute bottom-4 left-4 right-4 bg-background/80 backdrop-blur-md p-4 rounded-xl shadow-soft border border-border/40 group-hover:-translate-y-1 transition-all duration-500">
                   <div className="flex items-center gap-3 text-sm font-medium">
-                    <MapPin className="text-[#8B5E3C] h-4 w-4" />
-                    <span>Quận 1, TP. Hồ Chí Minh</span>
-                    <span className="ml-auto text-[#8B5E3C]">Từ 3.5tr/tháng</span>
+                    <MapPin className="text-primary h-4 w-4 stroke-[1.5]" />
+                    <span className="text-foreground">Quận 1, TP. Hồ Chí Minh</span>
+                    <span className="ml-auto text-primary font-bold">Từ 3.5tr/tháng</span>
                   </div>
                 </div>
               </div>
               {/* Floating Badge */}
-              <div className="absolute -top-6 -right-6 bg-white p-4 rounded-2xl shadow-xl hidden sm:block animate-bounce">
+              <div className="absolute -top-6 -right-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-soft border border-border/40 hidden sm:block transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-card">
                 <div className="flex items-center gap-3">
                   <StatusBadge label="Đã xác thực" tone="success" className="text-xs font-bold" />
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Trạng thái</p>
-                    <p className="text-sm font-bold">Phòng đã xác thực</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Trạng thái</p>
+                    <p className="text-sm font-bold text-foreground mt-0.5">Phòng đã xác thực</p>
                   </div>
                 </div>
               </div>
@@ -223,15 +223,15 @@ export default function App() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-background">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center mb-16">
-            <h2 className="text-sm font-bold text-[#8B5E3C] uppercase tracking-[0.2em] mb-4">Giải pháp toàn diện</h2>
-            <h3 className="text-4xl font-bold tracking-tight text-[#2D1F15] sm:text-5xl">
+            <h2 className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-4">Giải pháp toàn diện</h2>
+            <h3 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
               Tại sao chọn SmartRental?
             </h3>
-            <div className="h-1.5 w-24 bg-[#DBC1AC] mx-auto mt-6 rounded-full" />
-            <p className="mt-6 text-lg text-[#6D5D50]">
+            <div className="h-1 w-16 bg-primary/30 mx-auto mt-6 rounded-full" />
+            <p className="mt-6 text-lg text-muted-foreground">
               Chúng tôi không chỉ cung cấp nơi ở, chúng tôi mang lại một phong cách sống tiện nghi và cộng đồng tin cậy.
             </p>
           </div>
@@ -240,13 +240,13 @@ export default function App() {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="group p-8 rounded-3xl border border-[#EBD9C8] bg-[#FDF8F3]/30 transition-all duration-300 hover:bg-white hover:shadow-xl hover:-translate-y-2"
+                className="group p-8 rounded-3xl border border-border/40 bg-card transition-all duration-300 hover:shadow-card hover:-translate-y-2"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#8B5E3C]/10 text-[#8B5E3C] transition-colors group-hover:bg-[#8B5E3C] group-hover:text-white">
-                  <feature.icon className="h-7 w-7" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/5 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <feature.icon className="h-7 w-7 stroke-[1.5]" />
                 </div>
-                <h4 className="mt-6 text-xl font-bold text-[#2D1F15]">{feature.title}</h4>
-                <p className="mt-3 text-sm leading-relaxed text-[#6D5D50]">
+                <h4 className="mt-6 text-xl font-bold text-foreground">{feature.title}</h4>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
               </div>
@@ -299,14 +299,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Footer Branding */}
-      <footer className="py-12 border-t border-[#EBD9C8] text-center">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="h-8 w-8 bg-[#8B5E3C] rounded-lg flex items-center justify-center text-white font-bold">S</div>
-          <span className="text-xl font-bold tracking-tight text-[#2D1F15]">SmartRental</span>
-        </div>
-        <p className="text-[#6D5D50] text-sm">© 2025 SmartRental. Thiết kế bởi sự tinh tế và công nghệ hiện đại.</p>
-      </footer>
+
     </div>
   );
 }

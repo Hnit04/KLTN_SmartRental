@@ -88,8 +88,8 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
   return (
     <>
-      <div className={`group border rounded-2xl overflow-hidden bg-white flex flex-col h-full transition-all hover:shadow-lg hover:border-primary/50 
-        ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
+      <div className={`group border rounded-2xl overflow-hidden bg-white flex flex-col h-full transition-all duration-300 hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5
+        ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-muted/40' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
         <div className="relative h-36 cursor-pointer overflow-hidden bg-gray-100 group/carousel sm:h-44 md:h-48" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}>
@@ -98,7 +98,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               src={images[currImgIndex]} 
               alt={data.name} 
               loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-700 will-change-transform group-hover:scale-105"
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -112,13 +112,13 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
              <>
                <button 
                  onClick={handlePrevImage} 
-                 className="absolute top-1/2 left-2 -translate-y-1/2 w-7 h-7 bg-white/70 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity z-20"
+                 className="absolute top-1/2 left-2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-all duration-200 z-20 hover:scale-110"
                >
                  <ChevronLeft className="h-4 w-4 text-gray-800" />
                </button>
                <button 
                  onClick={handleNextImage} 
-                 className="absolute top-1/2 right-2 -translate-y-1/2 w-7 h-7 bg-white/70 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity z-20"
+                 className="absolute top-1/2 right-2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-all duration-200 z-20 hover:scale-110"
                >
                  <ChevronRight className="h-4 w-4 text-gray-800" />
                </button>
@@ -288,11 +288,11 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
       {/* --- MODAL CHI TIẾT PHÒNG --- */}
       {isDetailOpen && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-in fade-in"
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200"
           onClick={(e) => { e.stopPropagation(); setIsDetailOpen(false); }}
         >
           <div 
-            className="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 relative flex flex-col max-h-[90vh]"
+            className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 relative flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
 
@@ -316,7 +316,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               </p>
 
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="bg-muted/40 p-3 rounded-lg">
                   <span className="text-xs text-gray-500 uppercase font-bold">Diện tích & Không gian</span>
                   <p className="font-semibold text-sm mt-1">{data.area} m²</p>
                   {(data.hasMezzanine || data.hasBalcony || data.type) && (
@@ -328,7 +328,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                   )}
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg flex flex-col justify-center">
+                <div className="bg-muted/40 p-3 rounded-lg flex flex-col justify-center">
                   <span className="text-xs text-gray-500 uppercase font-bold mb-1">Trạng thái</span>
                   <p className={`font-semibold text-sm ${
                     isAvailable ? 'text-green-600' : 

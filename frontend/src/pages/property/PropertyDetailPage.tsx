@@ -409,7 +409,7 @@ export default function PropertyDetailPage() {
                             href={`https://maps.google.com/maps?q=${encodeURIComponent(`${property.address}, ${property.district}, ${property.city}`)}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center justify-center w-full bg-white hover:bg-gray-50 border border-gray-300 font-medium h-9 text-xs rounded-md transition-colors"
+                            className="flex items-center justify-center w-full bg-white hover:bg-muted/40 border border-gray-300 font-medium h-9 text-xs rounded-md transition-colors"
                           >
                             Chỉ đường tới đây
                           </a>
@@ -488,7 +488,7 @@ export default function PropertyDetailPage() {
                       <Button variant="outline" className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 h-11 rounded-xl" onClick={handleZalo}>
                         <MessageSquare className="h-4 w-4" /> Chat qua Zalo
                       </Button>
-                      <Button variant="outline" className="w-full gap-2 border-gray-200 text-gray-600 hover:bg-gray-50 h-11 rounded-xl shadow-sm" onClick={handleAskAI}>
+                      <Button variant="outline" className="w-full gap-2 border-gray-200 text-gray-600 hover:bg-muted/40 h-11 rounded-xl shadow-sm" onClick={handleAskAI}>
                         <Bot className="h-4 w-4" /> Hỏi AI về khu trọ này
                       </Button>
                     </>
@@ -513,7 +513,7 @@ export default function PropertyDetailPage() {
                 <StatusBadge label="Tin đăng đã xác thực" tone="success" className="text-sm font-medium" />
                 <button
                   onClick={() => setShowRoomFilter(!showRoomFilter)}
-                  className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition ${showRoomFilter ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition ${showRoomFilter ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-muted/40'
                     }`}
                 >
                   <SlidersHorizontal className="h-4 w-4" /> Lọc phòng
@@ -533,7 +533,7 @@ export default function PropertyDetailPage() {
                         onClick={() => setRoomStatusFilter(s)}
                         className={`px-3 py-1 rounded-full text-xs font-medium border transition ${roomStatusFilter === s
                             ? 'bg-primary text-white border-primary'
-                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            : 'border-gray-200 text-gray-600 hover:bg-muted/40'
                           }`}
                       >
                         {s === "ALL"
@@ -596,7 +596,7 @@ export default function PropertyDetailPage() {
 
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-dashed">
-                <div className="bg-gray-50 p-4 rounded-full mb-3">
+                <div className="bg-muted/40 p-4 rounded-full mb-3">
                   <ShieldCheck className="h-8 w-8 text-gray-300" />
                 </div>
                 <h3 className="text-gray-900 font-medium">
@@ -624,7 +624,7 @@ export default function PropertyDetailPage() {
               </h2>
 
               {reviews.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-dashed">
+                <div className="text-center py-8 text-gray-500 bg-muted/40 rounded-xl border border-dashed">
                   Chưa có đánh giá nào cho khu trọ này.
                 </div>
               ) : (
@@ -662,7 +662,7 @@ export default function PropertyDetailPage() {
                   {/* DANH SÁCH REVIEW */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {reviews.map((review) => (
-                      <div key={review.id} className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
+                      <div key={review.id} className="bg-muted/40 rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold shrink-0">
@@ -705,7 +705,7 @@ export default function PropertyDetailPage() {
         {isBookingModalOpen && selectedRoom && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-              <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50 p-5 sm:items-center">
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-muted/40 p-5 sm:items-center">
                 <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-900">
                   <CalendarClock className="h-5 w-5 text-primary" />
                   Đặt lịch xem phòng
@@ -755,7 +755,7 @@ export default function PropertyDetailPage() {
                 </div>
               </div>
 
-              <div className="p-5 bg-gray-50 border-t flex justify-end gap-3">
+              <div className="p-5 bg-muted/40 border-t flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsBookingModalOpen(false)}>Hủy</Button>
                 <Button onClick={handleSubmitBooking} disabled={isSubmitting || !meetDate || !meetTime}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -779,7 +779,7 @@ export default function PropertyDetailPage() {
 
       const ServiceItem = ({icon, label, value, unit}: any) => (
       <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-gray-200 hover:shadow-md sm:min-w-[140px] sm:flex-none">
-        <div className="p-2.5 bg-gray-50 rounded-full">{icon}</div>
+        <div className="p-2.5 bg-muted/40 rounded-full">{icon}</div>
         <div>
           <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{label}</p>
           <p className="text-sm font-bold text-gray-900">

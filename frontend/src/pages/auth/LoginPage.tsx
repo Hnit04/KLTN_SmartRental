@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "sonner";
@@ -6,7 +6,7 @@ import { userApi } from "@/api/userApi";
 import { authApi } from "@/api/authApi";
 import { GoogleLogin } from "@react-oauth/google";
 import { motion } from "framer-motion";
-import { User, Lock, Eye, EyeOff, LogIn, AlertTriangle } from "lucide-react";
+import { User, Lock, Eye, EyeOff, LogIn, AlertTriangle, RefreshCw } from "lucide-react";
 import "./auth.css";
 
 const stagger = {
@@ -15,7 +15,7 @@ const stagger = {
 };
 const fadeUp = {
   hidden: { opacity: 0, y: 14 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
 };
 
 export default function LoginPage() {
@@ -31,6 +31,75 @@ export default function LoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [actualCaptcha, setActualCaptcha] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Generate custom captcha
+  const generateCaptcha = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let text = "";
+    for (let i = 0; i < 6; i++) {
+      text += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setActualCaptcha(text);
+    return text;
+  };
+
+  const drawCaptcha = (text: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Nền
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Vẽ các đường nhiễu
+    for (let i = 0; i < 6; i++) {
+      ctx.strokeStyle = `rgba(${Math.random()*200},${Math.random()*200},${Math.random()*200}, 0.5)`;
+      ctx.lineWidth = Math.random() * 2 + 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.stroke();
+    }
+
+    // Vẽ text xoay nghiêng
+    ctx.font = 'bold 24px "Inter", sans-serif';
+    ctx.textBaseline = 'middle';
+    
+    for (let i = 0; i < text.length; i++) {
+      ctx.save();
+      // Random màu tối cho text
+      ctx.fillStyle = `rgb(${Math.random()*100},${Math.random()*100},${Math.random()*100})`;
+      ctx.translate(22 + i * 22, canvas.height / 2 + (Math.random() - 0.5) * 8);
+      ctx.rotate((Math.random() - 0.5) * 0.5); // Xoay text
+      ctx.fillText(text[i], 0, 0);
+      ctx.restore();
+    }
+
+    // Vẽ các chấm nhiễu
+    for (let i = 0; i < 30; i++) {
+      ctx.fillStyle = `rgba(${Math.random()*200},${Math.random()*200},${Math.random()*200}, 0.6)`;
+      ctx.beginPath();
+      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 2, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  };
+
+  const refreshCaptcha = () => {
+    const text = generateCaptcha();
+    drawCaptcha(text);
+    setCaptchaInput("");
+  };
+
+  useEffect(() => {
+    refreshCaptcha();
+  }, []);
 
   // Trạng thái modal thông báo khóa tài khoản
   const [showLockedModal, setShowLockedModal] = useState(false);
@@ -69,6 +138,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (captchaInput.toUpperCase() !== actualCaptcha) {
+      toast.error("Mã xác thực không chính xác. Vui lòng thử lại!");
+      refreshCaptcha();
+      return;
+    }
 
     if (isLoading) return;
     setIsLoading(true);
@@ -244,6 +319,31 @@ export default function LoginPage() {
               </div>
             </motion.div>
 
+            {/* Captcha */}
+            <motion.div variants={fadeUp} style={{ marginBottom: "1rem", marginTop: "1rem" }}>
+              <label htmlFor="captcha" className="auth-label">Mã xác thực</label>
+              <div className="flex items-center gap-3">
+                <div className="auth-input-group flex-1">
+                  <input
+                    id="captcha"
+                    type="text"
+                    placeholder="Nhập mã xác thực"
+                    required
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    className="auth-input-field"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div className="border border-border/60 bg-white rounded-xl overflow-hidden h-[42px] flex items-center justify-between shrink-0 shadow-sm pr-1">
+                  <canvas ref={canvasRef} width="160" height="42" className="cursor-pointer" onClick={refreshCaptcha} title="Bấm vào hình để đổi mã khác" />
+                  <button type="button" onClick={refreshCaptcha} className="p-2 text-muted-foreground hover:text-primary transition-colors h-full flex items-center justify-center bg-gray-50/50 hover:bg-primary/5 rounded-r-lg border-l border-border/40" title="Tải lại mã">
+                    <RefreshCw className="h-4 w-4 stroke-[2]" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+
             {/* Submit */}
             <motion.div variants={fadeUp} style={{ marginTop: "1.5rem" }}>
               <button type="submit" disabled={isLoading} className="auth-submit-btn">
@@ -310,7 +410,7 @@ export default function LoginPage() {
               {lockMessage}
             </div>
 
-            <div className="p-5 border-t bg-gray-50 flex justify-end">
+            <div className="p-5 border-t bg-muted/40 flex justify-end">
               <button
                 onClick={() => setShowLockedModal(false)}
                 style={{

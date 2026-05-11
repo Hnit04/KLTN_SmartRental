@@ -230,7 +230,7 @@ export default function PropertiesPage() {
                   key={filter.key}
                   type="button"
                   onClick={filter.onClear}
-                  className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-foreground hover:bg-secondary/70"
+                  className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-foreground transition-all duration-200 hover:bg-secondary/70 hover:shadow-sm"
                 >
                   {filter.label}
                   <X className="h-3 w-3" />
@@ -381,13 +381,13 @@ export default function PropertiesPage() {
             <div className="flex w-full max-w-full shrink-0 rounded-lg bg-gray-100 p-0.5 sm:w-fit sm:p-1">
               <button 
                 onClick={() => setViewMode("list")} 
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
               >
                 <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Danh sách
               </button>
               <button 
                 onClick={() => setViewMode("map")} 
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "map" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "map" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
               >
                 <MapIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Bản đồ
               </button>
@@ -397,7 +397,7 @@ export default function PropertiesPage() {
         {isLoading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-[280px] animate-pulse overflow-hidden rounded-xl border bg-white shadow-sm sm:h-[300px] md:h-[320px]">
+              <div key={i} className="h-[280px] overflow-hidden rounded-xl border bg-white shadow-sm skeleton-shimmer sm:h-[300px] md:h-[320px]">
                 <div className="h-36 bg-gray-200 sm:h-44 md:h-48" />
                 <div className="p-4 space-y-3">
                   <div className="h-4 bg-gray-200 rounded w-3/4" />

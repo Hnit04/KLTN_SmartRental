@@ -33,7 +33,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
       {/* ─── HEADER SECTION ─── */}
-      <div className="bg-primary/5 border-b py-12">
+      <div className="bg-primary/5 border-b py-12 animate-fade-in-up">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
                 <button
                   key={item.id}
                   onClick={() => scrollToSection(item.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-all duration-200 ${
                     activeSection === item.id 
                       ? 'bg-primary/10 text-primary font-medium' 
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -116,7 +116,7 @@ export default function PrivacyPage() {
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">1. Thông tin chúng tôi thu thập</h2>
               </div>
-              <div className="bg-card border rounded-xl p-6 space-y-4 shadow-sm">
+              <div className="bg-card border rounded-xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow duration-300">
                 <p className="text-muted-foreground">Chúng tôi thu thập các loại thông tin sau để cung cấp dịch vụ:</p>
                 <ul className="grid sm:grid-cols-2 gap-4">
                   <li className="flex items-start gap-3">

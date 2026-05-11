@@ -57,12 +57,13 @@ import { CompareProvider } from "./context/CompareContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import CompareBar from "./components/property/CompareBar";
 import CompareRoomsModal from "./components/property/CompareRoomsModal";
+import PageLoader from "./components/shared/PageLoader";
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
-  if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
+  if (isLoading) return <PageLoader />;
   return isAuthenticated ? <Outlet /> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} />;
 };
 

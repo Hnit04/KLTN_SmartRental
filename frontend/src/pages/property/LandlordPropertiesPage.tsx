@@ -140,7 +140,7 @@ export default function LandlordPropertiesPage() {
           </div>
         ) : (
           <div className="bg-white rounded-3xl p-20 text-center border-2 border-dashed border-gray-200">
-            <div className="bg-gray-50 h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="bg-muted/40 h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-6">
               <Building2 className="h-10 w-10 text-gray-300" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Chưa có bài đăng nào</h3>

@@ -73,7 +73,7 @@ export default function VipPaymentModal({ tier, orderId, qrUrl, amount, addInfo,
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
       <div
         className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}

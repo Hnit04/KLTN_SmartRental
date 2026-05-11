@@ -648,7 +648,7 @@ const ProfilePage = () => {
                     <div className="space-y-2 mt-3">
                       <Label>Ảnh mã QR chuyển khoản</Label>
                       <div className="flex items-center gap-4">
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 flex flex-col items-center justify-center h-24 w-24 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 flex flex-col items-center justify-center h-24 w-24 bg-muted/40 hover:bg-gray-100 transition-colors relative group">
                           {formData.bankQrUrl ? (
                             <img src={formData.bankQrUrl} alt="QR" className="h-full w-full object-contain rounded" />
                           ) : (
@@ -777,7 +777,7 @@ const ProfilePage = () => {
           {isKycModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                <div className="px-6 py-4 border-b flex justify-between items-center bg-muted/40">
                   <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-primary" /> Xác thực danh tính (eKYC)
                   </h3>
@@ -835,7 +835,7 @@ const ProfilePage = () => {
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label>Mặt trước thẻ <span className="text-red-500">*</span></Label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-muted/40 hover:bg-gray-100 transition-colors relative group">
                         {kycPreviews.front ? (
                           <img src={kycPreviews.front} alt="Front" className="h-full w-full object-contain rounded" />
                         ) : (
@@ -850,7 +850,7 @@ const ProfilePage = () => {
 
                     <div className="space-y-2">
                       <Label>Mặt sau thẻ <span className="text-red-500">*</span></Label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-40 bg-muted/40 hover:bg-gray-100 transition-colors relative group">
                         {kycPreviews.back ? (
                           <img src={kycPreviews.back} alt="Back" className="h-full w-full object-contain rounded" />
                         ) : (
@@ -865,7 +865,7 @@ const ProfilePage = () => {
                   </div>
                 </div>
 
-                <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
+                <div className="px-6 py-4 border-t bg-muted/40 flex justify-end gap-3">
                   <Button variant="ghost" onClick={() => setIsKycModalOpen(false)}>Hủy bỏ</Button>
                   <Button onClick={handleSubmitKYC} isLoading={isSaving} className="bg-green-600 hover:bg-green-700">
                     <ShieldCheck className="h-4 w-4 mr-2" /> Gửi hồ sơ xác thực
@@ -879,7 +879,7 @@ const ProfilePage = () => {
           {isHistoryModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 shrink-0">
+                <div className="px-6 py-4 border-b flex justify-between items-center bg-muted/40 shrink-0">
                   <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-primary" /> Lịch sử điểm uy tín
                   </h3>
@@ -952,7 +952,7 @@ const ProfilePage = () => {
                   )}
                 </div>
 
-                <div className="px-6 py-4 border-t bg-gray-50 flex justify-end shrink-0">
+                <div className="px-6 py-4 border-t bg-muted/40 flex justify-end shrink-0">
                   <Button onClick={() => setIsHistoryModalOpen(false)}>Đóng</Button>
                 </div>
               </div>
@@ -1091,7 +1091,7 @@ const ProfilePage = () => {
 
     function ActivityItem({ label, value, icon }: any) { return (
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">
+        <div className="h-8 w-8 rounded-lg bg-muted/40 flex items-center justify-center text-gray-400">
           {React.cloneElement(icon, { size: 16 })}
         </div>
         <div>

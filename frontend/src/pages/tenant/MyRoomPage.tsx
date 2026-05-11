@@ -164,7 +164,7 @@ export default function MyRoomPage() {
       <div className="mx-auto max-w-5xl space-y-6 pb-10">
         <InvitationsList onStatusChange={() => fetchRoomInfo()} />
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-white rounded-3xl border-2 border-dashed border-gray-200 shadow-sm">
-          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+          <div className="w-20 h-20 bg-muted/40 rounded-full flex items-center justify-center mb-6">
             <DoorOpen className="h-10 w-10 text-gray-300" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Bạn chưa có phòng nào</h2>
@@ -341,7 +341,7 @@ export default function MyRoomPage() {
                     </div>
                 ) : (
                     bills.slice(0, 3).map(bill => (
-                        <div key={bill.id} className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <div key={bill.id} className="p-5 flex items-center justify-between hover:bg-muted/40/50 transition-colors">
                             <div className="flex items-center gap-4">
                                 <div className="p-2.5 bg-gray-100 rounded-xl">
                                     <Receipt className="h-5 w-5 text-gray-500" />
@@ -367,7 +367,7 @@ export default function MyRoomPage() {
 
           {/* ────── THÀNH VIÊN CÙNG PHÒNG (NEW) ────── */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-             <div className="p-6 border-b flex items-center justify-between bg-gray-50/30">
+             <div className="p-6 border-b flex items-center justify-between bg-muted/40/30">
                 <h2 className="font-bold text-gray-900 flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" /> Thành viên cùng phòng
                 </h2>
@@ -398,7 +398,7 @@ export default function MyRoomPage() {
 
                 {/* Các thành viên khác */}
                 {members.map(member => (
-                   <div key={member.id} className="p-5 flex items-center justify-between group hover:bg-gray-50 transition-colors">
+                   <div key={member.id} className="p-5 flex items-center justify-between group hover:bg-muted/40 transition-colors">
                       <div className="flex items-center gap-4">
                          {member.avatarUrl ? (
                             <img src={member.avatarUrl} className="w-12 h-12 rounded-full border shadow-sm" alt="" />
@@ -457,7 +457,7 @@ export default function MyRoomPage() {
 
                 {/* Nút thêm thành viên */}
                 {(!contract.maxOccupants || members.length + 1 < contract.maxOccupants) ? (
-                    <div className="p-4 bg-gray-50/50">
+                    <div className="p-4 bg-muted/40/50">
                         <Button 
                             variant="outline" 
                             className="w-full border-dashed border-2 py-8 hover:bg-white hover:border-primary hover:text-primary transition-all group"
@@ -514,7 +514,7 @@ export default function MyRoomPage() {
 
             {/* Điều khoản khác */}
             <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                <div className="p-4 border-b bg-gray-50/50">
+                <div className="p-4 border-b bg-muted/40/50">
                    <p className="text-xs text-gray-500 font-bold uppercase">Điều khoản & Nội quy</p>
                 </div>
                 <div className="p-5">
@@ -534,7 +534,7 @@ export default function MyRoomPage() {
       {isInviteOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               <div 
-                className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" 
+                className="absolute inset-0 bg-gray-900/50 backdrop-blur-md" 
                 onClick={() => !isInviting && setIsInviteOpen(false)}
               />
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -610,7 +610,7 @@ export default function MyRoomPage() {
       {isRemovalOpen && selectedMember && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               <div 
-                className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" 
+                className="absolute inset-0 bg-gray-900/50 backdrop-blur-md" 
                 onClick={() => !isUpdatingResident && setIsRemovalOpen(false)}
               />
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -626,7 +626,7 @@ export default function MyRoomPage() {
                   </div>
 
                   <div className="p-6 space-y-5">
-                      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div className="flex items-center gap-4 p-4 bg-muted/40 rounded-2xl border border-gray-100">
                           <img 
                             src={selectedMember.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedMember.id}`} 
                             className="w-12 h-12 rounded-full border-2 border-white shadow-sm" 

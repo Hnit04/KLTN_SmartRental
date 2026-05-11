@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
@@ -10,11 +10,16 @@ import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
 import { roomApi } from '@/api/roomApi';
 import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import type { Property, Room } from '@/types/index';
 import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
+import { StatusSummaryStrip, AttentionBanner } from '@/components/detail';
+import type { SummaryStripItem } from '@/components/detail';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -505,48 +510,130 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (!property) return <div className="text-center py-20">Không tìm thấy khu trọ.</div>;
+  if (loading) {
+    return (
+      <div className="min-w-0 space-y-6">
+        <Skeleton className="h-4 w-48 rounded-md" />
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-full max-w-md rounded-lg" />
+          <Skeleton className="h-4 w-full max-w-xl rounded-md" />
+        </div>
+        <Skeleton className="h-11 w-full max-w-xs rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-80 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!property) {
+    return (
+      <div className="mx-auto max-w-lg py-16">
+        <EmptyState icon={Building} title="Không tìm thấy khu trọ" description="Kiểm tra đường dẫn hoặc quay lại danh sách." />
+      </div>
+    );
+  }
+
+  const propertyOps = useMemo(() => {
+    const vacant = rooms.filter((r) => r.status === 'AVAILABLE').length;
+    const rented = rooms.filter((r) => r.status === 'RENTED').length;
+    const maintenance = rooms.filter((r) => r.status === 'MAINTENANCE').length;
+    const reserved = rooms.filter((r) => r.status === 'RESERVED').length;
+    const vacantRevenue = rooms
+      .filter((r) => r.status === 'AVAILABLE')
+      .reduce((sum, r) => sum + Number(r.price || 0), 0);
+    const rentedYield = rooms
+      .filter((r) => r.status === 'RENTED')
+      .reduce((sum, r) => sum + Number(r.price || 0), 0);
+    const pendingApproval = rooms.filter((r) => r.approvalStatus === 'PENDING').length;
+
+    const summary: SummaryStripItem[] = [
+      { id: 'rooms', label: 'Tổng phòng', value: rooms.length, subline: 'Trong khu trọ này' },
+      { id: 'vacant', label: 'Đang trống', value: vacant, tone: vacant > 0 ? 'warning' : 'muted', subline: 'Có thể nhận khách' },
+      { id: 'rented', label: 'Đang cho thuê', value: rented, tone: rented > 0 ? 'success' : 'muted', subline: 'Đang sinh doanh thu' },
+      { id: 'maint', label: 'Bảo trì', value: maintenance, tone: maintenance > 0 ? 'warning' : 'muted', subline: 'Không nhận xem phòng' },
+      {
+        id: 'vac-rev',
+        label: 'Tiềm năng thu (trống)',
+        value: vacant ? `${vacantRevenue.toLocaleString('vi-VN')} đ` : '—',
+        subline: 'Tổng giá niêm yết phòng trống',
+        tone: vacant > 0 ? 'default' : 'muted',
+      },
+      {
+        id: 'run',
+        label: 'Doanh thu ước (đang thuê)',
+        value: rented ? `${rentedYield.toLocaleString('vi-VN')} đ/tháng` : '—',
+        subline: 'Theo giá phòng đang cho thuê',
+        tone: rented > 0 ? 'success' : 'muted',
+      },
+    ];
+
+    return { vacant, rented, maintenance, reserved, pendingApproval, vacantRevenue, summary };
+  }, [rooms]);
 
   return (
     <>
-    <div className="min-w-0 space-y-6 overflow-x-hidden">
-      {/* --- HEADER --- */}
-      <div>
-        <Link to="/landlord/properties" className="mb-4 inline-flex items-center text-sm font-medium text-gray-500 transition hover:text-primary">
-          <ArrowLeft className="mr-1 h-4 w-4" /> Về danh sách khu trọ
-        </Link>
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
-            <p className="mt-1 flex min-w-0 items-start gap-1 text-gray-500">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="break-words">{property.address}</span>
-            </p>
-          </div>
-          <Button onClick={handleOpenCreate} className="flex w-full shrink-0 items-center gap-2 md:w-auto">
-            <Plus className="h-4 w-4" /> Thêm phòng mới
-          </Button>
-        </div>
-      </div>
+    <div className="min-w-0 space-y-6 overflow-x-hidden pb-8">
+      <Link
+        to="/landlord/properties"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4 shrink-0" /> Danh sách khu trọ
+      </Link>
 
-      {/* --- DANH SÁCH PHÒNG --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+      <PageHeader
+        title={property.name}
+        description={property.address}
+        actions={
+          <Button type="button" onClick={handleOpenCreate} className="min-h-11 w-full shrink-0 gap-2 md:w-auto">
+            <Plus className="h-4 w-4" /> Thêm phòng
+          </Button>
+        }
+      />
+
+      <StatusSummaryStrip items={propertyOps.summary} />
+
+      {propertyOps.pendingApproval > 0 ? (
+        <AttentionBanner
+          tone="warning"
+          title={`${propertyOps.pendingApproval} phòng chờ duyệt nội dung`}
+          description="Hoàn tất duyệt để hiển thị công khai và nhận lịch xem phòng."
+          icon={AlertTriangle}
+        />
+      ) : null}
+      {propertyOps.maintenance > 0 ? (
+        <AttentionBanner
+          tone="info"
+          title={`${propertyOps.maintenance} phòng đang bảo trì`}
+          description="Khách không thể đặt lịch — hoàn tất bảo trì khi sẵn sàng cho thuê lại."
+          icon={Wrench}
+        />
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {rooms.length === 0 ? (
-          <div className="col-span-full py-16 text-center bg-gray-50 border-2 border-dashed rounded-xl">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có phòng nào</h3>
-            <p className="text-gray-500 mb-4">Khu trọ này hiện đang trống.</p>
-            <Button onClick={handleOpenCreate} variant="outline">Thêm phòng ngay</Button>
+          <div className="col-span-full">
+            <EmptyState
+              icon={Layers}
+              title="Chưa có phòng trong khu trọ"
+              description="Thêm phòng để hiển thị công khai và nhận yêu cầu thuê."
+            />
+            <div className="mt-4 flex justify-center">
+              <Button type="button" onClick={handleOpenCreate} variant="outline" className="min-h-11">
+                Thêm phòng đầu tiên
+              </Button>
+            </div>
           </div>
         ) : (
           rooms.map(room => (
             <div 
               key={room.id} 
-              className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition flex flex-col group cursor-pointer"
+              className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-soft transition-all duration-200 hover:border-primary/20 hover:shadow-card"
               onClick={() => window.location.href = `/landlord/properties/${id}/rooms/${room.id}`}
             >
               {/* Ảnh phòng */}
-              <div className="h-40 bg-gray-200 relative">
+              <div className="relative h-40 bg-muted">
                 {room.images && room.images.length > 0 ? (
                   <img src={room.images[0]} alt="Room" className="w-full h-full object-cover" />
                 ) : (
@@ -560,7 +647,7 @@ export default function PropertyManageDetailPage() {
                   room.status === 'RENTED' ? 'bg-blue-600 text-white' :
                   room.status === 'MAINTENANCE' ? 'bg-orange-500 text-white' :
                   room.status === 'RESERVED' ? 'bg-amber-500 text-white' : 
-                  'bg-gray-500 text-white'
+                  'bg-muted/400 text-white'
                 }`}>
                   {room.status === 'AVAILABLE' && '🟢 Trống'}
                   {room.status === 'RENTED' && room.availableFromDate && `Sắp trống (${new Date(room.availableFromDate).toLocaleDateString('vi-VN')})`}
@@ -736,7 +823,7 @@ export default function PropertyManageDetailPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b flex flex-col bg-gray-50 flex-shrink-0 relative">
+            <div className="px-6 py-4 border-b flex flex-col bg-muted/40 flex-shrink-0 relative">
               <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
               <h2 className="text-xl font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
               
@@ -862,7 +949,7 @@ export default function PropertyManageDetailPage() {
                       <p className="text-xs text-emerald-700">Chọn các tiện ích đã được trang bị sẵn trong phòng.</p>
                     </div>
                     
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <div className="bg-muted/40 p-4 rounded-xl border border-gray-200">
                   <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
                   </label>
@@ -974,7 +1061,7 @@ export default function PropertyManageDetailPage() {
                     {/* Upload Ảnh */}
                     <div className="border-t pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
-                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
+                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-muted/40 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
                     <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
                     <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
                     <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
@@ -1058,7 +1145,7 @@ export default function PropertyManageDetailPage() {
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-between gap-3 flex-shrink-0">
+            <div className="px-6 py-4 border-t bg-muted/40 flex justify-between gap-3 flex-shrink-0">
               {roomStep > 1 ? (
                 <Button type="button" variant="outline" onClick={() => setRoomStep(roomStep - 1)} disabled={isSubmitting}>
                   <ChevronLeft className="h-4 w-4 mr-1" /> Quay lại
@@ -1142,7 +1229,7 @@ export default function PropertyManageDetailPage() {
               
               <p className="text-sm text-gray-600 mb-1">Phòng: <span className="font-semibold">"{pendingMaintenanceAction.roomName}"</span></p>
 
-              <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-100">
+              <p className="text-xs text-gray-500 bg-muted/40 p-3 rounded-lg border border-gray-100">
                 {pendingMaintenanceAction.type === 'start' 
                   ? 'Phòng sẽ không hiển thị cho khách thuê trong thời gian bảo trì.' 
                   : 'Phòng sẽ trở về trạng thái Trống và có thể cho thuê lại.'}
@@ -1218,7 +1305,7 @@ export default function PropertyManageDetailPage() {
                <button onClick={() => setAiContentPreview(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="h-5 w-5" /></button>
             </div>
             
-            <div className="p-6 bg-gray-50 flex-1 overflow-y-auto max-h-[60vh]">
+            <div className="p-6 bg-muted/40 flex-1 overflow-y-auto max-h-[60vh]">
                <div className="bg-white border rounded-xl p-5 shadow-sm text-sm leading-relaxed text-gray-800 whitespace-pre-line relative">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-100/50 flex flex-col items-center pointer-events-none select-none">
                      <Sparkles className="h-24 w-24 mb-2" />

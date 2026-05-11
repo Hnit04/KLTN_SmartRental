@@ -14,8 +14,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useCompare } from "@/context/CompareContext";
 import type { Room } from "@/types/index";
-import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
+import { StatKpiCard } from "@/components/dashboard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Input } from "@/components/ui/Input";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
@@ -326,14 +328,36 @@ export default function RoomDetailPage() {
     return "Đặt lịch xem phòng";
   };
 
-  if (isLoading) return <LoadingSpinner />;
-  if (!room) return (
-    <div className="flex flex-col items-center justify-center py-32 text-gray-500">
-      <XCircle className="h-12 w-12 mb-3 text-gray-300" />
-      <p className="font-medium">Không tìm thấy phòng này.</p>
-      <Link to="/properties" className="mt-4 text-primary text-sm underline">Quay lại tìm kiếm</Link>
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="mx-auto min-h-[50vh] max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+        <Skeleton className="h-4 w-64 rounded-md" />
+        <Skeleton className="h-10 w-full max-w-2xl rounded-xl" />
+        <Skeleton className="h-[45vh] w-full rounded-[20px]" />
+        <div className="grid grid-cols-3 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+  if (!room) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20">
+        <EmptyState
+          icon={XCircle}
+          title="Không tìm thấy phòng"
+          description="Liên kết có thể đã hết hạn hoặc phòng đã được gỡ."
+          action={
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => navigate("/properties")}>
+              Quay lại tìm kiếm
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   // Parse dữ liệu
   let images: string[] = [];
@@ -345,6 +369,16 @@ export default function RoomDetailPage() {
     images = [];
     amenities = [];
   }
+
+  const statusSummary = isMaintenance
+    ? 'Đang bảo trì'
+    : isReserved
+      ? 'Đã đặt cọc'
+      : isAvailable
+        ? 'Đang trống'
+        : room.status === 'RENTED' && room.availableFromDate
+          ? 'Sắp trống'
+          : 'Đang cho thuê';
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background pb-20">
@@ -471,11 +505,35 @@ export default function RoomDetailPage() {
                 </div>
                 
                 {room.propertyName && (
-                  <p className="text-[13px] font-bold text-[#A67C52] uppercase tracking-wide mt-3">
+                  <p className="mt-3 text-[13px] font-bold uppercase tracking-wide text-amber-800/90">
                     {room.propertyName}
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatKpiCard
+                icon={<CalendarClock className="h-5 w-5" />}
+                iconClassName="text-primary"
+                label="Giá thuê"
+                value={room.price != null ? `${Number(room.price).toLocaleString('vi-VN')} đ/tháng` : '—'}
+                description="Giá niêm yết hiện tại"
+              />
+              <StatKpiCard
+                icon={<LayoutTemplate className="h-5 w-5" />}
+                iconClassName="text-emerald-600"
+                label="Diện tích"
+                value={room.area != null ? `${room.area} m²` : '—'}
+                description="Diện tích sử dụng"
+              />
+              <StatKpiCard
+                icon={<Box className="h-5 w-5" />}
+                iconClassName="text-amber-600"
+                label="Trạng thái"
+                value={statusSummary}
+                description="Ảnh hưởng đến đặt lịch và liên hệ"
+              />
             </div>
 
         {/* HERO GALLERY */}
@@ -531,7 +589,7 @@ export default function RoomDetailPage() {
               )}
             </div>
           ) : (
-            <div className="h-[55vh] bg-gray-50 rounded-[20px] flex items-center justify-center text-gray-400 border border-gray-200">
+            <div className="h-[55vh] bg-muted/40 rounded-[20px] flex items-center justify-center text-gray-400 border border-gray-200">
               Chưa có ảnh phòng
             </div>
           )}
@@ -658,7 +716,7 @@ export default function RoomDetailPage() {
                         <div>
                           <p className="font-bold text-gray-900 mb-1 line-clamp-1">{room.propertyName || "Vị trí phòng"}</p>
                           <p className="text-sm text-gray-600 mb-3 line-clamp-2">{(room.propertyAddress || room.address)?.replace(/^,\s*/, '')}</p>
-                          <Button size="sm" variant="outline" className="w-full bg-white hover:bg-gray-50 border-gray-300 font-medium h-9 text-xs" onClick={handleGetDirections}>
+                          <Button size="sm" variant="outline" className="w-full bg-white hover:bg-muted/40 border-gray-300 font-medium h-9 text-xs" onClick={handleGetDirections}>
                             Chỉ đường tới đây
                           </Button>
                         </div>
@@ -672,7 +730,7 @@ export default function RoomDetailPage() {
                         <MapPin className="h-10 w-10 text-red-500 mb-3" />
                         <p className="font-bold text-gray-900 mb-2 line-clamp-2 text-lg">{room.propertyName || "Vị trí phòng"}</p>
                         <p className="text-[15px] text-gray-600 mb-6 line-clamp-2">{(room.propertyAddress || room.address)?.replace(/^,\s*/, '')}</p>
-                        <Button variant="outline" className="w-full h-11 bg-white hover:bg-gray-50 border-gray-200 font-semibold" onClick={handleGetDirections}>
+                        <Button variant="outline" className="w-full h-11 bg-white hover:bg-muted/40 border-gray-200 font-semibold" onClick={handleGetDirections}>
                           Chỉ đường tới đây
                         </Button>
                      </div>
@@ -727,7 +785,7 @@ export default function RoomDetailPage() {
               {room.defaultTerms && (
                 <section id="nội-quy" className="pt-8 border-t">
                   <h2 className="text-lg font-bold text-gray-900 mb-4">Nội quy & Điều khoản</h2>
-                  <div className="text-[15px] text-gray-600 leading-relaxed whitespace-pre-line p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                  <div className="text-[15px] text-gray-600 leading-relaxed whitespace-pre-line p-5 rounded-2xl border border-gray-100 bg-muted/40">
                     {room.defaultTerms}
                   </div>
                 </section>
@@ -779,7 +837,7 @@ export default function RoomDetailPage() {
 
                 <div className="space-y-3">
                   <Button
-                    className="w-full h-12 bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 font-bold rounded-xl text-base shadow-sm"
+                    className="w-full h-12 bg-white text-gray-800 border border-gray-300 hover:bg-muted/40 font-bold rounded-xl text-base shadow-sm"
                     disabled={isReserved || isMaintenance || (!isAvailable && !room.availableFromDate)}
                     onClick={handleBooking}
                   >
@@ -799,7 +857,7 @@ export default function RoomDetailPage() {
 
                   <Button
                     variant="outline"
-                    className="w-full h-12 border-gray-200 text-gray-700 hover:bg-gray-50 font-medium rounded-xl"
+                    className="w-full h-12 border-gray-200 text-gray-700 hover:bg-muted/40 font-medium rounded-xl"
                     onClick={handleAskAI}
                   >
                     <Bot className="h-5 w-5 mr-2 text-[#A67C52]" />
@@ -809,7 +867,7 @@ export default function RoomDetailPage() {
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <Button
                       variant="outline"
-                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isFavorite(room.id) ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100 hover:text-red-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isFavorite(room.id) ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100 hover:text-red-600' : 'text-gray-700 hover:bg-muted/40'}`}
                       onClick={() => {
                         if (!isAuthenticated) {
                           setLoginModalConfig({
@@ -828,7 +886,7 @@ export default function RoomDetailPage() {
 
                     <Button
                       variant="outline"
-                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isInCompare(room.id) ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                      className={`h-11 border-gray-200 font-medium rounded-xl transition-all ${isInCompare(room.id) ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-600' : 'text-gray-700 hover:bg-muted/40'}`}
                       onClick={() => addToCompare(room as any)}
                     >
                       <GitCompareArrows className="h-4 w-4 mr-2" />
@@ -837,7 +895,7 @@ export default function RoomDetailPage() {
 
                     <Button
                       variant="outline"
-                      className="h-11 border-gray-200 font-medium rounded-xl text-gray-700 hover:bg-gray-50 transition-all"
+                      className="h-11 border-gray-200 font-medium rounded-xl text-gray-700 hover:bg-muted/40 transition-all"
                       onClick={handleShare}
                     >
                       <Share2 className="h-4 w-4 mr-2" />
@@ -955,7 +1013,7 @@ export default function RoomDetailPage() {
       {isBookingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-            <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50 p-5 sm:items-center">
+            <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-muted/40 p-5 sm:items-center">
               <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-900">
                 <CalendarClock className="h-5 w-5 shrink-0 text-primary" /> Đặt lịch xem phòng
               </h2>
@@ -997,7 +1055,7 @@ export default function RoomDetailPage() {
                 />
               </div>
             </div>
-            <div className="p-5 bg-gray-50 border-t flex justify-end gap-3">
+            <div className="p-5 bg-muted/40 border-t flex justify-end gap-3">
               <Button variant="outline" onClick={() => setIsBookingOpen(false)}>Hủy</Button>
               <Button 
                 onClick={handleSubmitBooking} 

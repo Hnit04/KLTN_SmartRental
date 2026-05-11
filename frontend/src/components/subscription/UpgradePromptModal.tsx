@@ -49,7 +49,7 @@ export default function UpgradePromptModal({ isOpen, onClose, limitType, current
   const displayProgress = mounted ? progressPercent : 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 transition-all duration-300 animate-in fade-in" onClick={onClose}>
       <div
         className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 fade-in duration-300"
         onClick={e => e.stopPropagation()}

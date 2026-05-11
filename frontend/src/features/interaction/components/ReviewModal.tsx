@@ -79,7 +79,7 @@ export default function ReviewModal({ isOpen, onClose, contractId, roomName, onS
           ></textarea>
         </div>
 
-        <div className="p-4 bg-gray-50 border-t flex gap-3">
+        <div className="p-4 bg-muted/40 border-t flex gap-3">
           <Button variant="outline" className="flex-1 rounded-xl" onClick={onClose}>Hủy</Button>
           <Button 
             className="flex-1 bg-primary text-white hover:bg-primary/90 rounded-xl" 

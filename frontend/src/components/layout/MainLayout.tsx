@@ -14,8 +14,8 @@ const MainLayout = () => {
         <Header />
         
         {/* Main content — thêm pb-16 trên mobile để không bị MobileBottomNav che */}
-        <main className="flex-1 overflow-y-auto pb-20 pt-4 md:pb-6 md:pt-6">
-          <div className="page-shell animate-in fade-in zoom-in-95 duration-300">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto pb-20 pt-4 md:pb-6 md:pt-6">
+          <div className="page-shell motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-400">
             <Outlet /> 
           </div>
         </main>

@@ -18,7 +18,7 @@ export function UserNav() {
   const Trigger = (
     <button
       type="button"
-      className="flex items-center gap-1 rounded-full border border-transparent p-0.5 transition-colors hover:border-gray-200 hover:bg-gray-100 focus:outline-none sm:gap-2 sm:p-1 sm:pr-3"
+      className="flex items-center gap-1 rounded-full border border-transparent p-0.5 transition-all duration-200 hover:border-gray-200 hover:bg-gray-100 hover:shadow-sm focus:outline-none sm:gap-2 sm:p-1 sm:pr-3"
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary/10">
         {user.avatarUrl ? (

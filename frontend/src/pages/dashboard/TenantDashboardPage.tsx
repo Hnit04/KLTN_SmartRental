@@ -13,6 +13,10 @@ import { billApi } from "@/api/billApi";
 import { useAuth } from "@/context/AuthContext";
 import type { Contract, AppointmentResponse, Bill } from "@/types/index";
 import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { StatKpiCard } from "@/components/dashboard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
@@ -39,7 +43,7 @@ const AppointmentStatusBadge = ({ status }: { status: string }) => {
     CANCELLED: { label: "Đã hủy", icon: <XCircle className="h-3 w-3" />, cls: "text-red-600 bg-red-50 border-red-200" },
     COMPLETED: { label: "Hoàn thành", icon: <CheckCircle className="h-3 w-3" />, cls: "text-blue-700 bg-blue-50 border-blue-200" },
   };
-  const { label, icon, cls } = map[status] ?? { label: status, icon: <Clock className="h-3 w-3" />, cls: "text-gray-500 bg-gray-50 border-gray-200" };
+  const { label, icon, cls } = map[status] ?? { label: status, icon: <Clock className="h-3 w-3" />, cls: "text-gray-500 bg-muted/40 border-gray-200" };
   return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 w-fit ${cls}`}>{icon}{label}</span>;
 };
 
@@ -116,101 +120,94 @@ export default function TenantDashboardPage() {
   const unpaidBills = bills.filter(b => b.status === "PENDING" || b.status === "LATE");
   const recentAppts = appointments.slice(0, 3);
 
-  if (isLoading) return (
-    <div className="space-y-6 pb-10">
-      {/* Skeleton Header */}
-      <div className="flex justify-between items-center animate-pulse">
-        <div className="space-y-2">
-          <div className="h-8 w-64 bg-gray-200 rounded" />
-          <div className="h-4 w-48 bg-gray-200 rounded" />
-        </div>
-        <div className="h-10 w-32 bg-gray-200 rounded-md block hidden sm:block" />
-      </div>
-      {/* Skeleton Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-[120px] bg-white rounded-2xl border p-5 shadow-sm animate-pulse">
-            <div className="w-10 h-10 bg-gray-200 rounded-xl mb-3" />
-            <div className="h-3 w-20 bg-gray-200 rounded mb-3" />
-            <div className="h-6 w-16 bg-gray-200 rounded" />
+  if (isLoading) {
+    return (
+      <div className="space-y-8 pb-10">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-56 rounded-lg" />
+            <Skeleton className="h-4 w-72 max-w-full rounded-md" />
           </div>
-        ))}
-      </div>
-      {/* Skeleton Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
-          {[1, 2].map(i => <div key={i} className="h-32 w-full bg-white rounded-2xl border animate-pulse" />)}
+          <Skeleton className="hidden h-10 w-36 rounded-lg sm:block" />
         </div>
-        <div className="space-y-4">
-          <div className="h-6 w-40 bg-gray-200 rounded mb-2 animate-pulse" />
-          {[1, 2, 3].map(i => <div key={i} className="h-20 w-full bg-white rounded-xl border animate-pulse" />)}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-[128px] rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-3 lg:col-span-2">
+            <Skeleton className="h-6 w-40 rounded-md" />
+            <Skeleton className="h-36 w-full rounded-2xl" />
+            <Skeleton className="h-36 w-full rounded-2xl" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-40 rounded-md" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="space-y-6 pb-10">
-
-      {/* ── HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-8 bg-gradient-to-r from-card to-primary/5 border border-border/40 rounded-3xl shadow-soft">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Xin chào, {user?.fullName?.split(" ").pop() || "bạn"} 👋
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            Xin chào, <span className="text-primary">{user?.fullName?.split(" ").pop() || "bạn"}</span> 👋
           </h1>
-          <p className="text-muted-foreground mt-0.5">Quản lý việc thuê phòng của bạn tại đây.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Theo dõi phòng, hợp đồng, lịch hẹn và hóa đơn — tập trung vào việc cần làm tiếp theo.
+          </p>
         </div>
         <Link to="/properties">
-          <Button className="gap-2">
-            <Search className="h-4 w-4" /> Tìm phòng mới
+          <Button className="gap-2 bg-primary/10 text-primary hover:bg-primary hover:text-white shadow-none border border-primary/20 transition-all rounded-xl h-11 px-5">
+            <Search className="h-4 w-4 stroke-[1.5]" /> Tìm phòng mới
           </Button>
         </Link>
       </div>
 
-      {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            icon: <Home className="h-5 w-5 text-blue-600" />,
-            bg: "bg-blue-50",
-            label: "Phòng đang thuê",
-            value: activeContract ? "1 phòng" : "Chưa có",
-            sub: activeContract?.roomName,
-          },
-          {
-            icon: <FileText className="h-5 w-5 text-purple-600" />,
-            bg: "bg-purple-50",
-            label: "Hợp đồng chờ ký",
-            value: pendingContracts.length,
-            sub: pendingContracts.length > 0 ? "Cần ký sớm" : "Không có",
-            alert: pendingContracts.length > 0,
-          },
-          {
-            icon: <CalendarClock className="h-5 w-5 text-orange-600" />,
-            bg: "bg-orange-50",
-            label: "Lịch hẹn sắp tới",
-            value: appointments.filter(a => a.status === "CONFIRMED" || a.status === "APPROVED").length,
-            sub: "Đã được duyệt",
-          },
-          {
-            icon: <Receipt className="h-5 w-5 text-red-600" />,
-            bg: "bg-red-50",
-            label: "Hóa đơn chưa trả",
-            value: unpaidBills.length,
-            sub: unpaidBills.length > 0 ? `${fmt(unpaidBills.reduce((a, b) => a + b.totalAmount, 0))}` : "Đã thanh toán hết",
-            alert: unpaidBills.length > 0,
-          },
-        ].map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-shadow">
-            <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>{s.icon}</div>
-            <p className="text-xs text-gray-500 font-medium">{s.label}</p>
-            <p className={`text-2xl font-extrabold mt-1 ${s.alert ? "text-red-600" : "text-gray-900"}`}>
-              {s.value}
-            </p>
-            {s.sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{s.sub}</p>}
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatKpiCard
+          to={activeContract ? `/tenant/contracts/${activeContract.id}` : "/properties"}
+          icon={<Home className="h-6 w-6 stroke-[1.5]" />}
+          iconClassName="text-sky-600 bg-sky-500/10"
+          label="Phòng đang thuê"
+          value={activeContract ? "1 phòng" : "Chưa có"}
+          description={activeContract?.roomName ? <span className="line-clamp-2">{activeContract.roomName}</span> : "Khám phá phòng phù hợp"}
+        />
+        <StatKpiCard
+          to="/tenant/contracts"
+          icon={<FileText className="h-6 w-6 stroke-[1.5]" />}
+          iconClassName="text-violet-600 bg-violet-500/10"
+          label="Hợp đồng chờ ký"
+          value={pendingContracts.length}
+          description={pendingContracts.length > 0 ? "Cần ký sớm" : "Không có"}
+          className={pendingContracts.length > 0 ? "border-amber-300/50 ring-1 ring-amber-200/40" : ""}
+        />
+        <StatKpiCard
+          to="/tenant/appointments"
+          icon={<CalendarClock className="h-6 w-6 stroke-[1.5]" />}
+          iconClassName="text-amber-600 bg-amber-500/10"
+          label="Lịch hẹn đã duyệt"
+          value={appointments.filter((a) => a.status === "CONFIRMED" || a.status === "APPROVED").length}
+          description="Lịch xem phòng đã được chấp nhận"
+        />
+        <StatKpiCard
+          to="/tenant/my-room"
+          icon={<Receipt className="h-6 w-6 stroke-[1.5]" />}
+          iconClassName={unpaidBills.length > 0 ? "text-red-600 bg-red-500/10" : "text-emerald-600 bg-emerald-500/10"}
+          label="Hóa đơn chưa trả"
+          value={unpaidBills.length}
+          description={
+            unpaidBills.length > 0
+              ? fmt(unpaidBills.reduce((a, b) => a + b.totalAmount, 0))
+              : "Đã thanh toán hết"
+          }
+          className={unpaidBills.length > 0 ? "border-red-200/80" : ""}
+        />
       </div>
 
       {/* ── PHÒNG HIỆN TẠI CỦA TÔI ── */}
@@ -236,7 +233,7 @@ export default function TenantDashboardPage() {
                 <h3 className="text-xl font-extrabold text-gray-900">
                   {activeContract.roomName || `Phòng #${activeContract.roomId}`}
                 </h3>
-                <StatusBadge label="Dang thue" tone="success" />
+                <StatusBadge label="Đang thuê" tone="success" />
               </div>
               {activeContract.propertyAddress && (
                 <p className="text-sm text-gray-500 flex items-center gap-1.5">
@@ -314,12 +311,18 @@ export default function TenantDashboardPage() {
           </div>
 
           {contracts.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed p-10 text-center">
-              <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600 font-medium">Bạn chưa có hợp đồng nào</p>
-              <p className="text-sm text-gray-400 mt-1">Tìm phòng và đặt lịch xem để bắt đầu nhé!</p>
-              <Link to="/properties"><Button className="mt-4 gap-2"><Search className="h-4 w-4" />Tìm phòng ngay</Button></Link>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="Bạn chưa có hợp đồng nào"
+              description="Tìm phòng và đặt lịch xem để bắt đầu — chúng tôi giữ mọi thứ gọn ở đây."
+              action={
+                <Link to="/properties">
+                  <Button className="gap-2 shadow-soft">
+                    <Search className="h-4 w-4" /> Tìm phòng ngay
+                  </Button>
+                </Link>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {contracts.slice(0, 4).map(c => (
@@ -375,7 +378,7 @@ export default function TenantDashboardPage() {
               </div>
               <div className="bg-white rounded-2xl border overflow-hidden shadow-sm">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-muted/40 border-b">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Tháng</th>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Phòng</th>
@@ -385,7 +388,7 @@ export default function TenantDashboardPage() {
                   </thead>
                   <tbody className="divide-y">
                     {bills.slice(0, 5).map(b => (
-                      <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={b.id} className="hover:bg-muted/40 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-700">T{b.month}/{b.year}</td>
                         <td className="px-4 py-3 text-gray-500 truncate max-w-[120px]">{b.roomName}</td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(b.totalAmount)}</td>
@@ -451,7 +454,7 @@ export default function TenantDashboardPage() {
               { to: "/tenant/appointments", icon: <CalendarClock className="h-4 w-4" />, label: "Lịch hẹn xem phòng" },
             ].map(item => (
               <Link key={item.to} to={item.to}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-all text-gray-600 hover:text-primary hover:shadow-sm hover:border-gray-100 border border-transparent active:scale-[0.98] group">
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 transition-all text-gray-600 hover:text-primary hover:shadow-sm hover:border-gray-100 border border-transparent active:scale-[0.98] group">
                 <span className="text-gray-400 group-hover:text-primary group-hover:scale-110 transition-all">{item.icon}</span>
                 <span className="text-sm font-medium">{item.label}</span>
                 <ChevronRight className="h-4 w-4 ml-auto text-gray-300 group-hover:text-primary group-hover:translate-x-1 transition-all" />

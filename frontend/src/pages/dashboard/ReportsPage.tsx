@@ -213,7 +213,7 @@ export default function ReportsPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold">
+            <thead className="bg-muted/40 text-gray-500 uppercase text-xs font-bold">
               <tr>
                 <th className="px-6 py-4">Khu trọ</th>
                 <th className="px-6 py-4 text-center">Tổng phòng</th>
@@ -224,7 +224,7 @@ export default function ReportsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
                 {data?.propertyDetails?.map((item: any) => (
-                  <tr key={item.name} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => item.propertyId && navigate(`/landlord/properties/${item.propertyId}`)}>
+                  <tr key={item.name} className="hover:bg-muted/40 transition-colors cursor-pointer" onClick={() => item.propertyId && navigate(`/landlord/properties/${item.propertyId}`)}>
                      <td className="px-6 py-4 font-bold text-gray-900">{item.name}</td>
                      <td className="px-6 py-4 text-center text-gray-600">{item.totalRooms}</td>
                      <td className="px-6 py-4 text-right font-bold text-primary">{item.revenue?.toLocaleString()}đ</td>

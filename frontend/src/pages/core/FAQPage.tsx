@@ -102,7 +102,7 @@ export default function FAQPage() {
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
       {/* ─── HERO SECTION ─── */}
-      <div className="bg-primary/5 py-16 border-b">
+      <div className="bg-primary/5 py-16 border-b animate-fade-in-up">
         <div className="container mx-auto max-w-4xl px-4 text-center">
           <h1 className="text-4xl font-bold text-primary tracking-tight mb-4">
             Câu hỏi thường gặp
@@ -112,7 +112,7 @@ export default function FAQPage() {
           </p>
           
           {/* Search Bar */}
-          <div className="relative max-w-xl mx-auto shadow-sm">
+          <div className="relative max-w-xl mx-auto shadow-sm hover:shadow-md transition-shadow duration-200">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input 
               placeholder="Nhập từ khóa (ví dụ: thanh toán, hợp đồng...)" 
@@ -178,8 +178,8 @@ export default function FAQPage() {
                     </div>
                   </div>
                   <div className={cn(
-                    "ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted transition-colors",
-                    openIndex === index && "bg-primary text-primary-foreground"
+                    "ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted transition-all duration-300",
+                    openIndex === index && "bg-primary text-primary-foreground rotate-180"
                   )}>
                     {openIndex === index ? (
                       <Minus className="h-4 w-4" />

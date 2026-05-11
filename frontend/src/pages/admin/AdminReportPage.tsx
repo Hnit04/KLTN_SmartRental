@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { reportApi, type RoomReportResponse } from '@/api/reportApi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { toast } from 'sonner';
 import {
   Loader2, Flag, CheckCircle, ShieldAlert, ShieldCheck, X, Eye,
@@ -117,66 +121,64 @@ export default function AdminReportPage() {
 
   const pendingCount = reports.filter(r => r.status === 'PENDING').length;
 
+  const reportFilterItems: SegmentItem[] = [
+    {
+      id: 'PENDING',
+      label: 'Chờ xử lý',
+      badge:
+        pendingCount > 0 ? (
+          <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground tabular-nums">
+            {pendingCount}
+          </span>
+        ) : undefined,
+    },
+    { id: 'RESOLVED_VIOLATING', label: 'Vi phạm' },
+    { id: 'RESOLVED_CLEAN', label: 'Phòng sạch' },
+    { id: 'all', label: 'Tất cả' },
+  ];
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="mx-auto max-w-[1100px] space-y-6 pb-10">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64 rounded-lg" />
+          <Skeleton className="h-4 w-full max-w-xl rounded-md" />
+        </div>
+        <Skeleton className="h-12 w-full max-w-2xl rounded-xl" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-36 w-full rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Flag className="h-8 w-8 text-red-500" />
-          Quản lý Báo cáo
-        </h1>
-        <p className="text-gray-500 mt-2">
-          Xem xét và xử lý các báo cáo vi phạm từ người thuê. Tổng cộng có <strong className="text-red-600">{pendingCount}</strong> báo cáo đang chờ xử lý.
-        </p>
-      </div>
+    <div className="mx-auto min-w-0 max-w-[1100px] space-y-6 pb-10">
+      <PageHeader
+        title="Quản lý báo cáo"
+        description={`Ưu tiên xử lý báo cáo chờ duyệt. Hiện có ${pendingCount} báo cáo cần hành động.`}
+      />
 
-      {/* Filter Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
-        {([
-          { key: 'PENDING', label: 'Chờ xử lý', icon: <Clock className="h-4 w-4" /> },
-          { key: 'RESOLVED_VIOLATING', label: 'Vi phạm', icon: <ShieldAlert className="h-4 w-4" /> },
-          { key: 'RESOLVED_CLEAN', label: 'Phòng sạch', icon: <ShieldCheck className="h-4 w-4" /> },
-          { key: 'all', label: 'Tất cả', icon: <Flag className="h-4 w-4" /> },
-        ] as { key: FilterType; label: string; icon: JSX.Element }[]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setFilter(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              filter === tab.key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {tab.key === 'PENDING' && pendingCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        aria-label="Lọc trạng thái báo cáo"
+        items={reportFilterItems}
+        value={filter}
+        onChange={(id) => setFilter(id as FilterType)}
+      />
 
-      {/* Report List */}
       {filteredReports.length === 0 ? (
-        <Card className="p-12 text-center bg-gray-50 border-dashed border-2">
-          <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-medium text-gray-600">
-            {filter === 'PENDING' ? 'Không có báo cáo nào đang chờ xử lý.' : 'Không có báo cáo nào.'}
-          </h3>
-        </Card>
+        <EmptyState
+          icon={filter === 'PENDING' ? Clock : CheckCircle}
+          title={filter === 'PENDING' ? 'Không có báo cáo chờ xử lý' : 'Không có báo cáo trong bộ lọc này'}
+          description="Đổi tab hoặc chờ báo cáo mới qua WebSocket."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredReports.map(report => (
-            <Card key={report.id} className={`p-5 flex flex-col md:flex-row gap-4 items-start ${
-              report.status === 'PENDING' ? 'border-yellow-300 border-l-4' : ''
+            <Card key={report.id} className={`flex flex-col gap-4 border-border/80 p-5 shadow-soft transition-all duration-200 hover:border-primary/20 hover:shadow-card md:flex-row md:items-start ${
+              report.status === 'PENDING' ? 'border-l-4 border-l-amber-500' : ''
             }`}>
               {/* Main Info */}
               <div className="flex-1 min-w-0">
@@ -265,7 +267,7 @@ export default function AdminReportPage() {
 
       {/* Detail Modal */}
       {selectedReport && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 md:p-8 animate-in fade-in">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b shrink-0 bg-red-50/50">
@@ -289,7 +291,7 @@ export default function AdminReportPage() {
               </div>
 
               {/* Room & Reporter Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/40 p-4 rounded-xl border">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Phòng bị báo cáo</p>
                   <p className="font-bold text-gray-900">Phòng {selectedReport.roomName}</p>
@@ -370,7 +372,7 @@ export default function AdminReportPage() {
 
             {/* Modal Footer */}
             {selectedReport.status === 'PENDING' && (
-              <div className="p-5 border-t bg-gray-50 shrink-0 flex items-center justify-between gap-4">
+              <div className="p-5 border-t bg-muted/40 shrink-0 flex items-center justify-between gap-4">
                 <div className="text-xs text-gray-500 italic max-w-[200px]">
                   Xem kỹ bằng chứng trước khi quyết định.
                 </div>

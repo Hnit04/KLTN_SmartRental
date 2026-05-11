@@ -2,12 +2,19 @@ import { useEffect, useState, useMemo } from 'react';
 import { aiApi } from '@/api/aiApi';
 import { toast } from 'sonner';
 import {
-  Brain, Sparkles, Search, RefreshCw, Trash2, Loader2,
-  CheckCircle2, XCircle, Database, MessageSquareText, Code2,
-  BarChart3, TrendingUp, Zap, Shield, Copy, ChevronDown, ChevronUp,
+  Brain, Search, RefreshCw, Trash2, Loader2,
+  CheckCircle2, XCircle, MessageSquareText, Code2,
+  TrendingUp, Zap, Shield, Copy, ChevronDown, ChevronUp,
   Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatKpiCard } from '@/components/dashboard';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { DashboardPanel } from '@/components/dashboard';
 import StatusBadge from '@/components/shared/StatusBadge';
 
 interface CacheEntry {
@@ -195,21 +202,40 @@ export default function AiAnalyticsPage() {
     return Math.max(...Object.values(data.categories), 1);
   }, [data]);
 
+  const aiFilterItems: SegmentItem[] = [
+    { id: 'all', label: 'Tất cả' },
+    { id: 'valid', label: 'Đúng' },
+    { id: 'invalid', label: 'Sai / cần sửa' },
+  ];
+
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-violet-500 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">Đang tải dữ liệu AI Analytics...</p>
+      <div className="mx-auto max-w-[1400px] space-y-6 pb-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-80 rounded-lg" />
+            <Skeleton className="h-4 w-full max-w-lg rounded-md" />
+          </div>
+          <Skeleton className="h-10 w-40 rounded-lg" />
         </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+        <Skeleton className="h-96 w-full rounded-2xl" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Không có dữ liệu</p>
+      <div className="mx-auto max-w-[1400px] pb-10">
+        <EmptyState icon={Brain} title="Không có dữ liệu AI" description="Thử làm mới trang hoặc kiểm tra kết nối API." />
       </div>
     );
   }
@@ -217,135 +243,140 @@ export default function AiAnalyticsPage() {
   const cacheHitRate = data.totalQueries > 0 ? Math.round((data.validQueries / data.totalQueries) * 100) : 0;
 
   return (
-    <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden px-3 pb-10 sm:px-6">
-      {/* === HEADER === */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Brain className="h-7 w-7 text-primary" />
-            AI Analytics & NLP Monitoring
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Thống kê hệ thống ngôn ngữ tự nhiên (NLP) — Human-in-the-loop</p>
-        </div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-          <Button variant="outline" onClick={handleClearCache} disabled={clearing} className="min-w-0 flex-1 gap-2 border-red-200 text-red-600 hover:bg-red-50 sm:flex-none">
-            {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Xoá toàn bộ Cache
-          </Button>
-          <Button variant="outline" onClick={fetchData} className="min-w-0 flex-1 gap-2 sm:flex-none">
-            <RefreshCw className="h-4 w-4" /> Làm mới
-          </Button>
-        </div>
+    <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden pb-10">
+      <PageHeader
+        title="AI analytics & NLP"
+        description="Theo dõi cache tri thức, chất lượng SQL và human-in-the-loop — ưu tiên mục invalid để giảm rủi ro truy vấn."
+        actions={
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={handleClearCache}
+              disabled={clearing}
+              className="min-h-11 min-w-0 flex-1 gap-2 border-destructive/30 text-destructive hover:bg-destructive/5 sm:flex-none"
+            >
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Xoá toàn bộ cache
+            </Button>
+            <Button variant="outline" onClick={fetchData} className="min-h-11 min-w-0 flex-1 gap-2 sm:flex-none">
+              <RefreshCw className="h-4 w-4" /> Làm mới
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatKpiCard
+          icon={<MessageSquareText className="h-5 w-5" />}
+          iconClassName="text-violet-600"
+          label="Tổng câu hỏi đã học"
+          value={data.totalQueries}
+          description="Số mục trong kho tri thức"
+        />
+        <StatKpiCard
+          icon={<Zap className="h-5 w-5" />}
+          iconClassName="text-emerald-600"
+          label="Trả lời đúng (valid)"
+          value={data.validQueries}
+          description={`${cacheHitRate}% so với tổng truy vấn`}
+        />
+        <StatKpiCard
+          icon={<Shield className="h-5 w-5" />}
+          iconClassName="text-destructive"
+          label="Cần chú ý (invalid)"
+          value={data.invalidQueries}
+          description="SQL không hợp lệ hoặc chưa an toàn"
+        />
+        <StatKpiCard
+          icon={<TrendingUp className="h-5 w-5" />}
+          iconClassName="text-primary"
+          label="Semantic hit (ước lượng)"
+          value={`${cacheHitRate}%`}
+          description="Giảm gọi LLM khi khớp embedding"
+        />
       </div>
 
-      {/* === METRICS === */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={<MessageSquareText className="h-5 w-5 text-primary" />} label="Tổng câu hỏi đã học" value={data.totalQueries} color="violet" />
-        <MetricCard icon={<Zap className="h-5 w-5 text-primary" />} label="Trả lời đúng (Valid)" value={data.validQueries} color="emerald" sub={`${cacheHitRate}% chính xác`} />
-        <MetricCard icon={<Shield className="h-5 w-5 text-primary" />} label="Cần chú ý (Invalid)" value={data.invalidQueries} color="red" sub="AI sinh sai lệnh SQL" />
-        <MetricCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Tỉ lệ Semantic Hit" value={`${cacheHitRate}%`} color="blue" sub="Đỡ tốn Token LLM" />
-      </div>
-
-      {/* === CATEGORIES CHART + QUICK STATS === */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border shadow-sm p-5">
-          <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
-            <BarChart3 className="h-5 w-5 text-violet-600" />
-            Phân loại câu hỏi theo chủ đề chính
-          </h3>
-          <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DashboardPanel title="Phân loại theo chủ đề" description="Tần suất câu hỏi theo nhóm nghiệp vụ — dùng để cân bằng dữ liệu huấn luyện.">
+          <div className="space-y-3 p-4 sm:p-5">
             {Object.entries(data.categories).map(([name, count]) => {
               const Icon = CATEGORY_ICONS[name] || HelpCircle;
-              const barColor = CATEGORY_COLORS[name] || 'bg-gray-400';
+              const barColor = CATEGORY_COLORS[name] || 'bg-muted-foreground/40';
               const pct = maxCategory > 0 ? (count / maxCategory) * 100 : 0;
               return (
                 <div key={name} className="flex items-center gap-3">
-                  <div className="w-36 flex items-center gap-1.5 text-sm text-gray-600 shrink-0 truncate" title={name}>
-                    <Icon className="h-4 w-4 text-gray-500 shrink-0" />
+                  <div className="flex w-36 shrink-0 items-center gap-1.5 truncate text-sm text-muted-foreground" title={name}>
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                     {name}
                   </div>
-                  <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
                     <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${Math.max(pct, count > 0 ? 2 : 0)}%` }} />
                   </div>
-                  <span className="text-sm font-bold text-gray-700 w-8 text-right shrink-0">{count}</span>
+                  <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">{count}</span>
                 </div>
               );
             })}
           </div>
-        </div>
+        </DashboardPanel>
 
-        <div className="bg-white rounded-xl border shadow-sm p-5 flex flex-col justify-between">
-          <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
-            <Sparkles className="h-5 w-5 text-violet-600" />
-            Kiến trúc AI Pipeline & System Specs
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between px-3 py-2 bg-violet-50 rounded-lg">
-              <span className="text-sm font-medium text-violet-800">Large Language Model</span>
-              <span className="text-sm font-bold text-violet-900">Google Gemini 2.5 Flash</span>
+        <DashboardPanel title="Kiến trúc pipeline" description="Tham chiếu nhanh mô hình và ngưỡng an toàn — không thay đổi cấu hình tại đây.">
+          <div className="space-y-2 p-4 sm:p-5">
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+              <span className="text-sm font-medium text-foreground">Large language model</span>
+              <span className="text-xs font-semibold text-muted-foreground sm:text-sm">Gemini 2.5 Flash</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-lg">
-              <span className="text-sm font-medium text-blue-800">Embedding Model</span>
-              <span className="text-sm font-bold text-blue-900">all-MiniLM-L6-v2</span>
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+              <span className="text-sm font-medium text-foreground">Embedding</span>
+              <span className="text-xs font-semibold text-muted-foreground sm:text-sm">all-MiniLM-L6-v2</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-lg">
-              <span className="text-sm font-medium text-emerald-800">Semantic Threshold</span>
-              <span className="text-sm font-bold text-emerald-900">≥ 85% Cosine Similarity</span>
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-emerald-500/10 px-3 py-2">
+              <span className="text-sm font-medium text-emerald-900">Semantic threshold</span>
+              <span className="text-xs font-semibold text-emerald-800 sm:text-sm">≥ 85% cosine</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-lg">
-              <span className="text-sm font-medium text-red-800">SQL Validator</span>
-              <span className="text-sm font-bold text-red-900">5-layer Role Security Gate</span>
+            <div className="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2">
+              <span className="text-sm font-medium text-destructive">SQL validator</span>
+              <span className="text-xs font-semibold text-destructive/90 sm:text-sm">5-layer role gate</span>
             </div>
           </div>
-        </div>
+        </DashboardPanel>
       </div>
 
-      {/* === QUERY TABLE === */}
-      <div className="bg-white rounded-xl border shadow-sm flex flex-col">
-        {/* Table Toolbar */}
-        <div className="p-4 border-b flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
-              <Database className="h-5 w-5 text-violet-600" />
-              Kho tri thức AI ({data.entries.length} câu)
-            </h3>
-            
-            {/* STATUS FILTERS */}
-            <div className="flex bg-gray-100 p-1 rounded-lg">
-              <button 
-                onClick={() => { setFilterStatus('all'); setCurrentPage(1); }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterStatus === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Tất cả
-              </button>
-              <button 
-                onClick={() => { setFilterStatus('valid'); setCurrentPage(1); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterStatus === 'valid' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" /> Đúng
-              </button>
-              <button 
-                onClick={() => { setFilterStatus('invalid'); setCurrentPage(1); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterStatus === 'invalid' ? 'bg-red-50 text-red-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <XCircle className="h-3.5 w-3.5" /> Sai (Cần sửa)
-              </button>
+      <DashboardPanel
+        title={`Kho tri thức AI (${data.entries.length} mục)`}
+        description="Mở rộng từng dòng để xem SQL; ưu tiên xử lý các mục invalid."
+        action={
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <SegmentedControl
+              aria-label="Lọc trạng thái cache"
+              items={aiFilterItems}
+              value={filterStatus}
+              onChange={(id) => {
+                setFilterStatus(id as 'all' | 'valid' | 'invalid');
+                setCurrentPage(1);
+              }}
+            />
+            <div className="relative w-full min-w-0 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Tìm câu hỏi hoặc SQL…"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9"
+              />
             </div>
           </div>
-
-          <div className="relative w-full lg:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input type="text" placeholder="Tìm câu hỏi, lệnh SQL..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-violet-300 outline-none transition-shadow" />
-          </div>
-        </div>
-
-        {/* Table Content */}
-        <div className="divide-y min-h-[400px]">
+        }
+      >
+        <div className="min-h-[320px] divide-y divide-border/60 sm:min-h-[400px]">
           {paginatedEntries.length === 0 ? (
-            <div className="text-center py-20 text-gray-400">
-              <Brain className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Không tìm thấy dữ liệu phù hợp</p>
-            </div>
+            <EmptyState
+              icon={Brain}
+              title="Không có mục phù hợp"
+              description="Đổi bộ lọc hoặc từ khóa tìm kiếm."
+            />
           ) : (
             paginatedEntries.map(entry => {
               const isExpanded = expandedId === entry.id;
@@ -454,51 +485,27 @@ export default function AiAnalyticsPage() {
           )}
         </div>
 
-        {/* PAGINATION */}
         {totalPages > 1 && (
-          <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              Hiển thị <span className="font-semibold text-gray-900">{paginatedEntries.length}</span> trên <span className="font-semibold text-gray-900">{filteredEntries.length}</span> mục
+          <div className="flex flex-col gap-3 border-t border-border/60 bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Hiển thị{' '}
+              <span className="font-semibold tabular-nums text-foreground">{paginatedEntries.length}</span> trên{' '}
+              <span className="font-semibold tabular-nums text-foreground">{filteredEntries.length}</span> mục
             </p>
-            <div className="flex gap-1">
-              <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+            <div className="flex flex-wrap gap-1">
+              <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
                 Trang trước
               </Button>
-              <div className="flex items-center justify-center px-4 font-semibold text-sm text-gray-700 min-w-[3rem]">
+              <div className="flex min-w-[3rem] items-center justify-center px-3 text-sm font-semibold tabular-nums text-foreground">
                 {currentPage} / {totalPages}
               </div>
-              <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+              <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
                 Trang sau
               </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// --- Metric Card Component ---
-function MetricCard({ icon, label, value, color, sub }: {
-  icon: React.ReactNode; label: string; value: string | number; color: string; sub?: string;
-}) {
-  const iconBg: Record<string, string> = {
-    violet: 'bg-violet-100 text-violet-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600 border border-red-200',
-    blue: 'bg-blue-100 text-blue-600',
-  };
-
-  return (
-    <div className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div className={`p-2.5 rounded-lg ${iconBg[color] || 'bg-gray-100 text-gray-600'}`}>{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-500 font-medium truncate">{label}</p>
-        <p className={`text-xl sm:text-2xl font-bold truncate ${color === 'red' && typeof value === 'number' && value > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-          {value}
-        </p>
-        {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{sub}</p>}
-      </div>
+      </DashboardPanel>
     </div>
   );
 }

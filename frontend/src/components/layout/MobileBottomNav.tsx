@@ -28,7 +28,7 @@ export default function MobileBottomNav() {
   }));
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div className="flex items-stretch h-16">
         {navItems.map((item) => {
           const isActive =
@@ -39,7 +39,7 @@ export default function MobileBottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                "relative flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-semibold transition-colors active:scale-95",
+                "relative flex flex-col items-center justify-center flex-1 gap-0.5 min-h-[48px] text-[10px] font-semibold transition-all duration-200 active:scale-95",
                 isActive
                   ? "text-primary"
                   : "text-gray-400 hover:text-gray-700"
@@ -54,7 +54,7 @@ export default function MobileBottomNav() {
               />
               <span>{item.label}</span>
               {isActive && (
-                <span className="absolute bottom-0 w-8 h-0.5 bg-primary rounded-full" />
+                <span className="absolute bottom-0 w-8 h-0.5 bg-primary rounded-full transition-all duration-300" />
               )}
             </Link>
           );

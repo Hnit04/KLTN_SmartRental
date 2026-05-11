@@ -24,17 +24,30 @@ const Sidebar = () => {
   const menuItems = [...ROLE_NAV_ITEMS[normalizedRole], ...bottomItems];
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white text-gray-900 transition-transform hidden md:flex flex-col">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[1px_0_0_0_hsl(var(--sidebar-border)/0.5)] transition-transform md:flex">
       {/* Logo Area */}
-      <div className="flex h-16 items-center border-b px-6">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl text-primary hover:opacity-80 transition-opacity" title="Về trang chủ">
-          <Home className="h-6 w-6" />
+      <div className="flex shrink-0 flex-col gap-2 border-b border-sidebar-border px-4 py-3">
+        <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-primary transition-opacity hover:opacity-85" title="Về trang chủ">
+          <Home className="h-5 w-5 shrink-0" />
           <span>SmartRental</span>
         </Link>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              normalizedRole === 'ADMIN'
+                ? 'border-violet-300/60 bg-violet-500/10 text-violet-900'
+                : normalizedRole === 'LANDLORD'
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-sky-300/60 bg-sky-500/10 text-sky-900'
+            }`}
+          >
+            {normalizedRole === 'ADMIN' ? 'Quản trị' : normalizedRole === 'LANDLORD' ? 'Chủ trọ' : 'Người thuê'}
+          </span>
+        </div>
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+      <div className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-4">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
@@ -42,13 +55,13 @@ const Sidebar = () => {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "bg-primary/10 text-primary font-bold shadow-sm"
+                  : "text-sidebar-foreground/70 hover:bg-muted/50 hover:text-foreground hover:translate-x-1"
               )}
             >
-              <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-gray-500")} />
+              <item.icon className={cn("h-5 w-5 shrink-0 transition-colors duration-200 stroke-[1.5]", isActive ? "text-primary" : "text-sidebar-foreground/50")} />
               {item.title}
             </Link>
           );
@@ -56,12 +69,12 @@ const Sidebar = () => {
       </div>
 
       {/* Bottom Area (Logout) */}
-      <div className="border-t p-4 bg-gray-50/50">
+      <div className="shrink-0 border-t border-sidebar-border bg-muted/25 p-3">
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-destructive transition-all duration-300 hover:bg-destructive/10 hover:translate-x-1 group"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-5 w-5 stroke-[1.5]" />
           Đăng xuất
         </button>
       </div>

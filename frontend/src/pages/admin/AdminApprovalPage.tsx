@@ -1,6 +1,10 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { propertyApi } from '@/api/propertyApi';
 import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
 import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
@@ -121,41 +125,41 @@ export default function AdminApprovalPage() {
   const AiScoreBadge = ({ score, reason }: { score?: number | null; reason?: string | null }) => {
     const s = score || 0;
     return (
-      <div className={`mt-4 p-3 rounded-lg border ${
-        s < 50 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'
+      <div className={`mt-4 rounded-lg border p-3 ${
+        s < 50 ? 'border-red-200 bg-red-50/90' : 'border-border/60 bg-muted/30'
       }`}>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Kiểm duyệt AI</span>
-          <span className={`text-sm font-bold ${
-            s >= 80 ? 'text-green-600' : s >= 50 ? 'text-yellow-600' : 'text-red-600'
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kiểm duyệt AI</span>
+          <span className={`text-sm font-bold tabular-nums ${
+            s >= 80 ? 'text-emerald-600' : s >= 50 ? 'text-amber-600' : 'text-red-600'
           }`}>
             {s}/100
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {s >= 80 ? (
             <div className="flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3 text-green-700" />
-              <StatusBadge label="Do an toan cao" tone="success" className="text-[11px]" />
+              <ShieldCheck className="h-3 w-3 text-emerald-700" />
+              <StatusBadge label="Độ an toàn cao" tone="success" className="text-[11px]" />
             </div>
           ) : s >= 50 ? (
             <div className="flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 text-amber-700" />
-              <StatusBadge label="Can xem ky noi dung" tone="warning" className="text-[11px]" />
+              <StatusBadge label="Cần xem kỹ nội dung" tone="warning" className="text-[11px]" />
             </div>
           ) : (
             <div className="flex items-center gap-1">
               <ShieldAlert className="h-3 w-3 text-red-700" />
-              <StatusBadge label="Nguy co vi pham cao" tone="danger" className="text-[11px]" />
+              <StatusBadge label="Nguy cơ vi phạm cao" tone="danger" className="text-[11px]" />
             </div>
           )}
-          <span className="text-[10px] text-gray-400 italic font-normal">
-            Dựa trên phân tích tự động từ AI
+          <span className="text-[10px] font-normal italic text-muted-foreground">
+            Phân tích tự động từ AI
           </span>
         </div>
         {reason && (
-          <div className="mt-2 text-xs text-gray-600 bg-white border border-gray-100 p-2 rounded">
-            <span className="font-semibold text-gray-700">Lý do chấm điểm:</span> {reason}
+          <div className="mt-2 rounded border border-border/60 bg-card p-2 text-xs text-foreground/90">
+            <span className="font-semibold text-foreground">Lý do chấm điểm:</span> {reason}
           </div>
         )}
       </div>
@@ -191,63 +195,79 @@ export default function AdminApprovalPage() {
     </div>
   );
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64 rounded-lg" />
+          <Skeleton className="h-4 w-full max-w-xl rounded-md" />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Skeleton className="h-11 w-full rounded-xl sm:w-80" />
+          <Skeleton className="h-11 w-40 rounded-lg" />
+        </div>
+        <div className="grid gap-4">
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  const approvalTabs: SegmentItem[] = [
+    {
+      id: 'properties',
+      label: (
+        <span className="flex items-center gap-2">
+          <Building className="h-4 w-4 shrink-0" />
+          Khu trọ
+        </span>
+      ),
+      badge:
+        pendingProperties.length > 0 ? (
+          <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">{pendingProperties.length}</span>
+        ) : undefined,
+    },
+    {
+      id: 'rooms',
+      label: (
+        <span className="flex items-center gap-2">
+          <DoorOpen className="h-4 w-4 shrink-0" />
+          Phòng trọ
+        </span>
+      ),
+      badge:
+        pendingRooms.length > 0 ? (
+          <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">{pendingRooms.length}</span>
+        ) : undefined,
+    },
+  ];
 
   return (
-    <div className="container mx-auto min-w-0 max-w-full overflow-x-hidden px-3 py-8 sm:px-4">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Duyệt tin đăng</h1>
-        <p className="mt-2 text-gray-500">Duyệt các khu trọ và phòng trọ mới đăng hoặc vừa cập nhật thông tin.</p>
-      </div>
+    <div className="min-w-0 space-y-6 overflow-x-hidden pb-10">
+      <PageHeader
+        title="Duyệt tin đăng"
+        description="Kiểm tra khu trọ và phòng mới hoặc vừa cập nhật — ưu tiên bản ghi AI score thấp khi cần."
+      />
 
-      {/* TABS */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex w-full gap-1 rounded-lg bg-gray-100 p-1 sm:w-auto">
-          <button
-            onClick={() => setActiveTab('properties')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'properties' 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Building className="h-4 w-4" />
-            Khu trọ
-            {pendingProperties.length > 0 && activeTab !== 'properties' && (
-              <StatusBadge label={`${pendingProperties.length}`} tone="warning" className="text-[10px] font-bold" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('rooms')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'rooms' 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <DoorOpen className="h-4 w-4" />
-            Phòng trọ
-            {pendingRooms.length > 0 && activeTab !== 'rooms' && (
-              <StatusBadge label={`${pendingRooms.length}`} tone="warning" className="text-[10px] font-bold" />
-            )}
-          </button>
-        </div>
-
-        {/* SORT DROPDOWN */}
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-          <ArrowUpDown className="h-4 w-4 text-gray-400" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <SegmentedControl
+          aria-label="Loại tin cần duyệt"
+          items={approvalTabs}
+          value={activeTab}
+          onChange={(id) => setActiveTab(id as TabType)}
+        />
+        <div className="relative flex w-full min-w-0 items-center gap-2 sm:w-72">
+          <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortType)}
-            className="text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white focus:ring-2 focus:ring-primary outline-none"
+            className="select-native w-full pl-9"
+            aria-label="Sắp xếp danh sách"
           >
             <option value="newest">Mới nhất</option>
-            <option value="score_asc">AI Score: Thấp → Cao (Ưu tiên)</option>
-            <option value="score_desc">AI Score: Cao → Thấp</option>
+            <option value="score_asc">AI score: thấp → cao (ưu tiên)</option>
+            <option value="score_desc">AI score: cao → thấp</option>
           </select>
         </div>
       </div>
@@ -256,21 +276,22 @@ export default function AdminApprovalPage() {
       {activeTab === 'properties' && (
         <>
           {pendingProperties.length === 0 ? (
-            <Card className="p-12 text-center bg-gray-50 border-dashed border-2">
-              <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-600">Tuyệt vời! Không có khu trọ nào đang chờ duyệt.</h3>
-            </Card>
+            <EmptyState
+              icon={CheckCircle}
+              title="Không có khu trọ chờ duyệt"
+              description="Hàng đợi kiểm duyệt đang trống — bạn có thể quay lại sau khi có tin mới."
+            />
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {sortItems(pendingProperties).map((p) => (
-                <Card key={p.id} className={`p-6 overflow-hidden flex flex-col md:flex-row gap-6 ${
-                  (p.safetyScore || 0) < 50 ? 'border-red-300 border-2 bg-red-50/30' : ''
+                <Card key={p.id} className={`flex flex-col gap-6 overflow-hidden p-6 shadow-soft transition-shadow hover:shadow-card md:flex-row ${
+                  (p.safetyScore || 0) < 50 ? 'border-2 border-destructive/40 bg-destructive/[0.04]' : 'border-border/80'
                 }`}>
-                  <div className="w-full md:w-64 h-40 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+                  <div className="h-40 w-full shrink-0 overflow-hidden rounded-lg bg-muted md:w-64">
                     {p.images && p.images.length > 0 ? (
                       <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                         <Building className="h-12 w-12" />
                       </div>
                     )}
@@ -279,12 +300,12 @@ export default function AdminApprovalPage() {
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">{p.name}</h2>
-                        <p className="flex items-center text-gray-500 text-sm mt-1">
-                          <MapPin className="h-4 w-4 mr-1" /> {p.address}, {p.district}, {p.city}
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">{p.name}</h2>
+                        <p className="mt-1 flex items-center text-sm text-muted-foreground">
+                          <MapPin className="mr-1 h-4 w-4 shrink-0" /> {p.address}, {p.district}, {p.city}
                         </p>
-                        <p className="mt-2 text-gray-600 text-sm line-clamp-2">{p.description}</p>
-                        <div className="mt-4 flex gap-4 text-xs font-medium text-gray-500">
+                        <p className="mt-2 line-clamp-2 text-sm text-foreground/85">{p.description}</p>
+                        <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-muted-foreground">
                            <span>Điện: {p.elecPrice?.toLocaleString()}đ</span>
                            <span>Nước: {p.waterPrice?.toLocaleString()}đ</span>
                            <span>Internet: {p.internetPrice?.toLocaleString()}đ</span>
@@ -307,21 +328,22 @@ export default function AdminApprovalPage() {
       {activeTab === 'rooms' && (
         <>
           {pendingRooms.length === 0 ? (
-            <Card className="p-12 text-center bg-gray-50 border-dashed border-2">
-              <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-600">Tuyệt vời! Không có phòng nào đang chờ duyệt.</h3>
-            </Card>
+            <EmptyState
+              icon={CheckCircle}
+              title="Không có phòng chờ duyệt"
+              description="Mọi phòng đã qua kiểm duyệt hoặc chưa có tin mới."
+            />
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {sortItems(pendingRooms).map((r) => (
-                <Card key={r.id} className={`p-6 overflow-hidden flex flex-col md:flex-row gap-6 ${
-                  (r.safetyScore || 0) < 50 ? 'border-red-300 border-2 bg-red-50/30' : ''
+                <Card key={r.id} className={`flex flex-col gap-6 overflow-hidden p-6 shadow-soft transition-shadow hover:shadow-card md:flex-row ${
+                  (r.safetyScore || 0) < 50 ? 'border-2 border-destructive/40 bg-destructive/[0.04]' : 'border-border/80'
                 }`}>
-                  <div className="w-full md:w-64 h-40 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+                  <div className="h-40 w-full shrink-0 overflow-hidden rounded-lg bg-muted md:w-64">
                     {r.images && r.images.length > 0 ? (
                       <img src={r.images[0]} alt={r.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                         <Home className="h-12 w-12" />
                       </div>
                     )}
@@ -330,22 +352,22 @@ export default function AdminApprovalPage() {
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">Phòng {r.name}</h2>
-                        <p className="text-gray-500 text-sm mt-1">
-                          Khu trọ: <span className="font-medium text-gray-700">{r.propertyName || 'N/A'}</span>
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">Phòng {r.name}</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Khu trọ: <span className="font-medium text-foreground">{r.propertyName || 'N/A'}</span>
                         </p>
                         {r.propertyAddress && (
-                          <p className="flex items-center text-gray-400 text-xs mt-0.5">
-                            <MapPin className="h-3 w-3 mr-1" /> {r.propertyAddress}
+                          <p className="mt-0.5 flex items-center text-xs text-muted-foreground">
+                            <MapPin className="mr-1 h-3 w-3 shrink-0" /> {r.propertyAddress}
                           </p>
                         )}
                         <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                          <span className="text-primary font-bold">{r.price?.toLocaleString()}đ/tháng</span>
-                          <span className="text-gray-500">{r.area}m²</span>
-                          <span className="text-gray-500">{r.type || 'STUDIO'}</span>
+                          <span className="font-bold text-primary">{r.price?.toLocaleString()}đ/tháng</span>
+                          <span className="text-muted-foreground">{r.area}m²</span>
+                          <span className="text-muted-foreground">{r.type || 'STUDIO'}</span>
                         </div>
                         {r.amenities && r.amenities.length > 0 && (
-                          <p className="text-xs text-gray-500 mt-2 line-clamp-1">
+                          <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
                             Tiện ích: {r.amenities.join(', ')}
                           </p>
                         )}
@@ -373,10 +395,10 @@ export default function AdminApprovalPage() {
 
       {/* DETAIL MODAL */}
       {detailModalTarget && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 md:p-8 animate-in fade-in">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b shrink-0 bg-gray-50/50">
+            <div className="flex items-center justify-between p-4 border-b shrink-0 bg-muted/40/50">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 {detailModalTarget.type === 'property' ? <Building className="h-6 w-6 text-primary" /> : <Home className="h-6 w-6 text-primary" />}
                 Chi tiết {detailModalTarget.type === 'property' ? 'khu trọ' : 'phòng'}: {detailModalTarget.data.name}
@@ -413,7 +435,7 @@ export default function AdminApprovalPage() {
               )}
 
               {/* Thông tin */}
-              <div className="bg-gray-50 p-4 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-muted/40 p-4 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-4">
                 {detailModalTarget.type === 'property' ? (
                   <>
                     <div>
@@ -465,7 +487,7 @@ export default function AdminApprovalPage() {
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 border-t bg-gray-50 shrink-0 flex items-center justify-between gap-4">
+            <div className="p-4 border-t bg-muted/40 shrink-0 flex items-center justify-between gap-4">
               <div className="text-xs text-gray-500 italic">
                 Xem kỹ thông tin và kết quả AI trước khi duyệt.
               </div>
@@ -503,7 +525,7 @@ export default function AdminApprovalPage() {
 
       {/* REJECT DIALOG */}
       {rejectTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">

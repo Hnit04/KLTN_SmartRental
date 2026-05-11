@@ -245,6 +245,16 @@ public class PropertyService {
         res.setPanoramaImages(JsonUtil.convertJsonToList(r.getPanoramaImages()));
         if (r.getProperty() != null) {
             res.setPropertyName(r.getProperty().getName());
+            res.setPropertyId(r.getProperty().getId());
+            String fullAddress = r.getProperty().getAddress() + ", " + r.getProperty().getDistrict() + ", "
+                    + r.getProperty().getCity();
+            res.setPropertyAddress(fullAddress);
+            res.setElecPrice(r.getProperty().getElecPrice());
+            res.setWaterPrice(r.getProperty().getWaterPrice());
+            res.setInternetPrice(r.getProperty().getInternetPrice());
+            if (r.getProperty().getLandlord() != null) {
+                res.setLandlordName(r.getProperty().getLandlord().getFullName());
+            }
         }
         return res;
     }

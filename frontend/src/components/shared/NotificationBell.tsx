@@ -250,7 +250,7 @@ export default function NotificationBell() {
       {/* ── CHUÔNG ── */}
       <button
         onClick={() => { setIsOpen(o => !o); if (!isOpen) fetchFull(); }}
-        className="relative p-2 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+        className="relative p-2 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-full transition-all duration-200"
         aria-label="Thông báo"
       >
         <Bell
@@ -345,7 +345,7 @@ export default function NotificationBell() {
                     {grouped[dateKey].map(noti => (
                       <li
                         key={noti.id}
-                        className={`group relative flex cursor-pointer gap-3 px-4 py-4 transition-colors hover:bg-stone-50/90 ${
+                        className={`group relative flex cursor-pointer gap-3 px-4 py-4 transition-all duration-150 hover:bg-stone-50/90 ${
                           !noti.isRead
                             ? 'bg-amber-50/50 pl-3 before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-primary'
                             : ''
@@ -376,7 +376,7 @@ export default function NotificationBell() {
                           {!noti.isRead && <span className="block h-2 w-2 rounded-full bg-primary shadow-sm ring-2 ring-primary/20" />}
                           <button
                             type="button"
-                            className="rounded-lg p-1.5 text-stone-400 transition-all hover:bg-red-50 hover:text-red-600 sm:text-stone-300 sm:opacity-0 sm:group-hover:opacity-100 sm:group-hover:text-stone-300"
+                            className="rounded-lg p-1.5 text-stone-400 transition-all duration-200 hover:bg-red-50 hover:text-red-600 sm:text-stone-300 sm:opacity-0 sm:group-hover:opacity-100 sm:group-hover:text-stone-300"
                             onClick={e => handleDelete(e, noti.id)}
                             title="Xoá thông báo"
                           >
