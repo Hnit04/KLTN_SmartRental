@@ -130,6 +130,7 @@ export default function PropertyManageDetailPage() {
   // --- STATE AI GỢI Ý GIÁ ---
   const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
   const [priceSuggestion, setPriceSuggestion] = useState<{suggestion: string, reason: string} | null>(null);
+  const [appliedSuggestion, setAppliedSuggestion] = useState<{suggestion: string, reason: string} | null>(null);
 
   useEffect(() => {
     if (id) fetchData();
@@ -380,6 +381,7 @@ export default function PropertyManageDetailPage() {
     const matches = priceSuggestion.suggestion.replace(/\./g, '').match(/\d+/);
     if (matches) {
       setFormData({ ...formData, price: matches[0] });
+      setAppliedSuggestion(priceSuggestion); // Lưu lại để hiển thị sau khi áp dụng
       setPriceSuggestion(null);
       toast.success('Đã áp dụng mức giá gợi ý!');
     }
@@ -422,6 +424,8 @@ export default function PropertyManageDetailPage() {
     setPreviewUrls([]);
     setPanoSelectedFiles([]);
     setPanoPreviewUrls([]);
+    setPriceSuggestion(null);
+    setAppliedSuggestion(null);
     setRoomStep(1);
     setShowModal(true);
   };
@@ -514,6 +518,8 @@ export default function PropertyManageDetailPage() {
     setPreviewUrls([]);
     setPanoSelectedFiles([]);
     setPanoPreviewUrls([]);
+    setPriceSuggestion(null);
+    setAppliedSuggestion(null);
     setRoomStep(1);
     setShowModal(true);
   };
@@ -1088,102 +1094,116 @@ export default function PropertyManageDetailPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên phòng (VD: 101) *</label>
-                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diện tích (m²) *</label>
-                    <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
-                      <span>Giá thuê (VND) *</span>
-                      <button 
-                        type="button"
-                        onClick={handleSuggestPrice}
-                        disabled={isSuggestingPrice}
-                        className="text-[10px] flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded hover:bg-purple-100 transition-colors border border-purple-100"
-                      >
-                        {isSuggestingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                        Gợi ý giá AI
-                      </button>
-                    </label>
-                    <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
-                    
-                    {priceSuggestion && (
-                      <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border border-purple-200 rounded-lg shadow-lg p-3 animate-in fade-in slide-in-from-top-1">
-                        <p className="text-xs font-bold text-purple-900 mb-1 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" /> Khoảng giá gợi ý: {priceSuggestion.suggestion}
-                        </p>
-                        <p className="text-[10px] text-gray-600 mb-2 leading-relaxed">{priceSuggestion.reason}</p>
-                        <div className="flex gap-2">
-                          <button 
-                            type="button"
-                            onClick={applyPriceSuggestion}
-                            className="text-[10px] bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 transition-colors"
-                          >
-                            Áp dụng
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setPriceSuggestion(null)}
-                            className="text-[10px] text-gray-500 hover:text-gray-700"
-                          >
-                            Bỏ qua
-                          </button>
-                        </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tên phòng (VD: 101) *</label>
+                        <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Diện tích (m²) *</label>
+                        <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                      </div>
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
+                          <span>Giá thuê (VND) *</span>
+                          <button 
+                            type="button"
+                            onClick={handleSuggestPrice}
+                            disabled={isSuggestingPrice}
+                            className="text-[10px] flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded hover:bg-purple-100 transition-colors border border-purple-100"
+                          >
+                            {isSuggestingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                            Gợi ý giá AI
+                          </button>
+                        </label>
+                        <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                        
+                        {/* MODAL GỢI Ý ĐANG CHỌN */}
+                        {priceSuggestion && (
+                          <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-purple-200 rounded-lg shadow-xl p-3 animate-in fade-in slide-in-from-top-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="text-xs font-bold text-purple-900 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" /> AI Đề xuất
+                              </p>
+                              <button onClick={() => setPriceSuggestion(null)} className="text-gray-400 hover:text-gray-600"><X className="h-3 w-3" /></button>
+                            </div>
+                            <p className="text-sm font-black text-purple-700 mb-1">{priceSuggestion.suggestion} <span className="text-[10px] font-normal text-gray-400">VND/tháng</span></p>
+                            <p className="text-[10px] text-gray-600 mb-3 leading-relaxed bg-purple-50 p-2 rounded-md italic">"{priceSuggestion.reason}"</p>
+                            <div className="flex gap-2">
+                              <Button 
+                                type="button"
+                                size="sm"
+                                onClick={applyPriceSuggestion}
+                                className="h-7 text-[10px] bg-purple-600 hover:bg-purple-700 w-full"
+                              >
+                                Áp dụng ngay
+                              </Button>
+                            </div>
+                          </div>
+                        )}
 
-                {/* Số người tối đa */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-gray-500" /> Số người tối đa
-                  </label>
-                  <input type="number" min="1" value={formData.maxOccupants} onChange={e => setFormData({...formData, maxOccupants: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3" />
-                </div>
+                        {/* HIỂN THỊ LẠI GỢI Ý ĐÃ ÁP DỤNG (DƯỚI Ô INPUT) */}
+                        {appliedSuggestion && !priceSuggestion && (
+                          <div className="mt-1.5 p-2 bg-purple-50 border border-purple-100 rounded-md animate-in fade-in">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full uppercase tracking-tighter">
+                                <Sparkles className="h-2.5 w-2.5" /> AI Recommended
+                              </div>
+                              <span className="text-[10px] font-bold text-purple-800">{appliedSuggestion.suggestion}</span>
+                            </div>
+                            <p className="text-[9px] text-purple-600/80 leading-tight italic">
+                              "{appliedSuggestion.reason}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                {/* Loại phòng + Không gian */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                      <Layers className="h-3.5 w-3.5 text-gray-500" /> Loại phòng
-                    </label>
-                    <select
-                      value={formData.type}
-                      onChange={e => setFormData({...formData, type: e.target.value as RoomType})}
-                      className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none bg-white"
-                    >
-                      {(Object.keys(ROOM_TYPE_LABELS) as RoomType[]).map(key => (
-                        <option key={key} value={key}>{ROOM_TYPE_LABELS[key]}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-end">
-                    <label className="flex items-center gap-2.5 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 hover:bg-amber-100 transition w-full">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasMezzanine}
-                        onChange={e => setFormData({...formData, hasMezzanine: e.target.checked})}
-                        className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 h-4 w-4 cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-amber-800">Có gác lửng</span>
-                    </label>
-                  </div>
-                  <div className="flex items-end">
-                    <label className="flex items-center gap-2.5 cursor-pointer bg-sky-50 border border-sky-200 rounded-lg px-4 py-2.5 hover:bg-sky-100 transition w-full">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasBalcony}
-                        onChange={e => setFormData({...formData, hasBalcony: e.target.checked})}
-                        className="rounded border-gray-300 text-sky-600 focus:ring-sky-500 h-4 w-4 cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-sky-800">Có ban công</span>
-                    </label>
-                  </div>
+                    {/* Số người tối đa */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5 text-gray-500" /> Số người tối đa
+                      </label>
+                      <input type="number" min="1" value={formData.maxOccupants} onChange={e => setFormData({...formData, maxOccupants: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3" />
+                    </div>
+
+                    {/* Loại phòng + Không gian */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                          <Layers className="h-3.5 w-3.5 text-gray-500" /> Loại phòng
+                        </label>
+                        <select
+                          value={formData.type}
+                          onChange={e => setFormData({...formData, type: e.target.value as RoomType})}
+                          className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none bg-white"
+                        >
+                          {(Object.keys(ROOM_TYPE_LABELS) as RoomType[]).map(key => (
+                            <option key={key} value={key}>{ROOM_TYPE_LABELS[key]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2.5 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 hover:bg-amber-100 transition w-full">
+                          <input
+                            type="checkbox"
+                            checked={formData.hasMezzanine}
+                            onChange={e => setFormData({...formData, hasMezzanine: e.target.checked})}
+                            className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 h-4 w-4 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium text-amber-800">Có gác lửng</span>
+                        </label>
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2.5 cursor-pointer bg-sky-50 border border-sky-200 rounded-lg px-4 py-2.5 hover:bg-sky-100 transition w-full">
+                          <input
+                            type="checkbox"
+                            checked={formData.hasBalcony}
+                            onChange={e => setFormData({...formData, hasBalcony: e.target.checked})}
+                            className="rounded border-gray-300 text-sky-600 focus:ring-sky-500 h-4 w-4 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium text-sky-800">Có ban công</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1197,35 +1217,35 @@ export default function PropertyManageDetailPage() {
                     </div>
                     
                     <div className="bg-muted/40 p-4 rounded-xl border border-gray-200">
-                  <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
-                  </label>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
-                    {COMMON_AMENITIES.map((amenity) => (
-                      <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-                          checked={formData.amenities.includes(amenity)}
-                          onChange={() => handleToggleAmenity(amenity)}
-                        />
-                        <span className="text-sm text-gray-700 group-hover:text-primary transition-colors">{amenity}</span>
+                      <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
                       </label>
-                    ))}
-                  </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                        {COMMON_AMENITIES.map((amenity) => (
+                          <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                              checked={formData.amenities.includes(amenity)}
+                              onChange={() => handleToggleAmenity(amenity)}
+                            />
+                            <span className="text-sm text-gray-700 group-hover:text-primary transition-colors">{amenity}</span>
+                          </label>
+                        ))}
+                      </div>
 
-                  <div className="pt-3 border-t border-gray-200">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Tiện ích khác (Ngăn cách bằng dấu phẩy)</label>
-                    <input 
-                      type="text" 
-                      placeholder="VD: Cửa sổ lớn, Máy nước nóng lạnh, Lò vi sóng..." 
-                      value={formData.customAmenitiesInput} 
-                      onChange={e => setFormData({...formData, customAmenitiesInput: e.target.value})} 
-                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-primary outline-none text-sm bg-white" 
-                    />
-                  </div>
-                  </div>
+                      <div className="pt-3 border-t border-gray-200">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Tiện ích khác (Ngăn cách bằng dấu phẩy)</label>
+                        <input 
+                          type="text" 
+                          placeholder="VD: Cửa sổ lớn, Máy nước nóng lạnh, Lò vi sóng..." 
+                          value={formData.customAmenitiesInput} 
+                          onChange={e => setFormData({...formData, customAmenitiesInput: e.target.value})} 
+                          className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-primary outline-none text-sm bg-white" 
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1233,72 +1253,72 @@ export default function PropertyManageDetailPage() {
                 {roomStep === 3 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-right-4">
                     {/* AI Mô tả */}
-                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col">
-                    <div className="flex justify-between items-end mb-2 border-b border-purple-100 pb-2">
-                      <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Copilot Viết Mô Tả</label>
-                    </div>
-                    
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-purple-800 font-medium">Giọng văn:</span>
-                      <select 
-                        value={aiTone} 
-                        onChange={e => setAiTone(e.target.value as any)}
-                        className="text-xs border border-purple-200 rounded px-2 py-1 bg-white outline-none text-purple-900 focus:ring-1 focus:ring-purple-400"
-                      >
-                         <option value="SEO">🔥 Tiêu chuẩn (Chuẩn SEO)</option>
-                         <option value="GENZ">🎓 Sinh viên (Gần gũi, GenZ)</option>
-                         <option value="PRO">💼 Chuyên nghiệp (Dành cho Căn hộ)</option>
-                      </select>
+                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col">
+                      <div className="flex justify-between items-end mb-2 border-b border-purple-100 pb-2">
+                        <label className="block text-sm font-bold text-purple-900 flex items-center gap-1"><Sparkles className="h-4 w-4" /> Copilot Viết Mô Tả</label>
+                      </div>
                       
-                      <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="ml-auto bg-purple-600 hover:bg-purple-700 text-white shadow-sm h-7 px-2.5 text-xs rounded-md">
-                        {isGeneratingAI ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
-                        Tạo nội dung ngay
-                      </Button>
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-purple-800 font-medium">Giọng văn:</span>
+                        <select 
+                          value={aiTone} 
+                          onChange={e => setAiTone(e.target.value as any)}
+                          className="text-xs border border-purple-200 rounded px-2 py-1 bg-white outline-none text-purple-900 focus:ring-1 focus:ring-purple-400"
+                        >
+                          <option value="SEO">🔥 Tiêu chuẩn (Chuẩn SEO)</option>
+                          <option value="GENZ">🎓 Sinh viên (Gần gũi, GenZ)</option>
+                          <option value="PRO">💼 Chuyên nghiệp (Dành cho Căn hộ)</option>
+                        </select>
+                        
+                        <Button type="button" size="sm" onClick={handleGenerateAI} disabled={isGeneratingAI} className="ml-auto bg-purple-600 hover:bg-purple-700 text-white shadow-sm h-7 px-2.5 text-xs rounded-md">
+                          {isGeneratingAI ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                          Tạo nội dung ngay
+                        </Button>
+                      </div>
+
+                      <textarea rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none text-sm leading-relaxed" placeholder="Bạn có thể tự nhập mô tả hoặc sử dụng AI để tạo tự động..." />
+                      <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">💡 Copilot sẽ quét Tên phòng, Giá, Diện tích và Tiện ích để tự động viết bài quảng cáo thay bạn.</p>
                     </div>
 
-                    <textarea rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full flex-1 border-purple-200 p-3 rounded-md focus:ring-2 focus:ring-purple-400 outline-none bg-white resize-none text-sm leading-relaxed" placeholder="Bạn có thể tự nhập mô tả hoặc sử dụng AI để tạo tự động..." />
-                    <p className="text-[11px] text-purple-700 mt-2 opacity-80 italic">💡 Copilot sẽ quét Tên phòng, Giá, Diện tích và Tiện ích để tự động viết bài quảng cáo thay bạn.</p>
-                  </div>
+                    {/* Điều khoản & Nội quy mẫu */}
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+                      <div className="flex justify-between items-end mb-2">
+                        <label className="block text-sm font-bold text-blue-900 flex items-center gap-1">
+                          <ScrollText className="h-4 w-4" /> Điều khoản & Nội quy mẫu
+                        </label>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
+                          const isAdded = formData.defaultTerms.includes(term);
+                          return (
+                            <span
+                              key={idx}
+                              onClick={() => !isAdded && handleAddTerm(term)}
+                              className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
+                                isAdded 
+                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                  : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
+                              }`}
+                            >
+                              <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
+                                {isAdded ? '✓' : '+'}
+                              </span> 
+                              {term.substring(0, 30)}...
+                            </span>
+                          );
+                        })}
+                      </div>
 
-                  {/* Điều khoản & Nội quy mẫu */}
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
-                    <div className="flex justify-between items-end mb-2">
-                      <label className="block text-sm font-bold text-blue-900 flex items-center gap-1">
-                        <ScrollText className="h-4 w-4" /> Điều khoản & Nội quy mẫu
-                      </label>
+                      <textarea 
+                        rows={6} 
+                        value={formData.defaultTerms} 
+                        onChange={e => setFormData({...formData, defaultTerms: e.target.value})} 
+                        className="w-full flex-1 border-blue-200 p-3 rounded-md focus:ring-2 focus:ring-blue-400 outline-none bg-white resize-none text-sm leading-relaxed" 
+                        placeholder="VD: Không nuôi chó mèo. Thanh toán tiền mùng 5 hàng tháng. Giữ vệ sinh chung..." 
+                      />
+                      <p className="text-[11px] text-blue-600 mt-2 italic">Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê phòng này.</p>
                     </div>
-                    
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
-                        const isAdded = formData.defaultTerms.includes(term);
-                        return (
-                          <span
-                            key={idx}
-                            onClick={() => !isAdded && handleAddTerm(term)}
-                            className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
-                              isAdded 
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
-                            }`}
-                          >
-                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
-                              {isAdded ? '✓' : '+'}
-                            </span> 
-                            {term.substring(0, 30)}...
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <textarea 
-                      rows={6} 
-                      value={formData.defaultTerms} 
-                      onChange={e => setFormData({...formData, defaultTerms: e.target.value})} 
-                      className="w-full flex-1 border-blue-200 p-3 rounded-md focus:ring-2 focus:ring-blue-400 outline-none bg-white resize-none text-sm leading-relaxed" 
-                      placeholder="VD: Không nuôi chó mèo. Thanh toán tiền mùng 5 hàng tháng. Giữ vệ sinh chung..." 
-                    />
-                    <p className="text-[11px] text-blue-600 mt-2 italic">Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê phòng này.</p>
-                  </div>
                   </div>
                 )}
 
@@ -1307,85 +1327,85 @@ export default function PropertyManageDetailPage() {
                   <div className="space-y-6 animate-in slide-in-from-right-4">
                     {/* Upload Ảnh */}
                     <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
-                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-muted/40 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
-                    <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
-                    <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
-                    <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
-                  </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
+                      <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-muted/40 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
+                        <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
+                        <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
+                        <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                      </div>
 
-                  {(formData.images.length > 0 || previewUrls.length > 0) && (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 mt-4">
-                      {formData.images.map((url, idx) => (
-                        <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border">
-                          <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
-                          <button type="button" onClick={() => removeOldImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                      {(formData.images.length > 0 || previewUrls.length > 0) && (
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 mt-4">
+                          {formData.images.map((url, idx) => (
+                            <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border">
+                              <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
+                              <button type="button" onClick={() => removeOldImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                            </div>
+                          ))}
+                          {previewUrls.map((url, idx) => (
+                            <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed">
+                              <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />
+                              <button type="button" onClick={() => removeSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                      {previewUrls.map((url, idx) => (
-                        <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed">
-                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />
-                          <button type="button" onClick={() => removeSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                        </div>
-                      ))}
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* Upload Ảnh 360 */}
-                <div className="border-t pt-4 mt-2">
-                  <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
-                    🌐 Ảnh 360° (Virtual Tour)
-                  </label>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Tải lên ảnh panorama 360 độ để khách thuê có thể xem phòng 3D trực tuyến. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB.
-                  </p>
+                    {/* Upload Ảnh 360 */}
+                    <div className="border-t pt-4 mt-2">
+                      <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                        🌐 Ảnh 360° (Virtual Tour)
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Tải lên ảnh panorama 360 độ để khách thuê có thể xem phòng 3D trực tuyến. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB.
+                      </p>
 
-                  <div 
-                    onClick={() => panoFileInputRef.current?.click()} 
-                    className="border-2 border-dashed border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer group"
-                  >
-                    <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                      <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
-                        <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
-                      </svg>
-                    </div>
-                    <span className="text-sm font-semibold text-cyan-700">Chọn ảnh 360°</span>
-                    <span className="text-[11px] text-cyan-600/70 mt-0.5">Chụp bằng Google Street View, Panorama trên điện thoại...</span>
-                    <input type="file" multiple accept="image/*" ref={panoFileInputRef} onChange={handlePanoImageChange} className="hidden" />
-                  </div>
-
-                  {(formData.panoramaImages.length > 0 || panoPreviewUrls.length > 0) && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
-                      {formData.panoramaImages.map((url, idx) => (
-                        <div key={`pano-old-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border border-cyan-200 bg-cyan-50">
-                          <img src={url} alt={`pano-${idx}`} className="w-full h-full object-cover" />
-                          <div className="absolute top-1 left-1">
-                            <span className="text-[9px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">360°</span>
-                          </div>
-                          <button type="button" onClick={() => removeOldPanoImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                      <div 
+                        onClick={() => panoFileInputRef.current?.click()} 
+                        className="border-2 border-dashed border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer group"
+                      >
+                        <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                          <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
+                            <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
+                          </svg>
                         </div>
-                      ))}
-                      {panoPreviewUrls.map((url, idx) => (
-                        <div key={`pano-new-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border-2 border-dashed border-cyan-400 bg-cyan-50/50">
-                          <img src={url} alt={`pano-preview-${idx}`} className="w-full h-full object-cover opacity-80" />
-                          <div className="absolute top-1 left-1">
-                            <span className="text-[9px] font-bold bg-cyan-500 text-white px-1.5 py-0.5 rounded">Mới</span>
-                          </div>
-                          <button type="button" onClick={() => removePanoSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        <span className="text-sm font-semibold text-cyan-700">Chọn ảnh 360°</span>
+                        <span className="text-[11px] text-cyan-600/70 mt-0.5">Chụp bằng Google Street View, Panorama trên điện thoại...</span>
+                        <input type="file" multiple accept="image/*" ref={panoFileInputRef} onChange={handlePanoImageChange} className="hidden" />
+                      </div>
 
-                  {formData.panoramaImages.length === 0 && panoPreviewUrls.length === 0 && (
-                    <p className="text-[11px] text-cyan-600 mt-2 flex items-start gap-1 bg-cyan-50 p-2.5 rounded-md border border-cyan-100">
-                      <span className="flex-shrink-0">💡</span>
-                      <span><strong>Mẹo:</strong> Mở ứng dụng Camera → chế độ Panorama → quay tròn 360°. Hoặc dùng app Google Street View để chụp ảnh cầu 360 chuyên nghiệp.</span>
-                    </p>
-                  )}
-                </div>
+                      {(formData.panoramaImages.length > 0 || panoPreviewUrls.length > 0) && (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                          {formData.panoramaImages.map((url, idx) => (
+                            <div key={`pano-old-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border border-cyan-200 bg-cyan-50">
+                              <img src={url} alt={`pano-${idx}`} className="w-full h-full object-cover" />
+                              <div className="absolute top-1 left-1">
+                                <span className="text-[9px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">360°</span>
+                              </div>
+                              <button type="button" onClick={() => removeOldPanoImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                            </div>
+                          ))}
+                          {panoPreviewUrls.map((url, idx) => (
+                            <div key={`pano-new-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border-2 border-dashed border-cyan-400 bg-cyan-50/50">
+                              <img src={url} alt={`pano-preview-${idx}`} className="w-full h-full object-cover opacity-80" />
+                              <div className="absolute top-1 left-1">
+                                <span className="text-[9px] font-bold bg-cyan-500 text-white px-1.5 py-0.5 rounded">Mới</span>
+                              </div>
+                              <button type="button" onClick={() => removePanoSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {formData.panoramaImages.length === 0 && panoPreviewUrls.length === 0 && (
+                        <p className="text-[11px] text-cyan-600 mt-2 flex items-start gap-1 bg-cyan-50 p-2.5 rounded-md border border-cyan-100">
+                          <span className="flex-shrink-0">💡</span>
+                          <span><strong>Mẹo:</strong> Mở ứng dụng Camera → chế độ Panorama → quay tròn 360°. Hoặc dùng app Google Street View để chụp ảnh cầu 360 chuyên nghiệp.</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </form>
@@ -1436,7 +1456,6 @@ export default function PropertyManageDetailPage() {
             <div className="flex gap-3 mt-6">
               <Button variant="outline" className="flex-1" onClick={() => setDeleteRoomConfirm(null)} disabled={isDeleting}>Hủy</Button>
               <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={() => {
-                // handleDeleteRoom function was missing in original, added here for completeness
                 if (!deleteRoomConfirm) return;
                 setIsDeleting(true);
                 propertyApi.deleteRoom(deleteRoomConfirm.id)
@@ -1446,12 +1465,11 @@ export default function PropertyManageDetailPage() {
                     fetchData();
                   })
                   .catch((error: any) => {
-                    toast.error(error?.response?.data?.message || 'Xóa phòng thất bại.');
+                    toast.error('Không thể xóa phòng đang có hợp đồng hoặc lỗi hệ thống.');
                   })
                   .finally(() => setIsDeleting(false));
-              }} disabled={isDeleting}>
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                Xóa phòng
+              }}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Xác nhận xóa'}
               </Button>
             </div>
           </div>
@@ -1461,114 +1479,104 @@ export default function PropertyManageDetailPage() {
       {/* MODAL XÁC NHẬN BẢO TRÌ */}
       {showMaintenanceConfirm && pendingMaintenanceAction && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <div className="flex flex-col items-center text-center">
-              <div className={`p-3 rounded-full mb-4 ${pendingMaintenanceAction.type === 'start' ? 'bg-orange-50' : 'bg-emerald-50'}`}>
-                {pendingMaintenanceAction.type === 'start' ? 
-                  <Wrench className="h-8 w-8 text-orange-500" /> : 
-                  <CheckCircle className="h-8 w-8 text-emerald-500" />
-                }
-              </div>
-              
-              <h3 className="text-lg font-bold text-gray-900 mb-1">
-                {pendingMaintenanceAction.type === 'start' ? 'Bắt đầu bảo trì phòng?' : 'Hoàn thành bảo trì phòng?'}
-              </h3>
-              
-              <p className="text-sm text-gray-600 mb-1">Phòng: <span className="font-semibold">"{pendingMaintenanceAction.roomName}"</span></p>
-
-              <p className="text-xs text-gray-500 bg-muted/40 p-3 rounded-lg border border-gray-100">
-                {pendingMaintenanceAction.type === 'start' 
-                  ? 'Phòng sẽ không hiển thị cho khách thuê trong thời gian bảo trì.' 
-                  : 'Phòng sẽ trở về trạng thái Trống và có thể cho thuê lại.'}
-              </p>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button 
-                variant="outline" 
-                className="flex-1" 
-                onClick={() => setShowMaintenanceConfirm(false)}
-                disabled={isMaintenanceLoading}
-              >
-                Hủy
-              </Button>
-              <Button 
-                className={`flex-1 ${pendingMaintenanceAction.type === 'start' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
-                onClick={executeMaintenanceAction}
-                disabled={isMaintenanceLoading}
-              >
-                {isMaintenanceLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  pendingMaintenanceAction.type === 'start' ? 'Xác nhận Bảo trì' : 'Xác nhận Hoàn thành'
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CẢNH BÁO KHÔNG ĐƯỢC BẢO TRÌ */}
-      {showCannotMaintenanceModal && cannotMaintenanceRoom && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex flex-col items-center text-center">
-              <div className="p-4 bg-red-50 rounded-full mb-4">
-                <AlertTriangle className="h-10 w-10 text-red-500" />
+            <div className="flex items-center gap-4 mb-6">
+              <div className={`p-3 rounded-xl ${pendingMaintenanceAction.type === 'start' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+                <Wrench className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Không thể bắt đầu bảo trì</h3>
-              <p className="text-gray-600 mb-1">Phòng <span className="font-semibold">"{cannotMaintenanceRoom.name}"</span></p>
-              <p className="text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-100">
-                Phòng hiện đang ở trạng thái <strong>
-                  {cannotMaintenanceRoom.status === 'RENTED' ? 'ĐANG CHO THUÊ' : 'ĐÃ ĐẶT CỌC'}
-                </strong>
-              </p>
-            </div>
-
-            <div className="mt-6">
-              <Button 
-                onClick={() => {
-                  setShowCannotMaintenanceModal(false);
-                  setCannotMaintenanceRoom(null);
-                }}
-                className="w-full"
-              >
-                Tôi đã hiểu
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL PREVIEW EXCEL */}
-      {showExcelPreview && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Xem trước dữ liệu Excel</h3>
-                <p className="text-sm text-gray-500">Đã đọc {excelRooms.length} phòng từ file</p>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {pendingMaintenanceAction.type === 'start' ? 'Bắt đầu bảo trì?' : 'Kết thúc bảo trì?'}
+                </h3>
+                <p className="text-sm text-gray-500">Phòng {pendingMaintenanceAction.roomName}</p>
               </div>
-              {!isImporting && <button onClick={() => setShowExcelPreview(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>}
             </div>
             
-            <div className="flex-1 overflow-auto p-6 bg-gray-50/50">
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-sm text-gray-600 border border-gray-100">
+              {pendingMaintenanceAction.type === 'start' ? (
+                <ul className="space-y-2">
+                  <li className="flex gap-2"><span>•</span> <span>Phòng sẽ chuyển sang trạng thái <b>Bảo trì</b>.</span></li>
+                  <li className="flex gap-2"><span>•</span> <span>Khách thuê sẽ <b>không thể</b> đặt lịch xem phòng này.</span></li>
+                  <li className="flex gap-2"><span>•</span> <span>Bạn có thể kết thúc bảo trì bất cứ lúc nào.</span></li>
+                </ul>
+              ) : (
+                <ul className="space-y-2">
+                  <li className="flex gap-2"><span>•</span> <span>Phòng sẽ quay lại trạng thái <b>Sẵn sàng</b>.</span></li>
+                  <li className="flex gap-2"><span>•</span> <span>Khách thuê có thể tiếp tục đặt lịch xem phòng.</span></li>
+                </ul>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowMaintenanceConfirm(false)} disabled={isMaintenanceLoading}>Hủy</Button>
+              <Button 
+                className={`flex-1 ${pendingMaintenanceAction.type === 'start' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'} text-white`}                 onClick={executeMaintenanceAction}
+                disabled={isMaintenanceLoading}
+              >
+                {isMaintenanceLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Xác nhận
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL THÔNG BÁO KHÔNG THỂ BẢO TRÌ */}
+      {showCannotMaintenanceModal && cannotMaintenanceRoom && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-red-50 rounded-full mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Không thể bảo trì</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Phòng <b>{cannotMaintenanceRoom.name}</b> hiện đang có hợp đồng còn hiệu lực hoặc yêu cầu thuê đang xử lý.
+              </p>
+              <div className="w-full p-3 bg-gray-50 rounded-lg text-xs text-gray-600 mb-6 text-left">
+                <p>Để bảo trì phòng này, bạn cần:</p>
+                <p className="mt-1">1. Kết thúc hợp đồng hiện tại (nếu có).</p>
+                <p>2. Từ chối các yêu cầu thuê đang chờ duyệt.</p>
+              </div>
+              <Button className="w-full" onClick={() => {
+                setShowCannotMaintenanceModal(false);
+                setCannotMaintenanceRoom(null);
+              }}>Đã hiểu</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL XEM TRƯỚC NHẬP EXCEL --- */}
+      {showExcelPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+               <div>
+                  <h3 className="text-lg font-bold text-gray-900">Xem trước danh sách nhập ({excelRooms.length} phòng)</h3>
+                  <p className="text-xs text-gray-500 italic">Vui lòng kiểm tra kỹ thông tin trước khi xác nhận lưu vào hệ thống.</p>
+               </div>
+               <button onClick={() => setShowExcelPreview(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/30">
                {isImporting ? (
-                 <div className="flex flex-col items-center justify-center py-10">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                    <h4 className="text-lg font-bold">Đang tải phòng lên...</h4>
-                    <p className="text-sm text-gray-500 mb-6">Tiến trình: {importProgress} / {importTotal}</p>
-                    <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5">
-                      <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: `${(importProgress / importTotal) * 100}%` }}></div>
-                    </div>
-                 </div>
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                     <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+                     <h4 className="text-lg font-bold text-gray-900 mb-1">Đang thực hiện nhập dữ liệu...</h4>
+                     <p className="text-sm text-gray-500 mb-6">Vui lòng không đóng trình duyệt lúc này.</p>
+                     <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5">
+                       <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: `${(importProgress / importTotal) * 100}%` }}></div>
+                     </div>
+                     <p className="mt-2 text-xs font-medium text-primary">Tiến độ: {importProgress}/{importTotal} ({Math.round((importProgress / importTotal) * 100)}%)</p>
+                  </div>
                ) : (
                 <>
                   {importErrors.length > 0 && (
                     <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                       <p className="font-bold mb-1">Có lỗi khi tải lên một số phòng:</p>
                       <ul className="list-disc pl-5 text-sm">
-                        {importErrors.map((err, idx) => (
+                        {importErrors.map((err: any, idx: number) => (
                           <li key={idx}>Phòng <strong>{err.name}</strong>: {err.reason}</li>
                         ))}
                       </ul>
@@ -1586,7 +1594,7 @@ export default function PropertyManageDetailPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {excelRooms.map((room, idx) => {
+                        {excelRooms.map((room: any, idx: number) => {
                           const isInvalid = !room.name || !room.price || !room.area;
                           return (
                             <tr key={idx} className={isInvalid ? 'bg-red-50' : 'hover:bg-gray-50'}>
@@ -1644,7 +1652,7 @@ export default function PropertyManageDetailPage() {
       {aiContentPreview && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
-<div className="bg-purple-50 px-5 py-4 border-b border-purple-100 flex justify-between items-center flex-shrink-0">
+            <div className="bg-purple-50 px-5 py-4 border-b border-purple-100 flex justify-between items-center flex-shrink-0">
                <h3 className="text-lg font-bold text-purple-900 flex items-center gap-2">
                  <Sparkles className="h-5 w-5 text-purple-600" />
                  Bản nháp từ Copilot

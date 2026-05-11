@@ -54,6 +54,9 @@ public class AiController {
     private iuh.se.kltn.backend.modules.user.repository.UserRepository userRepository;
 
     @Autowired
+    private iuh.se.kltn.backend.modules.ai.repository.AiActionLogRepository aiActionLogRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
 
@@ -466,44 +469,84 @@ public class AiController {
     }
 
     @PostMapping("/suggest-room-price")
-    public ResponseEntity<?> suggestRoomPrice(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> suggestRoomPrice(
+            @RequestBody Map<String, Object> request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        long startTime = System.currentTimeMillis();
+        String district = (String) request.get("district");
+        String city = (String) request.get("city");
+        Double area = Double.valueOf(request.get("area").toString());
+        String type = (String) request.get("type");
+        @SuppressWarnings("unchecked")
+        List<String> amenities = (List<String>) request.get("amenities");
+
+        String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Không có";
+        
+        // Tạo câu hỏi chuẩn hóa để tìm trong Cache
+        String standardizedQuestion = String.format("PRICE_SUGGEST:%s:%s:%s:%.0f", city, district, type, area);
+        String rawQueryForLog = String.format("Gợi ý giá phòng %s, diện tích %.1f m2 tại Quận %s, %s.", type, area, district, city);
+
+        // 1. KIỂM TRA CACHE TRƯỚC (Để tiết kiệm Token)
+        String cachedResponse = aiOrchestratorService.searchFaq(standardizedQuestion);
+        if (cachedResponse != null) {
+            try {
+                System.out.println("⚡ [PRICE CACHE HIT] Reusing suggestion for: " + standardizedQuestion);
+                saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 1.0, false, startTime, true);
+                return ResponseEntity.ok(objectMapper.readValue(cachedResponse, Map.class));
+            } catch (Exception e) {
+                System.err.println("Lỗi parse cache: " + e.getMessage());
+            }
+        }
+
         try {
-            String district = (String) request.get("district");
-            String city = (String) request.get("city");
-            Double area = Double.valueOf(request.get("area").toString());
-            String type = (String) request.get("type");
-            @SuppressWarnings("unchecked")
-            List<String> amenities = (List<String>) request.get("amenities");
-
-            String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Không có";
-
+            // 2. NẾU KHÔNG CÓ TRONG CACHE -> GỌI GEMINI
             String aiPrompt = String.format(
-                "Bạn là chuyên gia thẩm định giá bất động sản cho thuê tại Việt Nam. " +
-                "Hãy gợi ý một KHOẢNG GIÁ thuê hàng tháng (VND) cho phòng trọ với thông tin sau:\n" +
-                "- Địa điểm: Quận %s, %s\n" +
-                "- Loại phòng: %s\n" +
-                "- Diện tích: %.1f m2\n" +
-                "- Tiện ích: %s\n\n" +
-                "Yêu cầu:\n" +
-                "1. Trả về kết quả theo định dạng JSON: {\"suggestion\": \"Khoảng giá\", \"reason\": \"Lý do ngắn gọn\"}\n" +
-                "2. Khoảng giá phải thực tế với thị trường hiện nay.\n" +
-                "3. Phần 'reason' giải thích tại sao có mức giá đó (Vị trí, diện tích, tiện ích).\n" +
-                "Chỉ trả về JSON, không thêm văn bản khác. Tuyệt đối không có markdown code blocks.",
-                district, city, type, area, amenitiesStr
+                "Gợi ý KHOẢNG GIÁ thuê (VND) phòng %s, %.1f m2 tại Q.%s, %s. Tiện ích: %s.\n" +
+                "Trả về JSON: {\"suggestion\": \"Khoảng giá\", \"reason\": \"Lý do ngắn gọn\"}. Chỉ trả về JSON.",
+                type, area, district, city, amenitiesStr
             );
 
             String response = geminiChatModel.generate(aiPrompt);
-            
-            // Làm sạch response
             response = response.replace("```json", "").replace("```", "").trim();
             
+            // 3. LƯU VÀO CACHE FAQ (Dùng làm tri thức cho lần sau)
+            aiOrchestratorService.addFaq(standardizedQuestion, response);
+
+            // 4. LƯU LOG
+            saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 1.0, false, startTime, true);
+
             return ResponseEntity.ok(objectMapper.readValue(response, Map.class));
         } catch (Throwable t) {
             System.err.println("❌ [AI PRICE SUGGEST ERROR] " + t.getMessage());
+            saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 0.0, true, startTime, false);
+
             return ResponseEntity.status(503).body(Map.of(
                 "status", "error", 
                 "message", "Dịch vụ AI đang bận. Không thể đưa ra gợi ý lúc này."
             ));
         }
+    }
+
+    private void saveActionLog(Long userId, String userRole, String query, String intent, double score, boolean isError, long startTime, boolean isSuccess) {
+        if (userId == -1L) return;
+        try {
+            aiActionLogRepository.save(iuh.se.kltn.backend.modules.ai.entity.AiActionLog.builder()
+                    .userId(userId)
+                    .userRole(userRole)
+                    .rawQuery(query)
+                    .predictedIntent(intent)
+                    .confidenceScore(score)
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .isSuccess(isSuccess)
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Lỗi lưu log AI: " + e.getMessage());
+        }
+    }
+
+    private Long userIdFrom(UserPrincipal user) { return user != null ? user.getId() : -1L; }
+    private String roleFrom(UserPrincipal user) { 
+        return user != null ? user.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "") : "GUEST"; 
     }
 }
