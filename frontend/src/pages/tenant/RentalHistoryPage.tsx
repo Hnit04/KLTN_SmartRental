@@ -150,7 +150,7 @@ export default function RentalHistoryPage() {
       </div>
 
       {/* 2. FILTERS & TABS */}
-      <div className="flex flex-col lg:flex-row gap-6 sticky top-0 z-30 pt-2 bg-gray-50/80 backdrop-blur-md">
+      <div className="flex flex-col lg:flex-row gap-6 sticky top-0 z-30 pt-2 bg-muted/40/80 backdrop-blur-md">
         {/* TABS */}
         <div className="inline-flex p-1 bg-gray-200/50 rounded-xl">
           <button
@@ -208,7 +208,7 @@ export default function RentalHistoryPage() {
       <div className="space-y-6">
         {filteredList.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl py-24 flex flex-col items-center justify-center text-center px-6">
-            <div className="h-24 w-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 relative">
+            <div className="h-24 w-24 bg-muted/40 rounded-full flex items-center justify-center mb-6 relative">
               <Building2 className="h-10 w-10 text-gray-300" />
               <Search className="h-5 w-5 text-gray-400 absolute bottom-0 right-0" />
             </div>
@@ -260,10 +260,10 @@ export default function RentalHistoryPage() {
                             Phòng {item.roomName}
                           </h3>
                         </div>
-                        <div className="bg-gray-50 px-3 py-1 rounded-md text-[10px] font-bold text-gray-400">ID: #{item.id}</div>
+                        <div className="bg-muted/40 px-3 py-1 rounded-md text-[10px] font-bold text-gray-400">ID: #{item.id}</div>
                       </div>
 
-                      <div className="flex items-start gap-2 text-gray-500 bg-gray-50/50 p-3 rounded-xl">
+                      <div className="flex items-start gap-2 text-gray-500 bg-muted/40/50 p-3 rounded-xl">
                         <MapPin className="h-4 w-4 mt-1 text-primary/60 shrink-0" />
                         <span className="text-sm font-medium leading-relaxed">{item.propertyAddress}</span>
                       </div>
@@ -293,7 +293,7 @@ export default function RentalHistoryPage() {
                     </div>
 
                     {/* ACTION SECTION */}
-                    <div className="w-full lg:w-72 bg-gray-50/30 p-6 md:p-8 flex flex-col justify-between gap-6">
+                    <div className="w-full lg:w-72 bg-muted/40/30 p-6 md:p-8 flex flex-col justify-between gap-6">
                         <div className="space-y-4">
                             <div>
                                 <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Giá thuê (tháng)</div>

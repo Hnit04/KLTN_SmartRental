@@ -123,7 +123,7 @@ export default function StreetViewVerification({
             )}
             
             {streetViewError ? (
-              <div className="h-[350px] flex flex-col items-center justify-center bg-gray-50 text-gray-500">
+              <div className="h-[350px] flex flex-col items-center justify-center bg-muted/40 text-gray-500">
                 <MapPin className="h-10 w-10 text-gray-300 mb-3" />
                 <p className="font-medium text-gray-700">Khu vực này chưa có ảnh Google Street View</p>
                 <p className="text-xs text-gray-400 mt-1 mb-4">Bạn vẫn có thể mở Google Maps để kiểm tra</p>

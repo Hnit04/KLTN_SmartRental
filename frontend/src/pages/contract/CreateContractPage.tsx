@@ -9,7 +9,14 @@ import { propertyApi } from "@/api/propertyApi";
 import { contractApi } from "@/api/contractApi";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useAuth } from "@/context/AuthContext";
-import type { CreateContractPayload } from "@/types"; 
+import type { CreateContractPayload } from "@/types";
+import { StepIndicator } from "@/components/ui/StepIndicator";
+
+const WIZARD_STEPS = [
+  { title: "Thông tin & thời hạn" },
+  { title: "Điều khoản" },
+  { title: "Xác nhận" },
+] as const;
 
 export default function CreateContractPage() {
   const { user } = useAuth(); 
@@ -23,6 +30,7 @@ export default function CreateContractPage() {
 
   // --- THÊM STATE CHO MODAL PREVIEW ---
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
 
   const [formData, setFormData] = useState({
     startDate: new Date().toISOString().split('T')[0], 
@@ -31,14 +39,6 @@ export default function CreateContractPage() {
     landlordRules: "",
     tenantRequests: ""
   });
-
-  const LANDLORD_SUGGESTED_TERMS = [
-    "Không nuôi thú cưng (chó, mèo...).",
-    "Giữ yên tĩnh chung sau 22h00 đêm.",
-    "Báo trước 30 ngày trước khi trả phòng.",
-    "Bồi thường 100% nếu làm hỏng tài sản phòng.",
-    "Chậm tiền nhà quá 5 ngày phạt 5%."
-  ];
 
   const TENANT_SUGGESTED_TERMS = [
     "Yêu cầu dọn vệ sinh phòng trước khi bàn giao.",
@@ -59,6 +59,14 @@ export default function CreateContractPage() {
         ? `${prev.tenantRequests}\n- ${term}` 
         : `- ${term}`
     }));
+  };
+
+  const goNextStep = () => {
+    if (wizardStep === 1 && user?.role === "LANDLORD" && !formData.tenantEmail.trim()) {
+      toast.warning("Vui lòng nhập email khách thuê trước khi sang bước tiếp.");
+      return;
+    }
+    setWizardStep((s) => Math.min(3, s + 1));
   };
 
   useEffect(() => {
@@ -188,27 +196,25 @@ export default function CreateContractPage() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
-      <div className="container mx-auto max-w-3xl">
-
-        {/* ❌ CẢNH BÁO NẾU ĐÃ CÓ HỢP ĐỒNG */}
+    <div className="min-h-screen overflow-x-hidden bg-background py-6 md:py-10 animate-fade-in-up">
+      <div className="page-shell app-panel">
         {existingContract && user?.role === 'TENANT' && (
-          <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
+          <div className="mb-5 rounded-2xl border border-orange-200/90 bg-orange-50/90 p-4 shadow-sm sm:p-5">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-6 w-6 text-orange-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-orange-600" />
               <div>
-                <h3 className="font-bold text-orange-800 text-lg">Bạn đang có phòng đang thuê!</h3>
-                <p className="text-sm text-orange-700 mt-1">
+                <h3 className="text-lg font-bold text-orange-900">Bạn đang có phòng đang thuê!</h3>
+                <p className="mt-1 text-sm text-orange-800/95">
                   Bạn đang có hợp đồng <strong>{existingContract.status === 'ACTIVE' ? 'đang thuê' : 'chờ ký'}</strong> tại phòng{' '}
-                  <strong>{existingContract.roomName || `#${existingContract.roomId}`}</strong> 
+                  <strong>{existingContract.roomName || `#${existingContract.roomId}`}</strong>
                   {existingContract.endDate ? ` (Đến ngày ${new Date(existingContract.endDate).toLocaleDateString('vi-VN')})` : ' (Vô thời hạn)'}.
                 </p>
-                <p className="text-sm text-orange-700 mt-1 font-semibold">
+                <p className="mt-1 text-sm font-semibold text-orange-800/95">
                   Mỗi người chỉ được ở 1 phòng tại một thời điểm. {existingContract.endDate ? 'Để thuê phòng mới này, bạn phải chọn khoảng thời gian bắt đầu sau khi hợp đồng cũ kết thúc.' : 'Vui lòng hoàn tất trả phòng cũ trước khi dọn đến đây.'}
                 </p>
-                <div className="mt-4 flex gap-3">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Link to={`/tenant/contracts/${existingContract.id}`}>
-                    <Button size="sm" className="gap-1 bg-orange-600 hover:bg-orange-700 text-white">
+                    <Button size="sm" className="gap-1 bg-orange-600 text-white hover:bg-orange-700">
                       Xem hợp đồng hiện tại
                     </Button>
                   </Link>
@@ -218,216 +224,237 @@ export default function CreateContractPage() {
           </div>
         )}
 
-        <div className={`bg-white rounded-xl shadow-lg border overflow-hidden`}>
-          
-          <div className="bg-primary/5 p-6 border-b border-primary/10">
-            <h1 className="text-2xl font-bold text-gray-900">
-                {user?.role === 'LANDLORD' ? 'Tạo hợp đồng thuê mới' : 'Xác nhận thuê phòng'}
+        <div className="section-card overflow-hidden shadow-md">
+          <div className="border-b border-primary/10 bg-primary/[0.06] px-4 py-4 sm:px-6 sm:py-5">
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {user?.role === 'LANDLORD' ? 'Tạo hợp đồng thuê mới' : 'Xác nhận thuê phòng'}
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
-                {user?.role === 'LANDLORD' ? 'Thiết lập các thông số cơ bản để gửi cho khách thuê ký.' : 'Vui lòng kiểm tra kỹ thông tin trước khi gửi yêu cầu.'}
+            <p className="page-subtitle max-w-2xl">
+              {user?.role === 'LANDLORD'
+                ? 'Thiết lập các thông số cơ bản để gửi cho khách thuê ký.'
+                : 'Vui lòng kiểm tra kỹ thông tin trước khi gửi yêu cầu.'}
             </p>
+            <div className="mt-4 min-w-0">
+              <StepIndicator steps={[...WIZARD_STEPS]} current={wizardStep} />
+            </div>
           </div>
 
-          <div className="p-8 grid md:grid-cols-2 gap-8">
-            
-            <div className="space-y-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-green-600" /> 
-                    Thông tin phòng (Cố định)
-                </h3>
-                
-                <div className="bg-gray-50 p-4 rounded-lg space-y-4 border">
+          <div className="min-w-0 p-4 sm:p-6 md:p-8">
+            {wizardStep === 1 && (
+              <div className="grid gap-8 md:grid-cols-2">
+                <div className="space-y-4">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-600" />
+                    Thông tin phòng
+                  </h3>
+                  <div className="muted-surface space-y-4 p-4">
                     <div>
-                        <span className="text-xs text-gray-500 uppercase font-bold">Phòng</span>
-                        <p className="font-bold text-lg text-primary">{room.name}</p>
-                        <p className="text-sm text-gray-600">{room.propertyName || room.property?.address || 'Đang cập nhật địa chỉ'}</p>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Phòng</span>
+                      <p className="text-lg font-bold text-primary">{room.name}</p>
+                      <p className="text-sm text-muted-foreground">{room.propertyName || room.property?.address || 'Đang cập nhật địa chỉ'}</p>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <span className="text-xs text-gray-500 uppercase font-bold flex items-center gap-1">
-                                <CreditCard className="h-3 w-3" /> Giá thuê
-                            </span>
-                            <p className="font-semibold text-gray-900">
-                                {new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng
-                            </p>
-                         </div>
-                         <div>
-                            <span className="text-xs text-gray-500 uppercase font-bold flex items-center gap-1">
-                                <ShieldCheck className="h-3 w-3" /> Tiền cọc
-                            </span>
-                            <p className="font-semibold text-gray-900">
-                                {new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)
-                            </p>
-                         </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                          <CreditCard className="h-3 w-3" /> Giá thuê
+                        </span>
+                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng</p>
+                      </div>
+                      <div>
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                          <ShieldCheck className="h-3 w-3" /> Tiền cọc
+                        </span>
+                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)</p>
+                      </div>
                     </div>
-
-                    <div className="pt-2 border-t mt-2">
-                         <span className="text-xs text-gray-500 uppercase font-bold flex items-center gap-1 mb-1">
-                             <User className="h-3 w-3" /> Chủ nhà
-                         </span>
-                         <p className="text-sm font-medium">{room.landlordName || room.property?.landlordName || 'Chủ trọ'}</p>
+                    <div className="mt-2 border-t border-border/60 pt-3">
+                      <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        <User className="h-3 w-3" /> Chủ nhà
+                      </span>
+                      <p className="text-sm font-medium">{room.landlordName || room.property?.landlordName || 'Chủ trọ'}</p>
                     </div>
+                  </div>
                 </div>
-            </div>
-
-            <div className="space-y-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" /> 
-                    {user?.role === 'LANDLORD' ? 'Thiết lập hợp đồng' : 'Thông tin đăng ký'}
-                </h3>
 
                 <div className="space-y-4">
-                    
+                  <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <User className="h-5 w-5 shrink-0 text-primary" />
+                    {user?.role === 'LANDLORD' ? 'Thiết lập hợp đồng' : 'Thông tin đăng ký'}
+                  </h3>
+                  <div className="space-y-4">
                     {user?.role === 'LANDLORD' && (
-                       <div className="space-y-2 p-4 bg-purple-50 rounded-lg border border-purple-100">
-                          <Label className="text-purple-800">Email Khách Thuê (Bắt buộc)</Label>
-                          <p className="text-xs text-purple-600 mb-2">Khách cần có tài khoản trên hệ thống để ký số.</p>
-                          <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
-                              <Input 
-                                  type="email" 
-                                  placeholder="Nhập email khách hàng..."
-                                  className="pl-9 border-purple-200 focus-visible:ring-purple-400 bg-white"
-                                  value={formData.tenantEmail}
-                                  onChange={(e) => setFormData({...formData, tenantEmail: e.target.value})}
-                              />
-                          </div>
+                      <div className="space-y-2 rounded-xl border border-violet-200/80 bg-violet-50/80 p-4">
+                        <Label className="text-violet-900">Email khách thuê (bắt buộc)</Label>
+                        <p className="text-xs text-violet-700/90">Khách cần có tài khoản trên hệ thống để ký số.</p>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-400" />
+                          <Input
+                            type="email"
+                            placeholder="Nhập email khách hàng..."
+                            className="border-violet-200 bg-background pl-9 focus-visible:ring-violet-400"
+                            value={formData.tenantEmail}
+                            onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
+                          />
+                        </div>
                       </div>
                     )}
 
                     {room.status === 'RENTED' && room.availableFromDate && (
-                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-start gap-2 shadow-sm">
-                            <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <strong>Lưu ý:</strong> Phòng này hiện đang có người ở và sẽ trống vào ngày <strong>{new Date(room.availableFromDate).toLocaleDateString('vi-VN')}</strong>. Bạn bắt buộc phải chọn ngày bắt đầu từ ngày này trở đi.
-                            </div>
+                      <div className="flex items-start gap-2 rounded-xl border border-orange-200 bg-orange-50/90 p-3 text-sm text-orange-900 shadow-sm">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+                        <div>
+                          <strong>Lưu ý:</strong> Phòng đang có người ở, trống từ{' '}
+                          <strong>{new Date(room.availableFromDate).toLocaleDateString('vi-VN')}</strong>. Chọn ngày bắt đầu từ ngày này trở đi.
                         </div>
+                      </div>
                     )}
 
                     <div className="space-y-2">
-                        <Label>Ngày bắt đầu ở</Label>
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <Input 
-                                type="date" 
-                                className="pl-9"
-                                min={room.availableFromDate ? new Date(room.availableFromDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                                value={formData.startDate}
-                                onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                            />
-                        </div>
+                      <Label>Ngày bắt đầu ở</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          className="pl-9"
+                          min={
+                            room.availableFromDate
+                              ? new Date(room.availableFromDate).toISOString().split('T')[0]
+                              : new Date().toISOString().split('T')[0]
+                          }
+                          value={formData.startDate}
+                          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Thời hạn thuê (Tháng)</Label>
-                        <div className="relative">
-                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <select 
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                value={formData.duration}
-                                onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})}
-                            >
-                                <option value={1}>1 Tháng (Ngắn hạn)</option>
-                                <option value={3}>3 Tháng</option>
-                                <option value={6}>6 Tháng</option>
-                                <option value={12}>12 Tháng (1 Năm)</option>
-                                <option value={24}>24 Tháng (2 Năm)</option>
-                            </select>
-                        </div>
+                      <Label>Thời hạn thuê (tháng)</Label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          value={formData.duration}
+                          onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+                        >
+                          <option value={1}>1 tháng (ngắn hạn)</option>
+                          <option value={3}>3 tháng</option>
+                          <option value={6}>6 tháng</option>
+                          <option value={12}>12 tháng (1 năm)</option>
+                          <option value={24}>24 tháng (2 năm)</option>
+                        </select>
+                      </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                    <div className="space-y-4 pt-4 border-t mt-4">
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-gray-900 font-bold text-base flex items-center gap-2">
-                                <Info className="w-5 h-5 text-blue-500" />
-                                {user?.role === 'LANDLORD' ? 'Nội quy & Điều khoản cơ bản' : 'Nội quy từ Chủ nhà'}
-                            </Label>
-                            
-                            <div className="bg-blue-50/50 rounded-xl border border-blue-100 p-4 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-2 opacity-5">
-                                   <ShieldCheck className="w-12 h-12" />
-                                </div>
-                                <div className="space-y-2">
-                                    {formData.landlordRules.split('\n').filter(line => line.trim()).map((rule, idx) => (
-                                        <div key={idx} className="flex gap-2 text-sm text-blue-900 items-start">
-                                            <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-                                                <Check className="w-3 h-3 text-blue-600" />
-                                            </div>
-                                            <span className="leading-relaxed">{rule.replace(/^- /, '')}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3 pt-4">
-                            <Label className="text-gray-900 font-bold text-base flex items-center gap-2">
-                                <FileSignature className="w-5 h-5 text-indigo-500" />
-                                Yêu cầu thêm của bạn
-                            </Label>
-                            
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {TENANT_SUGGESTED_TERMS.map((term, idx) => {
-                                    const isAdded = formData.tenantRequests.includes(term);
-                                    return (
-                                        <span
-                                            key={idx}
-                                            onClick={() => !isAdded && handleAddTerm(term)}
-                                            className={`text-[11px] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1 border cursor-pointer active:scale-95 ${
-                                                isAdded 
-                                                    ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60'
-                                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
-                                            }`}
-                                        >
-                                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-primary'}`}>
-                                                {isAdded ? '✓' : '+'}
-                                            </span> 
-                                            {term}
-                                        </span>
-                                    );
-                                })}
-                            </div>
-
-                            <textarea 
-                                className="flex w-full rounded-xl border border-input bg-white px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[120px] resize-y placeholder:text-gray-400 shadow-sm"
-                                placeholder="Gõ thêm các yêu cầu riêng cho chủ nhà tại đây (ví dụ: xin thêm 1 chìa khóa)..."
-                                value={formData.tenantRequests}
-                                onChange={(e) => setFormData({...formData, tenantRequests: e.target.value})}
-                            />
-                        </div>
+            {wizardStep === 2 && (
+              <div className="mx-auto max-w-3xl space-y-6">
+                <div className="flex flex-col gap-2">
+                  <Label className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <Info className="h-5 w-5 text-sky-600" />
+                    {user?.role === 'LANDLORD' ? 'Nội quy & điều khoản cơ bản' : 'Nội quy từ chủ nhà'}
+                  </Label>
+                  <div className="relative overflow-hidden rounded-xl border border-sky-100 bg-sky-50/60 p-4">
+                    <div className="absolute right-0 top-0 p-2 opacity-[0.06]">
+                      <ShieldCheck className="h-12 w-12" />
                     </div>
+                    <div className="space-y-2">
+                      {formData.landlordRules
+                        .split('\n')
+                        .filter((line) => line.trim())
+                        .map((rule, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-sm text-sky-950">
+                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100">
+                              <Check className="h-3 w-3 text-sky-700" />
+                            </div>
+                            <span className="leading-relaxed">{rule.replace(/^- /, '')}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 border border-blue-100 mt-2">
-                    <p className="font-semibold">Thanh toán Cọc dự kiến (khi ký hợp đồng):</p>
-                    <p className="text-xl font-bold mt-1">
-                        {new Intl.NumberFormat('vi-VN').format(room.price)}đ
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">(Tiền nhà tháng đầu sẽ thu chung với Tiền Điện/Nước vào cuối tháng)</p>
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <FileSignature className="h-5 w-5 text-indigo-600" />
+                    Yêu cầu thêm của bạn
+                  </Label>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {TENANT_SUGGESTED_TERMS.map((term, idx) => {
+                      const isAdded = formData.tenantRequests.includes(term);
+                      return (
+                        <button
+                          type="button"
+                          key={idx}
+                          disabled={isAdded}
+                          onClick={() => !isAdded && handleAddTerm(term)}
+                          className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] shadow-sm transition-all active:scale-[0.98] ${
+                            isAdded
+                              ? 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-70'
+                              : 'cursor-pointer border-indigo-200 bg-indigo-50 text-indigo-800 hover:border-indigo-300 hover:bg-indigo-100'
+                          }`}
+                        >
+                          <span className={`font-bold ${isAdded ? 'text-muted-foreground' : 'text-primary'}`}>{isAdded ? '✓' : '+'}</span>
+                          {term}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <textarea
+                    className="min-h-[120px] w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    placeholder="Gõ thêm các yêu cầu riêng cho chủ nhà (ví dụ: xin thêm 1 chìa khóa)…"
+                    value={formData.tenantRequests}
+                    onChange={(e) => setFormData({ ...formData, tenantRequests: e.target.value })}
+                  />
                 </div>
+              </div>
+            )}
 
-                <div className="pt-4 space-y-3">
-                    {/* ✅ NÚT XEM TRƯỚC HỢP ĐỒNG */}
-                    <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="w-full h-11 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100"
-                        onClick={() => setIsPreviewOpen(true)}
-                    >
-                        <Eye className="w-4 h-4 mr-2" /> Xem trước bản hợp đồng
-                    </Button>
-
-                    <Button onClick={handleSubmit} isLoading={isLoading} className="w-full h-12 text-base shadow-lg shadow-primary/20">
-                        {user?.role === 'LANDLORD' ? 'Tạo Hợp Đồng Nháp' : 'Gửi yêu cầu & Xem hợp đồng'}
-                    </Button>
-                    <Button variant="ghost" onClick={() => navigate(-1)} className="w-full h-11">
-                        Hủy bỏ
-                    </Button>
+            {wizardStep === 3 && (
+              <div className="mx-auto max-w-lg space-y-6">
+                <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-sky-950">
+                  <p className="font-semibold">Thanh toán cọc dự kiến (khi ký hợp đồng)</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums">{new Intl.NumberFormat('vi-VN').format(room.price)}đ</p>
+                  <p className="mt-1 text-xs text-sky-800/90">Tiền nhà tháng đầu thu cùng điện/nước vào cuối tháng.</p>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full border-indigo-200 bg-indigo-50/50 text-indigo-800 hover:bg-indigo-100"
+                  onClick={() => setIsPreviewOpen(true)}
+                >
+                  <Eye className="mr-2 h-4 w-4" /> Xem trước bản hợp đồng
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">Kiểm tra lại rồi bấm gửi ở thanh dưới.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-border/60 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {wizardStep > 1 && (
+                <Button type="button" variant="outline" onClick={() => setWizardStep((s) => s - 1)}>
+                  Quay lại
+                </Button>
+              )}
+              <Button type="button" variant="ghost" className="text-muted-foreground" onClick={() => navigate(-1)}>
+                Hủy bỏ
+              </Button>
             </div>
-
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              {wizardStep < 3 && (
+                <Button type="button" onClick={goNextStep} className="sm:min-w-[9rem]">
+                  Tiếp theo
+                </Button>
+              )}
+              {wizardStep === 3 && (
+                <Button onClick={handleSubmit} isLoading={isLoading} className="h-11 shadow-md sm:min-w-[12rem]">
+                  {user?.role === 'LANDLORD' ? 'Tạo hợp đồng nháp' : 'Gửi yêu cầu'}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -436,11 +463,11 @@ export default function CreateContractPage() {
       {/* MODAL XEM TRƯỚC BẢN HỢP ĐỒNG */}
       {/* ======================================================== */}
       {isPreviewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white max-w-4xl w-full rounded-xl shadow-2xl relative flex flex-col max-h-[90vh]">
             
             {/* Header Modal */}
-            <div className="flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-xl shrink-0">
+            <div className="flex justify-between items-center p-4 border-b bg-muted/40 rounded-t-xl shrink-0">
                 <h3 className="font-bold flex items-center gap-2 text-gray-800">
                     <FileSignature className="w-5 h-5 text-indigo-600" /> Bản xem trước Hợp đồng
                 </h3>

@@ -117,7 +117,7 @@ const TopLandlordsPage = () => {
                             {user.avatarUrl ? (
                               <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-50 text-4xl font-black text-gray-300">
+                              <div className="w-full h-full flex items-center justify-center bg-muted/40 text-4xl font-black text-gray-300">
                                 {user.fullName?.charAt(0) || "U"}
                               </div>
                             )}
@@ -173,7 +173,7 @@ const TopLandlordsPage = () => {
                         {user.avatarUrl ? (
                           <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-50 font-black text-gray-300">
+                          <div className="w-full h-full flex items-center justify-center bg-muted/40 font-black text-gray-300">
                             {user.fullName?.charAt(0) || "U"}
                           </div>
                         )}

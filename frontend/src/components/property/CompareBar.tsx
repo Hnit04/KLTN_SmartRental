@@ -1,14 +1,25 @@
+import { useLocation } from "react-router-dom";
 import { useCompare } from "@/context/CompareContext";
 import { Button } from "@/components/ui/Button";
 import { X, GitCompareArrows, Plus } from "lucide-react";
+import { cn } from "@/utils/cn";
 
 export default function CompareBar() {
+  const location = useLocation();
   const { compareList, removeFromCompare, clearCompare, openCompareModal } = useCompare();
+  const isAppShell =
+    /^\/(landlord|tenant|admin)(\/|$)/.test(location.pathname) ||
+    location.pathname.startsWith("/profile");
 
   if (compareList.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 animate-in slide-in-from-bottom-4 duration-300 flex justify-center pointer-events-none">
+    <div
+      className={cn(
+        "fixed left-0 right-0 z-50 flex justify-center p-3 animate-in slide-in-from-bottom-4 duration-300 pointer-events-none sm:p-4",
+        isAppShell ? "bottom-16 md:bottom-0" : "bottom-0"
+      )}
+    >
       <div className="bg-white/98 backdrop-blur-xl border border-gray-200/80 shadow-[0_-4px_30px_rgba(0,0,0,0.12)] rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 pointer-events-auto w-full max-w-3xl">
         
         {/* Room pills */}
@@ -63,7 +74,7 @@ export default function CompareBar() {
           <Button 
             variant="outline" 
             size="sm"
-            className="h-9 text-xs text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-red-500 hover:border-red-200 px-3"
+            className="h-9 text-xs text-gray-500 border-gray-200 hover:bg-muted/40 hover:text-red-500 hover:border-red-200 px-3"
             onClick={clearCompare}
           >
             <X className="h-3.5 w-3.5 mr-1" /> Xóa

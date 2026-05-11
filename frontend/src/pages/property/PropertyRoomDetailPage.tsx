@@ -471,7 +471,7 @@ export default function PropertyRoomDetailPage() {
                 <span className={`px-4 py-1.5 rounded-xl text-sm font-bold shadow-md ${
                   room.status === 'AVAILABLE' ? 'bg-green-500 text-white' : 
                   room.status === 'RESERVED' ? 'bg-orange-500 text-white' : 
-                  room.status === 'HIDDEN' ? 'bg-gray-500 text-white' :
+                  room.status === 'HIDDEN' ? 'bg-muted/400 text-white' :
                   room.status === 'MAINTENANCE' ? 'bg-amber-500 text-white' :
                   room.status === 'RENTED' && room.availableFromDate ? 'bg-orange-500 text-white' :
                   'bg-red-500 text-white'
@@ -596,7 +596,7 @@ export default function PropertyRoomDetailPage() {
                   {amenities.map((item, index) => (
                     <div 
                       key={index}
-                      className="flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-lg text-sm text-gray-700 border border-gray-100"
+                      className="flex items-center gap-2 bg-muted/40 px-4 py-2.5 rounded-lg text-sm text-gray-700 border border-gray-100"
                     >
                       <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
                       {item}
@@ -642,7 +642,7 @@ export default function PropertyRoomDetailPage() {
             ) : (
               <div className="space-y-3">
                 {tenants.map((tenant) => (
-                  <div key={tenant.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                  <div key={tenant.id} className="flex items-center gap-4 p-4 bg-muted/40 rounded-xl hover:bg-gray-100 transition">
                     <div className="w-12 h-12 bg-gray-200 rounded-full flex-shrink-0 overflow-hidden">
                       {tenant.avatarUrl ? (
                         <img src={tenant.avatarUrl} alt={tenant.fullName} className="w-full h-full object-cover" />
@@ -708,7 +708,7 @@ export default function PropertyRoomDetailPage() {
                     <Link
                       key={contract.id}
                       to={`/landlord/contracts/${contract.id}`}
-                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition group"
+                      className="flex items-center gap-4 p-4 bg-muted/40 rounded-xl hover:bg-gray-100 transition group"
                     >
                       <div className="w-10 h-10 bg-indigo-100 rounded-full flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-sm">
                         #{contract.id}
@@ -746,7 +746,7 @@ export default function PropertyRoomDetailPage() {
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-muted/40 flex-shrink-0">
               <h2 className="text-xl font-bold">Cập nhật thông tin phòng</h2>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
@@ -847,7 +847,7 @@ export default function PropertyRoomDetailPage() {
                 </div>
 
                 {/* TIỆN ÍCH */}
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div className="bg-muted/40 p-4 rounded-xl border border-gray-200">
                   <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <CheckSquare className="h-4 w-4 text-primary" /> Tiện ích có sẵn
                   </label>
@@ -956,7 +956,7 @@ export default function PropertyRoomDetailPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Phòng</label>
                   <div 
                     onClick={() => fileInputRef.current?.click()} 
-                    className="border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 bg-muted/40 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer"
                   >
                     <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
                     <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
@@ -1048,7 +1048,7 @@ export default function PropertyRoomDetailPage() {
               </form>
             </div>
 
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+            <div className="px-6 py-4 border-t bg-muted/40 flex justify-end gap-3 flex-shrink-0">
               <Button type="button" variant="outline" onClick={() => setShowEditModal(false)} disabled={isSubmitting}>
                 Hủy
               </Button>
@@ -1081,7 +1081,7 @@ export default function PropertyRoomDetailPage() {
                 Phòng: <span className="font-semibold">"{room.name}"</span>
               </p>
 
-              <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border">
+              <p className="text-xs text-gray-500 bg-muted/40 p-3 rounded-lg border">
                 {pendingVisibilityAction.message}
               </p>
             </div>

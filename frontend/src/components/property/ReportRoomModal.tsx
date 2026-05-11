@@ -114,7 +114,7 @@ export default function ReportRoomModal({ isOpen, onClose, room }: ReportRoomMod
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
@@ -132,7 +132,7 @@ export default function ReportRoomModal({ isOpen, onClose, room }: ReportRoomMod
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+        <div className="p-6 overflow-y-auto flex-1 bg-muted/40">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex gap-3 mb-5">
             <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
             <p className="text-sm text-yellow-800">
@@ -154,7 +154,7 @@ export default function ReportRoomModal({ isOpen, onClose, room }: ReportRoomMod
               <p className="text-sm font-bold text-gray-800 mb-2">1. Lý do báo cáo <span className="text-red-500">*</span></p>
               <div className="space-y-2 bg-white p-3 rounded-xl border">
                 {REPORT_REASONS.map((r, idx) => (
-                  <label key={idx} className="flex items-start gap-2.5 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition group">
+                  <label key={idx} className="flex items-start gap-2.5 cursor-pointer p-2 hover:bg-muted/40 rounded-lg transition group">
                     <input
                       type="radio"
                       name="reportReason"

@@ -239,7 +239,7 @@ export default function VipPlansPage() {
                       )}
                     </Button>
                   ) : (
-                    <div className="w-full h-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 font-medium text-sm flex items-center justify-center">
+                    <div className="w-full h-11 rounded-xl bg-muted/40 border border-gray-200 text-gray-400 font-medium text-sm flex items-center justify-center">
                       Gói thấp hơn
                     </div>
                   )}
@@ -266,11 +266,11 @@ export default function VipPlansPage() {
                 </p>
               </div>
               <div className="flex gap-4">
-                <div className="bg-gray-50 rounded-xl px-4 py-2 text-center">
+                <div className="bg-muted/40 rounded-xl px-4 py-2 text-center">
                   <p className="text-lg font-bold text-gray-900">{myPlan.currentPropertyCount || 0}</p>
                   <p className="text-[10px] text-gray-400 font-medium">/ {myPlan.maxProperties === -1 ? '♾️' : myPlan.maxProperties} khu trọ</p>
                 </div>
-                <div className="bg-gray-50 rounded-xl px-4 py-2 text-center">
+                <div className="bg-muted/40 rounded-xl px-4 py-2 text-center">
                   <p className="text-lg font-bold text-indigo-600">+{myPlan.searchBoost || 0}</p>
                   <p className="text-[10px] text-gray-400 font-medium">Boost điểm</p>
                 </div>
@@ -294,7 +294,7 @@ export default function VipPlansPage() {
               <div className="bg-white border rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b">
+                    <tr className="bg-muted/40 border-b">
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Mã</th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Gói</th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Số tiền</th>
@@ -304,7 +304,7 @@ export default function VipPlansPage() {
                   </thead>
                   <tbody className="divide-y">
                     {history.filter((h: any) => h.status === 'PAID').map((h: any) => (
-                      <tr key={h.id} className="hover:bg-gray-50/50">
+                      <tr key={h.id} className="hover:bg-muted/40/50">
                         <td className="px-4 py-3 font-mono text-xs text-gray-500">#{h.id}</td>
                         <td className="px-4 py-3"><VipBadge tier={h.tier} size="sm" /></td>
                         <td className="px-4 py-3 font-semibold">{Number(h.amount).toLocaleString('vi-VN')}đ</td>

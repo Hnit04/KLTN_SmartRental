@@ -1,4 +1,5 @@
 // App.tsx
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext"; // KHÔNG cần import AuthProvider nữa
 import { Toaster } from "sonner"; 
@@ -56,12 +57,13 @@ import { CompareProvider } from "./context/CompareContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import CompareBar from "./components/property/CompareBar";
 import CompareRoomsModal from "./components/property/CompareRoomsModal";
+import PageLoader from "./components/shared/PageLoader";
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
-  if (isLoading) return <div className="h-screen flex items-center justify-center">Đang tải...</div>;
+  if (isLoading) return <PageLoader />;
   return isAuthenticated ? <Outlet /> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} />;
 };
 
@@ -108,10 +110,18 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   return <Outlet />;
 };
 
-function App() {
+function AppRoutesAndChrome() {
+  const [toasterNarrow, setToasterNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setToasterNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   return (
-    <FavoritesProvider>
-    <CompareProvider>
+    <>
       <ScrollToTop />
       <Routes>
           {/* ─── GROUP: PUBLIC PAGES (Có Header/Footer chung) ─── */}
@@ -199,12 +209,26 @@ function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      <Toaster position="top-right" richColors closeButton duration={5000} visibleToasts={5} />
-      {/* 🤖 GLOBAL AI CHATBOT */}
+      <Toaster
+        position={toasterNarrow ? "top-center" : "top-right"}
+        richColors
+        closeButton
+        duration={5000}
+        visibleToasts={5}
+      />
       <AiChatBot />
       <CompareBar />
       <CompareRoomsModal />
-    </CompareProvider>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <FavoritesProvider>
+      <CompareProvider>
+        <AppRoutesAndChrome />
+      </CompareProvider>
     </FavoritesProvider>
   );
 }

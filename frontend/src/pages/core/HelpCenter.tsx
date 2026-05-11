@@ -88,7 +88,7 @@ export default function HelpCenter() {
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
       {/* ─── HERO SEARCH SECTION ─── */}
-      <div className="bg-primary/5 py-20 border-b">
+      <div className="bg-primary/5 py-20 border-b animate-fade-in-up">
         <div className="container mx-auto max-w-4xl px-4 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
             <HelpCircle className="h-4 w-4" />
@@ -164,9 +164,9 @@ export default function HelpCenter() {
               <Link 
                 key={idx} 
                 to={cat.link}
-                className="group bg-card p-6 rounded-2xl border hover:border-primary/50 hover:shadow-md transition-all duration-300"
+                className="group bg-card p-6 rounded-2xl border hover:border-primary/50 hover:shadow-md hover:-translate-y-1 transition-all duration-300"
               >
-                <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-5 group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-md transition-all duration-200">
                   <cat.icon className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary transition-colors">

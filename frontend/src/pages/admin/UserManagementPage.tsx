@@ -9,6 +9,12 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/Dialog';
 import { Label } from '@/components/ui/Label';
 import { Input } from '@/components/ui/Input';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { TableShell } from '@/components/ui/TableShell';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Users } from 'lucide-react';
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState<'tenant' | 'landlord'>('tenant');
@@ -196,123 +202,129 @@ export default function UserManagementPage() {
     return { label: 'Uy tín thấp', class: 'bg-red-50 text-red-700 border-red-200' };
   };
 
+  const userTabs: SegmentItem[] = [
+    {
+      id: 'tenant',
+      label: 'Người thuê',
+      badge: <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{tenants.length}</span>,
+    },
+    {
+      id: 'landlord',
+      label: 'Chủ trọ',
+      badge: <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{landlords.length}</span>,
+    },
+  ];
+
   return (
-    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-      {/* Header Page */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản Lý Người Dùng</h1>
-        <p className="text-sm text-slate-500">Duyệt thông tin định danh và quản lý hoạt động của các tài khoản hệ thống</p>
-      </div>
+    <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
+      <PageHeader
+        title="Quản lý người dùng"
+        description="Duyệt định danh (KYC), uy tín và thao tác khóa/mở khóa — giao diện tối ưu cho quét nhanh."
+      />
 
-      {/* Tabs + Search */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgb(0,0,0,0.02)]">
-        <div className="flex-1 border-b border-slate-100 pb-2 md:border-b-0 md:pb-0">
-          <nav className="-mb-0.5 flex space-x-6">
-            {(['tenant', 'landlord'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setSearchTerm('');
-                }}
-                className={cn(
-                  'inline-flex items-center border-b-2 px-1 pb-3 text-sm font-bold transition-all duration-200',
-                  activeTab === tab
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-                )}
-              >
-                {tab === 'tenant' ? 'Người Thuê' : 'Chủ Trọ'}
-                <span className={cn(
-                  "ml-2.5 rounded-lg px-2.5 py-0.5 text-xs font-semibold",
-                  activeTab === tab ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-600"
-                )}>
-                  {tab === 'tenant' ? tenants.length : landlords.length}
-                </span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="w-full md:w-80">
-          <label htmlFor="search" className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-            Tìm kiếm nhanh
+      <div className="section-card flex flex-col gap-4 p-4 sm:flex-row sm:items-end sm:justify-between sm:p-5">
+        <SegmentedControl
+          aria-label="Nhóm người dùng"
+          items={userTabs}
+          value={activeTab}
+          onChange={(id) => {
+            setActiveTab(id as 'tenant' | 'landlord');
+            setSearchTerm('');
+          }}
+        />
+        <div className="w-full min-w-0 sm:max-w-xs">
+          <label htmlFor="search" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Tìm kiếm
           </label>
           <Input
             id="search"
             type="text"
-            placeholder="Tên, SĐT, CCCD, Email..."
+            placeholder="Tên, SĐT, CCCD, email…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:border-primary focus:ring-primary bg-white text-sm placeholder:text-slate-400 transition-colors"
           />
         </div>
       </div>
 
-      {/* Bảng dữ liệu */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/60">
-          <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          <p className="mt-3 text-sm font-medium text-slate-500">Đang tải dữ liệu người dùng...</p>
+        <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-6">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-2/3 rounded-lg" />
         </div>
       ) : filteredList.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center bg-slate-50/50">
-          <p className="text-slate-500 text-sm">
-            {searchTerm ? `Không tìm thấy kết quả cho "${searchTerm}"` : `Danh sách hiện đang trống.`}
-          </p>
-          {searchTerm && (
-            <Button variant="link" onClick={() => setSearchTerm('')} className="mt-2 text-primary font-semibold h-auto p-0 hover:underline">
-              Xóa bộ lọc
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={Users}
+          title={searchTerm ? 'Không tìm thấy kết quả' : 'Danh sách trống'}
+          description={
+            searchTerm
+              ? `Không có người dùng khớp “${searchTerm}”. Thử bỏ bớt từ khóa hoặc đổi nhóm.`
+              : 'Chưa có tài khoản trong nhóm này.'
+          }
+          action={
+            searchTerm ? (
+              <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+                Xóa bộ lọc
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200/60 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <table className="min-w-full divide-y divide-slate-100">
-            <thead className="bg-slate-50/75">
+        <TableShell>
+          <table className="min-w-[920px] w-full divide-y divide-border/60">
+            <thead>
               <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase">Người dùng</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase">Liên hệ</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase">CCCD</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase">KYC</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase">Uy tín</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold tracking-wider text-slate-400 uppercase">Hành động</th>
+                <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Người dùng</th>
+                <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Liên hệ</th>
+                <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">CCCD</th>
+                <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">KYC</th>
+                <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Uy tín</th>
+                <th className="px-5 py-3.5 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-border/60 bg-card">
               {filteredList.map((user) => {
                 const reputation = getReputationBadge(user.reputationScore || 0);
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50/60 transition-colors duration-150">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-bold text-slate-900">{user.fullName || '—'}</div>
-                      <div className="text-xs text-slate-400 mt-0.5 font-sans">{user.email}</div>
+                  <tr key={user.id} className="transition-colors duration-150 hover:bg-muted/35">
+                    <td className="px-5 py-4">
+                      <div className="text-sm font-bold text-foreground">{user.fullName || '—'}</div>
+                      <div className="mt-0.5 font-sans text-xs text-muted-foreground">{user.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-5 py-4 text-sm text-muted-foreground">
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-slate-800 font-medium">{user.phoneNumber || '—'}</span>
-                        <span className="text-[11px] text-primary font-medium">Zalo: {user.zaloPhone || '—'}</span>
+                        <span className="font-medium text-foreground">{user.phoneNumber || '—'}</span>
+                        <span className="text-[11px] font-medium text-primary">Zalo: {user.zaloPhone || '—'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-mono text-slate-800 tracking-tight">
+                    <td className="px-5 py-4 font-mono text-sm tracking-tight text-foreground">
                       {user.cccdNumber || '—'}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <StatusBadge
                         label={user.kycStatus === 'VERIFIED' ? 'Đã xác minh' : user.kycStatus === 'PENDING' ? 'Đang chờ duyệt' : user.kycStatus === 'REJECTED' ? 'Bị từ chối' : 'Chưa xác thực'}
-                        tone={user.kycStatus === 'VERIFIED' ? 'success' : user.kycStatus === 'PENDING' ? 'info' : 'warning'}
-                        className="text-[10px] uppercase font-bold px-2 py-1"
+                        tone={
+                          user.kycStatus === 'VERIFIED'
+                            ? 'success'
+                            : user.kycStatus === 'PENDING'
+                              ? 'info'
+                              : user.kycStatus === 'REJECTED'
+                                ? 'danger'
+                                : 'neutral'
+                        }
+                        className="px-2 py-1 text-[10px] font-bold uppercase"
                       />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <div className="flex flex-col items-start gap-1">
-                        <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border", reputation.class)}>
+                        <span className={cn("rounded-md border px-2 py-0.5 text-[10px] font-bold", reputation.class)}>
                           {reputation.label}
                         </span>
-                        <span className="text-xs font-semibold text-slate-500">{user.reputationScore}/100</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{user.reputationScore}/100</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2.5">
                         {user.kycStatus === 'PENDING' && (
                           <Button
@@ -354,7 +366,7 @@ export default function UserManagementPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </TableShell>
       )}
 
       {/* Modal nhập lý do khóa */}

@@ -16,20 +16,25 @@ export function UserNav() {
 
   // Nút bấm để mở Menu (Giữ nguyên giao diện cũ)
   const Trigger = (
-    <button className="flex items-center gap-2 rounded-full p-1 pr-3 transition-colors hover:bg-gray-100 focus:outline-none border border-transparent hover:border-gray-200">
-      <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center overflow-hidden">
+    <button
+      type="button"
+      className="flex items-center gap-1 rounded-full border border-transparent p-0.5 transition-all duration-200 hover:border-gray-200 hover:bg-gray-100 hover:shadow-sm focus:outline-none sm:gap-2 sm:p-1 sm:pr-3"
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary/10">
         {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+          <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="text-sm font-bold text-primary">
             {user.fullName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || 'U'}
           </span>
         )}
       </div>
-      <div className="hidden md:block text-left">
-        <p className="text-sm font-semibold text-gray-700 leading-none">{user.fullName || user.username} {user.role && `${user.role}`}</p>
+      <div className="hidden text-left md:block">
+        <p className="text-sm font-semibold leading-none text-gray-700">
+          {user.fullName || user.username} {user.role && `${user.role}`}
+        </p>
       </div>
-      <ChevronDown className="h-4 w-4 text-gray-400" />
+      <ChevronDown className="hidden h-4 w-4 shrink-0 text-gray-400 sm:block" aria-hidden />
     </button>
   );
 

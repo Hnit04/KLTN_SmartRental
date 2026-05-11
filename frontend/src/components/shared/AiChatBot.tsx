@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin, Sparkles, ChevronRight } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { aiApi } from "../../api/aiApi";
 import { useAuth } from "../../context/AuthContext";
+import { useCompare } from "@/context/CompareContext";
+import { cn } from "@/utils/cn";
 
 type Message = {
   id: string;
@@ -33,7 +36,20 @@ export default function AiChatBot() {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  const { compareList } = useCompare();
   const { isAuthenticated, user } = useAuth();
+
+  const isAppShell =
+    /^\/(landlord|tenant|admin)(\/|$)/.test(pathname) || pathname.startsWith("/profile");
+  const hasCompare = compareList.length > 0;
+  const mobileDockBottom = isAppShell && hasCompare
+    ? "max-md:bottom-40"
+    : isAppShell
+      ? "max-md:bottom-24"
+      : hasCompare
+        ? "max-md:bottom-28"
+        : "max-md:bottom-6";
 
   const isLandlord = user?.role === 'LANDLORD';
   const isTenant = user?.role === 'TENANT';
@@ -391,7 +407,12 @@ export default function AiChatBot() {
     <>
       {/* KHUNG CHAT (Mở ra khi isOpen = true) */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-80 sm:w-96 bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-5 duration-300">
+        <div
+          className={cn(
+            "fixed z-[60] flex min-h-0 max-h-[min(88dvh,calc(100dvh-1rem))] w-auto flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-in slide-in-from-bottom-5 zoom-in-95 duration-300 max-md:inset-x-3 max-md:w-auto md:bottom-6 md:right-6 md:h-[min(560px,85dvh)] md:w-96",
+            mobileDockBottom
+          )}
+        >
           {/* HEADER */}
           <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -519,7 +540,10 @@ export default function AiChatBot() {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-2xl flex items-center justify-center p-0 hover:scale-110 transition-transform duration-300 bg-primary hover:bg-primary/90 group"
+          className={cn(
+            "group fixed z-[55] flex h-14 w-14 items-center justify-center rounded-full bg-primary p-0 shadow-2xl transition-transform duration-300 hover:scale-110 hover:bg-primary/90 max-md:right-3 md:bottom-6 md:right-6",
+            mobileDockBottom
+          )}
         >
           <Sparkles className="w-6 h-6 text-yellow-300 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity" />
           <Bot className="w-7 h-7 text-primary-foreground" />
@@ -528,7 +552,7 @@ export default function AiChatBot() {
 
       {/* TÍNH NĂNG ACTIONABLE AI: MODAL DUYỆT TIN NHẮN */}
       {isDraftModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[85vh]">
             <div className="bg-indigo-600 text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">

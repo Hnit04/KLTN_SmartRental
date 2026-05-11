@@ -7,6 +7,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatKpiCard, DashboardPanel } from '@/components/dashboard';
 import { Link } from 'react-router-dom';
 import { billApi } from '@/api/billApi';
 import { roomApi } from '@/api/roomApi';
@@ -135,126 +137,95 @@ export default function DashboardPage() {
   const isPositiveChange = percentageChange >= 0;
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-8 pb-20">
+      <PageHeader
+        title="Tổng quan kinh doanh"
+        description="Tình hình doanh thu, lấp đầy và việc cần xử lý — cập nhật theo dữ liệu thực tế."
+        actions={
+          <Link to="/landlord/reports">
+            <Button variant="outline" size="sm" className="shadow-xs">
+              Báo cáo chi tiết
+            </Button>
+          </Link>
+        }
+      />
 
-      {/* --- HEADER --- */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tổng quan kinh doanh</h1>
-        <p className="text-sm text-gray-500 mt-1">Xin chào, đây là tình hình khu trọ của bạn hôm nay.</p>
-      </div>
-
-      {/* --- 4 THẺ THỐNG KÊ (KPI CARDS) --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-        {/* Doanh thu tháng này - Dùng dữ liệu từ API */}
-        <Link to="/landlord/reports" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Doanh thu (Tháng này)</p>
-              {loading ? (
-                <h3 className="text-2xl font-bold text-gray-900 mt-1">Đang tải...</h3>
-              ) : error ? (
-                <h3 className="text-2xl font-bold text-red-600 mt-1">Lỗi</h3>
-              ) : (
-                <h3 className="text-2xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(thisMonthRevenue)}
-                </h3>
-              )}
-            </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-all">
-              <Wallet className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            {loading || error ? (
-              <span className="text-gray-400">—</span>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+        <StatKpiCard
+          to="/landlord/reports"
+          icon={<Wallet className="h-5 w-5" />}
+          iconClassName="text-sky-600"
+          label="Doanh thu (tháng này)"
+          value={
+            loading ? '…' : error ? 'Lỗi' : formatCurrency(thisMonthRevenue)
+          }
+          description={
+            loading || error ? (
+              '—'
             ) : (
-              <>
-                <span
-                  className={`flex items-center font-medium ${isPositiveChange ? 'text-green-600' : 'text-red-600'
-                    }`}
-                >
-                  {isPositiveChange ? (
-                    <ArrowUpRight className="h-4 w-4 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4 mr-1" />
-                  )}
+              <span className="inline-flex items-center gap-1.5">
+                <span className={isPositiveChange ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}>
+                  {isPositiveChange ? <ArrowUpRight className="inline h-3.5 w-3.5" /> : <ArrowDownRight className="inline h-3.5 w-3.5" />}
                   {Math.abs(percentageChange).toFixed(1)}%
                 </span>
-                <span className="text-gray-400 ml-2">so với tháng trước</span>
-              </>
-            )}
-          </div>
-        </Link>
+                <span className="text-muted-foreground">so với tháng trước</span>
+              </span>
+            )
+          }
+        />
 
-        {/* Dự kiến thu (Tháng tới) */}
-        <Link to="/landlord/reports" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Dự kiến thu (Tháng tới)</p>
-              <h3 className="text-2xl font-bold text-blue-600 mt-1">
-                {formatCurrency(insights?.projectedRevenue || 0)}
-              </h3>
-            </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-all">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-gray-400">
-            Dựa trên các hợp đồng đang hiệu lực
-          </p>
-        </Link>
+        <StatKpiCard
+          to="/landlord/reports"
+          icon={<TrendingUp className="h-5 w-5" />}
+          iconClassName="text-primary"
+          label="Dự kiến thu (tháng tới)"
+          value={formatCurrency(insights?.projectedRevenue || 0)}
+          description="Dựa trên hợp đồng đang hiệu lực"
+        />
 
-        {/* Tiền thất thoát (Phòng trống) */}
-        <Link to="/landlord/properties" className="bg-white p-6 rounded-2xl border shadow-sm border-l-4 border-l-red-500 hover:shadow-md transition-all group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-500 text-red-600">Thất thoát (Phòng trống)</p>
-              <h3 className="text-2xl font-bold text-red-600 mt-1">
-                -{formatCurrency(insights?.opportunityCost || 0)}
-              </h3>
-            </div>
-            <div className="p-2 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
-              <AlertCircle className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-red-400 font-medium">
-             Cần đẩy nhanh việc tìm khách thuê
-          </p>
-        </Link>
+        <StatKpiCard
+          to="/landlord/properties"
+          icon={<AlertCircle className="h-5 w-5" />}
+          iconClassName="text-red-600"
+          label="Thất thoát (phòng trống)"
+          value={`-${formatCurrency(insights?.opportunityCost || 0)}`}
+          description="Ưu tiên tìm khách để giảm phần trống"
+          className="border-l-4 border-l-red-500"
+        />
 
-        {/* Tỷ lệ lấp đầy */}
-        <Link to="/landlord/properties" className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">Tỷ lệ lấp đầy</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-1">
-                {occupancyRate}%
-              </h3>
+        <StatKpiCard
+          to="/landlord/properties"
+          icon={<HomeIcon className="h-5 w-5" />}
+          iconClassName="text-emerald-600"
+          label="Tỷ lệ lấp đầy"
+          value={`${occupancyLoading ? '…' : occupancyError ? '—' : `${occupancyRate}%`}`}
+          footer={
+            <div className="flex items-center gap-2">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${Math.min(100, occupancyRate)}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                {occupiedRooms}/{totalRooms} phòng
+              </span>
             </div>
-            <div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all">
-              <HomeIcon className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500" style={{ width: `${occupancyRate}%` }} />
-            </div>
-            <span className="text-xs text-gray-400 font-medium">{occupiedRooms}/{totalRooms} phòng</span>
-          </div>
-        </Link>
+          }
+        />
       </div>
 
-      {/* Phần còn lại giữ nguyên (biểu đồ + to-do list) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* BIỂU ĐỒ DOANH THU */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Biểu đồ doanh thu 6 tháng</h3>
-            <span className="text-sm text-gray-500 font-medium bg-gray-50 px-3 py-1.5 rounded-lg border">{new Date().getFullYear()}</span>
-          </div>
-          <div className="h-[300px] w-full">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <DashboardPanel
+          className="lg:col-span-2"
+          title="Biểu đồ doanh thu 6 tháng"
+          action={
+            <span className="rounded-lg border border-border/60 bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground">
+              {new Date().getFullYear()}
+            </span>
+          }
+        >
+          <div className="h-[300px] w-full px-4 pb-5 pt-2 sm:px-6">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
@@ -274,17 +245,16 @@ export default function DashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </DashboardPanel>
 
-        {/* DANH SÁCH CẦN CHÚ Ý */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-orange-500" /> Cần xử lý ngay
-          </h3>
-
-          <div className="space-y-4 flex-1">
+        <DashboardPanel
+          title="Cần xử lý ngay"
+          description="Ưu tiên thu nợ, gia hạn và lấp phòng trống"
+          action={<AlertCircle className="h-5 w-5 shrink-0 text-amber-500" aria-hidden />}
+        >
+          <div className="flex flex-1 flex-col space-y-4 p-4 sm:p-5">
             {overdueCount > 0 && (
-              <Link to="/landlord/finance" className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-all group">
+              <Link to="/landlord/finance" className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 hover:shadow-sm transition-all duration-200 group">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-red-900 group-hover:text-red-600 transition-colors">{overdueCount} hóa đơn quá hạn</p>
@@ -295,7 +265,7 @@ export default function DashboardPage() {
 
             {insights?.expiringContractsCount > 0 && (
               <div className="space-y-2">
-                <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group">
+                <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 hover:shadow-sm transition-all duration-200 group">
                   <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div>
                     <p className="text-sm font-bold text-amber-900 group-hover:text-amber-600 transition-colors">{insights.expiringContractsCount} hợp đồng sắp hết hạn</p>
@@ -324,7 +294,7 @@ export default function DashboardPage() {
             )}
 
             {occupancyRate < 100 && (
-              <Link to="/landlord/properties" className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-all group">
+              <Link to="/landlord/properties" className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group">
                 <HomeIcon className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-blue-900 group-hover:text-blue-600 transition-colors">Phòng trống cần cho thuê</p>
@@ -334,7 +304,7 @@ export default function DashboardPage() {
             )}
             
             {insights?.latePaymentRoomsCount > 0 && (
-              <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100 hover:border-purple-300 transition-all group">
+              <Link to="/landlord/contracts" className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 group">
                 <Users className="h-5 w-5 text-purple-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-purple-900 group-hover:text-purple-600 transition-colors">{insights.latePaymentRoomsCount} phòng đóng tiền trễ</p>
@@ -342,14 +312,14 @@ export default function DashboardPage() {
                 </div>
               </Link>
             )}
-          </div>
 
-          <Link to="/landlord/contracts" className="w-full mt-4 block">
-            <Button variant="outline" className="w-full">
-              Xem tất cả công việc
-            </Button>
-          </Link>
-        </div>
+            <Link to="/landlord/contracts" className="mt-auto block w-full pt-2">
+              <Button variant="outline" className="w-full shadow-xs">
+                Xem tất cả công việc
+              </Button>
+            </Link>
+          </div>
+        </DashboardPanel>
       </div>
 
     </div>

@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { billApi } from '@/api/billApi';
@@ -275,16 +278,12 @@ export default function BillManagePage() {
   });
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý Thu Tiền</h1>
-          <p className="text-gray-500 text-sm">Chốt điện nước và quản lý hóa đơn hàng tháng</p>
-        </div>
-        
-        {/* KHỐI CHỌN THÁNG/NĂM (ĐÃ NÂNG CẤP) */}
-        <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+    <div className="mx-auto max-w-7xl space-y-6 pb-10">
+      <PageHeader
+        title="Quản lý thu tiền"
+        description="Chốt điện nước, tạo hóa đơn và xác nhận thanh toán theo tháng."
+        actions={
+          <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-card p-1.5 shadow-soft">
           <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
           
           <div className="relative flex items-center gap-2 font-semibold min-w-[130px] justify-center cursor-pointer hover:text-primary transition-colors group">
@@ -306,28 +305,29 @@ export default function BillManagePage() {
           </div>
 
           <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      {/* --- THANH CÔNG CỤ (TOOLBAR): SEARCH, FILTER, SORT --- */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+      <div className="section-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-4">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input 
-            placeholder="Tìm theo tên phòng, người thuê hoặc ID hợp đồng (VD: 5)..." 
-            className="pl-10 h-11 rounded-xl bg-white border-gray-200 shadow-sm"
+            placeholder="Tìm theo tên phòng, người thuê hoặc ID hợp đồng…" 
+            className="h-11 pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         
-        <div className="flex flex-wrap sm:flex-nowrap gap-3">
-          <div className="relative w-full sm:w-48">
-             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-nowrap">
+          <div className="relative w-full min-w-0 sm:w-48">
+             <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
              <select
-                className="w-full h-11 pl-9 pr-8 appearance-none bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none cursor-pointer shadow-sm text-gray-700"
+                className="select-native w-full pl-9"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
+                aria-label="Lọc theo trạng thái"
              >
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="UNBILLED">Chưa chốt sổ</option>
@@ -337,12 +337,13 @@ export default function BillManagePage() {
              </select>
           </div>
 
-          <div className="relative w-full sm:w-56">
-             <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <div className="relative w-full min-w-0 sm:w-56">
+             <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
              <select
-                className="w-full h-11 pl-9 pr-8 appearance-none bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none cursor-pointer shadow-sm text-gray-700"
+                className="select-native w-full pl-9"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
+                aria-label="Sắp xếp"
              >
                 <option value="ROOM_ASC">Sắp xếp: Phòng (A-Z)</option>
                 <option value="ROOM_DESC">Sắp xếp: Phòng (Z-A)</option>
@@ -353,23 +354,26 @@ export default function BillManagePage() {
         </div>
       </div>
 
-      {/* DANH SÁCH PHÒNG */}
       {isLoading ? (
-         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
-      ) : processedContracts.length === 0 ? (
-         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
-            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">Không tìm thấy kết quả</h3>
-            <p className="text-gray-500 mt-1">Vui lòng thử đổi từ khóa tìm kiếm hoặc bộ lọc khác.</p>
+         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+           {[1, 2, 3, 4, 5, 6].map((i) => (
+             <Skeleton key={i} className="h-[220px] rounded-2xl" />
+           ))}
          </div>
+      ) : processedContracts.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Không có hợp đồng phù hợp"
+          description="Thử đổi tháng, từ khóa tìm kiếm hoặc bộ lọc trạng thái."
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
           {processedContracts.map(contract => (
-            <div key={contract.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all flex flex-col">
-              <div className="p-5 border-b border-gray-100 flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Phòng {contract.roomName}</h3>
-                  <p className="text-sm text-gray-500">{contract.tenantName}</p>
+            <div key={contract.id} className="flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-soft transition-all duration-200 hover:border-primary/20 hover:shadow-card">
+              <div className="flex items-start justify-between border-b border-border/60 p-5">
+                <div className="min-w-0">
+                  <h3 className="truncate text-lg font-bold text-foreground">Phòng {contract.roomName}</h3>
+                  <p className="truncate text-sm text-muted-foreground">{contract.tenantName}</p>
                   <Link to="/landlord/contracts" className="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block border border-primary/10 hover:bg-primary/10 transition-colors">
                     Hợp đồng #{contract.id}
                   </Link>
@@ -380,16 +384,16 @@ export default function BillManagePage() {
                 {contract.billStatus === 'LATE' && <StatusBadge label="Trễ hạn" tone="danger" />}
               </div>
 
-              <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
+              <div className="flex flex-1 flex-col justify-between space-y-4 p-5">
                 <div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Giá thuê:</span>
-                    <span className="font-semibold">{formatCurrency(contract.actualPrice)}</span>
+                    <span className="text-muted-foreground">Giá thuê</span>
+                    <span className="font-semibold tabular-nums text-foreground">{formatCurrency(contract.actualPrice)}</span>
                   </div>
                   {contract.totalAmount && (
-                    <div className="flex justify-between text-sm pt-2 border-t border-dashed mt-2">
-                      <span className="text-gray-500">Tổng cộng:</span>
-                      <span className="font-bold text-primary text-base">{formatCurrency(contract.totalAmount)}</span>
+                    <div className="mt-2 flex justify-between border-t border-dashed border-border/60 pt-2 text-sm">
+                      <span className="text-muted-foreground">Tổng cộng</span>
+                      <span className="text-base font-bold tabular-nums text-primary">{formatCurrency(contract.totalAmount)}</span>
                     </div>
                   )}
                 </div>
@@ -426,9 +430,9 @@ export default function BillManagePage() {
 
       {/* --- MODAL CHỐT SỔ --- */}
       {isChotSoModalOpen && selectedContract && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8 animate-in zoom-in-95">
-            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-5 border-b flex justify-between items-center bg-muted/40">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Receipt className="h-5 w-5 text-primary" />
                 Chốt Sổ Tháng {currentMonth} - Phòng {selectedContract.roomName}
@@ -519,7 +523,7 @@ export default function BillManagePage() {
                     </div>
                 </div>
 
-                <div className="p-6 md:w-80 bg-gray-50 flex flex-col justify-between">
+                <div className="p-6 md:w-80 bg-muted/40 flex flex-col justify-between">
                     <div>
                         <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mb-5 shadow-sm">
                             <label className="text-xs font-bold text-orange-800 uppercase flex items-center gap-1.5 mb-2">
@@ -608,13 +612,13 @@ export default function BillManagePage() {
 
       {/* --- MODAL BIÊN LAI --- */}
       {isReceiptModalOpen && viewingContract && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
            <div className="bg-white w-full max-w-md overflow-hidden shadow-2xl relative my-8 animate-in zoom-in-95">
               <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 bg-white/50 rounded-full p-1">
                  <X className="h-5 w-5" />
               </button>
               
-              <div className="p-8 pb-4 text-center bg-gray-50 border-b border-gray-200">
+              <div className="p-8 pb-4 text-center bg-muted/40 border-b border-gray-200">
                  <div className="w-14 h-14 bg-white border border-gray-200 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                     <Receipt className="h-7 w-7 text-primary" />
                  </div>
@@ -680,7 +684,7 @@ export default function BillManagePage() {
                  {(viewingContract.elecMeterImageUrl || viewingContract.waterMeterImageUrl) && (
                      <div className="pt-2 flex gap-3">
                         {viewingContract.elecMeterImageUrl && (
-                            <div className="flex-1 bg-gray-50 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
+                            <div className="flex-1 bg-muted/40 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
                                 <a href={viewingContract.elecMeterImageUrl} target="_blank" rel="noopener noreferrer">
                                    <img src={viewingContract.elecMeterImageUrl} alt="Đồng hồ điện" className="w-full h-16 object-cover rounded hover:scale-110 transition-transform"/>
                                    <p className="text-[9px] font-bold text-gray-500 uppercase mt-1">Chỉ số Điện</p>
@@ -688,7 +692,7 @@ export default function BillManagePage() {
                             </div>
                         )}
                         {viewingContract.waterMeterImageUrl && (
-                            <div className="flex-1 bg-gray-50 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
+                            <div className="flex-1 bg-muted/40 border border-gray-100 rounded p-1 text-center group cursor-pointer overflow-hidden">
                                 <a href={viewingContract.waterMeterImageUrl} target="_blank" rel="noopener noreferrer">
                                    <img src={viewingContract.waterMeterImageUrl} alt="Đồng hồ nước" className="w-full h-16 object-cover rounded hover:scale-110 transition-transform"/>
                                    <p className="text-[9px] font-bold text-gray-500 uppercase mt-1">Chỉ số Nước</p>
@@ -713,7 +717,7 @@ export default function BillManagePage() {
                  ) : null}
 
                  {viewingContract.note && (
-                     <div className="p-3 bg-gray-50 rounded text-xs text-gray-600 border border-gray-100 italic">
+                     <div className="p-3 bg-muted/40 rounded text-xs text-gray-600 border border-gray-100 italic">
                          <span className="font-semibold not-italic">Ghi chú: </span>{viewingContract.note}
                      </div>
                  )}
@@ -745,7 +749,7 @@ export default function BillManagePage() {
       )}
       {/* --- MODAL THỰC THU --- */}
       {paymentModalOpen && selectedBillForPayment && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="p-5 border-b text-center bg-orange-50">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm text-orange-500 border border-orange-100">
@@ -774,7 +778,7 @@ export default function BillManagePage() {
                 )}
               </div>
             </div>
-            <div className="p-4 bg-gray-50 flex gap-3 border-t">
+            <div className="p-4 bg-muted/40 flex gap-3 border-t">
               <Button className="flex-1" variant="outline" onClick={() => setPaymentModalOpen(false)}>Hủy</Button>
               <Button 
                 className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" 

@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FileText, Download, PenTool, CheckCircle, Calendar,
   MapPin, ArrowLeft, Blocks, Receipt,
   AlertCircle, Clock, CheckCircle2, Loader2, Star, Users,
-  MessageSquare, XCircle, Check, Sparkles, User, LogOut, TrendingUp, QrCode, Trash2, ShieldCheck
+  MessageSquare, XCircle, Check, Sparkles, User, LogOut, TrendingUp, QrCode, Trash2, ShieldCheck,
+  AlertTriangle, Banknote, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -26,8 +28,20 @@ import {
   executeEndContract as web3ExecuteEndContract,
   withdrawFunds as web3WithdrawFunds
 } from "@/utils/contractHelper";
-import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import StatusBadge from "@/components/shared/StatusBadge";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl, type SegmentItem } from "@/components/ui/SegmentedControl";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { DashboardPanel } from "@/components/dashboard";
+import {
+  AttentionBanner,
+  StatusSummaryStrip,
+  OperationalTimeline,
+  type AttentionTone,
+  type SummaryStripItem,
+  type OperationalTimelineEvent,
+} from "@/components/detail";
 import { Bot } from "lucide-react";
 import type {
   Contract,
@@ -41,6 +55,31 @@ import { useSystemConfig } from "@/context/SystemConfigContext";
 import ReviewModal from "@/features/interaction/components/ReviewModal";
 import html2pdf from "html2pdf.js";
 import { ethers } from "ethers";
+
+const CONTRACT_STATUS_LABEL: Record<string, string> = {
+  PENDING_SIGNATURE: "Chờ ký",
+  AWAITING_DEPOSIT: "Chờ cọc",
+  ACTIVE: "Đang hiệu lực",
+  EXPIRED: "Hết hạn",
+  TERMINATED_EARLY: "Chấm dứt sớm",
+  CANCELLED: "Đã hủy",
+};
+
+const CHANGE_TYPE_LABELS: Record<RequestType, string> = {
+  RENT_INCREASE: "Điều chỉnh giá thuê",
+  EXTENSION: "Gia hạn hợp đồng",
+  TERMINATION: "Chấm dứt trước hạn",
+  CHANGE_TERMS: "Điều khoản / nội quy",
+  CHANGE_SIGN_METHOD: "Phương thức ký",
+};
+
+const REQUEST_STATUS_SHORT: Record<string, string> = {
+  PENDING: "Chờ xử lý",
+  ACCEPTED: "Đã chấp nhận",
+  APPROVED: "Đã duyệt",
+  REJECTED: "Từ chối",
+};
+
 interface ContractDetail extends Contract {
   roomName?: string;
   propertyAddress?: string;
@@ -828,8 +867,248 @@ export default function ContractDetailPage() {
     return { __html: html };
   };
 
-  if (isLoading) return <div className="py-20 flex justify-center"><LoadingSpinner /></div>;
-  if (!contract) return <div className="text-center py-20">Không tìm thấy hợp đồng.</div>;
+  type AttentionItem = {
+    id: string;
+    tone: AttentionTone;
+    title: string;
+    description?: string;
+    icon: LucideIcon;
+  };
+
+  const contractOperational = useMemo(() => {
+    if (!contract) {
+      return {
+        attention: [] as AttentionItem[],
+        summaryItems: [] as SummaryStripItem[],
+        timelineEvents: [] as OperationalTimelineEvent[],
+        sortedBills: [] as typeof bills,
+      };
+    }
+
+    const now = Date.now();
+    let overdueCount = 0;
+    let overdueAmount = 0;
+    let unpaidNotOverdue = 0;
+    const upcomingUnpaid: { bill: (typeof bills)[number]; t: number }[] = [];
+
+    for (const b of bills) {
+      const dl = new Date(b.deadline).getTime();
+      const overdue = b.status !== "PAID" && (b.status === "LATE" || dl < now);
+      if (overdue) {
+        overdueCount += 1;
+        overdueAmount += Number(b.totalAmount || 0);
+      } else if (b.status !== "PAID") {
+        unpaidNotOverdue += 1;
+        upcomingUnpaid.push({ bill: b, t: dl });
+      }
+    }
+    upcomingUnpaid.sort((a, b) => a.t - b.t);
+    const nextUnpaid = upcomingUnpaid[0];
+
+    const daysToEnd = contract.endDate
+      ? Math.ceil((new Date(contract.endDate).getTime() - now) / 86400000)
+      : null;
+
+    const pendingResident = residentRequests.filter((r) => r.status === "PENDING").length;
+
+    const sortedBills = [...bills].sort((a, b) => {
+      const rank = (x: (typeof bills)[number]) => {
+        if (x.status === "PAID") return 2_000_000_000_000 + new Date(x.deadline).getTime();
+        const d = new Date(x.deadline).getTime();
+        if (x.status === "LATE" || d < now) return d;
+        return 1_000_000_000_000 + d;
+      };
+      return rank(a) - rank(b);
+    });
+
+    const timelineEvents: OperationalTimelineEvent[] = [];
+    if (contract.startDate) {
+      timelineEvents.push({
+        id: "mile-start",
+        at: contract.startDate,
+        title: "Ngày bắt đầu hiệu lực",
+        tone: "muted",
+      });
+    }
+    if (contract.endDate) {
+      timelineEvents.push({
+        id: "mile-end",
+        at: contract.endDate,
+        title: "Ngày kết thúc theo hợp đồng",
+        tone:
+          daysToEnd !== null && daysToEnd <= 0 ? "danger" : daysToEnd !== null && daysToEnd <= 30 ? "warning" : "muted",
+      });
+    }
+    if (contract.signDate) {
+      timelineEvents.push({
+        id: "mile-sign",
+        at: contract.signDate,
+        title: "Ngày ký hợp đồng",
+        tone: "success",
+      });
+    }
+    for (const cr of changeRequests) {
+      timelineEvents.push({
+        id: `cr-${cr.id}`,
+        at: cr.requestDate,
+        title: `${CHANGE_TYPE_LABELS[cr.type] || cr.type} · ${REQUEST_STATUS_SHORT[cr.status] || cr.status}`,
+        detail: cr.reason?.slice(0, 140),
+        tone: cr.status === "REJECTED" ? "danger" : cr.status === "PENDING" ? "warning" : "success",
+      });
+    }
+
+    const attention: AttentionItem[] = [];
+
+    const needMySign =
+      contract.status === "PENDING_SIGNATURE" &&
+      user &&
+      ((user.role === "TENANT" && !contract.isTenantSigned) || (user.role === "LANDLORD" && !contract.isLandlordSigned));
+    if (needMySign) {
+      attention.push({
+        id: "sign-me",
+        tone: "warning",
+        title: "Cần chữ ký của bạn",
+        description: "Hoàn tất ký để chuyển các bước cọc / hiệu lực theo quy trình.",
+        icon: PenTool,
+      });
+    }
+
+    if (
+      user?.role === "TENANT" &&
+      contract.depositStatus !== "DEPOSITED" &&
+      contract.isTenantSigned &&
+      contract.isLandlordSigned &&
+      !["EXPIRED", "CANCELLED", "TERMINATED_EARLY"].includes(contract.status)
+    ) {
+      attention.push({
+        id: "dep",
+        tone: "warning",
+        title: "Tiền cọc chưa hoàn tất",
+        description: `Số tiền cọc ${Number(contract.depositAmount || 0).toLocaleString("vi-VN")} đ — nạp sớm để kích hoạt hiệu lực.`,
+        icon: Banknote,
+      });
+    }
+
+    if (user?.role === "TENANT" && overdueCount > 0) {
+      attention.push({
+        id: "bill-late-tenant",
+        tone: "danger",
+        title: `${overdueCount} hóa đơn quá hạn`,
+        description: "Ưu tiên thanh toán trong tab Hóa đơn để tránh tranh chấp hoặc phạt.",
+        icon: AlertTriangle,
+      });
+    }
+
+    if (user?.role === "LANDLORD" && overdueCount > 0) {
+      attention.push({
+        id: "bill-late-landlord",
+        tone: "warning",
+        title: `${overdueCount} kỳ chưa thanh toán đúng hạn`,
+        description: overdueAmount
+          ? `Tổng dư nợ hiển thị khoảng ${overdueAmount.toLocaleString("vi-VN")} đ — xem tab Hóa đơn.`
+          : "Kiểm tra tab Hóa đơn và liên hệ khách nếu cần.",
+        icon: Receipt,
+      });
+    }
+
+    if (contract.status === "ACTIVE" && daysToEnd !== null && daysToEnd > 0 && daysToEnd <= 30) {
+      attention.push({
+        id: "exp",
+        tone: daysToEnd <= 14 ? "warning" : "info",
+        title: "Hợp đồng sắp kết thúc",
+        description: `Còn khoảng ${daysToEnd} ngày đến ${new Date(contract.endDate!).toLocaleDateString("vi-VN")}.`,
+        icon: Calendar,
+      });
+    }
+
+    if (user?.role === "LANDLORD" && pendingResident > 0) {
+      attention.push({
+        id: "resident",
+        tone: "info",
+        title: `${pendingResident} yêu cầu thành viên phòng`,
+        description: "Duyệt hoặc từ chối để giữ danh sách cư trú minh bạch.",
+        icon: UserPlus,
+      });
+    }
+
+    const summaryItems: SummaryStripItem[] = [
+      {
+        id: "status",
+        label: "Trạng thái",
+        value: CONTRACT_STATUS_LABEL[contract.status] || contract.status,
+        subline: contract.signMethod === "BLOCKCHAIN" ? "On-chain" : "Ký điện tử",
+      },
+      {
+        id: "rent",
+        label: "Giá thuê",
+        value: `${Number(contract.actualPrice || 0).toLocaleString("vi-VN")} đ`,
+        subline: "Mỗi tháng",
+      },
+      {
+        id: "deposit",
+        label: "Cọc",
+        value: contract.depositStatus === "DEPOSITED" ? "Đã nạp" : "Chưa nạp",
+        tone: contract.depositStatus === "DEPOSITED" ? "success" : "warning",
+      },
+      {
+        id: "pay-health",
+        label: "Thanh toán",
+        value:
+          overdueCount > 0
+            ? `${overdueCount} quá hạn`
+            : unpaidNotOverdue > 0
+              ? `${unpaidNotOverdue} chờ thanh toán`
+              : bills.length
+                ? "Không có quá hạn"
+                : "—",
+        subline: nextUnpaid
+          ? `Hạn gần nhất: ${new Date(nextUnpaid.bill.deadline).toLocaleDateString("vi-VN")}`
+          : undefined,
+        tone: overdueCount > 0 ? "danger" : unpaidNotOverdue > 0 ? "warning" : bills.length ? "success" : "muted",
+      },
+      {
+        id: "trust",
+        label: "Trust layer",
+        value: contract.smartContractAddress ? "Smart contract" : "Không neo chain",
+        subline: contract.contractHash ? "Đã có hash" : contract.signMethod === "BLOCKCHAIN" ? "Theo dõi xác minh" : "",
+        tone: contract.smartContractAddress ? "success" : "muted",
+      },
+    ];
+
+    return {
+      attention: attention.slice(0, 4),
+      summaryItems,
+      timelineEvents,
+      sortedBills,
+    };
+  }, [contract, bills, changeRequests, residentRequests, user]);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6 px-3 py-6 sm:px-4">
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-8 w-64 max-w-full rounded-lg" />
+            <Skeleton className="h-4 w-48 rounded-md" />
+          </div>
+        </div>
+        <Skeleton className="h-11 w-full max-w-md rounded-xl" />
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-64 rounded-2xl md:col-span-2" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+  if (!contract) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16">
+        <EmptyState icon={FileText} title="Không tìm thấy hợp đồng" description="Mã hợp đồng không tồn tại hoặc bạn không có quyền xem." />
+      </div>
+    );
+  }
 
   const pendingRequest = changeRequests.find(req => req.status === 'PENDING');
 
@@ -865,16 +1144,24 @@ export default function ContractDetailPage() {
     ? (new Date(contract.endDate).getFullYear() - new Date(contract.startDate).getFullYear()) * 12 + (new Date(contract.endDate).getMonth() - new Date(contract.startDate).getMonth())
     : '...';
 
+  const contractTabItems: SegmentItem[] = [
+    { id: 'INFO', label: 'Thông tin & hợp đồng' },
+    { id: 'BILLS', label: user?.role === 'LANDLORD' ? 'Hóa đơn' : 'Hóa đơn & thanh toán' },
+  ];
+
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="rounded-full">
-          <ArrowLeft className="w-5 h-5" />
+    <div className="mx-auto min-w-0 max-w-5xl space-y-6 overflow-x-hidden px-3 py-4 sm:px-4">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="shrink-0 rounded-full" aria-label="Quay lại">
+          <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Chi tiết hợp đồng</h1>
-          <p className="text-sm text-gray-500">Mã hợp đồng: #{contract.id} • {contract.roomName}</p>
-        </div>
+        <PageHeader
+          className="mb-0 min-w-0 flex-1 border-0 pb-0"
+          title="Không gian làm việc hợp đồng"
+          description={
+            [ `#${contract.id}`, contract.roomName || 'Phòng', contract.propertyAddress ].filter(Boolean).join(' · ')
+          }
+        />
       </div>
 
       {contract.isCompromised && (
@@ -887,53 +1174,65 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      <div className="flex bg-white p-1 rounded-xl border shadow-sm w-fit">
-        <button
-          onClick={() => setActiveTab('INFO')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'INFO' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          <FileText className="w-4 h-4" /> Thông tin & Hợp đồng
-        </button>
-        <button
-          onClick={() => setActiveTab('BILLS')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'BILLS' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          <Receipt className="w-4 h-4" />
-          {user?.role === 'LANDLORD' ? 'Quản lý Hóa đơn' : 'Hóa đơn & Thanh toán'}
-        </button>
-      </div>
+      {contractOperational.attention.length > 0 ? (
+        <div className="space-y-2">
+          {contractOperational.attention.map((a) => (
+            <AttentionBanner key={a.id} tone={a.tone} title={a.title} description={a.description} icon={a.icon} />
+          ))}
+        </div>
+      ) : null}
 
-      <div className="section-card p-4 md:p-5">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tiến độ hợp đồng</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {timelineSteps.map((step, index) => {
-            const nextDone = timelineSteps[index + 1]?.done;
-            return (
-              <div key={step.key} className="relative rounded-xl border bg-background px-3 py-3">
-                {index < timelineSteps.length - 1 && (
-                  <div className="hidden lg:block absolute top-6 -right-2 w-4 h-[2px]">
-                    <div className={cn("h-full w-full", nextDone || step.done ? "bg-green-300" : "bg-border")} />
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    "h-7 w-7 rounded-full border flex items-center justify-center",
-                    step.done ? "bg-green-100 border-green-200 text-green-700" : "bg-muted border-border text-muted-foreground"
-                  )}>
-                    {step.done ? <Check className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                  </div>
-                  <div className="min-w-0">
-                    <p className={cn("text-xs font-semibold", step.done ? "text-foreground" : "text-muted-foreground")}>{step.label}</p>
-                    <p className={cn("text-[11px]", step.done ? "text-green-700" : "text-muted-foreground")}>
-                      {step.done ? "Đã hoàn thành" : "Đang chờ"}
-                    </p>
+      <StatusSummaryStrip items={contractOperational.summaryItems} />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <OperationalTimeline
+          events={contractOperational.timelineEvents}
+          description="Mốc hợp đồng và đề xuất thay đổi — mới nhất ở trên."
+        />
+        <div className="section-card p-4 md:p-5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tiến độ quy trình</p>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            {timelineSteps.map((step, index) => {
+              const nextDone = timelineSteps[index + 1]?.done;
+              return (
+                <div key={step.key} className="relative rounded-xl border border-border/60 bg-background px-2.5 py-2.5 sm:px-3 sm:py-3">
+                  {index < timelineSteps.length - 1 && (
+                    <div className="hidden lg:block absolute top-6 -right-1.5 w-3 h-[2px]">
+                      <div className={cn("h-full w-full rounded-full", nextDone || step.done ? "bg-emerald-400/80" : "bg-border")} />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
+                        step.done
+                          ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                          : "border-border bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {step.done ? <Check className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={cn("text-xs font-semibold", step.done ? "text-foreground" : "text-muted-foreground")}>{step.label}</p>
+                      <p className={cn("text-[11px]", step.done ? "text-emerald-800" : "text-muted-foreground")}>
+                        {step.done ? "Hoàn thành" : "Đang chờ"}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      <SegmentedControl
+        aria-label="Khu vực hợp đồng"
+        items={contractTabItems}
+        value={activeTab}
+        onChange={(id) => setActiveTab(id as 'INFO' | 'BILLS')}
+        className="w-full sm:w-auto"
+      />
 
       {activeTab === 'INFO' && (
         <div className="grid md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
@@ -941,8 +1240,8 @@ export default function ContractDetailPage() {
 
             {pendingRequest && (
               <div className="bg-white border-2 border-orange-200 rounded-2xl overflow-hidden shadow-md animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="bg-orange-50 px-5 py-3 border-b border-orange-100 flex justify-between items-center">
-                   <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-orange-100 bg-orange-50 px-4 py-3 sm:items-center sm:px-5">
+                   <div className="flex min-w-0 items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center">
                          <PenTool className="w-4 h-4 text-orange-700" />
                       </div>
@@ -965,7 +1264,7 @@ export default function ContractDetailPage() {
                              </div>
                           </div>
                           
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                          <div className="bg-muted/40 p-3 rounded-xl border border-gray-100">
                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Lý do đưa ra</p>
                              <p className="text-sm italic text-gray-600 leading-relaxed">“{pendingRequest.reason}”</p>
                           </div>
@@ -1122,7 +1421,7 @@ export default function ContractDetailPage() {
             {/* ────── QUẢN LÝ THÀNH VIÊN (DÀNH CHO CHỦ NHÀ / LANDLORD ONLY) ────── */}
             {user?.role === 'LANDLORD' && (
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6">
-                <div className="bg-gray-50/50 px-6 py-4 border-b flex items-center justify-between">
+                <div className="bg-muted/40/50 px-6 py-4 border-b flex items-center justify-between">
                   <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
                     <Users className="h-5 w-5 text-primary" /> Thành viên cùng phòng
                   </h3>
@@ -1148,7 +1447,7 @@ export default function ContractDetailPage() {
 
                   {/* Các thành viên khác đã được duyệt */}
                   {members.map(member => (
-                    <div key={member.id} className="p-5 flex items-center justify-between hover:bg-gray-50/30 transition-colors">
+                    <div key={member.id} className="p-5 flex items-center justify-between hover:bg-muted/40/30 transition-colors">
                       <div className="flex items-center gap-4">
                         <img
                           src={member.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`}
@@ -1287,7 +1586,7 @@ export default function ContractDetailPage() {
                       (r.type === 'ADD' && (r.status === 'PENDING' || r.status === 'ACCEPTED')) || 
                       (r.type === 'REMOVE' && (r.status === 'PENDING' || r.status === 'ACCEPTED'))
                     ).length === 0 && (
-                    <div className="p-8 text-center bg-gray-50/30">
+                    <div className="p-8 text-center bg-muted/40/30">
                       <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
                       <p className="text-xs text-gray-400 italic">Hiện tại chưa có thành viên nào khác trong phòng.</p>
                     </div>
@@ -1312,7 +1611,7 @@ export default function ContractDetailPage() {
                         req.status === 'REJECTED' ? "border-rose-400 bg-rose-50" : "border-amber-400 bg-amber-50"
                       )} />
                       
-                      <div className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100/80 group-hover:bg-white group-hover:shadow-md transition-all">
+                      <div className="bg-muted/40/50 rounded-2xl p-4 border border-gray-100/80 group-hover:bg-white group-hover:shadow-md transition-all">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-black uppercase bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
@@ -1388,7 +1687,7 @@ export default function ContractDetailPage() {
 
               return (
                 <div className="bg-white rounded-2xl border shadow-sm relative overflow-hidden">
-                  <div className="flex justify-between items-center bg-gray-50 px-6 py-4 border-b">
+                  <div className="flex justify-between items-center bg-muted/40 px-6 py-4 border-b">
                     <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
                       <AlertCircle className="h-5 w-5 text-gray-500" /> Thỏa thuận & Nội quy
                     </h3>
@@ -1423,7 +1722,7 @@ export default function ContractDetailPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed bg-gray-50/50 p-5 rounded-xl border border-gray-100">
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed bg-muted/40/50 p-5 rounded-xl border border-gray-100">
                         {contract.additionalTerms}
                       </div>
                     )}
@@ -1481,7 +1780,7 @@ export default function ContractDetailPage() {
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="bg-gray-50 p-2 rounded-lg">
+                            <div className="bg-muted/40 p-2 rounded-lg">
                               <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Giá trị cũ</p>
                               <p className="text-gray-600 line-through">{req.type === 'RENT_INCREASE' ? Number(req.oldValue).toLocaleString('vi-VN') + 'đ' : req.oldValue || '—'}</p>
                             </div>
@@ -1572,11 +1871,11 @@ export default function ContractDetailPage() {
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2 mb-4">
-                               <div className={cn("p-2 rounded-lg text-center border", contract.hasLandlordConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-100 text-gray-400")}>
+                               <div className={cn("p-2 rounded-lg text-center border", contract.hasLandlordConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-muted/40 border-gray-100 text-gray-400")}>
                                   <p className="text-[9px] font-bold uppercase">Chủ trọ</p>
                                   <p className="text-xs font-bold">{contract.hasLandlordConsented ? 'Đã ký' : 'Chờ...'}</p>
                                </div>
-                               <div className={cn("p-2 rounded-lg text-center border", contract.hasTenantConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-100 text-gray-400")}>
+                               <div className={cn("p-2 rounded-lg text-center border", contract.hasTenantConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-muted/40 border-gray-100 text-gray-400")}>
                                   <p className="text-[9px] font-bold uppercase">Khách thuê</p>
                                   <p className="text-xs font-bold">{contract.hasTenantConsented ? 'Đã ký' : 'Chờ...'}</p>
                                </div>
@@ -1694,7 +1993,7 @@ export default function ContractDetailPage() {
             {contract && (contract.status === 'EXPIRED' || contract.status === 'TERMINATED_EARLY') && user?.role === 'TENANT' && (
               <div className={`rounded-2xl border shadow-sm p-6 ${contract.depositStatus === 'REFUNDED' ? 'bg-green-50 border-green-200' :
                   contract.depositStatus === 'PENALIZED' ? 'bg-red-50 border-red-200' :
-                    'bg-gray-50 border-gray-200'
+                    'bg-muted/40 border-gray-200'
                 }`}>
                 <h3 className="text-md font-bold mb-2 flex items-center gap-2">
                   💰 Trạng thái Tiền cọc
@@ -1750,7 +2049,7 @@ export default function ContractDetailPage() {
 
               {contract.status !== 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  <div className="flex flex-col gap-2 text-sm text-left bg-gray-50/50 p-4 rounded-xl border border-gray-100 mb-4">
+                  <div className="flex flex-col gap-2 text-sm text-left bg-muted/40/50 p-4 rounded-xl border border-gray-100 mb-4">
                     <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
                     <div className="flex items-center justify-between">
                       <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
@@ -1918,7 +2217,7 @@ export default function ContractDetailPage() {
                    </div>
 
                    <div className="grid grid-cols-2 gap-3 pb-2">
-                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="p-3 rounded-xl bg-muted/40 border border-gray-100">
                          <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Định danh KYC</p>
                          <div className="flex items-center gap-1.5">
                             {contract.tenantKycStatus === 'VERIFIED' ? (
@@ -1934,7 +2233,7 @@ export default function ContractDetailPage() {
                             )}
                          </div>
                       </div>
-                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="p-3 rounded-xl bg-muted/40 border border-gray-100">
                         <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Mức độ tin cậy</p>
                         <div className="flex items-center gap-1.5">
                            {(contract.tenantReputationScore || 0) >= 80 ? (
@@ -1963,48 +2262,79 @@ export default function ContractDetailPage() {
       )}
 
       {activeTab === 'BILLS' && (
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <div>
-              <h2 className="text-lg font-bold flex items-center gap-2"><Receipt className="text-primary w-5 h-5" /> Lịch sử Hóa đơn</h2>
-            </div>
-          </div>
-
-          <div className="p-6">
+        <DashboardPanel
+          title="Lịch sử hóa đơn"
+          description={user?.role === 'TENANT' ? 'Thanh toán đúng hạn giữ uy tín và tránh phạt.' : 'Theo dõi từng kỳ và trạng thái thu tiền.'}
+        >
+          <div className="p-4 sm:p-5">
             {isLoadingBills ? (
-              <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>
+              <div className="space-y-3 py-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                ))}
+              </div>
             ) : bills.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 font-medium">Chưa có hóa đơn nào.</div>
+              <div className="py-8">
+                <EmptyState icon={Receipt} title="Chưa có hóa đơn" description="Hóa đơn sẽ hiển thị khi chủ trọ phát hành kỳ mới." />
+              </div>
             ) : (
-              <div className="space-y-4">
-                {bills.map((bill: any) => (
-                  <div key={bill.id} className="flex justify-between items-center p-4 border rounded-xl bg-white">
-                    <div>
-                      <h4 className="font-bold text-gray-900">Kỳ tháng {bill.month}/{bill.year}</h4>
-                      <p className="text-sm text-gray-500 mt-1">Hạn chót: {new Date(bill.deadline).toLocaleDateString()}</p>
+              <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card/50">
+                {contractOperational.sortedBills.map((bill: any) => {
+                  const deadlineMs = new Date(bill.deadline).getTime();
+                  const isOverdue =
+                    bill.status !== "PAID" && (bill.status === "LATE" || deadlineMs < Date.now());
+                  return (
+                  <div
+                    key={bill.id}
+                    className={cn(
+                      "flex flex-col gap-3 p-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between",
+                      isOverdue && "border-l-4 border-l-destructive bg-destructive/[0.03]"
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-semibold text-foreground">
+                          Kỳ {bill.month}/{bill.year}
+                        </h4>
+                        {isOverdue ? (
+                          <StatusBadge label="Quá hạn" tone="danger" className="text-[10px]" />
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        Hạn: {new Date(bill.deadline).toLocaleDateString("vi-VN")}
+                      </p>
                     </div>
-                    <div className="text-right flex items-center gap-4">
-                      <p className="text-xl font-black text-primary">{(bill.totalAmount).toLocaleString()}đ</p>
+                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                      <p className="text-lg font-bold tabular-nums text-primary sm:text-right">{(bill.totalAmount).toLocaleString()} đ</p>
                       {bill.status === 'PAID' ? (
-                        <span className="text-green-600 font-bold text-sm">Đã thu</span>
+                        <StatusBadge
+                          label={user?.role === 'LANDLORD' ? 'Đã thu' : 'Đã thanh toán'}
+                          tone="success"
+                          className="text-xs"
+                        />
                       ) : bill.status === 'PENDING' ? (
-                        <span className="text-orange-600 font-bold text-sm bg-orange-50 px-3 py-1 rounded-full border border-orange-200">Chờ xác nhận</span>
+                        <StatusBadge label="Chờ xác nhận" tone="warning" className="text-xs" />
                       ) : (
                         user?.role === 'TENANT' && (
                           contract.signMethod === 'BLOCKCHAIN' ? (
-                            <Button size="sm" onClick={() => handlePayWeb3(bill)} isLoading={isPaying}>Thanh toán Web3</Button>
+                            <Button size="sm" className="min-h-9" onClick={() => handlePayWeb3(bill)} isLoading={isPaying}>
+                              Thanh toán Web3
+                            </Button>
                           ) : (
-                            <Button size="sm" variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50" onClick={() => openTraditionalPaymentModal(bill)}>Thanh toán C.Khoản</Button>
+                            <Button size="sm" variant="outline" className="min-h-9 border-primary/30" onClick={() => openTraditionalPaymentModal(bill)}>
+                              Thanh toán CK
+                            </Button>
                           )
                         )
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
-        </div>
+        </DashboardPanel>
       )}
 
       {isRequestModalOpen && (
@@ -2029,7 +2359,7 @@ export default function ContractDetailPage() {
                       key={opt.type}
                       onClick={() => setChangeForm({ ...changeForm, type: opt.type as RequestType, newValue: '' })}
                       className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex flex-col items-center text-center gap-1 
-                        ${changeForm.type === opt.type ? `ring-2 ring-offset-1 ${opt.color} shadow-sm` : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50'}`}
+                        ${changeForm.type === opt.type ? `ring-2 ring-offset-1 ${opt.color} shadow-sm` : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-muted/40'}`}
                     >
                       <div className={`${changeForm.type === opt.type ? '' : 'text-gray-400'}`}>
                         {opt.icon}
@@ -2096,7 +2426,7 @@ export default function ContractDetailPage() {
                     </div>
                     <textarea
                       placeholder="Nhập nội dung mong muốn..."
-                      className="flex w-full rounded-xl border border-input bg-gray-50/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
+                      className="flex w-full rounded-xl border border-input bg-muted/40/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
                       value={changeForm.newValue}
                       onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
                     />
@@ -2343,7 +2673,7 @@ export default function ContractDetailPage() {
                 }
 
                 return (
-                  <div className="bg-gray-50 border border-gray-200 p-4 rounded-md whitespace-pre-wrap italic text-gray-700">
+                  <div className="bg-muted/40 border border-gray-200 p-4 rounded-md whitespace-pre-wrap italic text-gray-700">
                     {clean(terms || "Không có thỏa thuận bổ sung nào khác.")}
                   </div>
                 );
@@ -2409,7 +2739,7 @@ export default function ContractDetailPage() {
                  </Label>
                  <Textarea 
                     placeholder="VD: Phòng này đã có khách đặt trước, hoặc tôi muốn xem xét hồ sơ khác..."
-                    className="min-h-[120px] focus:ring-rose-500 border-rose-100 bg-gray-50/50"
+                    className="min-h-[120px] focus:ring-rose-500 border-rose-100 bg-muted/40/50"
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                  />
@@ -2422,7 +2752,7 @@ export default function ContractDetailPage() {
                </div>
             </div>
 
-            <div className="p-6 bg-gray-50 flex gap-3">
+            <div className="p-6 bg-muted/40 flex gap-3">
                <Button 
                  variant="ghost" 
                  className="flex-1 text-gray-600 hover:bg-gray-100 h-12 rounded-2xl" 
@@ -2506,7 +2836,7 @@ export default function ContractDetailPage() {
             </div>
 
             <div className="p-6 space-y-5">
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              <div className="flex items-center gap-4 p-4 bg-muted/40 rounded-2xl border border-gray-100">
                 <img
                   src={selectedMember?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedMember?.id}`}
                   className="w-12 h-12 rounded-full border-2 border-white shadow-sm"

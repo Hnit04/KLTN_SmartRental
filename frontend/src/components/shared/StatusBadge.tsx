@@ -18,7 +18,7 @@ type Props = {
 
 export default function StatusBadge({ label, tone = "neutral", className }: Props) {
   return (
-    <span className={cn("status-badge", toneClasses[tone], className)}>
+    <span className={cn("status-badge transition-colors duration-150", toneClasses[tone], className)}>
       {label}
     </span>
   );

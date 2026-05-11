@@ -137,7 +137,9 @@ export default function CompareRoomsModal() {
       icon: <Zap className="h-4 w-4 text-yellow-500" />,
       label: "Tiền điện",
       render: (room: typeof compareList[0]) => (
-        <span className="text-sm text-gray-700">{room.elecPrice?.toLocaleString()}đ/kW</span>
+        <span className="text-sm text-gray-700">
+          {room.elecPrice !== undefined && room.elecPrice !== null ? `${room.elecPrice.toLocaleString()}đ/kWh` : '—'}
+        </span>
       ),
     },
     {
@@ -145,7 +147,11 @@ export default function CompareRoomsModal() {
       label: "Tiền nước",
       render: (room: typeof compareList[0]) => (
         <span className="text-sm text-gray-700">
-          {room.waterPrice === 0 ? <span className="text-emerald-600 font-semibold">Miễn phí</span> : `${room.waterPrice?.toLocaleString()}đ/m³`}
+          {room.waterPrice === 0 
+            ? <span className="text-emerald-600 font-semibold">Miễn phí</span> 
+            : room.waterPrice !== undefined && room.waterPrice !== null
+              ? `${room.waterPrice.toLocaleString()}đ/m³` 
+              : '—'}
         </span>
       ),
     },
@@ -154,14 +160,18 @@ export default function CompareRoomsModal() {
       label: "Internet",
       render: (room: typeof compareList[0]) => (
         <span className="text-sm text-gray-700">
-          {room.internetPrice === 0 ? <span className="text-emerald-600 font-semibold">Miễn phí</span> : `${room.internetPrice?.toLocaleString()}đ/th`}
+          {room.internetPrice === 0 
+            ? <span className="text-emerald-600 font-semibold">Miễn phí</span> 
+            : room.internetPrice !== undefined && room.internetPrice !== null
+              ? `${room.internetPrice.toLocaleString()}đ/tháng` 
+              : '—'}
         </span>
       ),
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-6" onClick={closeCompareModal}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200" onClick={closeCompareModal}>
       <div 
         className="bg-white rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
@@ -240,7 +250,7 @@ export default function CompareRoomsModal() {
           <div className="px-6 pb-4">
             <div className="rounded-xl border overflow-hidden">
               {tableRows.map((row, rowIdx) => (
-                <div key={rowIdx} className={`grid items-center ${rowIdx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`} style={{ gridTemplateColumns: `160px repeat(${compareList.length}, 1fr)` }}>
+                <div key={rowIdx} className={`grid items-center ${rowIdx % 2 === 0 ? 'bg-muted/40/50' : 'bg-white'}`} style={{ gridTemplateColumns: `160px repeat(${compareList.length}, 1fr)` }}>
                   {/* Label */}
                   <div className="px-4 py-3 flex items-center gap-2.5 border-r border-gray-100">
                     {row.icon}
@@ -305,7 +315,7 @@ export default function CompareRoomsModal() {
         </div>
 
         {/* FOOTER */}
-        <div className="px-6 py-4 border-t bg-gray-50/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="px-6 py-4 border-t bg-muted/40/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <p className="text-xs text-gray-400">Nhấn vào "Xem chi tiết" để xem đầy đủ thông tin phòng.</p>
           <div className="flex gap-2">
             {compareList.map((room, i) => (

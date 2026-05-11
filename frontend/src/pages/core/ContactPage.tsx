@@ -35,7 +35,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
       {/* ─── HERO SECTION ─── */}
-      <div className="bg-primary/5 py-16 text-center border-b">
+      <div className="bg-primary/5 py-16 text-center border-b animate-fade-in-up">
         <div className="container px-4">
           <h1 className="text-4xl font-bold text-primary tracking-tight">Liên hệ với chúng tôi</h1>
           <p className="text-muted-foreground mt-4 max-w-2xl mx-auto text-lg">
@@ -50,13 +50,13 @@ export default function ContactPage() {
           {/* ─── LEFT COLUMN: INFO & MAP (Chiếm 5 phần) ─── */}
           <div className="lg:col-span-5 space-y-8">
             {/* Card Thông tin liên hệ */}
-            <div className="bg-card border rounded-2xl shadow-sm p-8 space-y-8">
+            <div className="bg-card border rounded-2xl shadow-sm p-8 space-y-8 hover:shadow-md transition-shadow duration-300">
               <div>
                 <h2 className="text-xl font-bold text-foreground mb-6">Thông tin liên hệ</h2>
                 <div className="space-y-6">
                   {/* Địa chỉ */}
                   <div className="flex items-start gap-4 group">
-                    <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200 group-hover:shadow-md">
                       <MapPin className="h-5 w-5" />
                     </div>
                     <div>

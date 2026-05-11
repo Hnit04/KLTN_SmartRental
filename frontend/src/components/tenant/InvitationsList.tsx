@@ -114,7 +114,7 @@ export default function InvitationsList({ onStatusChange }: InvitationsListProps
               </Button>
               <Button 
                 variant="outline"
-                className="flex-1 border-gray-200 text-gray-600 hover:bg-gray-50 h-10 rounded-xl gap-2"
+                className="flex-1 border-gray-200 text-gray-600 hover:bg-muted/40 h-10 rounded-xl gap-2"
                 onClick={() => handleUpdateStatus(invite.id, 'REJECTED')}
                 disabled={processingId === invite.id}
               >

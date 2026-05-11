@@ -58,7 +58,8 @@ public class DynamicQueryEngine {
     private List<Map<String, Object>> handleSearchRoom(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
                 "SELECT r.id AS room_id, r.name, r.price, r.area, r.type, r.images, " +
-                "r.has_mezzanine, r.has_balcony, p.name AS property_name, p.address, p.district " +
+                "r.has_mezzanine, r.has_balcony, p.name AS property_name, p.address, p.district, " +
+                "p.elec_price AS elecPrice, p.water_price AS waterPrice, p.internet_price AS internetPrice " +
                 "FROM rooms r JOIN properties p ON r.property_id = p.id " +
                 "WHERE r.status = 'AVAILABLE' AND p.status = 'APPROVED'"
         );

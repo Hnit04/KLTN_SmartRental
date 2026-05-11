@@ -149,16 +149,16 @@ export default function PropertiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 space-y-6">
+    <div className="min-h-screen space-y-6 overflow-x-hidden bg-background pb-20">
       {/* --- HEADER & FILTER --- */}
       <div className="sticky top-16 z-30">
-        <div className="page-shell pt-3">
-          <div className="section-card bg-card/95 p-4 shadow-sm backdrop-blur md:p-5">
-          <div className="flex flex-col lg:flex-row justify-between items-end lg:items-center gap-4">
+        <div className="page-shell pt-2 sm:pt-3">
+          <div className="section-card bg-card/95 p-3 shadow-sm backdrop-blur sm:p-4 md:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
             
-            <div>
-              <h1 className="page-title text-foreground">Tìm phòng trọ</h1>
-              <p className="page-subtitle">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl">Tìm phòng trọ</h1>
+              <p className="mt-0.5 text-xs text-muted-foreground sm:mt-1 sm:text-sm">
                 {isLoading 
                   ? "Đang cập nhật dữ liệu..." 
                   : `Đang hiển thị ${filteredProperties.length} khu trọ đã duyệt`
@@ -166,21 +166,22 @@ export default function PropertiesPage() {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            {/* Mobile: lưới gọn 2 cột; từ lg: một hàng như desktop */}
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:flex lg:w-auto lg:flex-row lg:items-center">
+              <div className="relative col-span-2 lg:col-span-1 lg:w-64 lg:shrink-0">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 sm:left-3 sm:h-4 sm:w-4" />
                 <Input 
-                  placeholder="Tìm theo khu vực, tên đường..." 
-                  className="pl-9 bg-muted/40 border-border"
+                  placeholder="Khu vực, đường..." 
+                  className="h-9 border-border bg-muted/40 pl-8 text-xs sm:h-10 sm:pl-9 sm:text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="relative min-w-0">
+                <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 sm:left-3 sm:h-4 sm:w-4" />
                 <select 
-                  className="h-10 w-full sm:w-40 rounded-lg border border-border bg-muted/40 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-background transition-colors"
+                  className="h-9 w-full min-w-0 rounded-lg border border-border bg-muted/40 pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary sm:h-10 sm:pl-9 sm:pr-3 sm:text-sm lg:w-40 appearance-none cursor-pointer hover:bg-background transition-colors"
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
                 >
@@ -191,10 +192,10 @@ export default function PropertiesPage() {
                 </select>
               </div>
 
-              <div className="relative">
-                <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="relative min-w-0">
+                <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 sm:left-3 sm:h-4 sm:w-4" />
                 <select
-                  className="h-10 w-full sm:w-44 rounded-lg border border-border bg-muted/40 pl-9 pr-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none cursor-pointer hover:bg-background transition-colors"
+                  className="h-9 w-full min-w-0 rounded-lg border border-border bg-muted/40 pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary sm:h-10 sm:pl-9 sm:pr-3 sm:text-sm lg:w-44 appearance-none cursor-pointer hover:bg-background transition-colors"
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as any)}
                 >
@@ -207,29 +208,29 @@ export default function PropertiesPage() {
 
               <Button 
                 variant="outline" 
-                className={`gap-2 relative ${showAdvanceFilters ? 'bg-primary/5 border-primary text-primary' : ''}`}
+                className={`relative col-span-2 h-9 gap-1.5 whitespace-normal px-2 py-1.5 text-center text-xs leading-tight sm:h-10 sm:gap-2 sm:px-4 sm:text-sm sm:leading-normal lg:col-span-1 lg:w-auto lg:shrink-0 lg:whitespace-nowrap ${showAdvanceFilters ? 'bg-primary/5 border-primary text-primary' : ''}`}
                 onClick={() => setShowAdvanceFilters(!showAdvanceFilters)}
               >
-                <Filter className="h-4 w-4" /> 
-                Bộ lọc
+                <Filter className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> 
+                <span>Bộ lọc</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white sm:-right-1.5 sm:-top-1.5">
                     {activeFilterCount}
                   </span>
                 )}
-                <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanceFilters ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${showAdvanceFilters ? 'rotate-180' : ''}`} />
               </Button>
             </div>
           </div>
 
           {activeFilters.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:mt-4 sm:gap-2">
               {activeFilters.map((filter) => (
                 <button
                   key={filter.key}
                   type="button"
                   onClick={filter.onClear}
-                  className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-foreground hover:bg-secondary/70"
+                  className="inline-flex items-center gap-1 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-foreground transition-all duration-200 hover:bg-secondary/70 hover:shadow-sm"
                 >
                   {filter.label}
                   <X className="h-3 w-3" />
@@ -242,8 +243,8 @@ export default function PropertiesPage() {
           )}
 
           {showAdvanceFilters && (
-            <div className="mt-6 pt-6 border-t animate-in slide-in-from-top-4 duration-300">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="mt-4 border-t pt-4 animate-in slide-in-from-top-4 duration-300 sm:mt-6 sm:pt-6">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3 lg:gap-8">
                 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -303,7 +304,7 @@ export default function PropertiesPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
+              <div className="mt-5 flex justify-end gap-2 border-t pt-3 sm:mt-8 sm:gap-3 sm:pt-4">
                   <Button variant="ghost" size="sm" onClick={resetFilters}>
                       Đặt lại tất cả
                   </Button>
@@ -319,16 +320,16 @@ export default function PropertiesPage() {
 
       {/* --- AI RECOMMENDATIONS --- */}
       {recommendedRooms.length > 0 && (
-        <div className="page-shell relative z-20 py-8">
-          <div className="flex items-center gap-3 border-b pb-4 mb-6">
-            <div className="p-2 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-lg text-amber-600">
-              <Sparkles className="h-6 w-6" />
+        <div className="page-shell relative z-20 py-5 sm:py-8">
+          <div className="mb-4 flex items-start gap-2.5 border-b pb-3 sm:mb-6 sm:items-center sm:gap-3 sm:pb-4">
+            <div className="shrink-0 rounded-lg bg-gradient-to-br from-yellow-100 to-amber-100 p-1.5 text-amber-600 sm:p-2">
+              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent sm:text-2xl">
                 {isAuthenticated ? "Phòng Gợi Ý Cho Bạn" : "Phòng Trọ Nổi Bật"}
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground sm:mt-1 sm:text-sm">
                 {isAuthenticated 
                   ? `Dựa trên sở thích của bạn, AI đã chọn ra ${recommendedRooms.length} phòng tối ưu nhất.`
                   : `Khám phá ${recommendedRooms.length} phòng trọ được đánh giá cao nhất bởi cộng đồng.`
@@ -336,9 +337,9 @@ export default function PropertiesPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-6 snap-x">
+          <div className="flex gap-3 overflow-x-auto pb-4 snap-x sm:gap-4 sm:pb-6">
             {recommendedRooms.map((room) => (
-              <div key={room.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] snap-start shrink-0 flex flex-col gap-3">
+              <div key={room.id} className="flex w-[min(85vw,280px)] shrink-0 snap-start flex-col gap-2 sm:w-[min(90vw,320px)] sm:gap-3 md:min-w-[350px] md:w-[350px]">
                  <div className="relative flex-1">
                    <RoomCard data={room} />
                  </div>
@@ -374,30 +375,30 @@ export default function PropertiesPage() {
       )}
 
       {/* --- MAIN CONTENT --- */}
-      <div className="page-shell py-8">
-        <h2 className="text-xl font-bold mb-6 text-foreground border-b pb-2 flex justify-between items-center">
-            <span>Khám Phá Khu Trọ Toàn Quốc</span>
-            <div className="flex bg-gray-100 p-1 rounded-lg">
+      <div className="page-shell py-5 sm:py-8">
+        <h2 className="mb-4 flex flex-col gap-2 border-b border-border pb-2 text-base font-bold text-foreground sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xl">
+            <span className="min-w-0 leading-tight">Khám phá khu trọ</span>
+            <div className="flex w-full max-w-full shrink-0 rounded-lg bg-gray-100 p-0.5 sm:w-fit sm:p-1">
               <button 
                 onClick={() => setViewMode("list")} 
-                className={`p-1.5 px-3 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
               >
-                <List className="h-4 w-4" /> Danh sách
+                <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Danh sách
               </button>
               <button 
                 onClick={() => setViewMode("map")} 
-                className={`p-1.5 px-3 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === "map" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 sm:flex-initial sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${viewMode === "map" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
               >
-                <MapIcon className="h-4 w-4" /> Bản đồ
+                <MapIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Bản đồ
               </button>
             </div>
         </h2>
         
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl overflow-hidden border shadow-sm h-[320px] animate-pulse">
-                <div className="h-48 bg-gray-200" />
+              <div key={i} className="h-[280px] overflow-hidden rounded-xl border bg-white shadow-sm skeleton-shimmer sm:h-[300px] md:h-[320px]">
+                <div className="h-36 bg-gray-200 sm:h-44 md:h-48" />
                 <div className="p-4 space-y-3">
                   <div className="h-4 bg-gray-200 rounded w-3/4" />
                   <div className="h-3 bg-gray-200 rounded w-1/2" />
@@ -411,7 +412,7 @@ export default function PropertiesPage() {
         ) : filteredProperties.length > 0 ? (
           <>
             {viewMode === "list" ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProperties.map((property) => (
                   <PropertyCard key={property.id} data={property} />
                 ))}

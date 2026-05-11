@@ -160,7 +160,7 @@ export default function FavoritesPage() {
 
         {/* Capacity bar */}
         {rooms.length > 0 && (
-          <div className="mt-8 bg-gray-50 border rounded-xl p-4 flex items-center gap-4">
+          <div className="mt-8 bg-muted/40 border rounded-xl p-4 flex items-center gap-4">
             <div className="flex-1">
               <div className="flex justify-between text-xs text-gray-500 mb-1.5">
                 <span>Dung lượng danh sách</span>

@@ -7,6 +7,14 @@ import {
   ScanSearch, X, AlertTriangle, Database, Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatKpiCard } from '@/components/dashboard';
+import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
+import { TableShell } from '@/components/ui/TableShell';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { DashboardPanel } from '@/components/dashboard';
 import StatusBadge from '@/components/shared/StatusBadge';
 
 const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
@@ -229,61 +237,64 @@ export default function BlockchainLogsPage() {
     TERMINATED: { label: 'Đã hủy', tone: 'danger', icon: XCircle },
   };
 
+  const chainFilterItems: SegmentItem[] = [
+    { id: 'all', label: 'Tất cả' },
+    { id: 'blockchain', label: 'On-chain' },
+    { id: 'traditional', label: 'Truyền thống' },
+  ];
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">Đang tải dữ liệu Blockchain...</p>
+      <div className="mx-auto max-w-[1400px] space-y-6 pb-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-72 rounded-lg" />
+            <Skeleton className="h-4 w-96 max-w-full rounded-md" />
+          </div>
+          <Skeleton className="h-10 w-40 rounded-lg" />
         </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
-      {/* === HEADER === */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Blocks className="h-7 w-7 text-primary" />
-            Blockchain Logs & Audit
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Giám sát Smart Contract trên mạng Sepolia Testnet</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleFullAudit}
-            disabled={auditRunning}
-            className="gap-2 border-violet-300 text-primary hover:bg-violet-50"
-          >
-            {auditRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
-            Kiểm toán Toàn hệ thống
-          </Button>
-          <Button variant="outline" onClick={fetchData} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Làm mới
-          </Button>
-        </div>
-      </div>
-
-      {/* === FULL AUDIT PROGRESS BAR === */}
-      {(auditRunning || auditProgress > 0) && (
-        <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ScanSearch className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-gray-900">
-                {auditRunning ? 'Đang kiểm toán...' : 'Kiểm toán hoàn tất'}
-              </h3>
-            </div>
-            <span className="text-sm font-mono text-gray-500">
-              {auditProgress}/{auditTotal}
-            </span>
+    <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden pb-10">
+      <PageHeader
+        title="Blockchain logs & audit"
+        description="Giám sát hợp đồng, hash và smart contract trên Sepolia — xác minh toàn vẹn dữ liệu."
+        actions={
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={handleFullAudit}
+              disabled={auditRunning}
+              className="min-h-11 min-w-0 flex-1 gap-2 border-primary/25 sm:flex-none"
+            >
+              {auditRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
+              Kiểm toán toàn hệ thống
+            </Button>
+            <Button variant="outline" onClick={fetchData} className="min-h-11 min-w-0 flex-1 gap-2 sm:flex-none">
+              <RefreshCw className="h-4 w-4" /> Làm mới
+            </Button>
           </div>
+        }
+      />
 
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+      {(auditRunning || auditProgress > 0) && (
+        <DashboardPanel
+          title={auditRunning ? 'Đang kiểm toán…' : 'Kiểm toán hoàn tất'}
+          description="Tiến độ xác minh on-chain theo từng hợp đồng có smart contract."
+          action={<span className="font-mono text-xs text-muted-foreground">{auditProgress}/{auditTotal}</span>}
+        >
+          <div className="space-y-3 p-4 sm:p-5">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
             <div
               className={`h-full rounded-full transition-all duration-500 ease-out ${
                 auditRunning ? 'bg-gradient-to-r from-violet-500 to-indigo-500' : 'bg-emerald-500'
@@ -292,58 +303,97 @@ export default function BlockchainLogsPage() {
             />
           </div>
 
-          {/* Stats */}
-          <div className="flex gap-4 text-sm">
-            <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-              <ShieldCheck className="h-4 w-4" /> {auditResults.valid} Toàn vẹn
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="flex items-center gap-1 font-semibold text-emerald-600">
+              <ShieldCheck className="h-4 w-4" /> {auditResults.valid} toàn vẹn
             </span>
-            <span className="flex items-center gap-1 text-red-600 font-semibold">
-              <ShieldAlert className="h-4 w-4" /> {auditResults.invalid} Bất thường
+            <span className="flex items-center gap-1 font-semibold text-red-600">
+              <ShieldAlert className="h-4 w-4" /> {auditResults.invalid} bất thường
             </span>
             {auditResults.errors > 0 && (
-              <span className="flex items-center gap-1 text-amber-600 font-semibold">
-                <AlertTriangle className="h-4 w-4" /> {auditResults.errors} Lỗi mạng
+              <span className="flex items-center gap-1 font-semibold text-amber-600">
+                <AlertTriangle className="h-4 w-4" /> {auditResults.errors} lỗi mạng
               </span>
             )}
           </div>
 
           {!auditRunning && auditProgress > 0 && (
-            <button onClick={() => { setAuditProgress(0); }} className="text-xs text-gray-400 hover:text-gray-600 underline">
+            <button
+              type="button"
+              onClick={() => {
+                setAuditProgress(0);
+              }}
+              className="text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+            >
               Ẩn thanh tiến trình
             </button>
           )}
-        </div>
+          </div>
+        </DashboardPanel>
       )}
 
-      {/* === DASHBOARD METRICS === */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={<FileText className="h-5 w-5 text-primary" />} label="Tổng Hợp đồng" value={totalContracts} color="indigo" />
-        <MetricCard icon={<Blocks className="h-5 w-5 text-primary" />} label="On-Chain (Blockchain)" value={blockchainContracts.length} color="violet" sub={`${totalContracts ? Math.round(blockchainContracts.length / totalContracts * 100) : 0}% tổng số`} />
-        <MetricCard icon={<ShieldCheck className="h-5 w-5 text-primary" />} label="Đang có hiệu lực" value={activeContracts.length} color="emerald" />
-        <MetricCard icon={<Landmark className="h-5 w-5 text-primary" />} label="Tổng tiền cọc" value={`${(totalDeposit / 1_000_000).toFixed(1)}M`} color="amber" sub="VNĐ" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatKpiCard
+          icon={<FileText className="h-5 w-5" />}
+          iconClassName="text-primary"
+          label="Tổng hợp đồng"
+          value={totalContracts}
+        />
+        <StatKpiCard
+          icon={<Blocks className="h-5 w-5" />}
+          iconClassName="text-violet-600"
+          label="On-chain"
+          value={blockchainContracts.length}
+          description={`${totalContracts ? Math.round((blockchainContracts.length / totalContracts) * 100) : 0}% tổng số`}
+        />
+        <StatKpiCard
+          icon={<ShieldCheck className="h-5 w-5" />}
+          iconClassName="text-emerald-600"
+          label="Đang hiệu lực"
+          value={activeContracts.length}
+        />
+        <StatKpiCard
+          icon={<Landmark className="h-5 w-5" />}
+          iconClassName="text-amber-600"
+          label="Tổng tiền cọc"
+          value={`${(totalDeposit / 1_000_000).toFixed(1)}M`}
+          description="VNĐ (ước lượng)"
+        />
       </div>
 
-      {/* === FILTER BAR === */}
-      <div className="bg-white rounded-xl border shadow-sm p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex gap-2 flex-wrap">
-          {(['all', 'blockchain', 'traditional'] as const).map(mode => (
-            <button key={mode} onClick={() => setFilterMode(mode)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${filterMode === mode ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-              {mode === 'all' ? '🗂 Tất cả' : mode === 'blockchain' ? '⛓ Blockchain' : '📄 Truyền thống'}
-            </button>
-          ))}
-        </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input type="text" placeholder="Tìm phòng, khách, hash..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 outline-none" />
+      <div className="section-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <SegmentedControl
+          aria-label="Lọc loại hợp đồng"
+          items={chainFilterItems}
+          value={filterMode}
+          onChange={(id) => setFilterMode(id as 'all' | 'blockchain' | 'traditional')}
+        />
+        <div className="relative w-full min-w-0 sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm phòng, khách, hash…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
       </div>
 
-      {/* === CONTRACT TABLE === */}
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Blocks}
+          title="Không có hợp đồng phù hợp"
+          description="Thử đổi bộ lọc hoặc từ khóa tìm kiếm."
+        />
+      ) : (
+        <DashboardPanel
+          title="Danh sách hợp đồng"
+          description={`${filtered.length} / ${totalContracts} bản ghi — Sepolia · Chain ID 11155111`}
+        >
+          <TableShell className="rounded-none border-0 border-t-0 shadow-none bg-transparent">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
-              <tr className="bg-gray-50/80 border-b">
+              <tr className="border-b border-border/60">
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">
                   <button onClick={() => { setSortField('id'); setSortAsc(!sortAsc); }} className="flex items-center gap-1 hover:text-indigo-600">
                     # <ArrowUpDown className="h-3 w-3" />
@@ -361,18 +411,9 @@ export default function BlockchainLogsPage() {
                 <th className="px-4 py-3 text-center font-semibold text-gray-600">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-16 text-gray-400">
-                    <Blocks className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">Không tìm thấy hợp đồng nào</p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map(c => {
+            <tbody className="divide-y divide-border/60">
+              {filtered.map((c) => {
                   const st = statusConfig[c.status] || statusConfig.EXPIRED;
-                  const StIcon = st.icon;
                   const vResult = verifyResults[c.id];
 
                   return (
@@ -431,22 +472,26 @@ export default function BlockchainLogsPage() {
                       </td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
           </table>
+          </TableShell>
+        <div className="flex flex-col gap-1 border-t border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Hiển thị {filtered.length} / {totalContracts} hợp đồng
+          </span>
+          <span className="flex items-center gap-1">
+            <Blocks className="h-3 w-3 shrink-0" /> Sepolia testnet · Chain ID 11155111
+          </span>
         </div>
-        <div className="px-4 py-3 border-t bg-gray-50/50 flex justify-between items-center text-xs text-gray-500">
-          <span>Hiển thị {filtered.length} / {totalContracts} hợp đồng</span>
-          <span className="flex items-center gap-1"><Blocks className="h-3 w-3" /> Sepolia Testnet · Chain ID 11155111</span>
-        </div>
-      </div>
+        </DashboardPanel>
+      )}
 
       {/* ============================================ */}
       {/* === DATA DIFF MODAL === */}
       {/* ============================================ */}
       {diffModal.open && diffModal.data && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDiffModal({ open: false, contractId: 0, data: null })}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setDiffModal({ open: false, contractId: 0, data: null })}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] mx-4 overflow-hidden animate-in fade-in zoom-in-95 flex flex-col" onClick={e => e.stopPropagation()}>
 
 
@@ -476,7 +521,7 @@ export default function BlockchainLogsPage() {
                   <div className="rounded-xl border overflow-hidden">
                   <table className="w-full text-sm table-fixed">
                       <thead>
-                        <tr className="bg-gray-50">
+                        <tr className="bg-muted/40">
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[18%]">Trường dữ liệu</th>
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[34%]">
                             <span className="flex items-center gap-1"><Database className="h-3 w-3" /> Database</span>
@@ -548,7 +593,7 @@ export default function BlockchainLogsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+            <div className="px-6 py-4 border-t bg-muted/40 flex justify-end">
               <Button variant="outline" onClick={() => setDiffModal({ open: false, contractId: 0, data: null })}>
                 Đóng
               </Button>
@@ -556,29 +601,6 @@ export default function BlockchainLogsPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// --- Metric Card Component ---
-function MetricCard({ icon, label, value, color, sub }: {
-  icon: React.ReactNode; label: string; value: string | number; color: string; sub?: string;
-}) {
-  const iconBg: Record<string, string> = {
-    indigo: 'bg-indigo-100 text-indigo-600',
-    violet: 'bg-violet-100 text-violet-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    amber: 'bg-amber-100 text-amber-600',
-  };
-
-  return (
-    <div className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div className={`p-2.5 rounded-lg ${iconBg[color]}`}>{icon}</div>
-      <div>
-        <p className="text-xs text-gray-500 font-medium">{label}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
-      </div>
     </div>
   );
 }

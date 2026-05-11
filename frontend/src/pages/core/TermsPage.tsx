@@ -27,7 +27,7 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
       {/* ─── HEADER SECTION ─── */}
-      <div className="bg-primary/5 border-b py-12">
+      <div className="bg-primary/5 border-b py-12 animate-fade-in-up">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
@@ -78,7 +78,7 @@ export default function TermsPage() {
                 <button
                   key={item.id}
                   onClick={() => scrollToSection(item.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-all duration-200 ${
                     activeSection === item.id 
                       ? 'bg-primary/10 text-primary font-medium' 
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
