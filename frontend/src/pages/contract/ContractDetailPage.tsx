@@ -866,14 +866,14 @@ export default function ContractDetailPage() {
     : '...';
 
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="mx-auto min-w-0 max-w-5xl space-y-6 overflow-x-hidden px-3 py-4 sm:px-4">
+      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Chi tiết hợp đồng</h1>
-          <p className="text-sm text-gray-500">Mã hợp đồng: #{contract.id} • {contract.roomName}</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold sm:text-2xl">Chi tiết hợp đồng</h1>
+          <p className="break-words text-sm text-gray-500">Mã hợp đồng: #{contract.id} • {contract.roomName}</p>
         </div>
       </div>
 
@@ -887,19 +887,19 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      <div className="flex bg-white p-1 rounded-xl border shadow-sm w-fit">
+      <div className="flex w-full flex-col gap-1 rounded-xl border bg-white p-1 shadow-sm sm:w-fit sm:flex-row">
         <button
           onClick={() => setActiveTab('INFO')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'INFO' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all sm:w-auto sm:px-6 ${activeTab === 'INFO' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
         >
-          <FileText className="w-4 h-4" /> Thông tin & Hợp đồng
+          <FileText className="h-4 w-4 shrink-0" /> <span className="text-center">Thông tin & Hợp đồng</span>
         </button>
         <button
           onClick={() => setActiveTab('BILLS')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'BILLS' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all sm:w-auto sm:px-6 ${activeTab === 'BILLS' ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
         >
-          <Receipt className="w-4 h-4" />
-          {user?.role === 'LANDLORD' ? 'Quản lý Hóa đơn' : 'Hóa đơn & Thanh toán'}
+          <Receipt className="h-4 w-4 shrink-0" />
+          <span className="text-center">{user?.role === 'LANDLORD' ? 'Quản lý Hóa đơn' : 'Hóa đơn & Thanh toán'}</span>
         </button>
       </div>
 
@@ -941,8 +941,8 @@ export default function ContractDetailPage() {
 
             {pendingRequest && (
               <div className="bg-white border-2 border-orange-200 rounded-2xl overflow-hidden shadow-md animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="bg-orange-50 px-5 py-3 border-b border-orange-100 flex justify-between items-center">
-                   <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-orange-100 bg-orange-50 px-4 py-3 sm:items-center sm:px-5">
+                   <div className="flex min-w-0 items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center">
                          <PenTool className="w-4 h-4 text-orange-700" />
                       </div>

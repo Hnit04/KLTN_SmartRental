@@ -1,6 +1,6 @@
-import { Outlet, Link, NavLink } from "react-router-dom"; // Sử dụng NavLink
+import { Outlet, Link, NavLink, useLocation } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { Home, Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, MapPin, Phone, CheckCircle2, Heart } from "lucide-react";
+import { Home, Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, CheckCircle2, Heart, Menu, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { UserNav } from "../shared/UserNav"; 
 import NotificationBell from "../shared/NotificationBell";
@@ -10,6 +10,7 @@ import { DASHBOARD_BY_ROLE, type AppRole } from "@/config/navigation";
 import { useFavorites } from "@/hooks/useFavorites";
 
 export default function PublicLayout() {
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const normalizedRole: AppRole = user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT';
   const dashboardPath = DASHBOARD_BY_ROLE[normalizedRole];
@@ -33,6 +34,22 @@ export default function PublicLayout() {
   };
 
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,13 +74,13 @@ export default function PublicLayout() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 min-w-0">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+          <Link to="/" className="flex min-w-0 items-center gap-2 shrink-0" onClick={() => setMobileMenuOpen(false)}>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
               <Home className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">SmartRental</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground truncate">SmartRental</span>
           </Link>
 
           {/* Menu Chính có Focus */}
@@ -101,16 +118,26 @@ export default function PublicLayout() {
             )}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-2 md:gap-3">
+            <button
+              type="button"
+              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg text-foreground hover:bg-muted border border-border"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="public-mobile-nav"
+              aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+              onClick={() => setMobileMenuOpen((o) => !o)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             {isAuthenticated ? (
               <>
                 {user?.role === 'TENANT' && (
                   <Link
                     to="/tenant/favorites"
-                    className="relative p-2 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+                    className="relative rounded-full p-1.5 text-gray-500 transition-all duration-200 hover:bg-red-50 hover:text-red-500 sm:p-2"
                     title="Phòng yêu thích"
                   >
-                    <Heart className="h-5 w-5" />
+                    <Heart className="h-[1.125rem] w-[1.125rem] sm:h-5 sm:w-5" />
                     {favCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
                         {favCount}
@@ -125,16 +152,116 @@ export default function PublicLayout() {
             ) : (
               <>
                 <Link to="/login">
-                  <Button variant="ghost" size="sm">Đăng nhập</Button>
+                  <Button variant="ghost" size="sm" className="px-2.5 sm:px-3 text-xs sm:text-sm whitespace-nowrap">
+                    Đăng nhập
+                  </Button>
                 </Link>
                 <Link to="/register">
-                  <Button size="sm">Đăng ký</Button>
+                  <Button size="sm" className="px-2.5 sm:px-3 text-xs sm:text-sm whitespace-nowrap">
+                    Đăng ký
+                  </Button>
                 </Link>
               </>
             )}
           </div>
         </div>
       </header>
+
+      {/* Mobile drawer — cùng route với nav desktop */}
+      {mobileMenuOpen && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[55] bg-black/50 md:hidden animate-in fade-in duration-200"
+            aria-hidden
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div
+            id="public-mobile-nav"
+            className="fixed inset-y-0 right-0 z-[56] flex w-[min(100%,20rem)] flex-col border-l bg-card shadow-2xl md:hidden animate-in slide-in-from-right duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu điều hướng"
+          >
+            <div className="flex h-16 items-center justify-between border-b px-4">
+              <span className="font-semibold text-foreground">Menu</span>
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-muted"
+                aria-label="Đóng menu"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
+              <NavLink
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-3 text-sm font-medium ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`
+                }
+              >
+                Trang chủ
+              </NavLink>
+              <NavLink
+                to="/properties"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-3 text-sm font-medium ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`
+                }
+              >
+                Tìm phòng
+              </NavLink>
+              <NavLink
+                to="/contact"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-3 text-sm font-medium ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`
+                }
+              >
+                Liên hệ
+              </NavLink>
+              <NavLink
+                to="/help"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-3 text-sm font-medium ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`
+                }
+              >
+                Trợ giúp
+              </NavLink>
+              {isAuthenticated && (
+                <NavLink
+                  to={dashboardPath}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `mt-2 flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold ${
+                      isActive ? "bg-primary text-primary-foreground" : "border border-primary/20 bg-primary/5 text-primary"
+                    }`
+                  }
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  {dashboardLabel}
+                </NavLink>
+              )}
+              {user?.role === "TENANT" && (
+                <Link
+                  to="/tenant/favorites"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-1 flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  <Heart className="h-4 w-4 text-red-500" />
+                  Phòng yêu thích
+                  {favCount > 0 && (
+                    <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">{favCount}</span>
+                  )}
+                </Link>
+              )}
+            </nav>
+          </div>
+        </>
+      )}
 
       {/* ─── MAIN CONTENT ─── */}
       <main className="flex-1">
@@ -156,19 +283,19 @@ export default function PublicLayout() {
                 <h3 className="text-3xl font-extrabold text-white mb-3 tracking-tight">Gia nhập cộng đồng <span className="text-primary italic">SmartRental</span></h3>
                 <p className="text-slate-400 max-w-md text-lg">Đăng ký ngay để nhận thông báo về những căn phòng tốt nhất sớm nhất.</p>
               </div>
-              <form onSubmit={handleNewsletterSubmit} className="flex w-full md:w-auto gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10 shadow-inner backdrop-blur-sm">
+              <form onSubmit={handleNewsletterSubmit} className="flex w-full flex-col gap-3 p-1.5 sm:flex-row sm:items-stretch md:w-auto bg-white/5 rounded-2xl border border-white/10 shadow-inner backdrop-blur-sm">
                 <input 
                   type="email" 
                   placeholder="Email của bạn..." 
                   value={newsletter}
                   onChange={(e) => setNewsletter(e.target.value)}
                   disabled={newsletterStatus === "loading"}
-                  className="px-5 py-3 rounded-xl border-none bg-transparent flex-1 md:flex-none md:min-w-72 focus:ring-0 text-white placeholder:text-slate-500 disabled:opacity-50"
+                  className="px-5 py-3 rounded-xl border-none bg-transparent flex-1 min-w-0 md:flex-none md:min-w-72 focus:ring-0 text-white placeholder:text-slate-500 disabled:opacity-50"
                 />
                 <Button 
                   type="submit"
                   disabled={newsletterStatus === "loading"}
-                  className="gap-2 px-6 py-6 rounded-xl shadow-lg hover:shadow-primary/25 transition-all duration-300"
+                  className="gap-2 px-6 py-3 sm:py-6 shrink-0 rounded-xl shadow-lg hover:shadow-primary/25 transition-all duration-300 w-full sm:w-auto"
                   isLoading={newsletterStatus === "loading"}
                 >
                   {newsletterStatus === "success" ? <CheckCircle2 className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
@@ -297,7 +424,7 @@ export default function PublicLayout() {
       {/* ─── BACK TO TOP BUTTON ─── */}
       <Button
         onClick={scrollToTop}
-        className={`fixed bottom-24 right-8 z-[60] h-12 w-12 rounded-full shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 border-2 border-white/20 ${
+        className={`fixed bottom-28 right-4 z-[60] h-12 w-12 rounded-full shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 border-2 border-white/20 sm:bottom-24 sm:right-8 ${
           showBackToTop ? "translate-y-0 opacity-100" : "translate-y-20 opacity-0 pointer-events-none"
         }`}
         size="icon"

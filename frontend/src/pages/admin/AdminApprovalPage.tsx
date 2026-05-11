@@ -198,15 +198,15 @@ export default function AdminApprovalPage() {
   );
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto min-w-0 max-w-full overflow-x-hidden px-3 py-8 sm:px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Duyệt tin đăng</h1>
-        <p className="text-gray-500 mt-2">Duyệt các khu trọ và phòng trọ mới đăng hoặc vừa cập nhật thông tin.</p>
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Duyệt tin đăng</h1>
+        <p className="mt-2 text-gray-500">Duyệt các khu trọ và phòng trọ mới đăng hoặc vừa cập nhật thông tin.</p>
       </div>
 
       {/* TABS */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full gap-1 rounded-lg bg-gray-100 p-1 sm:w-auto">
           <button
             onClick={() => setActiveTab('properties')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
@@ -238,7 +238,7 @@ export default function AdminApprovalPage() {
         </div>
 
         {/* SORT DROPDOWN */}
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
           <ArrowUpDown className="h-4 w-4 text-gray-400" />
           <select
             value={sortBy}

@@ -510,18 +510,21 @@ export default function PropertyManageDetailPage() {
 
   return (
     <>
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       {/* --- HEADER --- */}
       <div>
-        <Link to="/landlord/properties" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary mb-4 transition">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Về danh sách khu trọ
+        <Link to="/landlord/properties" className="mb-4 inline-flex items-center text-sm font-medium text-gray-500 transition hover:text-primary">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Về danh sách khu trọ
         </Link>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
-            <p className="flex items-center text-gray-500 mt-1"><MapPin className="h-4 w-4 mr-1" /> {property.address}</p>
+            <p className="mt-1 flex min-w-0 items-start gap-1 text-gray-500">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="break-words">{property.address}</span>
+            </p>
           </div>
-          <Button onClick={handleOpenCreate} className="flex items-center gap-2">
+          <Button onClick={handleOpenCreate} className="flex w-full shrink-0 items-center gap-2 md:w-auto">
             <Plus className="h-4 w-4" /> Thêm phòng mới
           </Button>
         </div>

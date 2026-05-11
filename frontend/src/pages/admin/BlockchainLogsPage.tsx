@@ -241,9 +241,9 @@ export default function BlockchainLogsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
+    <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden px-3 sm:px-4">
       {/* === HEADER === */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Blocks className="h-7 w-7 text-primary" />
@@ -251,17 +251,17 @@ export default function BlockchainLogsPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">Giám sát Smart Contract trên mạng Sepolia Testnet</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Button
             variant="outline"
             onClick={handleFullAudit}
             disabled={auditRunning}
-            className="gap-2 border-violet-300 text-primary hover:bg-violet-50"
+            className="min-w-0 flex-1 gap-2 border-violet-300 text-primary hover:bg-violet-50 sm:flex-none"
           >
             {auditRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
             Kiểm toán Toàn hệ thống
           </Button>
-          <Button variant="outline" onClick={fetchData} className="gap-2">
+          <Button variant="outline" onClick={fetchData} className="min-w-0 flex-1 gap-2 sm:flex-none">
             <RefreshCw className="h-4 w-4" /> Làm mới
           </Button>
         </div>

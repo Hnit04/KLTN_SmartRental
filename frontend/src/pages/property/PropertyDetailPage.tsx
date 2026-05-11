@@ -256,8 +256,8 @@ export default function PropertyDetailPage() {
   ].filter(Boolean) as { key: string; label: string }[];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+    <div className="min-h-screen overflow-x-hidden bg-background pb-20">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-8 md:px-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <Link to="/properties" className="hover:text-primary transition">Tìm khu trọ</Link>
@@ -274,9 +274,9 @@ export default function PropertyDetailPage() {
             {/* Header - Title & Address */}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.name}</h1>
-              <div className="flex items-center text-gray-500 text-[15px]">
-                <MapPin className="h-5 w-5 mr-1.5 text-[#A67C52] shrink-0" />
-                <span>{property.address}, {property.district}, {property.city}</span>
+              <div className="flex min-w-0 items-center text-gray-500 text-[15px]">
+                <MapPin className="h-5 w-5 mr-1.5 shrink-0 text-[#A67C52]" />
+                <span className="min-w-0 break-words">{property.address}, {property.district}, {property.city}</span>
               </div>
             </div>
 
@@ -705,8 +705,8 @@ export default function PropertyDetailPage() {
         {isBookingModalOpen && selectedRoom && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-              <div className="p-5 border-b flex justify-between items-center bg-gray-50">
-                <h2 className="text-lg font-bold flex items-center gap-2 text-gray-900">
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50 p-5 sm:items-center">
+                <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-900">
                   <CalendarClock className="h-5 w-5 text-primary" />
                   Đặt lịch xem phòng
                 </h2>
@@ -778,7 +778,7 @@ export default function PropertyDetailPage() {
 }
 
       const ServiceItem = ({icon, label, value, unit}: any) => (
-      <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm min-w-[150px] transition-all hover:shadow-md hover:border-gray-200">
+      <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-gray-200 hover:shadow-md sm:min-w-[140px] sm:flex-none">
         <div className="p-2.5 bg-gray-50 rounded-full">{icon}</div>
         <div>
           <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{label}</p>

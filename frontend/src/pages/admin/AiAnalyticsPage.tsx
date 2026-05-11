@@ -217,9 +217,9 @@ export default function AiAnalyticsPage() {
   const cacheHitRate = data.totalQueries > 0 ? Math.round((data.validQueries / data.totalQueries) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto px-4 sm:px-6 pb-10">
+    <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden px-3 pb-10 sm:px-6">
       {/* === HEADER === */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Brain className="h-7 w-7 text-primary" />
@@ -227,12 +227,12 @@ export default function AiAnalyticsPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">Thống kê hệ thống ngôn ngữ tự nhiên (NLP) — Human-in-the-loop</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleClearCache} disabled={clearing} className="gap-2 border-red-200 text-red-600 hover:bg-red-50">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <Button variant="outline" onClick={handleClearCache} disabled={clearing} className="min-w-0 flex-1 gap-2 border-red-200 text-red-600 hover:bg-red-50 sm:flex-none">
             {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             Xoá toàn bộ Cache
           </Button>
-          <Button variant="outline" onClick={fetchData} className="gap-2">
+          <Button variant="outline" onClick={fetchData} className="min-w-0 flex-1 gap-2 sm:flex-none">
             <RefreshCw className="h-4 w-4" /> Làm mới
           </Button>
         </div>

@@ -39,7 +39,7 @@ export default function MobileBottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-semibold transition-colors active:scale-95",
+                "relative flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-semibold transition-colors active:scale-95",
                 isActive
                   ? "text-primary"
                   : "text-gray-400 hover:text-gray-700"

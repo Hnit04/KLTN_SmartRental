@@ -5,7 +5,7 @@ import SockJS from 'sockjs-client';
 import { useAuth } from '@/context/AuthContext';
 import {
   Bell, CheckCircle2, Info, Check,
-  Star, CalendarClock, Banknote, FileText, Trash2, X
+  Star, CalendarClock, Banknote, FileText, Trash2, X, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notificationApi } from '@/api/notificationApi';
@@ -266,39 +266,52 @@ export default function NotificationBell() {
 
       {/* ── DROPDOWN ── */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[360px] md:w-[400px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="fixed left-3 right-3 top-16 z-[60] flex max-h-[min(72dvh,560px)] min-h-0 flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)] animate-in fade-in slide-in-from-top-2 duration-200 md:absolute md:inset-x-auto md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-[min(520px,72dvh)] md:w-[min(400px,calc(100vw-2rem))] lg:w-[420px]">
 
           {/* Header */}
-          <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between">
-            <h3 className="font-bold text-gray-900 text-base">Thông báo</h3>
-            <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center justify-between border-b border-stone-100 bg-gradient-to-b from-stone-50/90 to-white px-4 pb-3 pt-3.5">
+            <h3 className="text-[15px] font-semibold tracking-tight text-stone-900">Thông báo</h3>
+            <div className="flex items-center gap-1">
               {unreadCount > 0 && (
-                <button onClick={handleMarkAllAsRead}
-                  className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
-                  <Check className="h-3 w-3" /> Đọc tất cả
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsRead}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                >
+                  <Check className="h-3.5 w-3.5" /> Đọc tất cả
                 </button>
               )}
-              <button onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                aria-label="Đóng"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 px-3 py-2 bg-gray-50 border-b overflow-x-auto scrollbar-none">
+          <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-stone-100 bg-stone-50/80 px-3 py-2.5 scrollbar-none">
             {tabs.map(t => (
-              <button key={t.key}
+              <button
+                key={t.key}
+                type="button"
                 onClick={() => setActiveTab(t.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === t.key
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'text-gray-500 hover:bg-gray-200'
-                  }`}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all ${
+                  activeTab === t.key
+                    ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/30'
+                    : 'bg-white/80 text-stone-600 shadow-sm ring-1 ring-stone-200/80 hover:bg-white hover:text-stone-900'
+                }`}
               >
-                {t.label}
+                <span>{t.label}</span>
                 {t.count != null && t.count > 0 && (
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === t.key ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'
-                    }`}>
+                  <span
+                    className={`min-w-[1.125rem] rounded-full px-1 py-0.5 text-center text-[10px] font-bold leading-none ${
+                      activeTab === t.key ? 'bg-white/25 text-white' : 'bg-stone-200 text-stone-700'
+                    }`}
+                  >
                     {t.count}
                   </span>
                 )}
@@ -306,58 +319,64 @@ export default function NotificationBell() {
             ))}
           </div>
 
-          {/* List */}
-          <div className="max-h-[380px] overflow-y-auto">
+          {/* Danh sách — flex-1 + min-h-0: luôn chừa chỗ cho footer, không bị cắt */}
+          <div className="notif-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white">
             {isLoading ? (
               <div className="flex justify-center py-8">
                 <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : groupKeys.length === 0 ? (
-              <div className="p-10 text-center text-gray-400 flex flex-col items-center">
-                <div className="bg-gray-100 p-4 rounded-full mb-3">
-                  <Bell className="h-6 w-6 text-gray-300" />
+              <div className="flex flex-col items-center px-6 py-12 text-center text-stone-400">
+                <div className="mb-3 rounded-full bg-stone-100 p-4">
+                  <Bell className="h-7 w-7 text-stone-300" />
                 </div>
-                <p className="text-sm font-medium text-gray-500">Không có thông báo</p>
-                <p className="text-xs mt-1">
-                  {activeTab === 'UNREAD' ? 'Bạn đã đọc hết rồi 🎉' : 'Chưa có thông báo nào.'}
+                <p className="text-sm font-medium text-stone-600">Không có thông báo</p>
+                <p className="mt-1 max-w-[220px] text-xs leading-relaxed text-stone-500">
+                  {activeTab === 'UNREAD' ? 'Bạn đã đọc hết rồi.' : 'Chưa có thông báo trong mục này.'}
                 </p>
               </div>
             ) : (
               groupKeys.map(dateKey => (
                 <div key={dateKey}>
-                  {/* Date separator */}
-                  <div className="px-4 py-1.5 bg-gray-50 border-b border-t border-gray-100">
-                    <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">{dateKey}</span>
+                  <div className="sticky top-0 z-[1] border-y border-stone-100 bg-stone-50/95 px-4 py-2 backdrop-blur-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{dateKey}</span>
                   </div>
-                  <ul className="divide-y divide-gray-50">
+                  <ul className="divide-y divide-stone-100">
                     {grouped[dateKey].map(noti => (
-                      <li key={noti.id}
-                        className={`group flex gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-gray-50 ${!noti.isRead ? 'bg-blue-50/40' : ''}`}
+                      <li
+                        key={noti.id}
+                        className={`group relative flex cursor-pointer gap-3 px-4 py-4 transition-colors hover:bg-stone-50/90 ${
+                          !noti.isRead
+                            ? 'bg-amber-50/50 pl-3 before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-primary'
+                            : ''
+                        }`}
                         onClick={() => handleNotificationClick(noti)}
                       >
-                        {/* Icon */}
-                        <div className="pt-0.5">
+                        <div className="shrink-0 pt-0.5">
                           <NotiIcon type={noti.type} />
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <h4 className={`text-sm leading-snug ${!noti.isRead ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                        <div className="min-w-0 flex-1 pr-1">
+                          <h4
+                            className={`text-[13px] leading-snug ${!noti.isRead ? 'font-semibold text-stone-900' : 'font-medium text-stone-800'}`}
+                          >
                             {noti.title}
                           </h4>
-                          <p className={`text-xs mt-0.5 leading-relaxed ${!noti.isRead ? 'text-gray-700' : 'text-gray-500'}`}>
+                          <p
+                            className={`mt-1 text-xs leading-relaxed ${!noti.isRead ? 'text-stone-700' : 'text-stone-500'}`}
+                          >
                             {noti.message}
                           </p>
-                          <p className="text-[10px] text-gray-400 mt-1.5 font-medium">
+                          <p className="mt-2 text-[11px] font-medium tabular-nums text-stone-400">
                             {new Date(noti.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
 
-                        {/* Right: unread dot + delete */}
-                        <div className="flex flex-col items-end gap-1 shrink-0 pt-1">
-                          {!noti.isRead && <span className="h-2 w-2 bg-primary rounded-full block" />}
+                        <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+                          {!noti.isRead && <span className="block h-2 w-2 rounded-full bg-primary shadow-sm ring-2 ring-primary/20" />}
                           <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-red-400 rounded-full hover:bg-red-50"
+                            type="button"
+                            className="rounded-lg p-1.5 text-stone-400 transition-all hover:bg-red-50 hover:text-red-600 sm:text-stone-300 sm:opacity-0 sm:group-hover:opacity-100 sm:group-hover:text-stone-300"
                             onClick={e => handleDelete(e, noti.id)}
                             title="Xoá thông báo"
                           >
@@ -372,15 +391,20 @@ export default function NotificationBell() {
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
-            <div className="border-t px-4 py-2.5 flex justify-between items-center bg-gray-50">
-              <span className="text-xs text-gray-400">{notifications.length} thông báo</span>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-stone-200/80 bg-stone-50 px-4 py-3">
+              <span className="text-xs font-medium text-stone-500">
+                <span className="font-semibold text-stone-800">{notifications.length}</span> thông báo
+              </span>
               <button
-                onClick={() => { fetchFull(); }}
-                className="text-xs text-primary hover:underline font-medium"
+                type="button"
+                onClick={() => {
+                  fetchFull();
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
               >
-                Tải lại ↻
+                <RefreshCw className="h-3.5 w-3.5" />
+                Tải lại
               </button>
             </div>
           )}

@@ -29,33 +29,37 @@ export default function PropertyCard({ data }: PropertyCardProps) {
       className={`group bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/30 transition-[box-shadow,border-color] duration-300 flex flex-col h-full cursor-pointer relative ${data.availableRooms === 0 ? 'opacity-90' : ''}`}
     >
       {/* 1. Hình ảnh & Badge giá */}
-      <div className="relative h-48 overflow-hidden bg-gray-100">
+      <div className="relative h-36 overflow-hidden bg-gray-100 sm:h-44 md:h-48">
         <img 
           src={thumbnail} 
           alt={data.name} 
           loading="lazy"
-          className="w-full h-full object-cover will-change-transform group-hover:scale-[1.03] transition-transform duration-500"
+          className="h-full w-full object-cover transition-transform duration-500 will-change-transform group-hover:scale-[1.03]"
         />
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
-           <p className="text-white font-bold text-lg">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-2 pt-6 sm:p-3 sm:pt-8">
+           <p className="text-sm font-bold text-white sm:text-lg">
              {data.minPrice ? formatPrice(data.minPrice) : "Đang cập nhật"} 
-             <span className="text-sm font-normal opacity-90"> / tháng</span>
+             <span className="text-xs font-normal opacity-90 sm:text-sm"> / tháng</span>
            </p>
         </div>
         
-        {/* Badge số phòng trống */}
-        <div className="absolute top-3 right-3">
+        {/* Badge số phòng trống — gọn trên mobile */}
+        <div className="absolute right-2 top-2 max-w-[58%] sm:right-3 sm:top-3 sm:max-w-[85%]">
           <StatusBadge
-            label={data.availableRooms && data.availableRooms > 0 ? `${data.availableRooms} phòng trống` : "Hết phòng"}
+            label={
+              data.availableRooms && data.availableRooms > 0
+                ? `${data.availableRooms} phòng trống`
+                : "Hết phòng"
+            }
             tone={data.availableRooms && data.availableRooms > 0 ? "success" : "danger"}
-            className="text-xs font-bold shadow-sm backdrop-blur-sm"
+            className="block max-w-full truncate text-[11px] font-bold shadow-sm backdrop-blur-sm sm:text-xs"
           />
         </div>
       </div>
 
       {/* 2. Nội dung text */}
-      <div className="p-4 md:p-5 flex flex-col flex-1">
-        <h3 className="font-semibold text-lg text-foreground line-clamp-1 group-hover:text-primary transition-colors mb-1">
+      <div className="flex flex-1 flex-col p-3 sm:p-4 md:p-5">
+        <h3 className="mb-1 line-clamp-2 text-base font-semibold text-foreground transition-colors group-hover:text-primary sm:line-clamp-1 sm:text-lg">
           {data.name}
         </h3>
 
@@ -82,9 +86,9 @@ export default function PropertyCard({ data }: PropertyCardProps) {
           </div>
         </div>
 
-        <div className="mt-auto pt-3 border-t border-border/70 min-h-[52px] flex items-end">
+        <div className="mt-auto flex min-h-[44px] items-end border-t border-border/70 pt-2 sm:min-h-[52px] sm:pt-3">
           <Button 
-            className="w-full h-10 rounded-xl flex items-center justify-center bg-background text-primary border border-primary/20 hover:bg-primary hover:text-primary-foreground"
+            className="flex h-9 w-full items-center justify-center rounded-xl border border-primary/20 bg-background text-xs text-primary hover:bg-primary hover:text-primary-foreground sm:h-10 sm:text-sm"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/properties/${data.id}`);

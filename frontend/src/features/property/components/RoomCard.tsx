@@ -92,7 +92,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
         ${(!isAvailable && !data.availableFromDate) || isMaintenance ? 'opacity-75 bg-gray-50' : ''}`}>
         
         {/* --- ẢNH PHÒNG CAROUSEL --- */}
-        <div className="relative h-48 bg-gray-100 overflow-hidden cursor-pointer group/carousel" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}>
+        <div className="relative h-36 cursor-pointer overflow-hidden bg-gray-100 group/carousel sm:h-44 md:h-48" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDetailOpen(true); }}>
           {images.length > 0 ? (
             <img 
               src={images[currImgIndex]} 

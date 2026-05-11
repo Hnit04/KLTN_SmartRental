@@ -347,7 +347,7 @@ export default function RoomDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen overflow-x-hidden bg-background pb-20">
 
       {/* ============ LIGHTBOX ============ */}
       {lightboxOpen && images.length > 0 && (
@@ -392,7 +392,7 @@ export default function RoomDetailPage() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <Link to="/properties" className="hover:text-primary transition">Tìm phòng</Link>
@@ -465,9 +465,9 @@ export default function RoomDetailPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-[15px] text-gray-500 mt-1">
+                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[15px] text-gray-500">
                   <MapPin className="h-4 w-4 shrink-0" />
-                  <span>{room.propertyAddress || room.address}</span>
+                  <span className="min-w-0 break-words">{room.propertyAddress || room.address}</span>
                 </div>
                 
                 {room.propertyName && (
@@ -540,8 +540,8 @@ export default function RoomDetailPage() {
         {/* 360 VIEWER (Ngay dưới ảnh bình thường) */}
         {room.panoramaImages && room.panoramaImages.length > 0 && (
           <div className="mb-10">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900 min-w-0">
                 <span className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
                   <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
@@ -595,29 +595,29 @@ export default function RoomDetailPage() {
               {/* THÔNG TIN TỔNG QUAN */}
               <section id="tổng-quan">
                 <h2 className="text-lg font-bold text-gray-900 mb-5">Thông tin tổng quan</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 p-4 text-center sm:p-5">
                     <Maximize className="h-7 w-7 text-gray-400" />
                     <div className="space-y-0.5">
                       <p className="text-[13px] text-gray-500 font-medium">Diện tích</p>
                       <p className="font-bold text-gray-900">{room.area} m²</p>
                     </div>
                   </div>
-                  <div className="border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 p-4 text-center sm:p-5">
                     <LayoutTemplate className="h-7 w-7 text-gray-400" />
                     <div className="space-y-0.5">
                       <p className="text-[13px] text-gray-500 font-medium">Thiết kế</p>
                       <p className="font-bold text-gray-900">{room.hasMezzanine ? 'Gác lửng' : 'Tiêu chuẩn'}</p>
                     </div>
                   </div>
-                  <div className="border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 p-4 text-center sm:p-5">
                     <Box className="h-7 w-7 text-gray-400" />
                     <div className="space-y-0.5">
                       <p className="text-[13px] text-gray-500 font-medium">Tiện ích phụ</p>
                       <p className="font-bold text-gray-900">{room.hasBalcony ? 'Ban công' : 'Không có'}</p>
                     </div>
                   </div>
-                  <div className="border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 p-4 text-center sm:p-5">
                     <Users className="h-7 w-7 text-gray-400" />
                     <div className="space-y-0.5">
                       <p className="text-[13px] text-gray-500 font-medium">Số lượng người</p>
@@ -955,9 +955,9 @@ export default function RoomDetailPage() {
       {isBookingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-gray-900">
-                <CalendarClock className="h-5 w-5 text-primary" /> Đặt lịch xem phòng
+            <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50 p-5 sm:items-center">
+              <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-900">
+                <CalendarClock className="h-5 w-5 shrink-0 text-primary" /> Đặt lịch xem phòng
               </h2>
               <button onClick={() => setIsBookingOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
