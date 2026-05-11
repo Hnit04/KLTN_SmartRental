@@ -46,6 +46,9 @@ export const propertyApi = {
     return axiosClient.get(`/properties/reverse-geocode?lat=${lat}&lon=${lon}`);
   },
 
+  suggestRoomPrice: (data: { district: string, city: string, area: number, type: string, amenities: string[] }) =>
+    axiosClient.post<{ suggestion: string, reason: string }>("/ai/suggest-room-price", data),
+
   // --- CÁC HÀM DÀNH CHO ADMIN ---
   getPendingProperties: () => axiosClient.get<Property[]>("/properties/pending"),
   approveProperty: (id: number | string) => axiosClient.post(`/properties/${id}/approve`),
