@@ -560,7 +560,25 @@ export default function PropertiesManagePage() {
                         <select
                           className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none bg-white"
                           value={formData.city}
-                          onChange={e => setFormData({...formData, city: e.target.value})}
+                          onChange={e => {
+                            const selectedCity = e.target.value;
+                            setFormData(prev => {
+                              const newData = { ...prev, city: selectedCity };
+                              // Gợi ý giá dịch vụ cơ bản theo khu vực
+                              if (!prev.elecPrice && !prev.waterPrice && !prev.internetPrice) {
+                                if (selectedCity === 'Hồ Chí Minh' || selectedCity === 'Hà Nội' || selectedCity === 'Đà Nẵng') {
+                                  newData.elecPrice = '3500';
+                                  newData.waterPrice = '20000';
+                                  newData.internetPrice = '100000';
+                                } else if (selectedCity) {
+                                  newData.elecPrice = '3000';
+                                  newData.waterPrice = '15000';
+                                  newData.internetPrice = '50000';
+                                }
+                              }
+                              return newData;
+                            });
+                          }}
                         >
                           <option value="">-- Chọn Tỉnh/TP --</option>
                           {VIETNAM_CITIES.map(city => (

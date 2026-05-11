@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { 
   MapPin, Plus, Edit, ArrowLeft, Loader2, 
   Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
@@ -115,6 +116,21 @@ export default function PropertyManageDetailPage() {
   const [panoPreviewUrls, setPanoPreviewUrls] = useState<string[]>([]);
   const panoFileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- STATE CHO EXCEL IMPORT ---
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const excelImagesInputRef = useRef<HTMLInputElement>(null);
+  const [showExcelPreview, setShowExcelPreview] = useState(false);
+  const [excelRooms, setExcelRooms] = useState<any[]>([]);
+  const [excelImageFiles, setExcelImageFiles] = useState<Map<string, File>>(new Map());
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
+  const [importErrors, setImportErrors] = useState<{name: string, reason: string}[]>([]);
+
+  // --- STATE AI GỢI Ý GIÁ ---
+  const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+  const [priceSuggestion, setPriceSuggestion] = useState<{suggestion: string, reason: string} | null>(null);
+
   useEffect(() => {
     if (id) fetchData();
   }, [id]);
@@ -184,6 +200,188 @@ export default function PropertyManageDetailPage() {
       setIsMaintenanceLoading(false);
       setMaintenanceRoomId(null);
       setPendingMaintenanceAction(null);
+    }
+  };
+
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        const parsedRooms = data.map((row: any) => {
+          const roomName = row['Tên phòng']?.toString() || '';
+          const normalImgNames = row['Ảnh thường'] ? String(row['Ảnh thường']).split(',').map(s => s.trim()) : [];
+          const panoImgName = row['Ảnh 360'] ? String(row['Ảnh 360']).trim() : '';
+
+          // Tìm file khớp
+          const matchedNormalFiles = normalImgNames.map(name => excelImageFiles.get(name)).filter(f => !!f) as File[];
+          const matchedPanoFile = excelImageFiles.get(panoImgName);
+
+          return {
+            name: roomName,
+            price: Number(row['Giá thuê (VNĐ)']) || 0,
+            area: Number(row['Diện tích (m2)']) || 0,
+            type: row['Loại phòng'] || 'STUDIO',
+            maxOccupants: row['Sức chứa tối đa'] ? Number(row['Sức chứa tối đa']) : null,
+            hasMezzanine: row['Có gác lửng'] == 1 || row['Có gác lửng'] == '1' || String(row['Có gác lửng']).toLowerCase() === 'có',
+            hasBalcony: row['Có ban công'] == 1 || row['Có ban công'] == '1' || String(row['Có ban công']).toLowerCase() === 'có',
+            amenities: row['Tiện ích'] ? String(row['Tiện ích']).split(',').map(s => s.trim()) : [],
+            normalImgFiles: matchedNormalFiles,
+            panoImgFile: matchedPanoFile,
+            imageStatus: {
+              normalCount: matchedNormalFiles.length,
+              normalTotal: normalImgNames.length,
+              hasPano: !!matchedPanoFile,
+              needsPano: !!panoImgName
+            }
+          };
+        });
+
+        setExcelRooms(parsedRooms);
+        setShowExcelPreview(true);
+      } catch (err) {
+        toast.error('Lỗi đọc file Excel. Vui lòng kiểm tra lại định dạng!');
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (excelInputRef.current) excelInputRef.current.value = '';
+  };
+
+  const handleImageBatchSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const fileMap = new Map<string, File>();
+    for (let i = 0; i < files.length; i++) {
+      fileMap.set(files[i].name, files[i]);
+    }
+    setExcelImageFiles(fileMap);
+    toast.success(`Đã ghi nhớ ${files.length} ảnh. Bây giờ hãy chọn file Excel!`);
+    excelInputRef.current?.click();
+  };
+
+  const executeExcelImport = async () => {
+    try {
+      const res = await vipApi.getMyPlan();
+      const plan = (res as any).data || res;
+      if (plan.maxRoomsPerProperty !== -1 && rooms.length + excelRooms.length > plan.maxRoomsPerProperty) {
+        toast.error(`Gói ${plan.tier} chỉ cho phép tối đa ${plan.maxRoomsPerProperty} phòng. Bạn đang tải lên quá giới hạn!`);
+        return;
+      }
+    } catch (e) {
+      console.error("Lỗi lấy thông tin VIP", e);
+    }
+
+    setIsImporting(true);
+    setImportTotal(excelRooms.length);
+    setImportProgress(0);
+    setImportErrors([]);
+
+    let successCount = 0;
+    let errList = [];
+
+    for (let i = 0; i < excelRooms.length; i++) {
+      const room = excelRooms[i];
+      if (!room.name || !room.price || !room.area) {
+        errList.push({ name: room.name || `Dòng ${i+1}`, reason: 'Thiếu Tên, Giá hoặc Diện tích' });
+        setImportProgress(i + 1);
+        continue;
+      }
+
+      try {
+        // Tải ảnh lên trước
+        let uploadedNormalUrls: string[] = [];
+        let uploadedPanoUrls: string[] = [];
+
+        if (room.normalImgFiles.length > 0) {
+          const res = await propertyApi.uploadImages(room.normalImgFiles);
+          uploadedNormalUrls = (res as any).data || res;
+        }
+
+        if (room.panoImgFile) {
+          const res = await propertyApi.uploadImages([room.panoImgFile]);
+          uploadedPanoUrls = (res as any).data || res;
+        }
+
+        await propertyApi.createRoom(id!, {
+          name: room.name,
+          price: room.price,
+          area: room.area,
+          type: room.type as RoomType,
+          hasMezzanine: room.hasMezzanine,
+          hasBalcony: room.hasBalcony,
+          maxOccupants: room.maxOccupants,
+          description: `Phòng ${room.name} sạch sẽ thoáng mát.`,
+          amenities: room.amenities,
+          images: uploadedNormalUrls,
+          panoramaImages: uploadedPanoUrls,
+          defaultTerms: ''
+        });
+        successCount++;
+        await new Promise(r => setTimeout(r, 800)); // Delay để AI không bị quá tải
+      } catch (err: any) {
+        const errData = err?.response?.data;
+        errList.push({ name: room.name, reason: errData?.message || 'Lỗi không xác định' });
+        
+        if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+            toast.error('Đã đạt giới hạn VIP giữa chừng. Dừng tải lên!');
+            break;
+        }
+      }
+      setImportProgress(i + 1);
+    }
+
+    setIsImporting(false);
+    toast.success(`Đã thêm thành công ${successCount} phòng!`);
+    if (errList.length === 0) {
+      setShowExcelPreview(false);
+    }
+    setImportErrors(errList);
+    fetchData();
+  };
+
+  // --- LOGIC AI GỢI Ý GIÁ ---
+  const handleSuggestPrice = async () => {
+    if (!formData.area || !formData.type) {
+      toast.warning('Vui lòng nhập Diện tích và Loại phòng để AI gợi ý chính xác hơn');
+      return;
+    }
+
+    setIsSuggestingPrice(true);
+    setPriceSuggestion(null);
+
+    try {
+      const res = await propertyApi.suggestRoomPrice({
+        district: property?.district || '',
+        city: property?.city || '',
+        area: Number(formData.area),
+        type: formData.type,
+        amenities: [...formData.amenities, ...formData.customAmenitiesInput.split(',').map(s => s.trim()).filter(s => s)]
+      });
+      setPriceSuggestion((res as any).data || res);
+    } catch (err) {
+      toast.error('Không thể lấy gợi ý giá lúc này');
+    } finally {
+      setIsSuggestingPrice(false);
+    }
+  };
+
+  const applyPriceSuggestion = () => {
+    if (!priceSuggestion) return;
+    // Lấy con số đầu tiên trong chuỗi khoảng giá (VD: "3.500.000 - 4.000.000" -> 3500000)
+    const matches = priceSuggestion.suggestion.replace(/\./g, '').match(/\d+/);
+    if (matches) {
+      setFormData({ ...formData, price: matches[0] });
+      setPriceSuggestion(null);
+      toast.success('Đã áp dụng mức giá gợi ý!');
     }
   };
 
@@ -510,31 +708,6 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-w-0 space-y-6">
-        <Skeleton className="h-4 w-48 rounded-md" />
-        <div className="space-y-2">
-          <Skeleton className="h-9 w-full max-w-md rounded-lg" />
-          <Skeleton className="h-4 w-full max-w-xl rounded-md" />
-        </div>
-        <Skeleton className="h-11 w-full max-w-xs rounded-xl" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-80 rounded-2xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (!property) {
-    return (
-      <div className="mx-auto max-w-lg py-16">
-        <EmptyState icon={Building} title="Không tìm thấy khu trọ" description="Kiểm tra đường dẫn hoặc quay lại danh sách." />
-      </div>
-    );
-  }
-
   const propertyOps = useMemo(() => {
     const vacant = rooms.filter((r) => r.status === 'AVAILABLE').length;
     const rented = rooms.filter((r) => r.status === 'RENTED').length;
@@ -572,6 +745,31 @@ export default function PropertyManageDetailPage() {
     return { vacant, rented, maintenance, reserved, pendingApproval, vacantRevenue, summary };
   }, [rooms]);
 
+  if (loading) {
+    return (
+      <div className="min-w-0 space-y-6">
+        <Skeleton className="h-4 w-48 rounded-md" />
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-full max-w-md rounded-lg" />
+          <Skeleton className="h-4 w-full max-w-xl rounded-md" />
+        </div>
+        <Skeleton className="h-11 w-full max-w-xs rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-80 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!property) {
+    return (
+      <div className="mx-auto max-w-lg py-16">
+        <EmptyState icon={Building} title="Không tìm thấy khu trọ" description="Kiểm tra đường dẫn hoặc quay lại danh sách." />
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="min-w-0 space-y-6 overflow-x-hidden pb-8">
@@ -586,9 +784,22 @@ export default function PropertyManageDetailPage() {
         title={property.name}
         description={property.address}
         actions={
-          <Button type="button" onClick={handleOpenCreate} className="min-h-11 w-full shrink-0 gap-2 md:w-auto">
-            <Plus className="h-4 w-4" /> Thêm phòng
-          </Button>
+          <div className="flex gap-2 flex-col md:flex-row w-full md:w-auto">
+            <input type="file" accept=".xlsx, .xls" ref={excelInputRef} onChange={handleExcelImport} className="hidden" />
+            <input type="file" multiple ref={excelImagesInputRef} onChange={handleImageBatchSelect} className="hidden" />
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => excelImagesInputRef.current?.click()} 
+              className="min-h-11 w-full md:w-auto shrink-0 gap-2 border-primary text-primary hover:bg-primary/10"
+              title="Chọn ảnh trước, sau đó chọn file Excel để tự động khớp ảnh"
+            >
+              <ScrollText className="h-4 w-4" /> Nhập từ Excel
+            </Button>
+            <Button type="button" onClick={handleOpenCreate} className="min-h-11 w-full md:w-auto shrink-0 gap-2">
+              <Plus className="h-4 w-4" /> Thêm phòng
+            </Button>
+          </div>
         }
       />
 
@@ -885,9 +1096,45 @@ export default function PropertyManageDetailPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Diện tích (m²) *</label>
                     <input required type="number" step="0.1" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá thuê (VND) *</label>
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
+                      <span>Giá thuê (VND) *</span>
+                      <button 
+                        type="button"
+                        onClick={handleSuggestPrice}
+                        disabled={isSuggestingPrice}
+                        className="text-[10px] flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded hover:bg-purple-100 transition-colors border border-purple-100"
+                      >
+                        {isSuggestingPrice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        Gợi ý giá AI
+                      </button>
+                    </label>
                     <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                    
+                    {priceSuggestion && (
+                      <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border border-purple-200 rounded-lg shadow-lg p-3 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-bold text-purple-900 mb-1 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" /> Khoảng giá gợi ý: {priceSuggestion.suggestion}
+                        </p>
+                        <p className="text-[10px] text-gray-600 mb-2 leading-relaxed">{priceSuggestion.reason}</p>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={applyPriceSuggestion}
+                            className="text-[10px] bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 transition-colors"
+                          >
+                            Áp dụng
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setPriceSuggestion(null)}
+                            className="text-[10px] text-gray-500 hover:text-gray-700"
+                          >
+                            Bỏ qua
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1293,11 +1540,111 @@ export default function PropertyManageDetailPage() {
         </div>
       )}
 
+      {/* MODAL PREVIEW EXCEL */}
+      {showExcelPreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Xem trước dữ liệu Excel</h3>
+                <p className="text-sm text-gray-500">Đã đọc {excelRooms.length} phòng từ file</p>
+              </div>
+              {!isImporting && <button onClick={() => setShowExcelPreview(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>}
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-gray-50/50">
+               {isImporting ? (
+                 <div className="flex flex-col items-center justify-center py-10">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                    <h4 className="text-lg font-bold">Đang tải phòng lên...</h4>
+                    <p className="text-sm text-gray-500 mb-6">Tiến trình: {importProgress} / {importTotal}</p>
+                    <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5">
+                      <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: `${(importProgress / importTotal) * 100}%` }}></div>
+                    </div>
+                 </div>
+               ) : (
+                <>
+                  {importErrors.length > 0 && (
+                    <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                      <p className="font-bold mb-1">Có lỗi khi tải lên một số phòng:</p>
+                      <ul className="list-disc pl-5 text-sm">
+                        {importErrors.map((err, idx) => (
+                          <li key={idx}>Phòng <strong>{err.name}</strong>: {err.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-100 text-gray-700">
+                        <tr>
+                          <th className="px-4 py-3">Tên P.</th>
+                          <th className="px-4 py-3">Giá (VNĐ)</th>
+                          <th className="px-4 py-3">Diện tích</th>
+                          <th className="px-4 py-3">Ảnh đã khớp</th>
+                          <th className="px-4 py-3">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {excelRooms.map((room, idx) => {
+                          const isInvalid = !room.name || !room.price || !room.area;
+                          return (
+                            <tr key={idx} className={isInvalid ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                              <td className="px-4 py-3 font-medium">{room.name || <span className="text-red-500">Thiếu</span>}</td>
+                              <td className="px-4 py-3">{room.price ? room.price.toLocaleString() : <span className="text-red-500">Thiếu</span>}</td>
+                              <td className="px-4 py-3">{room.area ? `${room.area}m2` : <span className="text-red-500">Thiếu</span>}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${room.imageStatus.normalCount === room.imageStatus.normalTotal ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    Thường: {room.imageStatus.normalCount}/{room.imageStatus.normalTotal}
+                                  </span>
+                                  {room.imageStatus.needsPano && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${room.imageStatus.hasPano ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                      360°: {room.imageStatus.hasPano ? 'Đã khớp' : 'Thiếu'}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                {isInvalid ? (
+                                  <span className="text-xs text-red-600 font-bold bg-red-100 px-2 py-1 rounded">Lỗi dữ liệu</span>
+                                ) : (
+                                  <span className="text-xs text-green-600 font-bold bg-green-100 px-2 py-1 rounded">Hợp lệ</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+               )}
+            </div>
+
+            <div className="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <Button disabled={isImporting} variant="outline" onClick={() => setShowExcelPreview(false)}>
+                Đóng
+              </Button>
+              {!isImporting && (
+                <Button 
+                  onClick={executeExcelImport} 
+                  disabled={excelRooms.length === 0}
+                  className="bg-primary hover:bg-primary-dark"
+                >
+                  Xác nhận Nhập {excelRooms.length} phòng
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- MODAL XEM TRƯỚC NỘI DUNG AI (PREVIEW) --- */}
       {aiContentPreview && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
-            <div className="bg-purple-50 px-5 py-4 border-b border-purple-100 flex justify-between items-center flex-shrink-0">
+<div className="bg-purple-50 px-5 py-4 border-b border-purple-100 flex justify-between items-center flex-shrink-0">
                <h3 className="text-lg font-bold text-purple-900 flex items-center gap-2">
                  <Sparkles className="h-5 w-5 text-purple-600" />
                  Bản nháp từ Copilot

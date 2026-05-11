@@ -464,4 +464,46 @@ public class AiController {
             ));
         }
     }
+
+    @PostMapping("/suggest-room-price")
+    public ResponseEntity<?> suggestRoomPrice(@RequestBody Map<String, Object> request) {
+        try {
+            String district = (String) request.get("district");
+            String city = (String) request.get("city");
+            Double area = Double.valueOf(request.get("area").toString());
+            String type = (String) request.get("type");
+            @SuppressWarnings("unchecked")
+            List<String> amenities = (List<String>) request.get("amenities");
+
+            String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Không có";
+
+            String aiPrompt = String.format(
+                "Bạn là chuyên gia thẩm định giá bất động sản cho thuê tại Việt Nam. " +
+                "Hãy gợi ý một KHOẢNG GIÁ thuê hàng tháng (VND) cho phòng trọ với thông tin sau:\n" +
+                "- Địa điểm: Quận %s, %s\n" +
+                "- Loại phòng: %s\n" +
+                "- Diện tích: %.1f m2\n" +
+                "- Tiện ích: %s\n\n" +
+                "Yêu cầu:\n" +
+                "1. Trả về kết quả theo định dạng JSON: {\"suggestion\": \"Khoảng giá\", \"reason\": \"Lý do ngắn gọn\"}\n" +
+                "2. Khoảng giá phải thực tế với thị trường hiện nay.\n" +
+                "3. Phần 'reason' giải thích tại sao có mức giá đó (Vị trí, diện tích, tiện ích).\n" +
+                "Chỉ trả về JSON, không thêm văn bản khác. Tuyệt đối không có markdown code blocks.",
+                district, city, type, area, amenitiesStr
+            );
+
+            String response = geminiChatModel.generate(aiPrompt);
+            
+            // Làm sạch response
+            response = response.replace("```json", "").replace("```", "").trim();
+            
+            return ResponseEntity.ok(objectMapper.readValue(response, Map.class));
+        } catch (Throwable t) {
+            System.err.println("❌ [AI PRICE SUGGEST ERROR] " + t.getMessage());
+            return ResponseEntity.status(503).body(Map.of(
+                "status", "error", 
+                "message", "Dịch vụ AI đang bận. Không thể đưa ra gợi ý lúc này."
+            ));
+        }
+    }
 }
