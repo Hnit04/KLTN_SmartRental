@@ -438,6 +438,74 @@ public class BlockchainService {
         }
     }
 
+    /**
+     * 🛡️ PHASE 4: Hardened Web3 Bill Payment Verification
+     * Decodes the TransactionReceipt to verify the 'BillPaid' event.
+     */
+    public boolean verifyBillPaymentEvent(String txHash, String expectedContractAddress, Long expectedBillId, BigInteger expectedAmount) {
+        try {
+            TransactionReceipt receipt = web3j.ethGetTransactionReceipt(txHash).send()
+                    .getTransactionReceipt().orElse(null);
+            
+            if (receipt == null || !receipt.isStatusOK()) {
+                return false;
+            }
+
+            if (!receipt.getTo().equalsIgnoreCase(expectedContractAddress)) {
+                log.error("Fake Bill Payment: txHash {} called {}, expected {}", txHash, receipt.getTo(), expectedContractAddress);
+                return false;
+            }
+
+            // Encode the event signature: BillPaid(uint256 indexed billId, uint256 amount)
+            org.web3j.abi.datatypes.Event event = new org.web3j.abi.datatypes.Event("BillPaid", 
+                Arrays.asList(
+                    new org.web3j.abi.TypeReference<org.web3j.abi.datatypes.generated.Uint256>(true) {},
+                    new org.web3j.abi.TypeReference<org.web3j.abi.datatypes.generated.Uint256>(false) {}
+                ));
+            String eventSignatureHash = org.web3j.abi.EventEncoder.encode(event);
+
+            for (org.web3j.protocol.core.methods.response.Log logItem : receipt.getLogs()) {
+                if (logItem.getTopics().isEmpty()) continue;
+                
+                if (logItem.getTopics().get(0).equals(eventSignatureHash)) {
+                    // Check indexed billId (topic 1)
+                    if (logItem.getTopics().size() > 1) {
+                        String topic1 = logItem.getTopics().get(1);
+                        // Remove "0x"
+                        if (topic1.startsWith("0x")) topic1 = topic1.substring(2);
+                        BigInteger paidBillId = new BigInteger(topic1, 16);
+                        
+                        if (!paidBillId.equals(BigInteger.valueOf(expectedBillId))) {
+                            log.error("Bill ID mismatch: paid {}, expected {}", paidBillId, expectedBillId);
+                            continue;
+                        }
+                    }
+
+                    // Log data contains the non-indexed parameters (amount)
+                    String data = logItem.getData();
+                    if (data.startsWith("0x")) data = data.substring(2);
+                    if (data.isEmpty()) continue;
+                    
+                    BigInteger depositedAmount = new BigInteger(data, 16);
+                    
+                    if (depositedAmount.equals(expectedAmount)) {
+                        log.info("✅ Bill Payment Verified! txHash: {} amount: {}", txHash, expectedAmount);
+                        return true;
+                    } else {
+                        log.error("Fake Bill Amount: txHash {} paid {}, expected {}", txHash, depositedAmount, expectedAmount);
+                        return false;
+                    }
+                }
+            }
+
+            log.error("No BillPaid event found in txHash {}", txHash);
+            return false;
+        } catch (Exception e) {
+            log.error("Error verifying bill payment transaction {}: {}", txHash, e.getMessage());
+            return false;
+        }
+    }
+
     public Map<String, Object> getSettlementInfo(String contractAddress, String landlord, String tenant)
             throws Exception {
         Map<String, Object> info = new HashMap<>();
