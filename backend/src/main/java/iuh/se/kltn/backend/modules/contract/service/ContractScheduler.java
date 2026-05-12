@@ -109,9 +109,11 @@ public class ContractScheduler {
                 "Hợp đồng phòng " + (room != null ? room.getName() : "") + " đã bị hủy tự động do quá hạn 24h nạp cọc. Bạn bị trừ 10 điểm uy tín.", 
                 iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
             
-            notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
-                "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không nạp cọc sau 24h. Phòng đã được nhả về trạng thái Trống.", 
-                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            if (room != null) {
+                notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
+                    "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không nạp cọc sau 24h. Phòng đã được nhả về trạng thái Trống.", 
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            }
         }
 
         if (!stuckContracts.isEmpty()) {
@@ -169,7 +171,6 @@ public class ContractScheduler {
     public void sendRenewalReminders() {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDate in30Days = today.plusDays(30);
-        java.time.LocalDate in15Days = today.plusDays(15);
 
         // Lấy hợp đồng ACTIVE sắp hết hạn trong 30 ngày
         List<Contract> soonExpiring = contractRepository.findByStatusAndEndDateBefore(ContractStatus.ACTIVE, in30Days.plusDays(1));

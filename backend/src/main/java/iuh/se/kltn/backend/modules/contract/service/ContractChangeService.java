@@ -10,12 +10,14 @@ import iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepo
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
+import iuh.se.kltn.backend.modules.user.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigInteger;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +34,7 @@ public class ContractChangeService {
     private final iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     private final BlockchainService blockchainService;
     private final ContractService contractService;
+    private final EmailService emailService;
 
     // 1. Gửi yêu cầu (Dành cho Tenant hoặc Landlord tùy logic)
     @Transactional
@@ -62,6 +65,9 @@ public class ContractChangeService {
 
         // ✅ THÊM DÒNG NÀY: Lưu lại Role của người tạo yêu cầu (LANDLORD hoặc TENANT)
         req.setRequestedByRole(user.getRole().name());
+        
+        // ✅ THÊM DÒNG NÀY: Thiết lập thời hạn 72h cho yêu cầu
+        req.setExpiryDate(LocalDateTime.now().plusHours(72));
 
         // ═══════════════════════════════════════════════════════════════
         // 🛡️ RÀNG BUỘC NGHIỆP VỤ (Business Constraints)
@@ -132,6 +138,9 @@ public class ContractChangeService {
                 contract.getId()
         );
 
+        // ✅ GỬI MAIL CHO ĐỐI TÁC -> Đã chuyển sang cơ chế Reminder trong ContractTask 
+        // (Gửi trước khi hết hạn 24h thay vì gửi ngay lập tức)
+
         return saved;
     }
 
@@ -193,7 +202,7 @@ public class ContractChangeService {
                                 ? contract.getTenant() 
                                 : contract.getRoom().getProperty().getLandlord();
                         
-                        reputationService.processPoints(violator, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EARLY_TERMINATION, -15, "Hủy hợp đồng trước thời hạn không có lý do chính đáng (#" + contract.getId() + ")");
+                        reputationService.processPoints(violator, iuh.se.kltn.backend.modules.user.enums.ReputationAction.EARLY_TERMINATION, -30, "Đơn phương chấm dứt hợp đồng sớm (#" + contract.getId() + ")");
                         // Nếu ngày chấm dứt ở tương lai -> Chỉ lùi endDate, Scheduler sẽ nhả phòng khi đến hạn.
                     } else if (contract.getStatus() == ContractStatus.PENDING_SIGNATURE) {
                         // 💰 Hủy trước khi ký → Hoàn cọc (nếu đã đặt cọc)

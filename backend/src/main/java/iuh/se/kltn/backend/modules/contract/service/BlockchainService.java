@@ -527,6 +527,7 @@ public class BlockchainService {
                 Transaction.createEthCallTransaction(null, contractAddress, FunctionEncoder.encode(proposalFunc)),
                 DefaultBlockParameterName.LATEST).send();
 
+        @SuppressWarnings("rawtypes")
         List<Type> decodedProposal = FunctionReturnDecoder.decode(proposalCall.getValue(),
                 proposalFunc.getOutputParameters());
         if (!decodedProposal.isEmpty()) {
@@ -553,6 +554,7 @@ public class BlockchainService {
                 Transaction.createEthCallTransaction(null, contractAddress, FunctionEncoder.encode(func)),
                 DefaultBlockParameterName.LATEST).send();
 
+        @SuppressWarnings("rawtypes")
         List<Type> decoded = FunctionReturnDecoder.decode(call.getValue(), func.getOutputParameters());
         return !decoded.isEmpty() && (boolean) decoded.get(0).getValue();
     }

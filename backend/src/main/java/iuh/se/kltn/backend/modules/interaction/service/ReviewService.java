@@ -8,6 +8,7 @@ import iuh.se.kltn.backend.modules.interaction.entity.Review;
 import iuh.se.kltn.backend.modules.interaction.enums.NotificationType;
 import iuh.se.kltn.backend.modules.interaction.repository.ReviewRepository;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.enums.ReputationAction;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -63,9 +64,9 @@ public class ReviewService {
         Review savedReview = reviewRepo.save(review);
 
         // 4.5. Điểm uy tín
-        reputationService.processPoints(reviewer, iuh.se.kltn.backend.modules.user.enums.ReputationAction.REVIEW_SUBMITTED, 2, "Gửi đánh giá hợp đồng thành công");
+        reputationService.processPoints(reviewer, ReputationAction.REVIEW_SUBMITTED, 2, "Gửi đánh giá hợp đồng thành công");
         if (request.getRating() >= 4) {
-            reputationService.processPoints(landlord, iuh.se.kltn.backend.modules.user.enums.ReputationAction.GOOD_REVIEW_RECEIVED, 3, "Nhận được đánh giá tích cực từ khách thuê");
+            reputationService.processPoints(landlord, ReputationAction.GOOD_REVIEW_RECEIVED, 3, "Nhận được đánh giá tích cực từ khách thuê");
         }
 
         // 5. TỰ ĐỘNG BẮN THÔNG BÁO CHO CHỦ NHÀ
