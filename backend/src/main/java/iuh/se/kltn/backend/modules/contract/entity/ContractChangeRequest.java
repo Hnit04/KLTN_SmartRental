@@ -45,7 +45,11 @@ public class ContractChangeRequest {
     @CreationTimestamp
     private LocalDateTime requestDate;
 
+    private LocalDateTime expiryDate;
+
     private String requestedByRole;
+    
+    private boolean reminderSent = false;
 
     @JsonProperty("contractId")
     public Long retrieveContractId() {

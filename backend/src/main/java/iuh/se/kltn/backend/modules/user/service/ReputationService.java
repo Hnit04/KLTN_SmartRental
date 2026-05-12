@@ -15,6 +15,8 @@ public class ReputationService {
 
     private final UserRepository userRepository;
     private final ReputationHistoryRepository historyRepository;
+    private final iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+    private final EmailService emailService;
 
     @Transactional
     public void processPoints(User user, ReputationAction action, int points, String description) {
@@ -50,5 +52,22 @@ public class ReputationService {
         history.setDescription(description);
         
         historyRepository.save(history);
+
+        // ✅ GỬI THÔNG BÁO VÀ MAIL CHO NGƯỜI DÙNG
+        String typeStr = points >= 0 ? "cộng" : "trừ";
+        String absPoints = String.valueOf(Math.abs(points));
+        String title = "Điểm uy tín thay đổi";
+        String message = String.format("Bạn vừa bị %s %s điểm uy tín. Lý do: %s. Điểm hiện tại: %d/100", 
+                typeStr, absPoints, description, newScore);
+
+        notificationService.createNotification(
+                user,
+                title,
+                message,
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.SYSTEM,
+                null
+        );
+
+        emailService.sendReputationAlert(user.getEmail(), user.getFullName(), typeStr, absPoints, description, newScore);
     }
 }

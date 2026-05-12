@@ -238,7 +238,138 @@ public class EmailService {
         new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
     }
 
-    // Hàm helper để tránh lỗi resolve method
+    public void sendReputationAlert(String toEmail, String name, String type, String points, String reason, int total) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Thông báo thay đổi điểm uy tín");
+
+        String color = type.equals("cộng") ? "#10b981" : "#ef4444";
+        String icon = type.equals("cộng") ? "⭐" : "⚠️";
+
+        String html = String.format(
+                """
+                <div style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc;">
+                    <div style="max-width: 500px; margin: auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                        <div style="text-align: center; font-size: 40px;">%s</div>
+                        <h2 style="color: #1e293b; text-align: center; margin-top: 10px;">Điểm uy tín thay đổi</h2>
+                        <p>Chào <b>%s</b>,</p>
+                        <p>Hệ thống vừa thực hiện %s điểm uy tín của bạn:</p>
+                        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                            <span style="font-size: 24px; font-weight: bold; color: %s;">%s %s điểm</span>
+                            <br/>
+                            <span style="color: #64748b; font-size: 14px;">Lý do: %s</span>
+                        </div>
+                        <p style="text-align: center; font-weight: bold; color: #1e293b;">
+                            Tổng điểm hiện tại: <span style="font-size: 20px;">%d/100</span>
+                        </p>
+                        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                        <p style="font-size: 12px; color: #94a3b8; text-align: center;">
+                            Điểm uy tín cao giúp bạn dễ dàng thuê phòng và nhận được nhiều ưu đãi hơn. 
+                            Hãy duy trì phản hồi nhanh và tuân thủ các cam kết hợp đồng.
+                        </p>
+                    </div>
+                </div>
+                """,
+                icon, name, type, color, type.equals("cộng") ? "+" : "-", points, reason, total
+        );
+        body.put("htmlContent", html);
+        try {
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders());
+            new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi mail uy tín: " + e.getMessage());
+        }
+    }
+
+    public void sendContractChangeRequestAlert(String toEmail, String name, String partnerName, String roomName, String type, String expiry) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Đề xuất chỉnh sửa hợp đồng mới");
+
+        String html = String.format(
+                """
+                <div style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc;">
+                    <div style="max-width: 550px; margin: auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                        <h2 style="color: #2563eb; margin-bottom: 20px;">📝 Đề xuất mới</h2>
+                        <p>Chào <b>%s</b>,</p>
+                        <p>Bạn vừa nhận được một đề xuất <b>%s</b> cho hợp đồng phòng <b>%s</b> từ <b>%s</b>.</p>
+                        
+                        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                            <p style="color: #92400e; margin: 0;">
+                                <b>Thời hạn phản hồi:</b> Trước %s
+                            </p>
+                            <p style="font-size: 13px; color: #b45309; margin-top: 5px;">
+                                Lưu ý: Nếu quá thời hạn này mà không phản hồi, đề xuất sẽ tự động bị hủy và bạn có thể bị trừ điểm uy tín.
+                            </p>
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="http://localhost:5173/dashboard/contracts" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Xem và Phản hồi ngay</a>
+                        </div>
+
+                        <p style="font-size: 13px; color: #64748b;">
+                            Cảm ơn bạn đã sử dụng SmartRental.
+                        </p>
+                    </div>
+                </div>
+                """,
+                name, type, roomName, partnerName, expiry
+        );
+        body.put("htmlContent", html);
+        try {
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders());
+            new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi mail đề xuất: " + e.getMessage());
+        }
+    }
+    
+    public void sendSettlementReminder(String toEmail, String name, String roomName, String tenantName, String deadline) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Nhắc nhở quyết toán hợp đồng sắp hết hạn");
+
+        String html = String.format(
+                """
+                <div style="font-family: Arial, sans-serif; padding: 20px; background: #fffcf0;">
+                    <div style="max-width: 550px; margin: auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #fef3c7;">
+                        <h2 style="color: #d97706; margin-bottom: 20px;">⚠️ Nhắc nhở quyết toán</h2>
+                        <p>Chào <b>%s</b>,</p>
+                        <p>Hợp đồng phòng <b>%s</b> với khách <b>%s</b> đã kết thúc được một thời gian nhưng hệ thống chưa ghi nhận thao tác quyết toán cọc từ bạn.</p>
+                        
+                        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                            <p style="color: #92400e; margin: 0;">
+                                <b>Hạn chót tự động hoàn cọc:</b> %s
+                            </p>
+                            <p style="font-size: 13px; color: #b45309; margin-top: 5px;">
+                                <b>Lưu ý:</b> Nếu bạn không thực hiện quyết toán trước thời hạn này, hệ thống sẽ <b>tự động hoàn 100%% cọc</b> cho khách thuê và bạn sẽ bị <b>trừ 20 điểm uy tín</b>.
+                            </p>
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="http://localhost:5173/dashboard/contracts" style="background: #d97706; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Quyết toán ngay</a>
+                        </div>
+
+                        <p style="font-size: 13px; color: #64748b;">
+                            Vui lòng kiểm tra lại các hóa đơn và đề xuất khấu trừ (nếu có) để đảm bảo quyền lợi của mình.
+                        </p>
+                    </div>
+                </div>
+                """,
+                name, roomName, tenantName, deadline
+        );
+        body.put("htmlContent", html);
+        try {
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders());
+            new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi mail nhắc nhở quyết toán: " + e.getMessage());
+        }
+    }
+
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

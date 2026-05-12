@@ -88,4 +88,7 @@ public class Contract {
     @Column(columnDefinition = "boolean default false")
     private Boolean isDepositSettledToLandlord;
     private LocalDateTime depositSettledAt;
+
+    @Column(columnDefinition = "boolean default false")
+    private Boolean settlementReminderSent = false;
 }

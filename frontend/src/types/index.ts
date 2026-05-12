@@ -435,6 +435,7 @@ export interface ContractChangeRequest {
   reason: string;
   status: RequestStatus;
   requestDate: string;
+  expiryDate?: string;
   requestedByRole?: string;
 }
 

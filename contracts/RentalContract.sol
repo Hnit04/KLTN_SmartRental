@@ -44,7 +44,7 @@ contract RentalContract is ReentrancyGuard, Pausable {
     mapping(address => bool) public endConsent;
 
     uint256 public constant MAX_PENALTY_PERCENT = 20;
-    uint256 public constant EMERGENCY_DELAY = 90 days;
+    uint256 public constant EMERGENCY_DELAY = 7 days;
     uint256 public constant PROPOSAL_EXPIRY = 7 days;
     uint256 public constant MAX_BILLS = 120;
 
@@ -403,13 +403,13 @@ contract RentalContract is ReentrancyGuard, Pausable {
         emit ContractEnded(refund, _deduction);
     }
 
-    // ===== EMERGENCY WITHDRAW (M-01 Fix) =====
+    // ===== EMERGENCY WITHDRAW / AUTO-SETTLE (M-01 Fix) =====
     function emergencyWithdraw() 
         external 
-        onlyTenant 
         nonReentrant 
         inState(State.ACTIVE) 
     {
+        require(msg.sender == tenant || msg.sender == backend, "Not authorized");
         require(block.timestamp > endDate + EMERGENCY_DELAY, "Too early");
         
         uint256 totalUnpaid = 0;

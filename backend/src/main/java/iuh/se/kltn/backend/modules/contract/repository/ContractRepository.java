@@ -87,4 +87,10 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
 
     // ✅ Lịch sử thuê phòng (tất cả hợp đồng từng ký cho phòng này)
     List<Contract> findByRoomIdOrderByStartDateDesc(Long roomId);
+
+    @Query("SELECT c FROM Contract c WHERE c.signMethod = 'WEB3' AND c.depositStatus = 'PAID' AND c.endDate < :threshold AND c.status IN ('ACTIVE', 'EXPIRED', 'TERMINATED_EARLY')")
+    List<Contract> findStalledWeb3Settlements(@Param("threshold") LocalDate threshold);
+
+    @Query("SELECT c FROM Contract c WHERE c.signMethod = 'WEB3' AND c.depositStatus = 'PAID' AND c.endDate < :threshold AND c.settlementReminderSent = false AND c.status IN ('ACTIVE', 'EXPIRED', 'TERMINATED_EARLY')")
+    List<Contract> findSettlementRemindersNeeded(@Param("threshold") LocalDate threshold);
 }

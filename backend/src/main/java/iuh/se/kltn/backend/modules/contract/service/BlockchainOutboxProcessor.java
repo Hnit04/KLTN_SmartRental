@@ -2,7 +2,7 @@ package iuh.se.kltn.backend.modules.contract.service;
 
 import iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
-import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
+
 import iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;

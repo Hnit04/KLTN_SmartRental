@@ -1265,7 +1265,10 @@ export default function ContractDetailPage() {
           <div className="md:col-span-2 space-y-6">
 
             {/* QUYẾT TOÁN ON-CHAIN - VỊ TRÍ MỚI (TOP) */}
-            {contract.smartContractAddress && (
+            {contract.smartContractAddress && 
+             contract.status !== 'PENDING_SIGNATURE' && 
+             contract.status !== 'AWAITING_DEPOSIT' && 
+             contract.status !== 'CANCELLED' && (
               <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-2xl p-6 shadow-md mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
                 <h3 className="text-xl font-black text-indigo-900 mb-4 flex items-center gap-2">
                   <LogOut className="h-6 w-6 text-indigo-600" /> Quyết toán & Trả phòng (Web3)
@@ -1731,6 +1734,17 @@ export default function ContractDetailPage() {
                             className="text-[10px]"
                           />
                         </div>
+
+                        {req.status === 'PENDING' && req.expiryDate && (
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Hết hạn: {new Date(req.expiryDate).toLocaleString('vi-VN')}
+                            </span>
+                            <span className="text-[9px] text-rose-500 font-bold italic animate-pulse">
+                              (Quá hạn sẽ bị trừ 5 điểm uy tín)
+                            </span>
+                          </div>
+                        )}
                         
                         <p className="text-xs mb-3">
                           <span className="font-bold text-primary">{req.requestedByRole === 'LANDLORD' ? 'Chủ trọ' : 'Khách thuê'}</span> đã đề xuất thay đổi điều khoản.

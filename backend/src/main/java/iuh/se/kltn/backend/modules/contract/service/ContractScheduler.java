@@ -12,6 +12,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.service.EmailService;
+import iuh.se.kltn.backend.modules.interaction.service.NotificationService;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,7 +31,88 @@ public class ContractScheduler {
     private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
 
     @Autowired
-    private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
+    private NotificationService notificationService;
+
+    @Autowired
+    private BlockchainService blockchainService;
+
+    @Autowired
+    private EmailService emailService;
+
+    // 📧 NHẮC NHỞ QUYẾT TOÁN HỢP ĐỒNG (Gửi trước khi bị auto-settle)
+    // Chạy hàng ngày lúc 08:30 sáng
+    @Scheduled(cron = "0 30 8 * * ?")
+    @SchedulerLock(name = "send_settlement_reminders", lockAtMostFor = "1h", lockAtLeastFor = "10m")
+    @Transactional
+    public void sendSettlementReminders() {
+        java.time.LocalDate thresholdDate = java.time.LocalDate.now().minusDays(5); // Quá hạn 5 ngày (còn 2 ngày nữa là bị phạt)
+        List<Contract> contracts = contractRepository.findSettlementRemindersNeeded(thresholdDate);
+
+        for (Contract contract : contracts) {
+            try {
+                User landlord = contract.getRoom().getProperty().getLandlord();
+                String deadline = contract.getEndDate().plusDays(7).toString();
+                
+                emailService.sendSettlementReminder(
+                    landlord.getEmail(), 
+                    landlord.getFullName(), 
+                    contract.getRoom().getName(), 
+                    contract.getTenant().getFullName(), 
+                    deadline
+                );
+
+                contract.setSettlementReminderSent(true);
+                contractRepository.save(contract);
+                
+                System.out.println("📧 Đã gửi nhắc nhở quyết toán cho chủ trọ HĐ #" + contract.getId());
+            } catch (Exception e) {
+                System.err.println("❌ Lỗi gửi nhắc nhở quyết toán HĐ #" + contract.getId() + ": " + e.getMessage());
+            }
+        }
+    }
+
+    // 💰 TỰ ĐỘNG QUYẾT TOÁN HỢP ĐỒNG WEB3 BỊ "TREO" (Landlord không xử lý cọc)
+    // Chạy hàng ngày lúc 02:00 sáng
+    @Scheduled(cron = "0 0 2 * * ?")
+    @SchedulerLock(name = "auto_settle_web3_contracts", lockAtMostFor = "1h", lockAtLeastFor = "10m")
+    @Transactional
+    public void autoSettleExpiredWeb3Contracts() {
+        java.time.LocalDate thresholdDate = java.time.LocalDate.now().minusDays(7); // Quá hạn 7 ngày
+        List<Contract> stalledContracts = contractRepository.findStalledWeb3Settlements(thresholdDate);
+
+        if (stalledContracts.isEmpty()) return;
+
+        for (Contract contract : stalledContracts) {
+            try {
+                if (contract.getSmartContractAddress() == null || contract.getSmartContractAddress().isEmpty()) continue;
+
+                // 1. Gọi Blockchain thực thi Emergency Withdraw (mặc định hoàn cọc 0 khấu trừ vì landlord im lặng)
+                blockchainService.emergencyWithdrawOnChain(contract.getSmartContractAddress());
+
+                // 2. Cập nhật DB
+                contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
+                if (contract.getStatus() == ContractStatus.ACTIVE) {
+                    contract.setStatus(ContractStatus.EXPIRED);
+                }
+                contractRepository.save(contract);
+
+                // 3. Phạt chủ trọ
+                User landlord = contract.getRoom().getProperty().getLandlord();
+                reputationService.processPoints(landlord, 
+                    iuh.se.kltn.backend.modules.user.enums.ReputationAction.STALLING_SETTLEMENT, 
+                    -20, "Không chủ động quyết toán hợp đồng (#" + contract.getId() + ") sau 7 ngày kết thúc.");
+
+                // 4. Thông báo
+                notificationService.createNotification(contract.getTenant(), "Tự động hoàn cọc thành công", 
+                    "Do chủ trọ không phản hồi quyết toán sau 7 ngày, hệ thống đã tự động giải ngân cọc phòng " + contract.getRoom().getName() + " về ví của bạn.", 
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+
+                System.out.println("✅ Auto-Settle thành công HĐ #" + contract.getId());
+            } catch (Exception e) {
+                System.err.println("❌ Lỗi Auto-Settle HĐ #" + contract.getId() + ": " + e.getMessage());
+            }
+        }
+    }
 
     // Chạy mỗi giờ (cron: giây phút giờ ngày tháng thứ)
     @Scheduled(cron = "0 0 * * * *")
@@ -109,9 +193,11 @@ public class ContractScheduler {
                 "Hợp đồng phòng " + (room != null ? room.getName() : "") + " đã bị hủy tự động do quá hạn 24h nạp cọc. Bạn bị trừ 10 điểm uy tín.", 
                 iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
             
-            notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
-                "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không nạp cọc sau 24h. Phòng đã được nhả về trạng thái Trống.", 
-                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            if (room != null) {
+                notificationService.createNotification(room.getProperty().getLandlord(), "Hợp đồng bị hủy", 
+                    "Hợp đồng phòng " + room.getName() + " đã bị hủy tự động do khách không nạp cọc sau 24h. Phòng đã được nhả về trạng thái Trống.", 
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
+            }
         }
 
         if (!stuckContracts.isEmpty()) {
@@ -169,7 +255,6 @@ public class ContractScheduler {
     public void sendRenewalReminders() {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDate in30Days = today.plusDays(30);
-        java.time.LocalDate in15Days = today.plusDays(15);
 
         // Lấy hợp đồng ACTIVE sắp hết hạn trong 30 ngày
         List<Contract> soonExpiring = contractRepository.findByStatusAndEndDateBefore(ContractStatus.ACTIVE, in30Days.plusDays(1));
