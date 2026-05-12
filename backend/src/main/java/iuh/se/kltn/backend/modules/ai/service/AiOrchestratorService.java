@@ -501,6 +501,22 @@ public class AiOrchestratorService {
         // Cập nhật Placeholder thành User ID thật sự (Tiết kiệm Token hoàn hảo!)
         String finalSql = sqlToExecute.replace("USER_ID_PLACEHOLDER", userId.toString());
 
+        // 🛡️ LỚP BẢO VỆ 4: Chặn truy cập cột nhạy cảm (chống data exfiltration qua subquery/alias)
+        String upperFinalSql = finalSql.toUpperCase();
+        String[] sensitiveColumns = {"PASSWORD", "VERIFICATION_CODE", "VERIFICATION_EXPIRY", 
+                                      "WALLET_ADDRESS", "BLOCKCHAIN_PRIVATE", "REFRESH_TOKEN"};
+        for (String col : sensitiveColumns) {
+            if (upperFinalSql.contains(col)) {
+                System.err.println("🚨 [AI SECURITY] SQL chứa cột nhạy cảm: " + col);
+                return "Dạ, truy vấn chứa thông tin nhạy cảm bị hệ thống chặn. Vui lòng thử lại với câu hỏi khác.";
+            }
+        }
+
+        // 🛡️ LỚP BẢO VỆ 5: Giới hạn số dòng kết quả (chống data dumping)
+        if (!upperFinalSql.contains("LIMIT")) {
+            finalSql = finalSql.replaceAll(";\\s*$", "") + " LIMIT 50";
+        }
+
         // 3. THỰC THI SQL
         try {
             jdbcTemplate.setQueryTimeout(1); // Chặn DoS: Giới hạn 1 giây cho SQL sinh bởi AI

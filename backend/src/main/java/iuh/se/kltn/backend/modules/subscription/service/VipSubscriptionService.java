@@ -44,7 +44,8 @@ public class VipSubscriptionService {
     private String platformAccountNumber;
     @Value("${sepay.platform.account-name:TRAN CONG TINH}")
     private String platformAccountName;
-    @Value("${sepay.mock.amount-override:true}")
+    // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
+    @Value("${sepay.mock.amount-override:false}")
     private boolean mockAmountOverride;
 
     // ─── CORE: Lấy tier hiện tại ───
@@ -299,6 +300,7 @@ public class VipSubscriptionService {
 
     // ─── SCHEDULED: Hạ gói khi hết hạn ───
     @Scheduled(cron = "0 0 0 * * *") // Mỗi ngày lúc 00:00
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "vip_expire", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void processExpiredSubscriptions() {
         List<VipSubscription> expired = subscriptionRepo

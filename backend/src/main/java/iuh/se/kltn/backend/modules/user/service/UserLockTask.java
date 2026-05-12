@@ -17,6 +17,7 @@ public class UserLockTask {
     private UserRepository userRepository;
 
     @Scheduled(fixedRate = 60000)
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "auto_unlock_users", lockAtMostFor = "1m", lockAtLeastFor = "50s")
     @Transactional
     public void autoUnlockUsers() {
         LocalDateTime now = LocalDateTime.now();

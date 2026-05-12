@@ -7,6 +7,7 @@ import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class ContractScheduler {
 
     // Chạy mỗi giờ (cron: giây phút giờ ngày tháng thứ)
     @Scheduled(cron = "0 0 * * * *")
+    @SchedulerLock(name = "cancel_expired_pending", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void cancelExpiredPendingContracts() {
         // Lấy hợp đồng PENDING_SIGNATURE quá 24h
@@ -74,6 +76,7 @@ public class ContractScheduler {
 
     // Tự động hủy hợp đồng TRỄ NẠP CỌC (Quá 24h kể từ khi cả 2 bên ký)
     @Scheduled(cron = "0 30 * * * *") // Chạy mỗi giờ tại phút 30
+    @SchedulerLock(name = "cancel_expired_deposits", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void cancelExpiredAwaitingDepositContracts() {
         LocalDateTime threshold = LocalDateTime.now().minusHours(24);
@@ -117,6 +120,7 @@ public class ContractScheduler {
     }
     // Chạy hàng ngày lúc 01:00 sáng
     @Scheduled(cron = "0 0 1 * * ?")
+    @SchedulerLock(name = "expire_active_contracts", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void expireActiveContracts() {
         java.time.LocalDate today = java.time.LocalDate.now();
@@ -160,6 +164,7 @@ public class ContractScheduler {
 
     // 🔔 NHẮC NHỞ GIA HẠN HỢP ĐỒNG (Chạy hàng ngày lúc 8h sáng)
     @Scheduled(cron = "0 0 8 * * ?")
+    @SchedulerLock(name = "send_renewal_reminders", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void sendRenewalReminders() {
         java.time.LocalDate today = java.time.LocalDate.now();

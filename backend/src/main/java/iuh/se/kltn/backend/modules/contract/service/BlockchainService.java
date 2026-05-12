@@ -31,7 +31,6 @@ import jakarta.annotation.PreDestroy;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class BlockchainService {
@@ -49,7 +48,9 @@ public class BlockchainService {
 
     private Web3j web3j;
     private Credentials credentials;
-    private final AtomicLong nonceTracker = new AtomicLong(-1);
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private iuh.se.kltn.backend.modules.contract.repository.BlockchainNonceRepository nonceRepository;
 
     @PostConstruct
     public void init() {
@@ -75,15 +76,44 @@ public class BlockchainService {
         return privateKey != null && !privateKey.isEmpty();
     }
 
-    private synchronized BigInteger getNonce() throws Exception {
+    /**
+     * 🛡️ PHASE 3: DB-backed distributed nonce management.
+     * Uses SELECT FOR UPDATE to prevent concurrent instances from getting the same nonce.
+     * Must be called within a @Transactional context.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public BigInteger getNonce() throws Exception {
+        String walletAddress = credentials.getAddress().toLowerCase();
+
+        // Sync with on-chain nonce first
         EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
                 credentials.getAddress(), DefaultBlockParameterName.PENDING).send();
         long onChainNonce = ethGetTransactionCount.getTransactionCount().longValue();
 
-        if (nonceTracker.get() < onChainNonce) {
-            nonceTracker.set(onChainNonce);
+        // Atomic DB operation with pessimistic lock
+        var nonceOpt = nonceRepository.findByWalletAddressForUpdate(walletAddress);
+        iuh.se.kltn.backend.modules.contract.entity.BlockchainNonce nonceEntity;
+
+        if (nonceOpt.isPresent()) {
+            nonceEntity = nonceOpt.get();
+            // Always take the max of DB and on-chain
+            if (onChainNonce > nonceEntity.getCurrentNonce()) {
+                nonceEntity.setCurrentNonce(onChainNonce);
+            }
+        } else {
+            nonceEntity = iuh.se.kltn.backend.modules.contract.entity.BlockchainNonce.builder()
+                    .walletAddress(walletAddress)
+                    .currentNonce(onChainNonce)
+                    .build();
         }
-        return BigInteger.valueOf(nonceTracker.getAndIncrement());
+
+        long reservedNonce = nonceEntity.getCurrentNonce();
+        nonceEntity.setCurrentNonce(reservedNonce + 1);
+        nonceEntity.setLastSyncedAt(java.time.LocalDateTime.now());
+        nonceRepository.save(nonceEntity);
+
+        log.debug("Nonce reserved: {} for wallet: {}", reservedNonce, walletAddress);
+        return BigInteger.valueOf(reservedNonce);
     }
 
     // 👇👇👇 DÁN LẠI CHUỖI BYTECODE DÀI CỦA BẠN VÀO ĐÂY 👇👇👇
@@ -151,7 +181,7 @@ public class BlockchainService {
         EthSendTransaction transactionResponse = web3j.ethSendRawTransaction(hexValue).send();
 
         if (transactionResponse.hasError()) {
-            nonceTracker.set(-1); // Reset nonce on error
+            // Nonce reset is handled by DB sync on next call
             throw new RuntimeException("Lỗi Deploy Blockchain: " + transactionResponse.getError().getMessage());
         }
 
@@ -277,7 +307,7 @@ public class BlockchainService {
         EthSendTransaction transactionResponse = web3j.ethSendRawTransaction(hexValue).send();
 
         if (transactionResponse.hasError()) {
-            nonceTracker.set(-1);
+            // Nonce reset is handled by DB sync on next call
             throw new RuntimeException(
                     "Lỗi Blockchain (" + functionName + "): " + transactionResponse.getError().getMessage());
         }
@@ -346,13 +376,64 @@ public class BlockchainService {
                 new Utf8String(newHash)));
     }
 
-    public boolean verifyTransaction(String txHash) {
+    /**
+     * 🛡️ PHASE 4: Hardened Web3 Deposit Verification
+     * Replaces the insecure verifyTransaction that only checked txHash success.
+     * Decodes the TransactionReceipt to verify the 'ContractActivated' event.
+     */
+    public boolean verifyDepositEvent(String txHash, String expectedContractAddress, BigInteger expectedAmount) {
         try {
             TransactionReceipt receipt = web3j.ethGetTransactionReceipt(txHash).send()
                     .getTransactionReceipt().orElse(null);
-            return receipt != null && receipt.isStatusOK();
+            
+            if (receipt == null || !receipt.isStatusOK()) {
+                return false;
+            }
+
+            // Must interact with the exact contract
+            if (!receipt.getTo().equalsIgnoreCase(expectedContractAddress)) {
+                log.error("Fake Deposit: txHash {} called {}, expected {}", txHash, receipt.getTo(), expectedContractAddress);
+                return false;
+            }
+
+            // Encode the event signature: ContractActivated(address indexed tenant, uint256 amount)
+            org.web3j.abi.datatypes.Event event = new org.web3j.abi.datatypes.Event("ContractActivated", 
+                Arrays.asList(
+                    new org.web3j.abi.TypeReference<org.web3j.abi.datatypes.Address>(true) {},
+                    new org.web3j.abi.TypeReference<org.web3j.abi.datatypes.generated.Uint256>(false) {}
+                ));
+            String eventSignatureHash = org.web3j.abi.EventEncoder.encode(event);
+
+            // Find the specific log emitted by our contract
+            for (org.web3j.protocol.core.methods.response.Log logItem : receipt.getLogs()) {
+                if (logItem.getTopics().isEmpty()) continue;
+                
+                if (logItem.getTopics().get(0).equals(eventSignatureHash)) {
+                    // Log data contains the non-indexed parameters (amount)
+                    String data = logItem.getData();
+                    // Remove "0x" if present
+                    if (data.startsWith("0x")) {
+                        data = data.substring(2);
+                    }
+                    
+                    if (data.isEmpty()) continue;
+                    
+                    BigInteger depositedAmount = new BigInteger(data, 16);
+                    
+                    if (depositedAmount.equals(expectedAmount)) {
+                        log.info("✅ Deposit Verified! txHash: {} amount: {}", txHash, expectedAmount);
+                        return true;
+                    } else {
+                        log.error("Fake Deposit Amount: txHash {} deposited {}, expected {}", txHash, depositedAmount, expectedAmount);
+                        return false;
+                    }
+                }
+            }
+
+            log.error("No ContractActivated event found in txHash {}", txHash);
+            return false;
         } catch (Exception e) {
-            log.error("Lỗi verify transaction {}: {}", txHash, e.getMessage());
+            log.error("Error verifying deposit transaction {}: {}", txHash, e.getMessage());
             return false;
         }
     }

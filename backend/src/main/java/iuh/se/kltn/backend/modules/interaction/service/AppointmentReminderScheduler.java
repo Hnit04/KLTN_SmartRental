@@ -21,6 +21,7 @@ public class AppointmentReminderScheduler {
 
     // Chạy định kỳ mỗi 2 tiếng
     @Scheduled(cron = "0 0 */2 * * *")
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "appointment_reminder", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     public void scheduledScan() {
         performScan();
     }
