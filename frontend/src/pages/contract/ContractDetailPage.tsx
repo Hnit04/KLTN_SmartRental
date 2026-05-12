@@ -165,6 +165,9 @@ export default function ContractDetailPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [removalReason, setRemovalReason] = useState("");
 
+  // --- WITHDRAWABLE BALANCE STATE ---
+  const [withdrawableBalance, setWithdrawableBalance] = useState<number>(0);
+
   // Xác nhận thanh toán Cọc
   const [isDepositPaid, setIsDepositPaid] = useState(false);
 
@@ -258,6 +261,28 @@ export default function ContractDetailPage() {
     window.addEventListener('app:refresh-data', handleRefresh);
     return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, [id, activeTab, fetchContractData]);
+
+  // ── Fetch Withdrawable Balance from Smart Contract
+  useEffect(() => {
+    if (!contract?.smartContractAddress || !window.ethereum) return;
+    
+    const fetchBalance = async () => {
+      try {
+        const smartContract = await getSmartContract(contract.smartContractAddress);
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts && accounts.length > 0) {
+          const balance = await smartContract.pendingWithdrawals(accounts[0]);
+          const ethValue = Number(ethers.formatEther(balance));
+          // Convert back to VND based on the current rate
+          setWithdrawableBalance(ethValue * config.vndEthRate);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy số dư chờ rút:", err);
+      }
+    };
+    
+    fetchBalance();
+  }, [contract?.smartContractAddress, config.vndEthRate]);
 
   // ── POLLING FALLBACK: kiểm tra thay đổi hợp đồng mỗi 10 giây (đề phòng WebSocket không hoạt động)
   const lastDataHash = useRef<string>('');
@@ -784,6 +809,7 @@ export default function ContractDetailPage() {
       toast.info("Đang thực hiện rút tiền từ Smart Contract về ví...");
       await web3WithdrawFunds(contract.smartContractAddress);
       toast.success("Rút tiền thành công! Vui lòng kiểm tra ví MetaMask của bạn.");
+      setWithdrawableBalance(0); // Reset UI balance immediately
     } catch (err: any) {
       toast.error(err.message || "Lỗi khi rút tiền");
     } finally {
@@ -2262,10 +2288,37 @@ export default function ContractDetailPage() {
       )}
 
       {activeTab === 'BILLS' && (
-        <DashboardPanel
-          title="Lịch sử hóa đơn"
-          description={user?.role === 'TENANT' ? 'Thanh toán đúng hạn giữ uy tín và tránh phạt.' : 'Theo dõi từng kỳ và trạng thái thu tiền.'}
-        >
+        <div className="space-y-6">
+          {contract.smartContractAddress && (
+            <DashboardPanel
+              title="Ví Web3 (Sổ dư chờ rút)"
+              description="Khoản tiền hóa đơn hoặc cọc đã được lưu trong Smart Contract và chờ bạn rút về ví MetaMask."
+            >
+              <div className="p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 shadow-inner">
+                  <div>
+                    <p className="text-sm text-indigo-700 font-bold mb-1 uppercase tracking-wider">Số dư có thể rút</p>
+                    <p className="text-3xl font-black text-indigo-900">
+                      {withdrawableBalance.toLocaleString('vi-VN')} <span className="text-lg font-bold text-indigo-600">đ</span>
+                    </p>
+                  </div>
+                  <Button 
+                    className="bg-indigo-600 hover:bg-indigo-700 h-12 px-6 shadow-md shadow-indigo-200 text-sm font-bold"
+                    onClick={handleWithdrawFunds}
+                    isLoading={isWithdrawing}
+                    disabled={withdrawableBalance <= 0 || isWithdrawing}
+                  >
+                    💰 Rút toàn bộ về ví
+                  </Button>
+                </div>
+              </div>
+            </DashboardPanel>
+          )}
+
+          <DashboardPanel
+            title="Lịch sử hóa đơn"
+            description={user?.role === 'TENANT' ? 'Thanh toán đúng hạn giữ uy tín và tránh phạt.' : 'Theo dõi từng kỳ và trạng thái thu tiền.'}
+          >
           <div className="p-4 sm:p-5">
             {isLoadingBills ? (
               <div className="space-y-3 py-4">
