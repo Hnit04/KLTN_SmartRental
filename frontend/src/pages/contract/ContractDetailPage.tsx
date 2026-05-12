@@ -268,7 +268,7 @@ export default function ContractDetailPage() {
     
     const fetchBalance = async () => {
       try {
-        const smartContract = await getSmartContract(contract.smartContractAddress);
+        const smartContract = await getSmartContract(contract.smartContractAddress as string);
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (accounts && accounts.length > 0) {
           const balance = await smartContract.pendingWithdrawals(accounts[0]);
@@ -2388,6 +2388,7 @@ export default function ContractDetailPage() {
             )}
           </div>
         </DashboardPanel>
+        </div>
       )}
 
       {isRequestModalOpen && (
