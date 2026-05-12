@@ -55,6 +55,12 @@ import { useSystemConfig } from "@/context/SystemConfigContext";
 import ReviewModal from "@/features/interaction/components/ReviewModal";
 import html2pdf from "html2pdf.js";
 import { ethers } from "ethers";
+import RiskNotice from "@/components/shared/RiskNotice";
+import ConfirmActionDialog from "@/components/shared/ConfirmActionDialog";
+import {
+  getBlockchainRuntimeConfig,
+  isWalletOnExpectedChain,
+} from "@/config/blockchainConfig";
 
 const CONTRACT_STATUS_LABEL: Record<string, string> = {
   PENDING_SIGNATURE: "Chờ ký",
@@ -108,10 +114,16 @@ export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
   const { config } = useSystemConfig();
+  const runtimeBlockchainConfig = useMemo(
+    () => getBlockchainRuntimeConfig(config),
+    [config]
+  );
 
   const [contract, setContract] = useState<ContractDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chainRiskMessage, setChainRiskMessage] = useState<string | null>(null);
 
   const [isSigning, setIsSigning] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
@@ -163,6 +175,8 @@ export default function ContractDetailPage() {
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [isRefundConfirmOpen, setIsRefundConfirmOpen] = useState(false);
+  const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
   const [removalReason, setRemovalReason] = useState("");
 
   // --- WITHDRAWABLE BALANCE STATE ---
@@ -205,6 +219,61 @@ export default function ContractDetailPage() {
         : `- ${term}`
     }));
   };
+
+  useEffect(() => {
+    const envChainId =
+      (import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID as string | undefined)?.toLowerCase() || "";
+    if (envChainId && envChainId !== runtimeBlockchainConfig.chainIdHex.toLowerCase()) {
+      setChainRiskMessage(
+        `Mạng blockchain frontend (${envChainId}) khác backend (${runtimeBlockchainConfig.chainIdHex}). Vui lòng đồng bộ cấu hình trước khi ký hoặc thanh toán.`
+      );
+      return;
+    }
+    setChainRiskMessage(null);
+  }, [runtimeBlockchainConfig.chainIdHex]);
+
+  const ensureWalletNetworkReady = useCallback(async () => {
+    if (!window.ethereum) {
+      toast.error("Vui lòng cài đặt ví MetaMask để tiếp tục.");
+      return false;
+    }
+    if (chainRiskMessage) return false;
+
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: runtimeBlockchainConfig.chainIdHex }],
+      });
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: runtimeBlockchainConfig.chainIdHex,
+              chainName: runtimeBlockchainConfig.chainName,
+              nativeCurrency: runtimeBlockchainConfig.nativeCurrency,
+              rpcUrls: [runtimeBlockchainConfig.rpcUrl],
+              blockExplorerUrls: [runtimeBlockchainConfig.explorerUrl],
+            },
+          ],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+
+    const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+    if (!isWalletOnExpectedChain(chainIdHex, runtimeBlockchainConfig)) {
+      setChainRiskMessage(
+        `Ví đang ở mạng ${chainIdHex}. Hệ thống yêu cầu ${runtimeBlockchainConfig.chainName} (${runtimeBlockchainConfig.chainIdHex}).`
+      );
+      return false;
+    }
+
+    setChainRiskMessage(null);
+    return true;
+  }, [chainRiskMessage, runtimeBlockchainConfig]);
 
   const fetchContractData = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
@@ -391,25 +460,16 @@ export default function ContractDetailPage() {
           setIsSigning(false);
           return;
         }
-        // Chuyển sang mạng Sepolia
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0xaa36a7' }],
-          });
-        } catch (switchError: any) {
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: '0xaa36a7',
-                chainName: 'Sepolia Test Network',
-                nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
-                rpcUrls: ['https://rpc.sepolia.org'],
-                blockExplorerUrls: ['https://sepolia.etherscan.io'],
-              }],
-            });
-          } else { throw switchError; }
+        if (chainRiskMessage) {
+          toast.error(chainRiskMessage);
+          setIsSigning(false);
+          return;
+        }
+        const isNetworkReady = await ensureWalletNetworkReady();
+        if (!isNetworkReady) {
+          if (chainRiskMessage) toast.error(chainRiskMessage);
+          setIsSigning(false);
+          return;
         }
         
         await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -511,29 +571,14 @@ export default function ContractDetailPage() {
     }
     setIsPaying(true);
     try {
-      // Yêu cầu chuyển sang mạng Sepolia
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
-        });
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [
-              {
-                chainId: import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID || '0xaa36a7',
-                chainName: import.meta.env.VITE_BLOCKCHAIN_CHAIN_NAME || 'Sepolia Test Network',
-                nativeCurrency: { name: 'SepoliaETH', symbol: 'SEP', decimals: 18 },
-                rpcUrls: [import.meta.env.VITE_BLOCKCHAIN_RPC_URL || 'https://rpc.sepolia.org'],
-                blockExplorerUrls: [import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'],
-              },
-            ],
-          });
-        } else {
-          throw switchError;
-        }
+      if (chainRiskMessage) {
+        toast.error(chainRiskMessage);
+        return;
+      }
+      const isNetworkReady = await ensureWalletNetworkReady();
+      if (!isNetworkReady) {
+        if (chainRiskMessage) toast.error(chainRiskMessage);
+        return;
       }
 
       // Kết nối MetaMask
@@ -595,6 +640,15 @@ export default function ContractDetailPage() {
 
   const handleConfirmWeb3Deposit = async () => {
     if (!contract?.smartContractAddress || !window.ethereum) return;
+    if (chainRiskMessage) {
+      toast.error(chainRiskMessage);
+      return;
+    }
+    const isNetworkReady = await ensureWalletNetworkReady();
+    if (!isNetworkReady) {
+      if (chainRiskMessage) toast.error(chainRiskMessage);
+      return;
+    }
     setIsConfirmingDeposit(true);
     try {
       toast.info("Đang bật MetaMask để nạp cọc...");
@@ -666,6 +720,21 @@ export default function ContractDetailPage() {
       toast.error(error.response?.data?.message || "Lỗi giao dịch, thử lại sau!");
     } finally {
       setIsNotifyingPayment(false);
+    }
+  };
+
+  const handleConfirmDepositRefund = async () => {
+    if (!contract) return;
+    setIsConfirmingRefund(true);
+    try {
+      const res = await contractApi.confirmDepositRefund(contract.id);
+      setContract((prev) => prev ? { ...prev, depositStatus: (res as any).depositStatus || 'REFUNDED' } : prev);
+      toast.success('Đã xác nhận hoàn cọc thành công!');
+      setIsRefundConfirmOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra!');
+    } finally {
+      setIsConfirmingRefund(false);
     }
   };
 
@@ -1200,6 +1269,16 @@ export default function ContractDetailPage() {
         </div>
       )}
 
+      {chainRiskMessage && (
+        <RiskNotice
+          description={chainRiskMessage}
+          onRetry={() => {
+            setChainRiskMessage(null);
+            fetchContractData(true);
+          }}
+        />
+      )}
+
       {contractOperational.attention.length > 0 ? (
         <div className="space-y-2">
           {contractOperational.attention.map((a) => (
@@ -1315,10 +1394,9 @@ export default function ContractDetailPage() {
                     ) : (
                       user?.role === 'LANDLORD' && (
                         <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-lg shadow-lg shadow-indigo-200 transition-transform hover:scale-[1.02]" onClick={() => {
-                          setSettleForm({ deductionAmount: 0, earlyTermination: false });
-                          setIsSettleModalOpen(true);
+                          navigate(`${prefix}/contracts/${contract.id}/settle`);
                         }}>
-                          💸 Bắt đầu Quyết toán & Trả phòng
+                          💸 Bắt đầu Quyết toán & Trả phòng (Flow mới)
                         </Button>
                       )
                     )}
@@ -1967,7 +2045,7 @@ export default function ContractDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm border-b border-indigo-200/50 pb-2">
                     <span className="text-indigo-700">Contract Address</span>
-                    <a href={`${import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io'}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline text-xs">
+                    <a href={`${runtimeBlockchainConfig.explorerUrl}/address/${contract.smartContractAddress}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-900 hover:underline text-xs">
                       {contract.smartContractAddress.substring(0, 10)}...{contract.smartContractAddress.substring(38)}
                     </a>
                   </div>
@@ -2026,16 +2104,8 @@ export default function ContractDetailPage() {
 
                 <Button
                   className="w-full mt-4 bg-rose-600 hover:bg-rose-700"
-                  onClick={async () => {
-                    if (!window.confirm(`Xác nhận đã hoàn cọc ${contract.depositAmount?.toLocaleString('vi-VN')}đ cho khách thuê ${contract.tenantName}?`)) return;
-                    try {
-                      const res = await contractApi.confirmDepositRefund(contract.id);
-                      setContract(prev => prev ? { ...prev, depositStatus: (res as any).depositStatus || 'REFUNDED' } : prev);
-                      toast.success('Đã xác nhận hoàn cọc thành công!');
-                    } catch (err: any) {
-                      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra!');
-                    }
-                  }}
+                  onClick={() => setIsRefundConfirmOpen(true)}
+                  isLoading={isConfirmingRefund}
                 >
                   💸 Xác nhận đã hoàn cọc
                 </Button>
@@ -2609,7 +2679,9 @@ export default function ContractDetailPage() {
                       Ký bằng Smart Contract <Blocks className="h-4 w-4 text-indigo-500" />
                       <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-1" />
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">Sử dụng MetaMask để xác nhận giao dịch và lưu trên mạng lưới Sepolia.</p>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Sử dụng MetaMask để xác nhận giao dịch và lưu trên mạng lưới {runtimeBlockchainConfig.chainName}.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -2654,6 +2726,7 @@ export default function ContractDetailPage() {
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={handleSignContract}
                 isLoading={isSigning}
+                disabled={!!chainRiskMessage && contract?.signMethod === "BLOCKCHAIN"}
               >
                 {contract.signMethod === 'BLOCKCHAIN' ? 'Ký Web3 ngay' : 'Xác nhận ngay'}
               </Button>
@@ -2667,6 +2740,17 @@ export default function ContractDetailPage() {
         onClose={() => setIsReviewModalOpen(false)}
         contractId={Number(id)}
         roomName={contract.roomName || ''}
+      />
+
+      <ConfirmActionDialog
+        open={isRefundConfirmOpen}
+        onOpenChange={setIsRefundConfirmOpen}
+        title="Xác nhận hoàn tiền cọc?"
+        description={`Xác nhận đã hoàn cọc ${contract.depositAmount?.toLocaleString('vi-VN')}đ cho khách thuê ${contract.tenantName}?`}
+        confirmLabel="Xác nhận hoàn cọc"
+        tone="danger"
+        onConfirm={handleConfirmDepositRefund}
+        isLoading={isConfirmingRefund}
       />
 
       <div className="hidden">

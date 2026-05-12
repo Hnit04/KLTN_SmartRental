@@ -8,6 +8,7 @@ import "./index.css";
 import { AuthProvider } from "./context/AuthContext";
 import { SystemConfigProvider } from "./context/SystemConfigContext";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MobileLayerProvider } from "./context/MobileLayerContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,7 +28,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <SystemConfigProvider>
           <AuthProvider>
             <BrowserRouter>
-              <App />
+              <MobileLayerProvider>
+                <App />
+              </MobileLayerProvider>
             </BrowserRouter>
           </AuthProvider>
         </SystemConfigProvider>

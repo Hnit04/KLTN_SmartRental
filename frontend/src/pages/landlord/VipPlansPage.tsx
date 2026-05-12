@@ -5,6 +5,7 @@ import { Crown, Check, X, Zap, ChevronDown, History, Sparkles, Shield, Star, Ima
 import { Button } from '@/components/ui/Button';
 import VipPaymentModal from '@/components/subscription/VipPaymentModal';
 import VipBadge from '@/components/shared/VipBadge';
+import { toast } from 'sonner';
 
 const TIERS = ['FREE', 'SILVER', 'GOLD', 'PLATINUM'] as const;
 type TierName = typeof TIERS[number];
@@ -106,7 +107,7 @@ export default function VipPlansPage() {
         addInfo: data.addInfo,
       });
     } catch (e: any) {
-      alert(e?.response?.data?.error || 'Có lỗi xảy ra');
+      toast.error(e?.response?.data?.error || 'Có lỗi xảy ra');
     } finally {
       setPurchasing(null);
     }

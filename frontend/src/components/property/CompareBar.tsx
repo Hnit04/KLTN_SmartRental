@@ -1,24 +1,41 @@
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useCompare } from "@/context/CompareContext";
 import { Button } from "@/components/ui/Button";
 import { X, GitCompareArrows, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useMobileLayer } from "@/context/MobileLayerContext";
 
 export default function CompareBar() {
   const location = useLocation();
   const { compareList, removeFromCompare, clearCompare, openCompareModal } = useCompare();
+  const { registerLayer, unregisterLayer, getBottomOffset, getZIndex } = useMobileLayer();
   const isAppShell =
     /^\/(landlord|tenant|admin)(\/|$)/.test(location.pathname) ||
     location.pathname.startsWith("/profile");
+  const mobileBottomOffset = getBottomOffset("compareBar");
+
+  useEffect(() => {
+    registerLayer("compareBar", {
+      active: compareList.length > 0,
+      height: 88,
+      zIndex: 60,
+      priority: 80,
+    });
+    return () => unregisterLayer("compareBar");
+  }, [compareList.length, registerLayer, unregisterLayer]);
 
   if (compareList.length === 0) return null;
 
   return (
     <div
       className={cn(
-        "fixed left-0 right-0 z-50 flex justify-center p-3 animate-in slide-in-from-bottom-4 duration-300 pointer-events-none sm:p-4",
-        isAppShell ? "bottom-16 md:bottom-0" : "bottom-0"
+        "fixed left-0 right-0 flex justify-center p-3 animate-in slide-in-from-bottom-4 duration-300 pointer-events-none sm:p-4 md:bottom-0"
       )}
+      style={{
+        bottom: `${isAppShell ? mobileBottomOffset : 0}px`,
+        zIndex: getZIndex("compareBar"),
+      }}
     >
       <div className="bg-white/98 backdrop-blur-xl border border-gray-200/80 shadow-[0_-4px_30px_rgba(0,0,0,0.12)] rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 pointer-events-auto w-full max-w-3xl">
         

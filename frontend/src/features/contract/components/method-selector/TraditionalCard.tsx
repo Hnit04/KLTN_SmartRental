@@ -1,0 +1,42 @@
+import { CheckCircle2, ShieldCheck } from "lucide-react";
+import { cn } from "@/utils/cn";
+
+type TraditionalCardProps = {
+  selected: boolean;
+  onClick: () => void;
+};
+
+export default function TraditionalCard({ selected, onClick }: TraditionalCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-2xl border p-4 text-left transition-all duration-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        selected
+          ? "border-primary bg-primary/5 shadow-sm"
+          : "border-border bg-background hover:border-primary/40 hover:bg-muted/30"
+      )}
+      aria-pressed={selected}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">Ký điện tử truyền thống</p>
+        </div>
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+          Recommended
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">Nhanh chóng và quen thuộc</p>
+      {selected && (
+        <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Đang chọn
+        </div>
+      )}
+    </button>
+  );
+}
+

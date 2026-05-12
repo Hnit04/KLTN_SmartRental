@@ -16,6 +16,7 @@ import { tenantPreferenceApi } from '@/api/tenantPreferenceApi';
 import type { TenantPreference } from '@/types/index';
 import { Lightbulb } from 'lucide-react';
 import StatusBadge from '@/components/shared/StatusBadge';
+import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
 
 // Khai báo global interface cho MetaMask
 declare global {
@@ -37,6 +38,7 @@ const ProfilePage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isKycModalOpen, setIsKycModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isDiscardChangesConfirmOpen, setIsDiscardChangesConfirmOpen] = useState(false);
 
   // State Reputation History
   const [reputationHistory, setReputationHistory] = useState<any[]>([]);
@@ -199,8 +201,8 @@ const ProfilePage = () => {
 
   const handleCloseEditModal = () => {
     if (hasProfileChanges) {
-      const confirmed = window.confirm("Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?");
-      if (!confirmed) return;
+      setIsDiscardChangesConfirmOpen(true);
+      return;
     }
     setIsEditModalOpen(false);
   };
@@ -960,6 +962,19 @@ const ProfilePage = () => {
           )}
 
           {/* ─── SỞ THÍCH THUÊ PHÒNG (Tenant Only) ─── */}
+          <ConfirmActionDialog
+            open={isDiscardChangesConfirmOpen}
+            onOpenChange={setIsDiscardChangesConfirmOpen}
+            title="Bỏ thay đổi chưa lưu?"
+            description="Bạn đang có thay đổi chưa lưu trong hồ sơ. Nếu tiếp tục, các thay đổi này sẽ bị mất."
+            confirmLabel="Bỏ thay đổi"
+            tone="danger"
+            onConfirm={() => {
+              setIsDiscardChangesConfirmOpen(false);
+              setIsEditModalOpen(false);
+            }}
+          />
+
           {user.role === 'TENANT' && <TenantPreferenceSection />}
         </div>
       );

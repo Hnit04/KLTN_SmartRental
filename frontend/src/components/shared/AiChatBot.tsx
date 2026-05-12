@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin, Sparkles, ChevronRight } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { aiApi } from "../../api/aiApi";
 import { useAuth } from "../../context/AuthContext";
-import { useCompare } from "@/context/CompareContext";
 import { cn } from "@/utils/cn";
+import { useMobileLayer } from "@/context/MobileLayerContext";
+import { toast } from "sonner";
 
 type Message = {
   id: string;
@@ -37,19 +38,25 @@ export default function AiChatBot() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
-  const { compareList } = useCompare();
+  const { registerLayer, unregisterLayer, getBottomOffset, getZIndex } = useMobileLayer();
   const { isAuthenticated, user } = useAuth();
 
   const isAppShell =
     /^\/(landlord|tenant|admin)(\/|$)/.test(pathname) || pathname.startsWith("/profile");
-  const hasCompare = compareList.length > 0;
-  const mobileDockBottom = isAppShell && hasCompare
-    ? "max-md:bottom-40"
-    : isAppShell
-      ? "max-md:bottom-24"
-      : hasCompare
-        ? "max-md:bottom-28"
-        : "max-md:bottom-6";
+  const aiChatBottomOffset = getBottomOffset("aiChat");
+  const mobileDockStyle = {
+    "--mobile-chat-bottom": `${(isAppShell ? aiChatBottomOffset : 0) + 12}px`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    registerLayer("aiChat", {
+      active: !isOpen,
+      height: 56,
+      zIndex: 55,
+      priority: 70,
+    });
+    return () => unregisterLayer("aiChat");
+  }, [isOpen, registerLayer, unregisterLayer]);
 
   const isLandlord = user?.role === 'LANDLORD';
   const isTenant = user?.role === 'TENANT';
@@ -256,10 +263,10 @@ export default function AiChatBot() {
         setDraftedReminders(res.data);
         setIsDraftModalOpen(true);
       } else {
-        alert(res.message || "Không có phòng nào đang nợ để nhắc nhở.");
+        toast.info(res.message || "Không có phòng nào đang nợ để nhắc nhở.");
       }
     } catch (e: any) {
-      alert("Lỗi khi nhờ AI soạn thông báo: " + (e.message || "Thử lại sau."));
+      toast.error("Lỗi khi nhờ AI soạn thông báo: " + (e.message || "Thử lại sau."));
     } finally {
       setIsGeneratingDrafts(false);
     }
@@ -269,7 +276,7 @@ export default function AiChatBot() {
     setIsSendingReminders(true);
     try {
       const res = await aiApi.sendReminders(draftedReminders);
-      alert(res.message || "Gửi thành công!");
+      toast.success(res.message || "Gửi thành công!");
       setIsDraftModalOpen(false);
       
       // AI phản hồi vào chat
@@ -279,7 +286,7 @@ export default function AiChatBot() {
         sender: "ai"
       }]);
     } catch (e: any) {
-      alert("Lỗi khi gửi thông báo: " + (e.message || ""));
+      toast.error("Lỗi khi gửi thông báo: " + (e.message || ""));
     } finally {
       setIsSendingReminders(false);
     }
@@ -409,9 +416,9 @@ export default function AiChatBot() {
       {isOpen && (
         <div
           className={cn(
-            "fixed z-[60] flex min-h-0 max-h-[min(88dvh,calc(100dvh-1rem))] w-auto flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-in slide-in-from-bottom-5 zoom-in-95 duration-300 max-md:inset-x-3 max-md:w-auto md:bottom-6 md:right-6 md:h-[min(560px,85dvh)] md:w-96",
-            mobileDockBottom
+            "fixed z-[60] flex min-h-0 max-h-[min(88dvh,calc(100dvh-1rem))] w-auto flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-in slide-in-from-bottom-5 zoom-in-95 duration-300 max-md:inset-x-3 max-md:bottom-[var(--mobile-chat-bottom)] max-md:w-auto md:bottom-6 md:right-6 md:h-[min(560px,85dvh)] md:w-96"
           )}
+          style={{ ...mobileDockStyle, zIndex: getZIndex("aiChat") + 5 }}
         >
           {/* HEADER */}
           <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
@@ -541,9 +548,9 @@ export default function AiChatBot() {
         <Button
           onClick={() => setIsOpen(true)}
           className={cn(
-            "group fixed z-[55] flex h-14 w-14 items-center justify-center rounded-full bg-primary p-0 shadow-2xl transition-transform duration-300 hover:scale-110 hover:bg-primary/90 max-md:right-3 md:bottom-6 md:right-6",
-            mobileDockBottom
+            "group fixed z-[55] flex h-14 w-14 items-center justify-center rounded-full bg-primary p-0 shadow-2xl transition-transform duration-300 hover:scale-110 hover:bg-primary/90 max-md:bottom-[var(--mobile-chat-bottom)] max-md:right-3 md:bottom-6 md:right-6"
           )}
+          style={{ ...mobileDockStyle, zIndex: getZIndex("aiChat") }}
         >
           <Sparkles className="w-6 h-6 text-yellow-300 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity" />
           <Bot className="w-7 h-7 text-primary-foreground" />

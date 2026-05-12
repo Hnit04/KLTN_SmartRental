@@ -33,6 +33,9 @@ import LandlordPropertiesPage from "./pages/property/LandlordPropertiesPage";
 import ContractsPage from "./pages/contract/ContractsPage"; 
 import ContractDetailPage from "./pages/contract/ContractDetailPage";
 import CreateContractPage from "./pages/contract/CreateContractPage"; 
+import { ContractSigningWizardPage } from "./flows/contract-signing";
+import { ContractSettlementWizardPage } from "./flows/contract-settlement";
+import { PaymentIntentPage } from "./flows/payment-intent";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import TenantDashboardPage from "./pages/dashboard/TenantDashboardPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
@@ -110,6 +113,16 @@ const RoleRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
   return <Outlet />;
 };
 
+const RoleBasedContractRouteRedirect = ({ target }: { target: "sign" | "payment-intent" | "settle" }) => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const pathParts = location.pathname.split("/").filter(Boolean);
+  const contractId = pathParts.at(-2);
+  if (!contractId) return <Navigate to="/" replace />;
+  const prefix = user?.role === "LANDLORD" ? "/landlord" : "/tenant";
+  return <Navigate to={`${prefix}/contracts/${contractId}/${target}`} replace />;
+};
+
 function AppRoutesAndChrome() {
   const [toasterNarrow, setToasterNarrow] = useState(false);
   useEffect(() => {
@@ -156,6 +169,9 @@ function AppRoutesAndChrome() {
             <Route element={<MainLayout />}>
  
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/contracts/:id/sign" element={<RoleBasedContractRouteRedirect target="sign" />} />
+              <Route path="/contracts/:id/settle" element={<RoleBasedContractRouteRedirect target="settle" />} />
+              <Route path="/contracts/:id/payment-intent" element={<RoleBasedContractRouteRedirect target="payment-intent" />} />
               
               {/* === KHU VỰC DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD) === */}
               <Route path="/landlord" element={<RoleRoute allowedRoles={['LANDLORD']} />}>
@@ -171,6 +187,9 @@ function AppRoutesAndChrome() {
                 <Route path="contracts" element={<ContractsPage />} />
                 <Route path="contracts/create" element={<CreateContractPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
+                <Route path="contracts/:id/sign" element={<ContractSigningWizardPage />} />
+                <Route path="contracts/:id/settle" element={<ContractSettlementWizardPage />} />
+                <Route path="contracts/:id/payment-intent" element={<PaymentIntentPage />} />
                 <Route path="appointments" element={<AppointmentManagePage />} />
                 <Route path="vip" element={<VipPlansPage />} />
               </Route>
@@ -186,6 +205,9 @@ function AppRoutesAndChrome() {
                 <Route path="contracts" element={<ContractsPage />} />
                 <Route path="contracts/create" element={<CreateContractPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
+                <Route path="contracts/:id/sign" element={<ContractSigningWizardPage />} />
+                <Route path="contracts/:id/settle" element={<ContractSettlementWizardPage />} />
+                <Route path="contracts/:id/payment-intent" element={<PaymentIntentPage />} />
                 <Route path="appointments" element={<AppointmentManagePage />} />
               </Route>
               

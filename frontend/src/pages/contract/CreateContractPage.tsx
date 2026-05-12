@@ -9,8 +9,10 @@ import { propertyApi } from "@/api/propertyApi";
 import { contractApi } from "@/api/contractApi";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useAuth } from "@/context/AuthContext";
-import type { CreateContractPayload } from "@/types";
+import type { ContractSignMethod, CreateContractPayload } from "@/types";
 import { StepIndicator } from "@/components/ui/StepIndicator";
+import { ContractMethodSelector } from "@/features/contract/components/method-selector";
+import { trackEvent } from "@/utils/analytics";
 
 const WIZARD_STEPS = [
   { title: "Thông tin & thời hạn" },
@@ -37,7 +39,8 @@ export default function CreateContractPage() {
     duration: 6, 
     tenantEmail: "", 
     landlordRules: "",
-    tenantRequests: ""
+    tenantRequests: "",
+    signMethod: "TRADITIONAL" as ContractSignMethod,
   });
 
   const TENANT_SUGGESTED_TERMS = [
@@ -146,7 +149,7 @@ export default function CreateContractPage() {
           startDate: formData.startDate,
           endDate: endDateStr, 
           depositAmount: room.price, 
-          signMethod: 'TRADITIONAL', 
+          signMethod: formData.signMethod,
           additionalTerms: combinedTerms,
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
@@ -344,6 +347,18 @@ export default function CreateContractPage() {
                         </select>
                       </div>
                     </div>
+
+                    <ContractMethodSelector
+                      value={formData.signMethod}
+                      onChange={(method) => {
+                        setFormData((prev) => ({ ...prev, signMethod: method }));
+                        trackEvent("contract_method_selected", {
+                          method,
+                          role: user?.role || "UNKNOWN",
+                          roomId: Number(roomId),
+                        });
+                      }}
+                    />
                   </div>
                 </div>
               </div>

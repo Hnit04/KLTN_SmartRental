@@ -11,5 +11,9 @@ import lombok.NoArgsConstructor;
 @Builder
 public class SystemConfigResponse {
     private long vndEthRate;
-    private String networkName; // "Sepolia Testnet"
+    private String networkName; // e.g. "Polygon Amoy Testnet"
+    private long chainId;
+    private String chainIdHex;
+    private String rpcUrl;
+    private String explorerUrl;
 }

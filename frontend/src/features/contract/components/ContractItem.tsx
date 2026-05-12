@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Contract } from "@/types";
 import StatusBadge from "@/components/shared/StatusBadge";
+import { Button } from "@/components/ui/Button";
 
 interface ContractItemProps {
   data: Contract;
@@ -46,11 +47,14 @@ export default function ContractItem({ data }: ContractItemProps) {
     }
   };
 
+  const canUseWizard =
+    data.status === "PENDING_SIGNATURE" || data.status === "AWAITING_DEPOSIT";
+  const prefix = user?.role === "LANDLORD" ? "/landlord" : "/tenant";
+
   return (
     <div 
       className="group bg-white rounded-2xl border border-slate-200/60 p-5 md:p-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-primary transition-all duration-300 cursor-pointer relative overflow-hidden"
       onClick={() => {
-        const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
         navigate(`${prefix}/contracts/${data.id}`);
       }}
     >
@@ -101,8 +105,37 @@ export default function ContractItem({ data }: ContractItemProps) {
         </div>
 
         <div className="flex items-center justify-between md:w-1/4 md:justify-end gap-6 border-t border-slate-100/80 pt-4 md:pt-0 md:border-t-0">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             {renderStatus(data.status)}
+            {canUseWizard && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary font-bold"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`${prefix}/contracts/${data.id}/sign`);
+                }}
+              >
+                Ký & Thanh toán
+              </Button>
+            )}
+
+            {(data.status === 'EXPIRED' || data.status === 'TERMINATED_EARLY') && data.depositStatus === 'DEPOSITED' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700 font-bold"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`${prefix}/contracts/${data.id}/settle`);
+                }}
+              >
+                {user?.role === 'LANDLORD' ? 'Quyết toán ngay' : 'Theo dõi quyết toán'}
+              </Button>
+            )}
           </div>
           <div className="h-9 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 transition-all duration-300 shadow-sm">
             <ChevronRight className="h-4 w-4" />
