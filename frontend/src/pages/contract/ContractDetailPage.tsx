@@ -1264,6 +1264,84 @@ export default function ContractDetailPage() {
         <div className="grid md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
           <div className="md:col-span-2 space-y-6">
 
+            {/* QUYẾT TOÁN ON-CHAIN - VỊ TRÍ MỚI (TOP) */}
+            {contract.smartContractAddress && (
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-2xl p-6 shadow-md mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                <h3 className="text-xl font-black text-indigo-900 mb-4 flex items-center gap-2">
+                  <LogOut className="h-6 w-6 text-indigo-600" /> Quyết toán & Trả phòng (Web3)
+                </h3>
+                {contract.status === 'ACTIVE' ? (
+                  <div className="space-y-4">
+                    {contract.isProposalActive ? (
+                      <div className="bg-white rounded-xl p-5 border border-indigo-200 shadow-sm">
+                        <div className="flex justify-between items-start mb-4">
+                           <div>
+                              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Số tiền đề xuất khấu trừ</p>
+                              <p className="text-2xl font-black text-rose-600">{contract.currentDeductionAmount?.toLocaleString()}đ</p>
+                           </div>
+                           <StatusBadge label={contract.isEarlyTerminationProposal ? 'Kết thúc sớm' : 'Đúng hạn'} tone="warning" className="px-3 py-1" />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 mb-5">
+                           <div className={cn("p-3 rounded-xl text-center border-2", contract.hasLandlordConsented ? "bg-green-50 border-green-200 text-green-700 shadow-inner" : "bg-muted/40 border-gray-100 text-gray-400")}>
+                              <p className="text-[10px] font-bold uppercase mb-1">Chủ trọ</p>
+                              <p className="text-sm font-black flex items-center justify-center gap-1">
+                                {contract.hasLandlordConsented ? <><CheckCircle2 className="w-4 h-4"/> Đã ký</> : '⏳ Đang chờ'}
+                              </p>
+                           </div>
+                           <div className={cn("p-3 rounded-xl text-center border-2", contract.hasTenantConsented ? "bg-green-50 border-green-200 text-green-700 shadow-inner" : "bg-muted/40 border-gray-100 text-gray-400")}>
+                              <p className="text-[10px] font-bold uppercase mb-1">Khách thuê</p>
+                              <p className="text-sm font-black flex items-center justify-center gap-1">
+                                {contract.hasTenantConsented ? <><CheckCircle2 className="w-4 h-4"/> Đã ký</> : '⏳ Đang chờ'}
+                              </p>
+                           </div>
+                        </div>
+
+                        {user?.role === 'TENANT' && !contract.hasTenantConsented && (
+                          <Button className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg shadow-lg shadow-green-200" onClick={handleConsentSettlement} isLoading={isConsenting}>
+                            ✍️ Tôi đồng ý Quyết toán này
+                          </Button>
+                        )}
+
+                        {contract.hasLandlordConsented && contract.hasTenantConsented && (
+                          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-lg shadow-lg shadow-indigo-200" onClick={handleExecuteSettlement} isLoading={isExecuting}>
+                            🚀 Thực thi Kết thúc Hợp đồng
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      user?.role === 'LANDLORD' && (
+                        <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-lg shadow-lg shadow-indigo-200 transition-transform hover:scale-[1.02]" onClick={() => {
+                          setSettleForm({ deductionAmount: 0, earlyTermination: false });
+                          setIsSettleModalOpen(true);
+                        }}>
+                          💸 Bắt đầu Quyết toán & Trả phòng
+                        </Button>
+                      )
+                    )}
+                    {user?.role === 'TENANT' && !contract.isProposalActive && (
+                      <div className="bg-indigo-100/50 p-4 rounded-xl border border-indigo-100 text-center">
+                         <p className="text-sm text-indigo-800 font-medium flex items-center justify-center gap-2">
+                           <Clock className="w-4 h-4 animate-spin-slow" /> Đang chờ Chủ trọ đề xuất quyết toán tiền cọc...
+                         </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-5 bg-green-50 border-2 border-green-200 rounded-xl shadow-inner">
+                      <p className="text-sm text-green-800 font-bold flex items-center gap-2">
+                         <CheckCircle className="w-5 h-5 text-green-600" /> Hợp đồng đã kết thúc an toàn trên Blockchain.
+                      </p>
+                    </div>
+                    <Button variant="outline" className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-12 text-lg font-bold shadow-sm" onClick={handleWithdrawFunds} isLoading={isWithdrawing}>
+                      💰 Rút tiền từ Contract về ví MetaMask
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {pendingRequest && (
               <div className="bg-white border-2 border-orange-200 rounded-2xl overflow-hidden shadow-md animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="flex flex-wrap items-start justify-between gap-2 border-b border-orange-100 bg-orange-50 px-4 py-3 sm:items-center sm:px-5">
@@ -1880,72 +1958,7 @@ export default function ContractDetailPage() {
                     </a>
                   </div>
                   
-                  {/* QUYẾT TOÁN ON-CHAIN */}
-                  <div className="mt-6 pt-4 border-t border-indigo-200">
-                    <h4 className="text-sm font-bold text-indigo-900 mb-4 uppercase tracking-wider">Quyết toán & Kết thúc</h4>
-                    
-                    {contract.status === 'ACTIVE' ? (
-                      <div className="space-y-4">
-                        {contract.isProposalActive ? (
-                          <div className="bg-white rounded-xl p-4 border border-indigo-200 shadow-sm">
-                            <div className="flex justify-between items-start mb-3">
-                               <div>
-                                  <p className="text-[10px] text-gray-400 font-bold uppercase">Số tiền đề xuất khấu trừ</p>
-                                  <p className="text-lg font-black text-rose-600">{contract.currentDeductionAmount?.toLocaleString()}đ</p>
-                               </div>
-                               <StatusBadge label={contract.isEarlyTerminationProposal ? 'Kết thúc sớm' : 'Đúng hạn'} tone="warning" />
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 mb-4">
-                               <div className={cn("p-2 rounded-lg text-center border", contract.hasLandlordConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-muted/40 border-gray-100 text-gray-400")}>
-                                  <p className="text-[9px] font-bold uppercase">Chủ trọ</p>
-                                  <p className="text-xs font-bold">{contract.hasLandlordConsented ? 'Đã ký' : 'Chờ...'}</p>
-                               </div>
-                               <div className={cn("p-2 rounded-lg text-center border", contract.hasTenantConsented ? "bg-green-50 border-green-100 text-green-700" : "bg-muted/40 border-gray-100 text-gray-400")}>
-                                  <p className="text-[9px] font-bold uppercase">Khách thuê</p>
-                                  <p className="text-xs font-bold">{contract.hasTenantConsented ? 'Đã ký' : 'Chờ...'}</p>
-                               </div>
-                            </div>
-
-                            {user?.role === 'TENANT' && !contract.hasTenantConsented && (
-                              <Button className="w-full bg-green-600 hover:bg-green-700 h-10" onClick={handleConsentSettlement} isLoading={isConsenting}>
-                                ✍️ Tôi đồng ý Quyết toán này
-                              </Button>
-                            )}
-
-                            {contract.hasLandlordConsented && contract.hasTenantConsented && (
-                              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-10" onClick={handleExecuteSettlement} isLoading={isExecuting}>
-                                🚀 Thực thi Kết thúc Hợp đồng
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          user?.role === 'LANDLORD' && (
-                            <Button className="w-full bg-indigo-600 hover:bg-indigo-700 h-11 shadow-md shadow-indigo-200" onClick={() => {
-                              setSettleForm({ deductionAmount: 0, earlyTermination: false });
-                              setIsSettleModalOpen(true);
-                            }}>
-                              💸 Bắt đầu Quyết toán & Trả phòng
-                            </Button>
-                          )
-                        )}
-                        {user?.role === 'TENANT' && !contract.isProposalActive && (
-                          <p className="text-xs text-indigo-600 italic text-center">Đang chờ Chủ trọ đề xuất quyết toán tiền cọc...</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="p-4 bg-green-50 border border-green-100 rounded-xl">
-                          <p className="text-xs text-green-800 font-medium flex items-center gap-2">
-                             <CheckCircle className="w-4 h-4" /> Hợp đồng đã kết thúc on-chain.
-                          </p>
-                        </div>
-                        <Button variant="outline" className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-100 h-11" onClick={handleWithdrawFunds} isLoading={isWithdrawing}>
-                          💰 Rút tiền từ Contract về ví MetaMask
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  {/* Block quyết toán đã được di chuyển lên trên */}
                 </div>
               </div>
             )}

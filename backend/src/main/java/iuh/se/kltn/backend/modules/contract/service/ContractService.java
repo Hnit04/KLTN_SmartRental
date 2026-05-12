@@ -1194,22 +1194,25 @@ public class ContractService {
         }
 
         try {
-            // 🛡️ PHASE 3: Outbox Pattern
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("contractAddress", contract.getSmartContractAddress());
-            payload.put("deductionAmount", request.getDeductionAmount());
-            payload.put("earlyTermination", request.isEarlyTermination());
-
-            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
-                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
-                    .eventType("PROPOSE_DEDUCTION")
-                    .contractId(contract.getId())
-                    .payload(payload)
-                    .build();
-            outboxRepository.save(event);
-            log.info("✅ Đã xếp hàng đề xuất khấu trừ lên Blockchain cho HĐ #{}", contractId);
+            // 🛡️ State is automatically fetched from Blockchain in mapToResponse.
+            // We just trigger a notification to the tenant here.
+            iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService = 
+                org.springframework.web.context.support.WebApplicationContextUtils
+                    .getRequiredWebApplicationContext(
+                        ((org.springframework.web.context.request.ServletRequestAttributes) 
+                            org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest().getServletContext()
+                    ).getBean(iuh.se.kltn.backend.modules.interaction.service.NotificationService.class);
+                    
+            notificationService.createNotification(
+                contract.getTenant(),
+                "Chủ trọ đề xuất quyết toán",
+                "Chủ trọ đã đề xuất quyết toán " + request.getDeductionAmount() + "đ. Vui lòng kiểm tra và đồng ý để hoàn tất.",
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+            );
+            log.info("✅ Đã ghi nhận đề xuất khấu trừ từ Blockchain cho HĐ #{}", contractId);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi xếp hàng đề xuất lên Blockchain: " + e.getMessage());
+            log.error("Lỗi gửi thông báo quyết toán: " + e.getMessage());
         }
 
         return mapToResponse(contract, currentUserId);
@@ -1225,17 +1228,11 @@ public class ContractService {
         }
 
         try {
-            // 🛡️ PHASE 3: Outbox Pattern
-            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
-                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
-                    .eventType("CONSENT_END")
-                    .contractId(contract.getId())
-                    .payload(Map.of("contractAddress", contract.getSmartContractAddress()))
-                    .build();
-            outboxRepository.save(event);
-            log.info("✅ Khách thuê đã xếp hàng đồng ý quyết toán on-chain cho HĐ #{}", contractId);
+            // 🛡️ State is automatically fetched from Blockchain in mapToResponse.
+            // No DB update needed for consents.
+            log.info("✅ Đã ghi nhận đồng thuận quyết toán từ Blockchain cho HĐ #{}", contractId);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi xếp hàng đồng thuận lên Blockchain: " + e.getMessage());
+            log.error("Lỗi ghi nhận đồng thuận: " + e.getMessage());
         }
 
         return mapToResponse(contract, currentUserId);
@@ -1255,18 +1252,10 @@ public class ContractService {
 
         // Backend gọi thực thi
         try {
-            // 🛡️ PHASE 3: Outbox Pattern
-            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
-                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
-                    .eventType("END_CONTRACT")
-                    .contractId(contract.getId())
-                    .payload(Map.of("contractAddress", contract.getSmartContractAddress()))
-                    .build();
-            outboxRepository.save(event);
-            
-            // Cập nhật DB
-            contract.setStatus(ContractStatus.TERMINATED_EARLY); // Hoặc EXPIRED tùy isEarly
-            contract.setDepositStatus(DepositStatus.REFUNDED); // Đã giải ngân cọc (toán bộ hoặc 1 phần)
+            // Cập nhật trạng thái DB thành kết thúc
+            boolean isEarly = java.time.LocalDate.now().isBefore(contract.getEndDate());
+            contract.setStatus(isEarly ? ContractStatus.TERMINATED_EARLY : ContractStatus.EXPIRED);
+            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED); // Đã giải ngân cọc
             
             if (contract.getRoom() != null) {
                 contract.getRoom().setStatus(RoomStatus.AVAILABLE);
@@ -1274,9 +1263,9 @@ public class ContractService {
             }
             
             contractRepository.save(contract);
-            log.info("✅ Hợp đồng #{} đã kết thúc hoàn toàn on-chain và off-chain", contractId);
+            log.info("✅ Hợp đồng #{} đã kết thúc hoàn toàn (Đồng bộ Blockchain -> DB)", contractId);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi thực thi kết thúc trên Blockchain: " + e.getMessage());
+            throw new RuntimeException("Lỗi cập nhật thực thi kết thúc lên Database: " + e.getMessage());
         }
 
         return mapToResponse(contract, currentUserId);
