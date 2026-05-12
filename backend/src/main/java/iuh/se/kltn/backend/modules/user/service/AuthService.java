@@ -110,7 +110,6 @@ public class AuthService {
         // 5. LƯU XUỐNG CSDL (Sau khi gửi mail thành công)
         return userRepository.save(newUser);
     }
-    // XÁC THỰC MÃ OTP ĐỂ KÍCH HOẠT TÀI KHOẢN
     public String verifyOtp(String email, String code) {
         // Tìm user bằng email
         User user = userRepository.findByEmail(email)
@@ -121,9 +120,20 @@ public class AuthService {
             return "Tài khoản đã được kích hoạt trước đó!";
         }
 
+        // 🛡️ SECURITY: Chống brute-force — tối đa 5 lần thử
+        if (user.getKycAttempts() >= 5) {
+            user.setVerificationCode(null);
+            user.setVerificationExpiry(null);
+            userRepository.save(user);
+            throw new RuntimeException("Đã vượt quá số lần thử cho phép (5 lần). Vui lòng yêu cầu gửi lại mã mới.");
+        }
+
         // Kiểm tra mã OTP
         if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code.trim())) {
-            throw new RuntimeException("Mã xác thực không đúng!");
+            user.setKycAttempts(user.getKycAttempts() + 1);
+            userRepository.save(user);
+            int remaining = 5 - user.getKycAttempts();
+            throw new RuntimeException("Mã xác thực không đúng! Còn " + remaining + " lần thử.");
         }
 
         // Kiểm tra thời hạn
@@ -135,6 +145,7 @@ public class AuthService {
         user.setIsEnabled(true);
         user.setVerificationCode(null);          // Xóa mã để tránh dùng lại
         user.setVerificationExpiry(null);        // Xóa expiry
+        user.setKycAttempts(0);                  // Reset attempt counter
         userRepository.save(user);
 
         return "Xác thực thành công! Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập ngay.";
@@ -349,9 +360,8 @@ public class AuthService {
                         : "Không có lý do cụ thể";
                 throw new RuntimeException("Tài khoản bị khóa. Lý do: " + reasons);
             }
-            System.out.println("--- Chi tiết User đăng nhập Google ---");
-            System.out.println("Username: " + loginResponseGoogle.getUsername());
-            System.out.println("Password (Hash): " + loginResponseGoogle.getPassword());
+            // 🛡️ SECURITY: Không log thông tin nhạy cảm ra console
+            System.out.println("✅ Google OAuth login thành công: " + loginResponseGoogle.getUsername());
             return loginResponseGoogle;
         } catch (Exception e) {
             System.out.println("Unexpected error in googleLogin: " + e.getMessage());

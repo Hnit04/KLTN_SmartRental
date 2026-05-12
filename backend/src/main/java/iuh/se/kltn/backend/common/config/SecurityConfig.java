@@ -91,7 +91,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/crawler/**").permitAll()
                         // Swagger UI
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/api/ai/**").permitAll()
+                        // 🛡️ AI: Admin endpoints yêu cầu role ADMIN
+                        .requestMatchers("/api/ai/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/ai/clear-cache").hasRole("ADMIN")
+                        // AI: Chat và query công khai (cho phép Guest sử dụng chatbot)
+                        .requestMatchers(HttpMethod.POST, "/api/ai/chat").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/ai/query-data").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/ai/generate-room-description").permitAll()
+                        // AI: Các endpoint còn lại cần đăng nhập
+                        .requestMatchers("/api/ai/**").authenticated()
                         // Trang lỗi và API Public
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, 

@@ -55,6 +55,7 @@ public class ContractService {
     private final ModelMapper modelMapper;
     
     @Autowired private BlockchainService blockchainService;
+    @Autowired private iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository outboxRepository;
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
@@ -69,7 +70,8 @@ public class ContractService {
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
 
-    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:false}")
     private boolean mockAmountOverride;
     @Autowired
     public ContractService(ModelMapper modelMapper) {
@@ -742,18 +744,35 @@ public class ContractService {
                     BigInteger endWei = BigInteger.valueOf(endDateVal);
                     BigInteger penaltyWei = BigInteger.valueOf(penaltyVal);
 
-                    String deployedAddress = blockchainService.deployRentalContract(
-                            landlordWallet, tenantWallet, (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"),
-                            contractHashData, rentWei, depositWei, elecWei, waterWei, internetWei, startWei, endWei, penaltyWei
-                    );
+                    // 🛡️ PHASE 3: Outbox Pattern
+                    // Do NOT block DB transaction by calling deploy directly.
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("landlordWallet", landlordWallet);
+                    payload.put("tenantWallet", tenantWallet);
+                    payload.put("roomName", (contract.getRoom() != null ? contract.getRoom().getName() : "Unknown"));
+                    payload.put("contractHash", contractHashData);
+                    payload.put("rentWei", rentWei.toString());
+                    payload.put("depositWei", depositWei.toString());
+                    payload.put("elecWei", elecWei.toString());
+                    payload.put("waterWei", waterWei.toString());
+                    payload.put("internetWei", internetWei.toString());
+                    payload.put("startWei", startWei.toString());
+                    payload.put("endWei", endWei.toString());
+                    payload.put("penaltyWei", penaltyWei.toString());
 
-                    contract.setSmartContractAddress(deployedAddress);
-                    contract.setContractHash(contractHashData);
-                    contract.setDeployTxHash("Deployed on Sepolia via Backend");
+                    iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                        iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                            .eventType("DEPLOY_CONTRACT")
+                            .contractId(contract.getId())
+                            .payload(payload)
+                            .build();
+                    outboxRepository.save(event);
+
+                    contract.setDeployTxHash("Deployment Pending (Outbox)");
 
                 } catch (Exception e) {
                     e.printStackTrace();
-                    throw new RuntimeException("Lỗi Deploy Blockchain: " + e.getMessage());
+                    throw new RuntimeException("Lỗi xếp hàng Deploy Blockchain: " + e.getMessage());
                 }
             }
 
@@ -866,9 +885,10 @@ public class ContractService {
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        // Chỉ Chủ trọ mới được xác nhận hoàn cọc
-        if (currentUser.getRole() != iuh.se.kltn.backend.common.enums.Role.LANDLORD) {
-            throw new RuntimeException("Chỉ Chủ trọ mới có quyền xác nhận hoàn cọc!");
+        // 🛡️ SECURITY: Chỉ Chủ trọ SỞ HỮU hợp đồng này mới được xác nhận hoàn cọc
+        if (currentUser.getRole() != iuh.se.kltn.backend.common.enums.Role.LANDLORD
+                || !contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId)) {
+            throw new RuntimeException("Chỉ Chủ trọ sở hữu hợp đồng này mới có quyền xác nhận hoàn cọc!");
         }
 
         // Chỉ cho phép khi hợp đồng đã kết thúc
@@ -882,11 +902,18 @@ public class ContractService {
         // 🔗 Kết thúc hợp đồng trên Blockchain (hoàn cọc full, deduction = 0)
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
-                blockchainService.endContractOnChain(contract.getSmartContractAddress());
-                System.out.println("✅ Đã kết thúc hợp đồng trên Blockchain (hoàn cọc full)");
+                // 🛡️ PHASE 3: Outbox Pattern
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                    iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                        .eventType("END_CONTRACT")
+                        .contractId(contract.getId())
+                        .payload(Map.of("contractAddress", contract.getSmartContractAddress()))
+                        .build();
+                outboxRepository.save(event);
+                log.info("✅ Xếp hàng kết thúc hợp đồng trên Blockchain (hoàn cọc full) cho contract #{}", contract.getId());
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Lỗi kết thúc hợp đồng trên Blockchain: " + e.getMessage());
+            log.error("⚠️ Lỗi xếp hàng kết thúc hợp đồng trên Blockchain: " + e.getMessage());
         }
 
         if (contract.getRoom() != null) {
@@ -904,13 +931,25 @@ public class ContractService {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
         
+        // 🛡️ SECURITY: Chỉ Tenant hoặc Landlord của hợp đồng mới được xác nhận cọc Web3
+        boolean isTenant = contract.getTenant().getId().equals(userId);
+        boolean isLandlord = contract.getRoom().getProperty().getLandlord().getId().equals(userId);
+        if (!isTenant && !isLandlord) {
+            throw new RuntimeException("Bạn không có quyền xác nhận cọc cho hợp đồng này!");
+        }
+
         if (contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
             throw new RuntimeException("Hợp đồng này không trong trạng thái chờ nạp cọc.");
         }
 
-        // 🔍 Xác minh giao dịch thật trên Blockchain
-        if (!blockchainService.verifyTransaction(txHash)) {
-            throw new RuntimeException("Giao dịch nạp cọc không hợp lệ hoặc chưa được xác nhận trên Blockchain!");
+        // 🔍 PHASE 4: Hardened Web3 Verification
+        long depositVal = contract.getDepositAmount() != null ? contract.getDepositAmount().longValue() : 0L;
+        long EXCHANGE_RATE = vndEthRate;
+        BigInteger WEI_MULT = BigInteger.TEN.pow(18);
+        BigInteger expectedDepositWei = BigInteger.valueOf(depositVal).multiply(WEI_MULT).divide(BigInteger.valueOf(EXCHANGE_RATE));
+
+        if (!blockchainService.verifyDepositEvent(txHash, contract.getSmartContractAddress(), expectedDepositWei)) {
+            throw new RuntimeException("Giao dịch nạp cọc KHÔNG hợp lệ! Vui lòng kiểm tra lại địa chỉ hợp đồng và số tiền nạp.");
         }
 
         // ✅ FIX: Kích hoạt hợp đồng sau khi verify thành công (giống confirmTraditionalDeposit)
@@ -1155,14 +1194,22 @@ public class ContractService {
         }
 
         try {
-            blockchainService.proposeDeductionOnChain(
-                contract.getSmartContractAddress(),
-                request.getDeductionAmount(),
-                request.isEarlyTermination()
-            );
-            log.info("✅ Đã gửi đề xuất khấu trừ lên Blockchain cho HĐ #{}", contractId);
+            // 🛡️ PHASE 3: Outbox Pattern
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("contractAddress", contract.getSmartContractAddress());
+            payload.put("deductionAmount", request.getDeductionAmount());
+            payload.put("earlyTermination", request.isEarlyTermination());
+
+            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                    .eventType("PROPOSE_DEDUCTION")
+                    .contractId(contract.getId())
+                    .payload(payload)
+                    .build();
+            outboxRepository.save(event);
+            log.info("✅ Đã xếp hàng đề xuất khấu trừ lên Blockchain cho HĐ #{}", contractId);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi gửi đề xuất lên Blockchain: " + e.getMessage());
+            throw new RuntimeException("Lỗi xếp hàng đề xuất lên Blockchain: " + e.getMessage());
         }
 
         return mapToResponse(contract, currentUserId);
@@ -1178,10 +1225,17 @@ public class ContractService {
         }
 
         try {
-            blockchainService.consentEndContractOnChain(contract.getSmartContractAddress());
-            log.info("✅ Khách thuê đã đồng ý quyết toán on-chain cho HĐ #{}", contractId);
+            // 🛡️ PHASE 3: Outbox Pattern
+            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                    .eventType("CONSENT_END")
+                    .contractId(contract.getId())
+                    .payload(Map.of("contractAddress", contract.getSmartContractAddress()))
+                    .build();
+            outboxRepository.save(event);
+            log.info("✅ Khách thuê đã xếp hàng đồng ý quyết toán on-chain cho HĐ #{}", contractId);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi gửi đồng thuận lên Blockchain: " + e.getMessage());
+            throw new RuntimeException("Lỗi xếp hàng đồng thuận lên Blockchain: " + e.getMessage());
         }
 
         return mapToResponse(contract, currentUserId);
@@ -1192,9 +1246,23 @@ public class ContractService {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
 
+        // 🛡️ SECURITY: Kiểm tra quyền — Chỉ Landlord hoặc Tenant của hợp đồng mới được thực thi
+        boolean isContractLandlord = contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId);
+        boolean isContractTenant = contract.getTenant().getId().equals(currentUserId);
+        if (!isContractLandlord && !isContractTenant) {
+            throw new RuntimeException("Bạn không có quyền thực thi quyết toán hợp đồng này!");
+        }
+
         // Backend gọi thực thi
         try {
-            blockchainService.endContractOnChain(contract.getSmartContractAddress());
+            // 🛡️ PHASE 3: Outbox Pattern
+            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                    .eventType("END_CONTRACT")
+                    .contractId(contract.getId())
+                    .payload(Map.of("contractAddress", contract.getSmartContractAddress()))
+                    .build();
+            outboxRepository.save(event);
             
             // Cập nhật DB
             contract.setStatus(ContractStatus.TERMINATED_EARLY); // Hoặc EXPIRED tùy isEarly

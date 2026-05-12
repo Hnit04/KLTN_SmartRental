@@ -2,7 +2,9 @@ package iuh.se.kltn.backend.modules.contract.controller;
 
 import iuh.se.kltn.backend.modules.contract.dto.request.SePayWebhookRequest;
 import iuh.se.kltn.backend.modules.contract.entity.Bill;
+import iuh.se.kltn.backend.modules.contract.entity.ProcessedWebhook;
 import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
+import iuh.se.kltn.backend.modules.contract.repository.ProcessedWebhookRepository;
 import iuh.se.kltn.backend.modules.contract.service.BillService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
@@ -32,6 +34,9 @@ public class PaymentController {
     private ContractService contractService;
 
     @Autowired
+    private ProcessedWebhookRepository processedWebhookRepository;
+
+    @Autowired
     private iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService vipSubscriptionService;
 
     @Value("${sepay.webhook.token:}")
@@ -47,7 +52,8 @@ public class PaymentController {
     private String platformAccountName;
 
     // Toggle mock: true = dùng 2000đ để test, false = dùng số tiền thật (PRODUCTION)
-    @Value("${sepay.mock.amount-override:true}")
+    // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
+    @Value("${sepay.mock.amount-override:false}")
     private boolean mockAmountOverride;
 
     @GetMapping("/bill/{billId}/qr-code")
@@ -130,33 +136,51 @@ public class PaymentController {
 
         System.out.println("🔔 [SePay Webhook] Nhận request: " + request.getTransactionContent());
 
-        // Kiểm tra bảo mật nếu có cấu hình token
-        if (sepayWebhookToken != null && !sepayWebhookToken.trim().isEmpty()) {
-            boolean isAuthorized = false;
-            String cleanToken = sepayWebhookToken.trim();
-            
-            // Trường hợp 1: Token nằm trong header Authorization theo dạng "Apikey [TOKEN]"
-            if (authHeader != null && authHeader.trim().equals("Apikey " + cleanToken)) {
-                isAuthorized = true;
-            }
-            
-            // Trường hợp 2: Token nằm trực tiếp trong header Apikey
-            if (apiKeyHeader != null && apiKeyHeader.trim().equals(cleanToken)) {
-                isAuthorized = true;
-            }
+        // 🛡️ SECURITY: BẮT BUỘC kiểm tra token — reject nếu chưa cấu hình
+        if (sepayWebhookToken == null || sepayWebhookToken.trim().isEmpty()) {
+            System.err.println("🚨 [SECURITY] SePay webhook token chưa được cấu hình! Từ chối mọi request.");
+            return ResponseEntity.status(503).body(Map.of("success", false, "message", "Webhook service not configured"));
+        }
 
-            if (!isAuthorized) {
-                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Unauthorized"));
-            }
+        boolean isAuthorized = false;
+        String cleanToken = sepayWebhookToken.trim();
+        
+        // Trường hợp 1: Token nằm trong header Authorization theo dạng "Apikey [TOKEN]"
+        if (authHeader != null && authHeader.trim().equals("Apikey " + cleanToken)) {
+            isAuthorized = true;
+        }
+        
+        // Trường hợp 2: Token nằm trực tiếp trong header Apikey
+        if (apiKeyHeader != null && apiKeyHeader.trim().equals(cleanToken)) {
+            isAuthorized = true;
+        }
+
+        if (!isAuthorized) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Unauthorized"));
         }
 
         try {
+            // 🛡️ IDEMPOTENCY: Kiểm tra webhook đã xử lý chưa (chống duplicate từ SePay retry)
+            String refNumber = request.getReferenceNumber();
+            if (refNumber != null && !refNumber.trim().isEmpty()) {
+                if (processedWebhookRepository.existsByReferenceNumber(refNumber)) {
+                    System.out.println("⚡ [SePay] Webhook đã xử lý trước đó, bỏ qua: " + refNumber);
+                    return ResponseEntity.ok(Map.of("success", true, "message", "Already processed (idempotent)"));
+                }
+            }
+
             String content = request.getTransactionContent();
+            String webhookType = "UNKNOWN";
+            Long targetId = null;
+
             if (content != null) {
                 java.util.regex.Matcher depositMatcher = java.util.regex.Pattern.compile("SMR DEPOSIT (\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(content);
                 if (depositMatcher.find()) {
                     Long contractId = Long.parseLong(depositMatcher.group(1));
                     contractService.processSePayDepositWebhook(contractId, request.getAmountIn(), request.getReferenceNumber(), request.getAccountNumber());
+                    webhookType = "DEPOSIT";
+                    targetId = contractId;
+                    recordProcessedWebhook(refNumber, webhookType, targetId, request.getAmountIn(), content);
                     return ResponseEntity.ok(Map.of("success", true, "message", "Deposit Webhook processed"));
                 }
 
@@ -165,17 +189,43 @@ public class PaymentController {
                 if (vipMatcher.find()) {
                     Long orderId = Long.parseLong(vipMatcher.group(1));
                     vipSubscriptionService.processVipPayment(orderId, request.getAmountIn(), request.getReferenceNumber());
+                    webhookType = "VIP";
+                    targetId = orderId;
+                    recordProcessedWebhook(refNumber, webhookType, targetId, request.getAmountIn(), content);
                     return ResponseEntity.ok(Map.of("success", true, "message", "VIP Webhook processed"));
                 }
             }
 
             // Mặc định gọi BillService
             billService.processSePayWebhook(request);
+            webhookType = "BILL";
+            recordProcessedWebhook(refNumber, webhookType, targetId, request.getAmountIn(), content);
             return ResponseEntity.ok(Map.of("success", true, "message", "Bill Webhook processed"));
         } catch (Exception e) {
             System.err.println("❌ [SePay Webhook] Lỗi xử lý: " + e.getMessage());
             // Vẫn trả về 200 OK để SePay không gửi lại liên tục nếu lỗi logic
             return ResponseEntity.ok(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * 🛡️ Ghi nhận webhook đã xử lý thành công vào DB để chống duplicate.
+     * Nếu lỗi ghi (ví dụ: unique constraint violation từ race condition), bỏ qua im lặng
+     * vì nghiệp vụ chính đã hoàn thành.
+     */
+    private void recordProcessedWebhook(String refNumber, String type, Long targetId, Double amount, String content) {
+        if (refNumber == null || refNumber.trim().isEmpty()) return;
+        try {
+            processedWebhookRepository.save(ProcessedWebhook.builder()
+                    .referenceNumber(refNumber)
+                    .webhookType(type)
+                    .targetId(targetId)
+                    .amount(amount)
+                    .transactionContent(content != null && content.length() > 300 ? content.substring(0, 300) : content)
+                    .build());
+        } catch (Exception e) {
+            // Unique constraint violation = webhook đã được ghi bởi concurrent request → OK
+            System.out.println("ℹ️ [SePay] Webhook ref đã tồn tại (concurrent): " + refNumber);
         }
     }
 }

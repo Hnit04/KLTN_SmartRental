@@ -8,13 +8,13 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.jdbc.core.JdbcTemplate;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 @Configuration
 public class AiConfig {
@@ -43,10 +43,15 @@ public class AiConfig {
         return new AllMiniLmL6V2EmbeddingModel();
     }
 
+    /**
+     * 🧠 PHASE 3: Thay InMemoryEmbeddingStore bằng PgVector.
+     * Embeddings persist qua restarts và share giữa các instances.
+     */
     @Bean
-    public EmbeddingStore<TextSegment> embeddingStore() {
-        return new InMemoryEmbeddingStore<>();
+    public EmbeddingStore<TextSegment> embeddingStore(JdbcTemplate jdbcTemplate) {
+        return new PgVectorEmbeddingStore(jdbcTemplate);
     }
+
     @Bean
     @Lazy
     public ContentRetriever contentRetriever(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel) {

@@ -1,0 +1,34 @@
+package iuh.se.kltn.backend.common.config;
+
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
+import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+import javax.sql.DataSource;
+
+/**
+ * 🛡️ ShedLock Configuration
+ * 
+ * Ensures that @Scheduled jobs run on only ONE instance at a time
+ * in a multi-pod Kubernetes deployment.
+ * 
+ * Uses PostgreSQL table 'shedlock' for distributed locking.
+ */
+@Configuration
+@EnableScheduling
+@EnableSchedulerLock(defaultLockAtMostFor = "10m")
+public class ShedLockConfig {
+
+    @Bean
+    public LockProvider lockProvider(DataSource dataSource) {
+        return new JdbcTemplateLockProvider(
+                JdbcTemplateLockProvider.Configuration.builder()
+                        .withJdbcTemplate(new org.springframework.jdbc.core.JdbcTemplate(dataSource))
+                        .usingDbTime()
+                        .build()
+        );
+    }
+}

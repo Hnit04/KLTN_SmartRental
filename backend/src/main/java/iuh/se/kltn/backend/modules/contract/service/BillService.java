@@ -48,7 +48,8 @@ public class BillService {
     @Autowired
     private BlockchainService blockchainService;
 
-    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:true}")
+    // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
+    @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:false}")
     private boolean mockAmountOverride;
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
