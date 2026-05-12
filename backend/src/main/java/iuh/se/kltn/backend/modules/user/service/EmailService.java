@@ -325,6 +325,50 @@ public class EmailService {
             System.err.println("Lỗi gửi mail đề xuất: " + e.getMessage());
         }
     }
+    
+    public void sendSettlementReminder(String toEmail, String name, String roomName, String tenantName, String deadline) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
+        body.put("to", List.of(Map.of("email", toEmail)));
+        body.put("subject", "[SmartRental] Nhắc nhở quyết toán hợp đồng sắp hết hạn");
+
+        String html = String.format(
+                """
+                <div style="font-family: Arial, sans-serif; padding: 20px; background: #fffcf0;">
+                    <div style="max-width: 550px; margin: auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #fef3c7;">
+                        <h2 style="color: #d97706; margin-bottom: 20px;">⚠️ Nhắc nhở quyết toán</h2>
+                        <p>Chào <b>%s</b>,</p>
+                        <p>Hợp đồng phòng <b>%s</b> với khách <b>%s</b> đã kết thúc được một thời gian nhưng hệ thống chưa ghi nhận thao tác quyết toán cọc từ bạn.</p>
+                        
+                        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                            <p style="color: #92400e; margin: 0;">
+                                <b>Hạn chót tự động hoàn cọc:</b> %s
+                            </p>
+                            <p style="font-size: 13px; color: #b45309; margin-top: 5px;">
+                                <b>Lưu ý:</b> Nếu bạn không thực hiện quyết toán trước thời hạn này, hệ thống sẽ <b>tự động hoàn 100%% cọc</b> cho khách thuê và bạn sẽ bị <b>trừ 20 điểm uy tín</b>.
+                            </p>
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="http://localhost:5173/dashboard/contracts" style="background: #d97706; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Quyết toán ngay</a>
+                        </div>
+
+                        <p style="font-size: 13px; color: #64748b;">
+                            Vui lòng kiểm tra lại các hóa đơn và đề xuất khấu trừ (nếu có) để đảm bảo quyền lợi của mình.
+                        </p>
+                    </div>
+                </div>
+                """,
+                name, roomName, tenantName, deadline
+        );
+        body.put("htmlContent", html);
+        try {
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders());
+            new RestTemplate().postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi mail nhắc nhở quyết toán: " + e.getMessage());
+        }
+    }
 
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
