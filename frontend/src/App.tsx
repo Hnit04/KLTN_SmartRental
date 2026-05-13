@@ -119,7 +119,9 @@ const RoleBasedContractRouteRedirect = ({ target }: { target: "sign" | "payment-
   const pathParts = location.pathname.split("/").filter(Boolean);
   const contractId = pathParts.at(-2);
   if (!contractId) return <Navigate to="/" replace />;
-  const prefix = user?.role === "LANDLORD" ? "/landlord" : "/tenant";
+  if (user?.role === "ADMIN") return <Navigate to="/admin/dashboard" replace />;
+  const prefix = user?.role === "LANDLORD" ? "/landlord" : user?.role === "TENANT" ? "/tenant" : null;
+  if (!prefix) return <Navigate to="/" replace />;
   return <Navigate to={`${prefix}/contracts/${contractId}/${target}`} replace />;
 };
 

@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
 import type { Contract } from "@/types";
 import type { ContractSettlementContext } from "../machine/contractSettlementMachine";
+import { executeEndContract, proposeDeduction } from "@/utils/contractHelper";
+import { useSystemConfig } from "@/context/SystemConfigContext";
+import { ethers } from "ethers";
 import { contractApi } from "@/api/contractApi";
 import { useNavigate } from "react-router-dom";
 
@@ -11,6 +14,7 @@ type SettlementStepPayoutProps = {
   contract: Contract;
   context: ContractSettlementContext;
   onSuccess: (settledAt: string) => void;
+  onSetTxHash: (hash: string) => void;
   onBack: () => void;
 };
 
@@ -18,9 +22,11 @@ export default function SettlementStepPayout({
   contract,
   context,
   onSuccess,
+  onSetTxHash,
   onBack,
 }: SettlementStepPayoutProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const { config } = useSystemConfig();
   const navigate = useNavigate();
   const isWeb3 = contract.signMethod === "BLOCKCHAIN";
   
@@ -30,14 +36,36 @@ export default function SettlementStepPayout({
   const handleSettle = async () => {
     setIsProcessing(true);
     try {
-      // Gọi API quyết toán cuối cùng
-      await contractApi.confirmDepositRefund(contract.id); 
+      if (isWeb3) {
+        if (!contract.smartContractAddress) throw new Error("Hợp đồng chưa được triển khai Web3");
+
+        // 1. Propose Deduction (nếu chưa propose trên chuỗi)
+        // Lưu ý: Logic này có thể phức tạp hơn nếu landlord đã propose rồi. 
+        // Ở đây giả định landlord thực hiện flow này để propose + execute.
+        const deductionWei = ethers.parseEther((totalDeduction / config.vndEthRate).toFixed(18)).toString();
+        
+        // Nếu chưa có proposal active trên chuỗi, phải propose trước
+        if (!contract.isProposalActive) {
+           await proposeDeduction(
+             contract.smartContractAddress, 
+             deductionWei, 
+             context.step === 'DEDUCTION' || contract.status === 'TERMINATED_EARLY', // isEarly
+             (hash) => onSetTxHash(hash)
+           );
+           toast.info("Đã gửi đề xuất khấu trừ lên Blockchain. Đang chờ xác nhận...");
+        }
+
+        // 2. Execute End Contract (Nếu cả 2 đã ký hoặc là admin/emergency)
+        await executeEndContract(contract.smartContractAddress, (hash) => onSetTxHash(hash));
+      } else {
+        await contractApi.confirmDepositRefund(contract.id); 
+      }
       
       const settledAt = new Date().toISOString();
       onSuccess(settledAt);
       toast.success("Hợp đồng đã được quyết toán thành công!");
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Lỗi xử lý hoàn tiền");
+      toast.error(error?.message || error?.response?.data?.message || "Lỗi xử lý quyết toán");
     } finally {
       setIsProcessing(false);
     }

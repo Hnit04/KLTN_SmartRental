@@ -23,6 +23,12 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        trust: "hsl(var(--trust))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        error: "hsl(var(--error))",
+        surface: "hsl(var(--card))",
+        "surface-2": "hsl(var(--surface-2))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -67,10 +73,20 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ["var(--font-ui)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "monospace"],
+      },
       boxShadow: {
         xs: "var(--shadow-xs)",
         soft: "var(--shadow-sm)",
         card: "var(--shadow-md)",
+      },
+      transitionDuration: {
+        hover: "var(--motion-hover)",
+        press: "var(--motion-press)",
+        modal: "var(--motion-modal)",
+        page: "var(--motion-page)",
       },
       transitionTimingFunction: {
         "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",

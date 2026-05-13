@@ -20,51 +20,59 @@ export const getSmartContract = async (contractAddress: string) => {
 // --- Ví dụ các hàm gọi Contract ---
 
 // 1. Hàm Đặt cọc (Deposit)
-export const depositContract = async (contractAddress: string, amountWei: string) => {
+export const depositContract = async (
+  contractAddress: string, 
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm deposit() trong Smart Contract và gửi kèm ETH (value)
     const tx = await contract.deposit({ value: amountWei });
     
+    if (onHash) onHash(tx.hash);
     console.log("Đang giao dịch...", tx.hash);
-    await tx.wait(); // Chờ giao dịch được xác nhận trên Blockchain
-    console.log("Đặt cọc thành công!");
-    return tx.hash;
+    
+    const receipt = await tx.wait(); 
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi đặt cọc:", error);
     throw error;
   }
 };
 
-// 2. Hàm Thanh toán hóa đơn (Pay Bill) - On-chain bill
-export const payBill = async (contractAddress: string, billId: number, amountWei: string) => {
+// 2. Hàm Thanh toán hóa đơn (Pay Bill)
+export const payBill = async (
+  contractAddress: string, 
+  billId: number, 
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm payBill(_billId)
     const tx = await contract.payBill(billId, { value: amountWei });
     
-    await tx.wait();
-    return tx.hash;
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait();
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi thanh toán:", error);
     throw error;
   }
 };
 
-// 3. Hàm Thanh toán hóa đơn từ Backend (Payment Gateway)
-// Gọi payExternalBill() trên Smart Contract -> Tiền chuyển thẳng cho chủ trọ + Ghi log on-chain
-export const payExternalBill = async (contractAddress: string, backendBillId: number, amountWei: string) => {
+// 3. Hàm Thanh toán hóa đơn từ Backend
+export const payExternalBill = async (
+  contractAddress: string, 
+  backendBillId: number, 
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm payExternalBill(_backendBillId) trên smart contract
     const tx = await contract.payExternalBill(backendBillId, { value: amountWei });
     
-    console.log("Đang chờ xác nhận giao dịch...", tx.hash);
-    const receipt = await tx.wait(); // Chờ blockchain xác nhận
-    console.log("Thanh toán thành công!", receipt.hash);
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait(); 
     return receipt.hash;
   } catch (error) {
     console.error("Lỗi thanh toán Web3:", error);
@@ -73,12 +81,19 @@ export const payExternalBill = async (contractAddress: string, backendBillId: nu
 };
 
 // 4. Đề xuất khấu trừ và kết thúc (Landlord)
-export const proposeDeduction = async (contractAddress: string, amountWei: string, isEarly: boolean) => {
+export const proposeDeduction = async (
+  contractAddress: string, 
+  amountWei: string, 
+  isEarly: boolean,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.proposeDeduction(amountWei, isEarly);
-    await tx.wait();
-    return tx.hash;
+    
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait();
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi đề xuất khấu trừ:", error);
     throw error;
@@ -86,12 +101,17 @@ export const proposeDeduction = async (contractAddress: string, amountWei: strin
 };
 
 // 5. Đồng ý kết thúc (Tenant)
-export const consentEndContract = async (contractAddress: string) => {
+export const consentEndContract = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.consentEndContract();
-    await tx.wait();
-    return tx.hash;
+    
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait();
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi đồng ý kết thúc:", error);
     throw error;
@@ -99,12 +119,17 @@ export const consentEndContract = async (contractAddress: string) => {
 };
 
 // 6. Thực thi kết thúc (Either or Backend)
-export const executeEndContract = async (contractAddress: string) => {
+export const executeEndContract = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.endContract();
-    await tx.wait();
-    return tx.hash;
+    
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait();
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi thực thi kết thúc:", error);
     throw error;
@@ -112,12 +137,17 @@ export const executeEndContract = async (contractAddress: string) => {
 };
 
 // 7. Rút tiền (Pull Payment)
-export const withdrawFunds = async (contractAddress: string) => {
+export const withdrawFunds = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.withdraw();
-    await tx.wait();
-    return tx.hash;
+    
+    if (onHash) onHash(tx.hash);
+    const receipt = await tx.wait();
+    return receipt.hash;
   } catch (error) {
     console.error("Lỗi rút tiền:", error);
     throw error;

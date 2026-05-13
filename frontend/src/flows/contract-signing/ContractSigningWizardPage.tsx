@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ethers } from "ethers";
 import { toast } from "sonner";
 import { contractApi } from "@/api/contractApi";
-import type { Contract, ContractSignMethod } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useSystemConfig } from "@/context/SystemConfigContext";
-import { trackEvent } from "@/utils/analytics";
-import {
-  getBlockchainRuntimeConfig,
-  isWalletOnExpectedChain,
-} from "@/config/blockchainConfig";
+import { getBlockchainRuntimeConfig, isWalletOnExpectedChain } from "@/config/blockchainConfig";
 import type { BlockchainRuntimeConfig } from "@/config/blockchainConfig";
+import { featureFlags } from "@/config/featureFlags";
+import type { Contract } from "@/types";
+import { trackEvent } from "@/utils/analytics";
+import { depositContract } from "@/utils/contractHelper";
+import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
+import RiskNotice from "@/components/shared/RiskNotice";
 import { useContractSigningFlow } from "@/flows/contract-signing/hooks/useContractSigningFlow";
 import {
   ContractSigningProgress,
@@ -22,6 +23,12 @@ import {
   ContractSigningStepReview,
   ContractSigningStepSign,
 } from "@/flows/contract-signing/components";
+import {
+  canAccessContractSigningWizard,
+  canPayDeposit,
+  canSignContract,
+  resolveContractSigningStep,
+} from "@/features/contract/utils/contractFlowGuards";
 
 async function requestBlockchainSignature(params: {
   contractHash: string;
@@ -29,7 +36,7 @@ async function requestBlockchainSignature(params: {
   walletAddress?: string;
 }) {
   const ethereum = (window as any).ethereum as any;
-  if (!ethereum) throw new Error("Vui lòng cài MetaMask để dùng ký blockchain.");
+  if (!ethereum) throw new Error("Vui long cai MetaMask truoc khi ky blockchain.");
 
   try {
     await ethereum.request({
@@ -55,18 +62,15 @@ async function requestBlockchainSignature(params: {
   await ethereum.request({ method: "eth_requestAccounts" });
   const accounts: string[] = await ethereum.request({ method: "eth_accounts" });
   const connectedWallet = accounts?.[0];
-  if (!connectedWallet) throw new Error("Không lấy được địa chỉ ví để ký.");
+  if (!connectedWallet) throw new Error("Khong lay duoc dia chi vi de ky.");
 
-  if (
-    params.walletAddress &&
-    connectedWallet.toLowerCase() !== params.walletAddress.toLowerCase()
-  ) {
-    throw new Error("Ví đang kết nối không trùng với ví đã đăng ký trong hồ sơ.");
+  if (params.walletAddress && connectedWallet.toLowerCase() !== params.walletAddress.toLowerCase()) {
+    throw new Error("Vi dang ket noi khong trung voi vi da dang ky.");
   }
 
   const chainHex: string | undefined = await ethereum.request({ method: "eth_chainId" });
   if (!isWalletOnExpectedChain(chainHex, params.runtimeConfig)) {
-    throw new Error(`Ví chưa ở đúng mạng ${params.runtimeConfig.chainName}.`);
+    throw new Error(`Vi chua o dung mang ${params.runtimeConfig.chainName}.`);
   }
 
   const signature = await ethereum.request({
@@ -74,7 +78,7 @@ async function requestBlockchainSignature(params: {
     params: [params.contractHash, connectedWallet],
   });
 
-  if (!signature) throw new Error("Bạn đã từ chối ký giao dịch.");
+  if (!signature) throw new Error("Ban da tu choi ky giao dich.");
   return { walletAddress: connectedWallet, signature };
 }
 
@@ -87,7 +91,16 @@ export default function ContractSigningWizardPage() {
   const runtimeConfig = useMemo(() => getBlockchainRuntimeConfig(config), [config]);
   const contractId = Number(id);
   const basePath = user?.role === "LANDLORD" ? "/landlord" : "/tenant";
-  const v2Enabled = (import.meta.env.VITE_CONTRACT_SIGNING_V2 ?? "true") !== "false";
+  const detailPath = `${basePath}/contracts/${contractId}`;
+
+  const chainRiskMessage = useMemo(() => {
+    const envChainId = (import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID as string | undefined)?.toLowerCase();
+    if (!envChainId) return null;
+    if (envChainId !== runtimeConfig.chainIdHex.toLowerCase()) {
+      return `Mang frontend (${envChainId}) khac backend (${runtimeConfig.chainIdHex}). Vui long dong bo cau hinh truoc khi ky blockchain.`;
+    }
+    return null;
+  }, [runtimeConfig.chainIdHex]);
 
   const [contract, setContract] = useState<Contract | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,6 +111,8 @@ export default function ContractSigningWizardPage() {
 
   const {
     context,
+    isHydrated,
+    hasRecoveredDraft,
     lastSavedAt,
     goBack,
     goNext,
@@ -106,6 +121,7 @@ export default function ContractSigningWizardPage() {
     markSigned,
     setPaymentState,
     setError,
+    setTxHash,
     clearError,
     resetDraft,
   } = useContractSigningFlow(contractId, "TRADITIONAL");
@@ -120,12 +136,13 @@ export default function ContractSigningWizardPage() {
   }, [contractId, setPaymentState]);
 
   useEffect(() => {
-    if (!v2Enabled) {
-      navigate(`${basePath}/contracts/${contractId}`, { replace: true });
+    if (!featureFlags.contractSigningV2) {
+      navigate(detailPath, { replace: true });
       return;
     }
+
     if (!id || Number.isNaN(contractId)) {
-      toast.error("Không tìm thấy hợp đồng");
+      toast.error("Khong tim thay hop dong hop le.");
       navigate(-1);
       return;
     }
@@ -137,36 +154,70 @@ export default function ContractSigningWizardPage() {
         await fetchContract();
       } catch (error: any) {
         if (!mounted) return;
-        toast.error(error?.response?.data?.message || "Không tải được dữ liệu hợp đồng");
+        toast.error(error?.response?.data?.message || "Khong tai duoc du lieu hop dong.");
       } finally {
         if (mounted) setIsLoading(false);
       }
     };
+
     run();
     return () => {
       mounted = false;
     };
-  }, [basePath, contractId, fetchContract, id, navigate, v2Enabled]);
+  }, [contractId, detailPath, fetchContract, id, navigate]);
 
   useEffect(() => {
-    if (!contract || methodSeeded) return;
+    if (!contract || methodSeeded || !isHydrated || hasRecoveredDraft) return;
     if (contract.signMethod === "TRADITIONAL" || contract.signMethod === "BLOCKCHAIN") {
       setMethod(contract.signMethod);
       setMethodSeeded(true);
     }
-  }, [contract, methodSeeded, setMethod]);
+  }, [contract, methodSeeded, isHydrated, hasRecoveredDraft, setMethod]);
+
+  useEffect(() => {
+    if (!contract) return;
+    const targetStep = resolveContractSigningStep(contract);
+    if (targetStep === "PAYMENT" && context.step !== "PAYMENT") {
+      goToStep("PAYMENT");
+      return;
+    }
+    if (targetStep === "SIGN" && context.step === "PAYMENT") {
+      goToStep("SIGN");
+    }
+  }, [context.step, contract, goToStep]);
+
+  const canUseWizard = useMemo(
+    () => (contract ? canAccessContractSigningWizard(contract) : false),
+    [contract]
+  );
+  const canSignNow = useMemo(() => (contract ? canSignContract(contract) : false), [contract]);
+  const canPayNow = useMemo(() => (contract ? canPayDeposit(contract) : false), [contract]);
 
   const handleSign = useCallback(async () => {
     if (!contract) return;
+
+    if (!canSignNow) {
+      toast.info("Hop dong hien tai khong o trang thai co the ky.");
+      return;
+    }
+
+    if (context.selectedMethod === "BLOCKCHAIN" && chainRiskMessage) {
+      setError(chainRiskMessage);
+      toast.error(chainRiskMessage);
+      return;
+    }
+
     setIsSigning(true);
     clearError();
     trackEvent("sign_started", { contractId: contract.id, method: context.selectedMethod });
+
     try {
       let signature: string | undefined;
       if (context.selectedMethod === "BLOCKCHAIN") {
         if (!contract.contractHash) {
-          throw new Error("Hợp đồng chưa có hash để ký blockchain. Vui lòng thử lại sau.");
+          throw new Error("Hop dong chua co hash de ky blockchain.");
         }
+
         const signed = await requestBlockchainSignature({
           contractHash: contract.contractHash,
           runtimeConfig,
@@ -183,29 +234,28 @@ export default function ContractSigningWizardPage() {
       const signedAt = new Date().toISOString();
       markSigned(signedAt);
       trackEvent("sign_success", { contractId: contract.id, method: context.selectedMethod });
-      toast.success("Đã ký hợp đồng thành công.");
+      toast.success("Da ky hop dong thanh cong.");
       await fetchContract();
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.reason ||
         error?.message ||
-        "Không thể ký hợp đồng lúc này.";
+        "Khong the ky hop dong luc nay.";
       setError(message);
       toast.error(message);
     } finally {
       setIsSigning(false);
     }
   }, [
+    canSignNow,
+    chainRiskMessage,
     clearError,
     context.selectedMethod,
     contract,
     fetchContract,
     markSigned,
-    runtimeConfig.chainIdHex,
-    runtimeConfig.chainName,
-    runtimeConfig.explorerUrl,
-    runtimeConfig.rpcUrl,
+    runtimeConfig,
     setError,
     user?.walletAddress,
   ]);
@@ -214,29 +264,65 @@ export default function ContractSigningWizardPage() {
     setMethod("TRADITIONAL");
     clearError();
     trackEvent("sign_fallback_traditional", { contractId, from: "BLOCKCHAIN" });
-    toast.info("Đã chuyển sang ký truyền thống.");
+    toast.info("Da chuyen sang ky truyen thong.");
   }, [clearError, contractId, setMethod]);
 
   const handleQuickPaymentConfirm = useCallback(async () => {
     if (!contract) return;
-    if (context.selectedMethod === "BLOCKCHAIN") {
-      setPaymentNote("Với blockchain, hãy mở Payment Intent để đồng bộ Transaction Hash.");
-      setPaymentState("initiated");
+
+    if (!canPayNow) {
+      toast.info("Buoc dat coc chua san sang cho hop dong nay.");
+      return;
+    }
+
+    if (context.selectedMethod === "BLOCKCHAIN" && chainRiskMessage) {
+      setPaymentState("failed");
+      setPaymentNote(chainRiskMessage);
+      toast.error(chainRiskMessage);
       return;
     }
 
     setIsQuickPaying(true);
     setPaymentState("pending");
+    clearError();
+
     try {
       trackEvent("payment_started", { contractId: contract.id, method: context.selectedMethod });
-      await contractApi.confirmTraditionalDeposit(contract.id);
+
+      if (context.selectedMethod === "BLOCKCHAIN") {
+        if (!contract.smartContractAddress) {
+          throw new Error("Chua co dia chi smart contract de dat coc blockchain.");
+        }
+
+        const rate = Number(config.vndEthRate || 0);
+        if (rate <= 0) {
+          throw new Error("Ty gia VND/ETH khong hop le. Vui long thu lai sau.");
+        }
+
+        const amountEth = ((contract.depositAmount || 0) / rate).toFixed(18);
+        const amountWei = ethers.parseEther(amountEth).toString();
+
+        await depositContract(contract.smartContractAddress, amountWei, (hash) => {
+          setTxHash(hash);
+          setPaymentNote("Da bat duoc giao dich. Dang cho blockchain xac nhan.");
+        });
+
+        setPaymentState("synced");
+        setPaymentNote("Dat coc thanh cong va da dong bo.");
+      } else {
+        await contractApi.confirmTraditionalDeposit(contract.id);
+        setPaymentState("synced");
+        setPaymentNote("Da xac nhan dat coc truyen thong thanh cong.");
+      }
+
       await fetchContract();
-      setPaymentState("synced");
-      setPaymentNote("Đã xác nhận cọc thành công.");
       trackEvent("payment_success", { contractId: contract.id, method: context.selectedMethod });
-      toast.success("Đã xác nhận thanh toán cọc.");
+      toast.success("Thanh toan dat coc thanh cong.");
     } catch (error: any) {
-      const message = error?.response?.data?.message || "Không thể xác nhận thanh toán lúc này.";
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Khong the xac nhan thanh toan luc nay.";
       setPaymentState("failed");
       setPaymentNote(message);
       trackEvent("payment_failed", { contractId: contract.id, method: context.selectedMethod, message });
@@ -244,24 +330,57 @@ export default function ContractSigningWizardPage() {
     } finally {
       setIsQuickPaying(false);
     }
-  }, [context.selectedMethod, contract, fetchContract, setPaymentState]);
+  }, [
+    canPayNow,
+    chainRiskMessage,
+    clearError,
+    config.vndEthRate,
+    context.selectedMethod,
+    contract,
+    fetchContract,
+    setPaymentState,
+    setTxHash,
+  ]);
 
   const openPaymentIntent = useCallback(() => {
-    navigate(
-      `${basePath}/contracts/${contractId}/payment-intent?method=${context.selectedMethod}`
-    );
+    navigate(`${basePath}/contracts/${contractId}/payment-intent?method=${context.selectedMethod}`);
   }, [basePath, context.selectedMethod, contractId, navigate]);
 
+  const handleNext = useCallback(() => {
+    if (!contract) return;
+    if (context.step === "SIGN" && !context.signedAt && !canPayNow) {
+      toast.info("Vui long ky hop dong truoc khi sang buoc thanh toan.");
+      return;
+    }
+    goNext();
+  }, [canPayNow, context.signedAt, context.step, contract, goNext]);
+
   if (isLoading || !contract) {
-    return <div className="p-4 text-sm text-muted-foreground">Đang tải contract wizard...</div>;
+    return <div className="p-4 text-sm text-muted-foreground">Dang tai contract wizard...</div>;
+  }
+
+  if (!canUseWizard) {
+    return (
+      <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
+        <RiskNotice
+          title="Flow khong kha dung"
+          description="Hop dong da qua buoc ky/dat coc hoac khong phu hop de vao flow moi."
+        />
+        <div>
+          <Button type="button" onClick={() => navigate(detailPath)}>
+            Mo chi tiet hop dong
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-3 py-4 sm:px-4">
       <div className="flex items-center justify-between gap-3">
-        <Button type="button" variant="outline" onClick={() => navigate(`${basePath}/contracts/${contract.id}`)}>
+        <Button type="button" variant="outline" onClick={() => navigate(detailPath)}>
           <ArrowLeft className="h-4 w-4" />
-          Về chi tiết hợp đồng
+          Ve chi tiet hop dong
         </Button>
         <Button type="button" variant="ghost" onClick={resetDraft}>
           Reset draft
@@ -269,9 +388,15 @@ export default function ContractSigningWizardPage() {
       </div>
 
       <PageHeader
-        title="Contract Signing Wizard"
-        description={`Hợp đồng #${contract.id} · Lưu nháp tự động${lastSavedAt ? ` · ${new Date(lastSavedAt).toLocaleTimeString("vi-VN")}` : ""}`}
+        title="Wizard Ky Hop Dong"
+        description={`Hop dong #${contract.id} - Luu nhap tu dong${
+          lastSavedAt ? ` - ${new Date(lastSavedAt).toLocaleTimeString("vi-VN")}` : ""
+        }`}
       />
+
+      {chainRiskMessage && context.selectedMethod === "BLOCKCHAIN" && (
+        <RiskNotice description={chainRiskMessage} onRetry={fetchContract} retryLabel="Tai lai" />
+      )}
 
       <ContractSigningProgress currentStep={context.step} onJump={goToStep} />
 
@@ -297,7 +422,7 @@ export default function ContractSigningWizardPage() {
         <ContractSigningStepSign
           selectedMethod={context.selectedMethod}
           isSubmitting={isSigning}
-          lastError={context.lastError}
+          lastError={context.lastError ?? (context.selectedMethod === "BLOCKCHAIN" ? chainRiskMessage : null)}
           signedAt={context.signedAt}
           onSign={handleSign}
           onFallbackTraditional={handleFallbackTraditional}
@@ -308,6 +433,8 @@ export default function ContractSigningWizardPage() {
         <ContractSigningStepPayment
           method={context.selectedMethod}
           paymentState={context.paymentState}
+          txHash={context.txHash}
+          explorerUrl={runtimeConfig.explorerUrl}
           note={paymentNote || context.lastError}
           updatedAt={lastSavedAt}
           isSubmitting={isQuickPaying}
@@ -325,12 +452,12 @@ export default function ContractSigningWizardPage() {
       <div className="flex flex-wrap gap-2">
         {context.step !== "REVIEW" && (
           <Button type="button" variant="outline" onClick={goBack}>
-            Quay lại
+            Quay lai
           </Button>
         )}
         {context.step !== "PAYMENT" && (
-          <Button type="button" onClick={goNext}>
-            Tiếp tục
+          <Button type="button" onClick={handleNext}>
+            Tiep tuc
           </Button>
         )}
       </div>

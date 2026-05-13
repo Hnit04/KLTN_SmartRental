@@ -16,6 +16,7 @@ export type ContractSettlementContext = {
     amount: number;
   }[];
   isTenantAgreed: boolean;
+  txHash: string | null; // ✅ Thêm để track Web3
   settledAt: string | null;
   lastError: string | null;
   updatedAt: number;
@@ -28,6 +29,7 @@ export type ContractSettlementEvent =
   | { type: "SUBMIT_INSPECTION"; reading: { electricity: number; water: number; note?: string } }
   | { type: "SET_DEDUCTIONS"; items: { reason: string; amount: number }[] }
   | { type: "TENANT_ACTION"; agree: boolean }
+  | { type: "SET_TX_HASH"; hash: string } // ✅ Event mới
   | { type: "SETTLE_SUCCESS"; settledAt: string }
   | { type: "FAIL"; message: string }
   | { type: "CLEAR_ERROR" };
@@ -44,6 +46,7 @@ export function createInitialSettlementContext(): ContractSettlementContext {
     step: "INSPECTION",
     deductions: [],
     isTenantAgreed: false,
+    txHash: null,
     settledAt: null,
     lastError: null,
     updatedAt: Date.now(),
@@ -101,6 +104,12 @@ export function contractSettlementTransition(
       return withUpdatedAt({
         ...current,
         settledAt: event.settledAt,
+        lastError: null,
+      });
+    case "SET_TX_HASH":
+      return withUpdatedAt({
+        ...current,
+        txHash: event.hash,
         lastError: null,
       });
     case "FAIL":

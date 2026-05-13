@@ -45,6 +45,7 @@ function sanitizeContext(input: unknown): ContractSigningContext | null {
     selectedMethod: raw.selectedMethod,
     signedAt: typeof raw.signedAt === "string" ? raw.signedAt : null,
     paymentState: raw.paymentState,
+    txHash: typeof raw.txHash === "string" ? raw.txHash : null,
     lastError: typeof raw.lastError === "string" ? raw.lastError : null,
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
   };
@@ -60,6 +61,7 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
     createInitialContractSigningContext(initialMethod)
   );
   const [isHydrated, setIsHydrated] = useState(false);
+  const [hasRecoveredDraft, setHasRecoveredDraft] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
       const raw = localStorage.getItem(storageKey);
       if (!raw) {
         setContext(fallback);
+        setHasRecoveredDraft(false);
         setIsHydrated(true);
         return;
       }
@@ -75,15 +78,18 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
       const parsed: PersistedDraft = JSON.parse(raw);
       if (parsed.version !== DRAFT_VERSION) {
         setContext(fallback);
+        setHasRecoveredDraft(false);
         setIsHydrated(true);
         return;
       }
 
       const sanitized = sanitizeContext(parsed.context);
       setContext(sanitized ?? fallback);
+      setHasRecoveredDraft(Boolean(sanitized));
       setIsHydrated(true);
     } catch {
       setContext(fallback);
+      setHasRecoveredDraft(false);
       setIsHydrated(true);
     }
   }, [initialMethod, storageKey]);
@@ -120,6 +126,10 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
     (state: PaymentIntentState) => dispatch({ type: "PAYMENT_UPDATED", state }),
     [dispatch]
   );
+  const setTxHash = useCallback(
+    (hash: string) => dispatch({ type: "SET_TX_HASH", hash }),
+    [dispatch]
+  );
   const setError = useCallback(
     (message: string) => dispatch({ type: "FAIL", message }),
     [dispatch]
@@ -129,12 +139,14 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
   const resetDraft = useCallback(() => {
     localStorage.removeItem(storageKey);
     setContext(createInitialContractSigningContext(initialMethod));
+    setHasRecoveredDraft(false);
     setLastSavedAt(null);
   }, [initialMethod, storageKey]);
 
   return {
     context,
     isHydrated,
+    hasRecoveredDraft,
     lastSavedAt,
     goNext,
     goBack,
@@ -142,9 +154,9 @@ export function useContractSigningFlow(contractId: number, initialMethod: Contra
     setMethod,
     markSigned,
     setPaymentState,
+    setTxHash,
     setError,
     clearError,
     resetDraft,
   };
 }
-

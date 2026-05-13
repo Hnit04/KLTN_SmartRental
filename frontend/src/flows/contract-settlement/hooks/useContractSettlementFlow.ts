@@ -29,6 +29,7 @@ function sanitizeContext(input: unknown): ContractSettlementContext | null {
     lastReading: raw.lastReading as any,
     deductions: Array.isArray(raw.deductions) ? raw.deductions : [],
     isTenantAgreed: !!raw.isTenantAgreed,
+    txHash: typeof raw.txHash === "string" ? raw.txHash : null,
     settledAt: typeof raw.settledAt === "string" ? raw.settledAt : null,
     lastError: typeof raw.lastError === "string" ? raw.lastError : null,
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
@@ -111,6 +112,11 @@ export function useContractSettlementFlow(contractId: number) {
     [dispatch]
   );
 
+  const setTxHash = useCallback(
+    (hash: string) => dispatch({ type: "SET_TX_HASH", hash }),
+    [dispatch]
+  );
+
   const markSettled = useCallback(
     (settledAt: string) => dispatch({ type: "SETTLE_SUCCESS", settledAt }),
     [dispatch]
@@ -139,6 +145,7 @@ export function useContractSettlementFlow(contractId: number) {
     submitInspection,
     setDeductions,
     setTenantAction,
+    setTxHash,
     markSettled,
     setError,
     clearError,

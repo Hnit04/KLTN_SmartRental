@@ -8,6 +8,7 @@ export type ContractSigningContext = {
   selectedMethod: ContractSignMethod;
   signedAt: string | null;
   paymentState: PaymentIntentState;
+  txHash: string | null; // ✅ Thêm hash để track Web3
   lastError: string | null;
   updatedAt: number;
 };
@@ -19,6 +20,7 @@ export type ContractSigningEvent =
   | { type: "SELECT_METHOD"; method: ContractSignMethod }
   | { type: "SIGN_SUCCESS"; signedAt: string }
   | { type: "PAYMENT_UPDATED"; state: PaymentIntentState }
+  | { type: "SET_TX_HASH"; hash: string } // ✅ Event mới
   | { type: "FAIL"; message: string }
   | { type: "CLEAR_ERROR" };
 
@@ -37,6 +39,7 @@ export function createInitialContractSigningContext(
     selectedMethod: initialMethod,
     signedAt: null,
     paymentState: "initiated",
+    txHash: null,
     lastError: null,
     updatedAt: Date.now(),
   };
@@ -97,6 +100,13 @@ export function contractSigningTransition(
       return withUpdatedAt({
         ...current,
         lastError: event.message,
+      });
+    case "SET_TX_HASH":
+      return withUpdatedAt({
+        ...current,
+        txHash: event.hash,
+        paymentState: "pending", // ✅ Tự động chuyển sang pending khi có hash
+        lastError: null,
       });
     case "CLEAR_ERROR":
       return withUpdatedAt({

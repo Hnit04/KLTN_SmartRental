@@ -10,6 +10,8 @@ type ContractSigningStepPaymentProps = {
   note: string | null;
   updatedAt: string | null;
   isSubmitting: boolean;
+  txHash?: string | null;
+  explorerUrl?: string;
   onRetry: () => void;
   onSupport: () => void;
   onConfirmQuick: () => Promise<void> | void;
@@ -17,9 +19,9 @@ type ContractSigningStepPaymentProps = {
 };
 
 function getEstimatedTime(method: ContractSignMethod, paymentState: PaymentIntentState) {
-  if (paymentState === "synced") return "Hoàn tất";
-  if (paymentState === "pending") return method === "BLOCKCHAIN" ? "1-3 phút" : "Dưới 1 phút";
-  return method === "BLOCKCHAIN" ? "2-5 phút" : "Dưới 2 phút";
+  if (paymentState === "synced") return "Hoan tat";
+  if (paymentState === "pending") return method === "BLOCKCHAIN" ? "1-3 phut" : "Duoi 1 phut";
+  return method === "BLOCKCHAIN" ? "2-5 phut" : "Duoi 2 phut";
 }
 
 export default function ContractSigningStepPayment({
@@ -28,6 +30,8 @@ export default function ContractSigningStepPayment({
   note,
   updatedAt,
   isSubmitting,
+  txHash,
+  explorerUrl,
   onRetry,
   onSupport,
   onConfirmQuick,
@@ -41,6 +45,8 @@ export default function ContractSigningStepPayment({
           method={method}
           estimatedConfirmation={getEstimatedTime(method, paymentState)}
           note={note}
+          txHash={txHash}
+          explorerUrl={explorerUrl}
           onRetry={onRetry}
           onSupport={onSupport}
         />
@@ -49,13 +55,12 @@ export default function ContractSigningStepPayment({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={onConfirmQuick} isLoading={isSubmitting}>
-          Xác nhận nhanh trạng thái cọc
+          Xac nhan nhanh trang thai coc
         </Button>
         <Button type="button" variant="outline" onClick={onOpenPaymentIntent}>
-          Mở Payment Intent đầy đủ
+          Mo Payment Intent day du
         </Button>
       </div>
     </div>
   );
 }
-

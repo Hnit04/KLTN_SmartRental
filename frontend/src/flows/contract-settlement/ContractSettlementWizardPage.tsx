@@ -36,6 +36,7 @@ export default function ContractSettlementWizardPage() {
     submitInspection,
     setDeductions,
     setTenantAction,
+    setTxHash,
     markSettled,
     setError,
     clearError,
@@ -119,6 +120,7 @@ export default function ContractSettlementWizardPage() {
             contract={contract}
             context={context}
             onSuccess={markSettled}
+            onSetTxHash={setTxHash}
             onBack={goBack}
           />
         )}

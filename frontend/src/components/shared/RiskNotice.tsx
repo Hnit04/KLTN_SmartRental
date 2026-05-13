@@ -17,18 +17,18 @@ export default function RiskNotice({
   return (
     <div
       role="alert"
-      className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900"
+      className="rounded-xl border border-warning/35 bg-warning/10 p-4 text-foreground"
     >
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-relaxed text-amber-900/90">{description}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
           {onRetry && (
             <Button
               type="button"
               variant="outline"
-              className="mt-3 h-9 border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+              className="mt-3 h-9 border-warning/35 bg-background text-foreground hover:bg-warning/10"
               onClick={onRetry}
             >
               {retryLabel}
@@ -39,4 +39,3 @@ export default function RiskNotice({
     </div>
   );
 }
-
