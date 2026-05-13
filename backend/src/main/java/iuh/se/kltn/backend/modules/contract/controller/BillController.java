@@ -4,11 +4,16 @@ import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.contract.dto.response.AnnualReportResponse;
 
 import iuh.se.kltn.backend.modules.contract.dto.request.BillRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.TransactionHashRequest;
 import iuh.se.kltn.backend.modules.contract.dto.response.RevenueChartResponse;
 import iuh.se.kltn.backend.modules.contract.service.BillService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +23,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/bills")
+@Validated
 public class BillController {
 
     @Autowired
@@ -26,7 +32,7 @@ public class BillController {
     //Chủ trọ tạo hóa đơn tháng
     @PostMapping
     public ResponseEntity<?> createBill(@AuthenticationPrincipal UserPrincipal currentUser,
-                                        @RequestBody BillRequest request) {
+                                        @Valid @RequestBody BillRequest request) {
         return ResponseEntity.ok(billService.createBill(currentUser.getId(), request));
     }
 
@@ -38,8 +44,8 @@ public class BillController {
     @GetMapping("/billing-status")
     public ResponseEntity<?> getBillingStatus(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestParam int month,
-            @RequestParam int year) {
+            @RequestParam @Min(1) @Max(12) int month,
+            @RequestParam @Min(2000) @Max(2100) int year) {
 
         // Truyền ID của Chủ trọ đang đăng nhập vào
         return ResponseEntity.ok(billService.getBillingStatus(currentUser.getId(), month, year));
@@ -79,8 +85,8 @@ public class BillController {
 
     @PostMapping("/{billId}/confirm-web3")
     public ResponseEntity<?> confirmWeb3Payment(@PathVariable Long billId,
-                                                @RequestBody Map<String, String> request) {
-        String txHash = request.get("txHash");
+                                                @Valid @RequestBody TransactionHashRequest request) {
+        String txHash = request.getTxHash();
         return ResponseEntity.ok(billService.confirmWeb3Payment(billId, txHash));
     }
 
@@ -108,7 +114,7 @@ public class BillController {
     @GetMapping("/reports/annual-report")
     public ResponseEntity<AnnualReportResponse> getAnnualReport(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestParam(defaultValue = "2026") int year) {
+            @RequestParam(defaultValue = "2026") @Min(2000) @Max(2100) int year) {
         return ResponseEntity.ok(billService.getAnnualReport(currentUser.getId(), year));
     }
 }

@@ -4,13 +4,16 @@ import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.user.dto.request.TenantPreferenceRequest;
 import iuh.se.kltn.backend.modules.user.entity.TenantPreference;
 import iuh.se.kltn.backend.modules.user.service.TenantPreferenceService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/tenant-preferences")
+@Validated
 public class TenantPreferenceController {
 
     @Autowired
@@ -28,7 +31,7 @@ public class TenantPreferenceController {
     @PutMapping
     public ResponseEntity<?> updateMyPreference(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestBody TenantPreferenceRequest request) {
+            @Valid @RequestBody TenantPreferenceRequest request) {
         TenantPreference updated = tenantPreferenceService.updatePreference(currentUser.getId(), request);
         return ResponseEntity.ok(updated);
     }

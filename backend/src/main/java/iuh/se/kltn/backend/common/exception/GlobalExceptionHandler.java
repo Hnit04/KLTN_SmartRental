@@ -6,9 +6,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
-
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.stream.Collectors;
+
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -22,6 +23,22 @@ public class GlobalExceptionHandler {
                 .body(Map.of(
                         "status", "error",
                         "message", "Dữ liệu không hợp lệ: " + message
+                ));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<?> handleConstraintViolationException(ConstraintViolationException ex) {
+        String message = ex.getConstraintViolations().stream()
+                .map(violation -> {
+                    String path = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "request";
+                    return path + ": " + violation.getMessage();
+                })
+                .collect(Collectors.joining(", "));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "status", "error",
+                        "message", "Du lieu khong hop le: " + message
                 ));
     }
 

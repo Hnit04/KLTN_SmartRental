@@ -3,15 +3,21 @@ package iuh.se.kltn.backend.modules.property.controller;
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.common.service.CloudinaryService;
 import iuh.se.kltn.backend.modules.property.dto.request.PropertyRequest;
+import iuh.se.kltn.backend.modules.property.dto.request.RejectReasonRequest;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import iuh.se.kltn.backend.modules.property.dto.response.PropertyResponse;
 import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
 import iuh.se.kltn.backend.modules.property.service.PropertyService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
@@ -20,10 +26,10 @@ import org.springframework.data.domain.Sort;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/properties")
+@Validated
 public class PropertyController {
 
     @Autowired
@@ -34,8 +40,8 @@ public class PropertyController {
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public - Ai cũng xem được)
     @GetMapping
     public ResponseEntity<?> getAllProperties(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
         return ResponseEntity.ok(propertyService.getAllProperties(pageable));
@@ -57,8 +63,8 @@ public class PropertyController {
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> rejectProperty(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        String reason = (body != null) ? body.get("reason") : null;
+    public ResponseEntity<?> rejectProperty(@PathVariable Long id, @Valid @RequestBody(required = false) RejectReasonRequest body) {
+        String reason = (body != null) ? body.getReason() : null;
         propertyService.updateStatus(id, PropertyStatus.REJECTED, reason);
         return ResponseEntity.ok("Đã từ chối khu trọ");
     }
@@ -133,7 +139,9 @@ public class PropertyController {
     }
 
     @GetMapping("/reverse-geocode")
-    public ResponseEntity<?> reverseGeocode(@RequestParam double lat, @RequestParam double lon) {
+    public ResponseEntity<?> reverseGeocode(
+            @RequestParam @DecimalMin(value = "-90.0") @DecimalMax(value = "90.0") double lat,
+            @RequestParam @DecimalMin(value = "-180.0") @DecimalMax(value = "180.0") double lon) {
         try {
             // Gọi sang Service để lấy chuỗi JSON địa chỉ
             String result = propertyService.reverseGeocode(lat, lon);

@@ -1,13 +1,15 @@
 package iuh.se.kltn.backend.modules.contract.dto.request;
 
 import iuh.se.kltn.backend.modules.contract.enums.ContractSignMethod;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class SignContractRequest {
-    // Người dùng chọn cách ký nào: TRADITIONAL hay BLOCKCHAIN
+    @NotNull(message = "Sign method is required")
     private ContractSignMethod signMethod;
-    
-    // Chữ ký điện tử (nếu dùng Blockchain)
+
+    @Size(max = 4096, message = "Signature is too long")
     private String signature;
 }
