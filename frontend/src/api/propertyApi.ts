@@ -15,7 +15,9 @@ export const propertyApi = {
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
   getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),
   getMyProperties: () => axiosClient.get<Property[]>("/properties/mine"),
-  getPropertiesByLandlord: (landlordId: number | string) => axiosClient.get<Property[]>(`/properties/landlord/${landlordId}`),
+  getPropertiesByLandlordUsername: (username: string) => axiosClient.get<Property[]>(`/properties/landlord/${username}`),
+  // Backward-compat alias. Prefer getPropertiesByLandlordUsername for clarity.
+  getPropertiesByLandlord: (landlordUsername: string) => axiosClient.get<Property[]>(`/properties/landlord/${landlordUsername}`),
   getRecommendedRooms: () => axiosClient.get<Room[]>("/recommendations/rooms"),
 
   // --- CÁC HÀM QUẢN LÝ KHU TRỌ ---

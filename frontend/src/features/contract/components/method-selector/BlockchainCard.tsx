@@ -12,7 +12,7 @@ export default function BlockchainCard({ selected, onClick }: BlockchainCardProp
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full rounded-2xl border p-4 text-left transition-all duration-hover",
+        "h-full w-full rounded-2xl border p-4 text-left transition-all duration-hover",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         selected
           ? "border-trust bg-trust/10 shadow-sm"
@@ -20,10 +20,10 @@ export default function BlockchainCard({ selected, onClick }: BlockchainCardProp
       )}
       aria-pressed={selected}
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
           <Blocks className="h-4 w-4 text-trust" />
-          <p className="text-sm font-semibold text-foreground">Ky bang blockchain</p>
+          <p className="text-sm font-semibold leading-5 text-foreground">Ky bang blockchain</p>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">Co bang chung chong chinh sua</p>

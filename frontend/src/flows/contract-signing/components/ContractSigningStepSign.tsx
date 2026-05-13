@@ -9,6 +9,7 @@ type ContractSigningStepSignProps = {
   signedAt: string | null;
   onSign: () => Promise<void> | void;
   onFallbackTraditional: () => void;
+  onOpenGuide?: () => void;
 };
 
 export default function ContractSigningStepSign({
@@ -18,15 +19,16 @@ export default function ContractSigningStepSign({
   signedAt,
   onSign,
   onFallbackTraditional,
+  onOpenGuide,
 }: ContractSigningStepSignProps) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-background p-4">
-        <h3 className="text-sm font-semibold text-foreground">Bước ký hợp đồng</h3>
+        <h3 className="text-sm font-semibold text-foreground">Buoc ky hop dong</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           {selectedMethod === "BLOCKCHAIN"
-            ? "Kết nối ví để ký và tạo bằng chứng blockchain có thể kiểm chứng."
-            : "Ký điện tử truyền thống, nhanh và quen thuộc với đa số người dùng."}
+            ? "Ket noi vi de ky va tao bang chung blockchain co the kiem chung."
+            : "Ky dien tu truyen thong, nhanh va quen thuoc voi da so nguoi dung."}
         </p>
       </div>
 
@@ -38,7 +40,7 @@ export default function ContractSigningStepSign({
           </div>
           {selectedMethod === "BLOCKCHAIN" && (
             <Button type="button" variant="outline" className="mt-3" onClick={onFallbackTraditional}>
-              Chuyển sang ký truyền thống
+              Chuyen sang ky truyen thong
             </Button>
           )}
         </div>
@@ -48,9 +50,7 @@ export default function ContractSigningStepSign({
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
-            <p>
-              Đã ký thành công lúc {new Date(signedAt).toLocaleString("vi-VN")}
-            </p>
+            <p>Da ky thanh cong luc {new Date(signedAt).toLocaleString("vi-VN")}</p>
           </div>
         </div>
       ) : null}
@@ -58,16 +58,20 @@ export default function ContractSigningStepSign({
       <div className="flex flex-wrap gap-2">
         <Button type="button" isLoading={isSubmitting} onClick={onSign}>
           <FileSignature className="h-4 w-4" />
-          {selectedMethod === "BLOCKCHAIN" ? "Ký blockchain" : "Ký truyền thống"}
+          {selectedMethod === "BLOCKCHAIN" ? "Ky blockchain" : "Ky truyen thong"}
         </Button>
+        {selectedMethod === "BLOCKCHAIN" && (
+          <Button type="button" variant="outline" onClick={onOpenGuide}>
+            Huong dan MetaMask
+          </Button>
+        )}
         {selectedMethod === "BLOCKCHAIN" && (
           <div className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Cần ví đúng mạng trước khi ký.
+            Can vi dung mang truoc khi ky.
           </div>
         )}
       </div>
     </div>
   );
 }
-

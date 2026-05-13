@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import RiskNotice from "@/components/shared/RiskNotice";
 import { useContractSigningFlow } from "@/flows/contract-signing/hooks/useContractSigningFlow";
 import {
+  BlockchainQuickGuideSheet,
   ContractSigningProgress,
   ContractSigningStepMethod,
   ContractSigningStepPayment,
@@ -29,6 +30,15 @@ import {
   canSignContract,
   resolveContractSigningStep,
 } from "@/features/contract/utils/contractFlowGuards";
+
+type WalletGuideState = {
+  isProviderAvailable: boolean;
+  connectedAddress: string | null;
+  walletChainIdHex: string | null;
+  isExpectedNetwork: boolean;
+  registeredAddress: string | null;
+  isWalletMatched: boolean;
+};
 
 async function requestBlockchainSignature(params: {
   contractHash: string;
@@ -108,6 +118,18 @@ export default function ContractSigningWizardPage() {
   const [isQuickPaying, setIsQuickPaying] = useState(false);
   const [paymentNote, setPaymentNote] = useState<string | null>(null);
   const [methodSeeded, setMethodSeeded] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [hasAutoOpenedGuide, setHasAutoOpenedGuide] = useState(false);
+  const [isWalletRefreshing, setIsWalletRefreshing] = useState(false);
+  const [isWalletConnecting, setIsWalletConnecting] = useState(false);
+  const [walletGuideState, setWalletGuideState] = useState<WalletGuideState>({
+    isProviderAvailable: false,
+    connectedAddress: null,
+    walletChainIdHex: null,
+    isExpectedNetwork: false,
+    registeredAddress: null,
+    isWalletMatched: true,
+  });
 
   const {
     context,
@@ -134,6 +156,51 @@ export default function ContractSigningWizardPage() {
       setPaymentState("synced");
     }
   }, [contractId, setPaymentState]);
+
+  const refreshWalletGuideState = useCallback(async () => {
+    const ethereum = (window as any).ethereum as any;
+    const registeredAddress = user?.walletAddress || null;
+
+    if (!ethereum) {
+      setWalletGuideState({
+        isProviderAvailable: false,
+        connectedAddress: null,
+        walletChainIdHex: null,
+        isExpectedNetwork: false,
+        registeredAddress,
+        isWalletMatched: true,
+      });
+      return;
+    }
+
+    setIsWalletRefreshing(true);
+    try {
+      const [accountsResult, chainResult] = await Promise.all([
+        ethereum.request({ method: "eth_accounts" }).catch(() => []),
+        ethereum.request({ method: "eth_chainId" }).catch(() => null),
+      ]);
+
+      const accounts = Array.isArray(accountsResult) ? (accountsResult as string[]) : [];
+      const connectedAddress = accounts[0] || null;
+      const walletChainIdHex =
+        typeof chainResult === "string" && chainResult.length > 0 ? chainResult : null;
+      const isWalletMatched =
+        !registeredAddress ||
+        !connectedAddress ||
+        connectedAddress.toLowerCase() === registeredAddress.toLowerCase();
+
+      setWalletGuideState({
+        isProviderAvailable: true,
+        connectedAddress,
+        walletChainIdHex,
+        isExpectedNetwork: isWalletOnExpectedChain(walletChainIdHex ?? undefined, runtimeConfig),
+        registeredAddress,
+        isWalletMatched,
+      });
+    } finally {
+      setIsWalletRefreshing(false);
+    }
+  }, [runtimeConfig, user?.walletAddress]);
 
   useEffect(() => {
     if (!featureFlags.contractSigningV2) {
@@ -185,6 +252,23 @@ export default function ContractSigningWizardPage() {
       goToStep("SIGN");
     }
   }, [context.step, contract, goToStep]);
+
+  useEffect(() => {
+    if (context.step !== "SIGN" || context.selectedMethod !== "BLOCKCHAIN") return;
+    void refreshWalletGuideState();
+
+    if (!hasAutoOpenedGuide) {
+      setIsGuideOpen(true);
+      setHasAutoOpenedGuide(true);
+      trackEvent("blockchain_guide_opened", { contractId, source: "auto_sign_step" });
+    }
+  }, [
+    context.selectedMethod,
+    context.step,
+    contractId,
+    hasAutoOpenedGuide,
+    refreshWalletGuideState,
+  ]);
 
   const canUseWizard = useMemo(
     () => (contract ? canAccessContractSigningWizard(contract) : false),
@@ -263,9 +347,36 @@ export default function ContractSigningWizardPage() {
   const handleFallbackTraditional = useCallback(() => {
     setMethod("TRADITIONAL");
     clearError();
+    setIsGuideOpen(false);
     trackEvent("sign_fallback_traditional", { contractId, from: "BLOCKCHAIN" });
     toast.info("Da chuyen sang ky truyen thong.");
   }, [clearError, contractId, setMethod]);
+
+  const handleOpenGuide = useCallback(() => {
+    setIsGuideOpen(true);
+    trackEvent("blockchain_guide_opened", { contractId, source: "manual" });
+    void refreshWalletGuideState();
+  }, [contractId, refreshWalletGuideState]);
+
+  const handleConnectWallet = useCallback(async () => {
+    const ethereum = (window as any).ethereum as any;
+    if (!ethereum) {
+      toast.error("Chua phat hien MetaMask. Vui long cai vi truoc.");
+      return;
+    }
+
+    setIsWalletConnecting(true);
+    try {
+      await ethereum.request({ method: "eth_requestAccounts" });
+      await refreshWalletGuideState();
+      toast.success("Da ket noi vi. Ban co the tiep tuc ky.");
+    } catch (error: any) {
+      const message = error?.message || "Khong the ket noi vi luc nay.";
+      toast.error(message);
+    } finally {
+      setIsWalletConnecting(false);
+    }
+  }, [refreshWalletGuideState]);
 
   const handleQuickPaymentConfirm = useCallback(async () => {
     if (!contract) return;
@@ -426,6 +537,7 @@ export default function ContractSigningWizardPage() {
           signedAt={context.signedAt}
           onSign={handleSign}
           onFallbackTraditional={handleFallbackTraditional}
+          onOpenGuide={handleOpenGuide}
         />
       )}
 
@@ -448,6 +560,25 @@ export default function ContractSigningWizardPage() {
           onOpenPaymentIntent={openPaymentIntent}
         />
       )}
+
+      <BlockchainQuickGuideSheet
+        open={isGuideOpen && context.selectedMethod === "BLOCKCHAIN"}
+        onOpenChange={setIsGuideOpen}
+        chainName={runtimeConfig.chainName}
+        chainIdHex={runtimeConfig.chainIdHex}
+        chainRiskMessage={chainRiskMessage}
+        isProviderAvailable={walletGuideState.isProviderAvailable}
+        connectedAddress={walletGuideState.connectedAddress}
+        registeredAddress={walletGuideState.registeredAddress}
+        walletChainIdHex={walletGuideState.walletChainIdHex}
+        isWalletMatched={walletGuideState.isWalletMatched}
+        isExpectedNetwork={walletGuideState.isExpectedNetwork}
+        isConnecting={isWalletConnecting}
+        isRefreshing={isWalletRefreshing}
+        onConnectWallet={handleConnectWallet}
+        onRefreshWalletState={refreshWalletGuideState}
+        onSwitchTraditional={handleFallbackTraditional}
+      />
 
       <div className="flex flex-wrap gap-2">
         {context.step !== "REVIEW" && (

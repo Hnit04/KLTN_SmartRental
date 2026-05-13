@@ -6,6 +6,7 @@ import { featureFlags } from "@/config/featureFlags";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { canAccessContractSigningWizard } from "@/features/contract/utils/contractFlowGuards";
+import { trackEvent } from "@/utils/analytics";
 
 interface ContractItemProps {
   data: Contract;
@@ -49,52 +50,53 @@ export default function ContractItem({ data }: ContractItemProps) {
 
   return (
     <div
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/60 bg-white p-5 transition-all duration-300 hover:border-primary hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:p-6"
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border/70 bg-card p-5 transition-all duration-page hover:border-primary/40 hover:shadow-card md:p-6"
       onClick={() => {
+        trackEvent("contract_item_opened", { contractId: data.id, role: user?.role || "UNKNOWN" });
         navigate(detailPath);
       }}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-500" />
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent opacity-0 transition-opacity duration-page group-hover:opacity-100" />
 
       <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center">
         <div className="flex items-center gap-4 md:w-1/4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-primary shadow-sm transition-all duration-300">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-soft transition-all duration-page">
             <FileText className="h-6 w-6" />
           </div>
           <div className="min-w-0 space-y-1">
             <h3 className="truncate text-base font-bold text-primary transition-colors">
               {data.roomName || `Phong #${data.roomId}`}
             </h3>
-            <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-medium tracking-wide text-slate-600">
+            <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-[10px] font-mono font-medium tracking-wide text-muted-foreground">
               MA: {data.code || `#${data.id}`}
             </span>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5 text-sm text-slate-600 md:w-1/3">
+        <div className="flex flex-col gap-2.5 text-sm text-muted-foreground md:w-1/3">
           <div className="flex items-start gap-2.5">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
-            <span className="line-clamp-2 font-medium leading-relaxed text-slate-600">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-trust" />
+            <span className="line-clamp-2 font-medium leading-relaxed text-muted-foreground">
               {data.propertyAddress || "Dia chi dang cap nhat..."}
             </span>
           </div>
           <div className="flex items-center gap-2.5">
-            <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-            <span className="text-[13px] font-medium text-slate-500">
+            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="text-[13px] font-medium text-muted-foreground">
               {formatDate(data.startDate)} - {formatDate(data.endDate)}
             </span>
           </div>
         </div>
 
         <div className="flex flex-col justify-center md:w-1/6">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            <Banknote className="h-3.5 w-3.5 text-slate-400" />
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Gia thue thang</span>
           </div>
-          <p className="text-xl font-black tracking-tight text-slate-900">{formatPrice(data.actualPrice || 0)}</p>
+          <p className="text-xl font-black tracking-tight text-foreground">{formatPrice(data.actualPrice || 0)}</p>
         </div>
 
-        <div className="flex items-center justify-between gap-6 border-t border-slate-100/80 pt-4 md:w-1/4 md:justify-end md:border-t-0 md:pt-0">
+        <div className="flex items-center justify-between gap-6 border-t border-border/70 pt-4 md:w-1/4 md:justify-end md:border-t-0 md:pt-0">
           <div className="flex items-center gap-2">
             {renderStatus(data.status)}
 
@@ -106,6 +108,11 @@ export default function ContractItem({ data }: ContractItemProps) {
                 className="border-primary/20 bg-primary/5 font-bold text-primary hover:bg-primary/10"
                 onClick={(e) => {
                   e.stopPropagation();
+                  trackEvent("contract_sign_entry_clicked", {
+                    contractId: data.id,
+                    role: user?.role || "UNKNOWN",
+                    flow: featureFlags.contractSigningV2 ? "v2" : "legacy",
+                  });
                   navigate(signActionPath);
                 }}
               >
@@ -118,9 +125,13 @@ export default function ContractItem({ data }: ContractItemProps) {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="border-amber-200 bg-amber-50 font-bold text-amber-700 hover:bg-amber-100"
+                className="border-warning/30 bg-warning/10 font-bold text-warning hover:bg-warning/20"
                 onClick={(e) => {
                   e.stopPropagation();
+                  trackEvent("contract_settlement_entry_clicked", {
+                    contractId: data.id,
+                    role: user?.role || "UNKNOWN",
+                  });
                   navigate(`${prefix}/contracts/${data.id}/settle`);
                 }}
               >
@@ -129,7 +140,7 @@ export default function ContractItem({ data }: ContractItemProps) {
             )}
           </div>
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-300">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-soft transition-all duration-page">
             <ChevronRight className="h-4 w-4" />
           </div>
         </div>

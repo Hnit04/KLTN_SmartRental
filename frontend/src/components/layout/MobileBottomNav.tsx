@@ -82,7 +82,7 @@ export default function MobileBottomNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]"
+        className="fixed bottom-0 left-0 right-0 border-t border-border/80 bg-card/95 shadow-soft backdrop-blur-md md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)", zIndex: getZIndex("bottomNav") }}
       >
       <div className="flex items-stretch h-16">
@@ -93,22 +93,19 @@ export default function MobileBottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                "relative flex flex-col items-center justify-center flex-1 gap-0.5 min-h-[48px] text-[10px] font-semibold transition-all duration-200 active:scale-95",
+                "relative flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-all duration-hover active:scale-95 active:duration-press",
                 isActive
                   ? "text-primary"
-                  : "text-gray-400 hover:text-gray-700"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <item.icon
-                className={cn(
-                  "h-5 w-5 transition-transform",
-                  isActive && "scale-110"
-                )}
+                className={cn("h-5 w-5 transition-transform duration-hover", isActive && "scale-110")}
                 strokeWidth={isActive ? 2.5 : 1.8}
               />
               <span>{item.label}</span>
               {isActive && (
-                <span className="absolute bottom-0 w-8 h-0.5 bg-primary rounded-full transition-all duration-300" />
+                <span className="absolute bottom-0 h-0.5 w-8 rounded-full bg-primary transition-all duration-page" />
               )}
             </Link>
           );
@@ -118,8 +115,8 @@ export default function MobileBottomNav() {
           type="button"
           onClick={() => setIsMoreOpen(true)}
           className={cn(
-            "relative flex flex-1 min-h-[48px] flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-all duration-200 active:scale-95",
-            isMoreActive ? "text-primary" : "text-gray-400 hover:text-gray-700"
+            "relative flex flex-1 min-h-[48px] flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-all duration-hover active:scale-95",
+            isMoreActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
           aria-expanded={isMoreOpen}
           aria-label="Mở thêm menu"
@@ -139,16 +136,16 @@ export default function MobileBottomNav() {
           <button
             type="button"
             onClick={() => setIsMoreOpen(false)}
-            className="absolute inset-0 bg-black/35 backdrop-blur-[1px]"
+            className="absolute inset-0 bg-foreground/20 backdrop-blur-[1px]"
             aria-label="Đóng menu thêm"
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-background p-4 shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-background p-4 shadow-2xl animate-in slide-in-from-bottom-6 duration-modal">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-foreground">Tính năng khác</p>
               <button
                 type="button"
                 onClick={() => setIsMoreOpen(false)}
-                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"
+                className="rounded-full p-1.5 text-muted-foreground transition-colors duration-hover hover:bg-muted"
                 aria-label="Đóng"
               >
                 <X className="h-4 w-4" />

@@ -148,6 +148,7 @@ export interface Property {
   longitude?: number;
   images: string[];
   landlordId?: number;
+  landlordUsername?: string;
   landlordName?: string;
   landlordPhone?: string;
   landlordAvatar?: string;
@@ -184,7 +185,11 @@ export interface Room {
   address?: string;
   propertyAddress?: string;
   maxOccupants?: number | null;
+  landlordUsername?: string;
   landlordName?: string;
+  landlordPhone?: string;
+  landlordAvatar?: string;
+  landlordReputationScore?: number;
   elecPrice?: number;
   waterPrice?: number;
   internetPrice?: number;

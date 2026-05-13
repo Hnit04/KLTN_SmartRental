@@ -151,7 +151,7 @@ export default function PropertiesPage() {
   return (
     <div className="min-h-screen space-y-6 overflow-x-hidden bg-background pb-20">
       {/* --- HEADER & FILTER --- */}
-      <div className="sticky top-16 z-30">
+      <div>
         <div className="page-shell pt-2 sm:pt-3">
           <div className="section-card bg-card/95 p-3 shadow-sm backdrop-blur sm:p-4 md:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">

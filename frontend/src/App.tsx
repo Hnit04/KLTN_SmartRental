@@ -154,7 +154,7 @@ function AppRoutesAndChrome() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/top-landlords" element={<TopLandlordsPage />} />
-            <Route path="/landlord/:id/properties" element={<LandlordPropertiesPage />} />
+            <Route path="/landlord/:username/properties" element={<LandlordPropertiesPage />} />
 
             {/* AUTH ROUTES (chặn nếu đã đăng nhập) */}
             <Route element={<PublicRoute />}>

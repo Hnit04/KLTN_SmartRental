@@ -955,7 +955,7 @@ export default function RoomDetailPage() {
               )}
 
               {/* Liên hệ chủ nhà (ẩn khi phòng MAINTENANCE hoặc chế độ ADMIN) */}
-              {!isMaintenance && user?.role !== 'ADMIN' && (room as any).landlordPhone && (
+              {!isMaintenance && user?.role !== 'ADMIN' && room.landlordPhone && (
                 <div className="bg-white rounded-2xl border p-4 space-y-3">
                   <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Liên hệ chủ nhà</p>
                   <p className="font-bold text-gray-900">{room.landlordName || "Chủ nhà"}</p>
@@ -968,12 +968,12 @@ export default function RoomDetailPage() {
                         if (!isAuthenticated && !showFullPhone) {
                           handleShowPhone();
                         } else {
-                          window.location.href = `tel:${(room as any).landlordPhone}`;
+                          window.location.href = `tel:${room.landlordPhone}`;
                         }
                       }}
                     >
                       <Phone className="h-3.5 w-3.5" /> 
-                      {(!isAuthenticated && !showFullPhone) ? maskPhone((room as any).landlordPhone) : "Gọi điện"}
+                      {(!isAuthenticated && !showFullPhone) ? maskPhone(room.landlordPhone) : "Gọi điện"}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -983,7 +983,7 @@ export default function RoomDetailPage() {
                         if (!isAuthenticated && !showFullPhone) {
                           handleShowPhone();
                         } else {
-                          window.open(`https://zalo.me/${(room as any).landlordPhone}`, "_blank");
+                          window.open(`https://zalo.me/${room.landlordPhone}`, "_blank");
                         }
                       }}
                     >
@@ -1003,6 +1003,21 @@ export default function RoomDetailPage() {
                   <ArrowLeft className="h-4 w-4" />
                   Xem tất cả phòng của khu trọ này
                 </Link>
+              )}
+
+              {room.landlordUsername && (
+                <Link
+                  to={`/landlord/${room.landlordUsername}/properties`}
+                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary transition px-1"
+                >
+                  <Users className="h-4 w-4" />
+                  Xem tất cả khu trọ của chủ này
+                </Link>
+              )}
+              {!room.landlordUsername && (
+                <p className="px-1 text-xs text-muted-foreground">
+                  Chủ trọ chưa công khai hồ sơ khu trọ.
+                </p>
               )}
             </div>
           </div>

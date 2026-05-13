@@ -27,6 +27,7 @@ public class PropertyResponse {
 
     private Long landlordId;
 
+    private String landlordUsername;
     private String landlordName;
     private String landlordPhone;
     private String landlordAvatar;

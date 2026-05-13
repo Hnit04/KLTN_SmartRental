@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import { vipApi } from '@/api/vipApi';
 import { useAuth } from '@/context/AuthContext';
 import { Crown, Check, X, Zap, ChevronDown, History, Sparkles, Shield, Star, Image, Home, DoorOpen, Bot } from 'lucide-react';

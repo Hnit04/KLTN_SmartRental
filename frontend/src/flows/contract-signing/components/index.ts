@@ -3,4 +3,4 @@ export { default as ContractSigningStepReview } from "./ContractSigningStepRevie
 export { default as ContractSigningStepMethod } from "./ContractSigningStepMethod";
 export { default as ContractSigningStepSign } from "./ContractSigningStepSign";
 export { default as ContractSigningStepPayment } from "./ContractSigningStepPayment";
-
+export { default as BlockchainQuickGuideSheet } from "./BlockchainQuickGuideSheet";

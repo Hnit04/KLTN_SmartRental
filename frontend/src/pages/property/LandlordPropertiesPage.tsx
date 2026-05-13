@@ -8,25 +8,22 @@ import { Button } from "@/components/ui/Button";
 import { ArrowLeft, ShieldCheck, Mail, Phone, Building2, Star } from "lucide-react";
 
 export default function LandlordPropertiesPage() {
-  const { id } = useParams<{ id: string }>();
+  const { username } = useParams<{ username: string }>();
   const [properties, setProperties] = useState<Property[]>([]);
   const [landlord, setLandlord] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!username) return;
       try {
         setIsLoading(true);
         // Lấy thông tin user và danh sách phòng cùng lúc
         const [userRes, propsRes] = await Promise.all([
-          userApi.findByUsername(id), // Giả sử API này có thể tìm theo ID hoặc Username (cần kiểm tra lại Backend)
-          propertyApi.getPropertiesByLandlord(id)
+          userApi.findByUsername(username),
+          propertyApi.getPropertiesByLandlordUsername(username),
         ]);
         
-        // Lưu ý: Nếu userApi.findByUsername chỉ nhận username, ta có thể cần một API getById
-        // Tuy nhiên, trong context này ID thường là số. 
-        // Hãy thử lấy từ propsRes nếu userRes thất bại hoặc dùng API findById nếu có.
         setLandlord(userRes);
         setProperties(propsRes.data);
       } catch (error) {
@@ -36,7 +33,7 @@ export default function LandlordPropertiesPage() {
       }
     };
     fetchData();
-  }, [id]);
+  }, [username]);
 
   if (isLoading) {
     return (

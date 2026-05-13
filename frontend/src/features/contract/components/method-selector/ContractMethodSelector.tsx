@@ -16,7 +16,7 @@ export default function ContractMethodSelector({
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Phương thức ký hợp đồng
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <TraditionalCard
           selected={value === "TRADITIONAL"}
           onClick={() => onChange("TRADITIONAL")}
@@ -29,4 +29,3 @@ export default function ContractMethodSelector({
     </div>
   );
 }
-

@@ -256,18 +256,18 @@ export default function CreateContractPage() {
                       <p className="text-lg font-bold text-primary">{room.name}</p>
                       <p className="text-sm text-muted-foreground">{room.propertyName || room.property?.address || 'Đang cập nhật địa chỉ'}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="min-w-0 rounded-lg border border-border/60 bg-background/60 p-2.5">
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                           <CreditCard className="h-3 w-3" /> Giá thuê
                         </span>
-                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng</p>
+                        <p className="mt-1 break-words font-semibold leading-snug text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 rounded-lg border border-border/60 bg-background/60 p-2.5">
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                           <ShieldCheck className="h-3 w-3" /> Tiền cọc
                         </span>
-                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)</p>
+                        <p className="mt-1 break-words font-semibold leading-snug text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)</p>
                       </div>
                     </div>
                     <div className="mt-2 border-t border-border/60 pt-3">

@@ -6,7 +6,7 @@
   --font-mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
 
   /* Brand palette (hex) */
-  --color-primary: #2563eb;
+  --color-primary: #A67C52;
   --color-secondary: #0f172a;
   --color-trust: #0ea5a4;
   --color-background: #f8fafc;
@@ -17,7 +17,7 @@
   --color-error: #dc2626;
 
   /* Brand palette (hsl channels for Tailwind tokens) */
-  --color-primary-hsl: 221 83% 53%;
+  --color-primary-hsl: 31 31% 49%;
   --color-secondary-hsl: 222 47% 11%;
   --color-trust-hsl: 180 84% 35%;
   --color-background-hsl: 210 40% 98%;
