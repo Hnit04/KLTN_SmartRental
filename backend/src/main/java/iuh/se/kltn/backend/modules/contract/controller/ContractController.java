@@ -1,6 +1,7 @@
 package iuh.se.kltn.backend.modules.contract.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
+import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.service.ContractChangeService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
