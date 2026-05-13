@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import { vipApi } from '@/api/vipApi';
 import { useAuth } from '@/context/AuthContext';
 import { Crown, Check, X, Zap, ChevronDown, History, Sparkles, Shield, Star, Image, Home, DoorOpen, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import VipPaymentModal from '@/components/subscription/VipPaymentModal';
 import VipBadge from '@/components/shared/VipBadge';
+import { toast } from 'sonner';
 
 const TIERS = ['FREE', 'SILVER', 'GOLD', 'PLATINUM'] as const;
 type TierName = typeof TIERS[number];
@@ -106,7 +107,7 @@ export default function VipPlansPage() {
         addInfo: data.addInfo,
       });
     } catch (e: any) {
-      alert(e?.response?.data?.error || 'Có lỗi xảy ra');
+      toast.error(e?.response?.data?.error || 'Có lỗi xảy ra');
     } finally {
       setPurchasing(null);
     }

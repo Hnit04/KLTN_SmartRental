@@ -1,125 +1,260 @@
-import { ethers } from "ethers";
-import RentalContractABI from "../abis/RentalContract.json"; // Import file JSON vừa tạo
+﻿import { ethers } from "ethers";
+import RentalContractABI from "../abis/RentalContract.json";
+import { trackEvent } from "@/utils/analytics";
 
-// Hàm lấy đối tượng Contract để tương tác
+type ContractAction =
+  | "deposit"
+  | "pay_bill"
+  | "pay_external_bill"
+  | "propose_deduction"
+  | "consent_end_contract"
+  | "execute_end_contract"
+  | "withdraw_funds";
+
+function trackBlockchainTx(
+  action: ContractAction,
+  phase: "started" | "confirmed" | "failed",
+  payload?: Record<string, unknown>
+) {
+  trackEvent(`blockchain_tx_${phase}`, {
+    action,
+    ...payload,
+  });
+}
+
+function trackTxHash(action: ContractAction, contractAddress: string, hash: string, payload?: Record<string, unknown>) {
+  trackEvent("blockchain_tx_hash_received", {
+    action,
+    contractAddress,
+    hash,
+    ...payload,
+  });
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return "Unknown blockchain error";
+}
+
 export const getSmartContract = async (contractAddress: string) => {
   if (!window.ethereum) {
-    throw new Error("Vui lòng cài đặt MetaMask!");
+    throw new Error("Vui long cai dat MetaMask!");
   }
 
-  // 1. Kết nối với MetaMask
   const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner(); // Lấy ví người dùng hiện tại
-
-  // 2. Tạo đối tượng Contract (Address + ABI + Signer)
-  const contract = new ethers.Contract(contractAddress, RentalContractABI, signer);
-
-  return contract;
+  const signer = await provider.getSigner();
+  return new ethers.Contract(contractAddress, RentalContractABI, signer);
 };
 
-// --- Ví dụ các hàm gọi Contract ---
-
-// 1. Hàm Đặt cọc (Deposit)
-export const depositContract = async (contractAddress: string, amountWei: string) => {
+export const depositContract = async (
+  contractAddress: string,
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
   try {
+    trackBlockchainTx("deposit", "started", { contractAddress, amountWei });
     const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm deposit() trong Smart Contract và gửi kèm ETH (value)
     const tx = await contract.deposit({ value: amountWei });
-    
-    console.log("Đang giao dịch...", tx.hash);
-    await tx.wait(); // Chờ giao dịch được xác nhận trên Blockchain
-    console.log("Đặt cọc thành công!");
-    return tx.hash;
-  } catch (error) {
-    console.error("Lỗi đặt cọc:", error);
-    throw error;
-  }
-};
 
-// 2. Hàm Thanh toán hóa đơn (Pay Bill) - On-chain bill
-export const payBill = async (contractAddress: string, billId: number, amountWei: string) => {
-  try {
-    const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm payBill(_billId)
-    const tx = await contract.payBill(billId, { value: amountWei });
-    
-    await tx.wait();
-    return tx.hash;
-  } catch (error) {
-    console.error("Lỗi thanh toán:", error);
-    throw error;
-  }
-};
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("deposit", contractAddress, tx.hash as string, { amountWei });
 
-// 3. Hàm Thanh toán hóa đơn từ Backend (Payment Gateway)
-// Gọi payExternalBill() trên Smart Contract -> Tiền chuyển thẳng cho chủ trọ + Ghi log on-chain
-export const payExternalBill = async (contractAddress: string, backendBillId: number, amountWei: string) => {
-  try {
-    const contract = await getSmartContract(contractAddress);
-    
-    // Gọi hàm payExternalBill(_backendBillId) trên smart contract
-    const tx = await contract.payExternalBill(backendBillId, { value: amountWei });
-    
-    console.log("Đang chờ xác nhận giao dịch...", tx.hash);
-    const receipt = await tx.wait(); // Chờ blockchain xác nhận
-    console.log("Thanh toán thành công!", receipt.hash);
+    const receipt = await tx.wait();
+    trackBlockchainTx("deposit", "confirmed", { contractAddress, txHash: receipt.hash, amountWei });
     return receipt.hash;
   } catch (error) {
-    console.error("Lỗi thanh toán Web3:", error);
+    trackBlockchainTx("deposit", "failed", {
+      contractAddress,
+      amountWei,
+      message: getErrorMessage(error),
+    });
     throw error;
   }
 };
 
-// 4. Đề xuất khấu trừ và kết thúc (Landlord)
-export const proposeDeduction = async (contractAddress: string, amountWei: string, isEarly: boolean) => {
+export const payBill = async (
+  contractAddress: string,
+  billId: number,
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
   try {
+    trackBlockchainTx("pay_bill", "started", { contractAddress, billId, amountWei });
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.payBill(billId, { value: amountWei });
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("pay_bill", contractAddress, tx.hash as string, { billId, amountWei });
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("pay_bill", "confirmed", {
+      contractAddress,
+      billId,
+      amountWei,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
+  } catch (error) {
+    trackBlockchainTx("pay_bill", "failed", {
+      contractAddress,
+      billId,
+      amountWei,
+      message: getErrorMessage(error),
+    });
+    throw error;
+  }
+};
+
+export const payExternalBill = async (
+  contractAddress: string,
+  backendBillId: number,
+  amountWei: string,
+  onHash?: (hash: string) => void
+) => {
+  try {
+    trackBlockchainTx("pay_external_bill", "started", {
+      contractAddress,
+      backendBillId,
+      amountWei,
+    });
+    const contract = await getSmartContract(contractAddress);
+    const tx = await contract.payExternalBill(backendBillId, { value: amountWei });
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("pay_external_bill", contractAddress, tx.hash as string, {
+      backendBillId,
+      amountWei,
+    });
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("pay_external_bill", "confirmed", {
+      contractAddress,
+      backendBillId,
+      amountWei,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
+  } catch (error) {
+    trackBlockchainTx("pay_external_bill", "failed", {
+      contractAddress,
+      backendBillId,
+      amountWei,
+      message: getErrorMessage(error),
+    });
+    throw error;
+  }
+};
+
+export const proposeDeduction = async (
+  contractAddress: string,
+  amountWei: string,
+  isEarly: boolean,
+  onHash?: (hash: string) => void
+) => {
+  try {
+    trackBlockchainTx("propose_deduction", "started", { contractAddress, amountWei, isEarly });
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.proposeDeduction(amountWei, isEarly);
-    await tx.wait();
-    return tx.hash;
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("propose_deduction", contractAddress, tx.hash as string, { amountWei, isEarly });
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("propose_deduction", "confirmed", {
+      contractAddress,
+      amountWei,
+      isEarly,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
   } catch (error) {
-    console.error("Lỗi đề xuất khấu trừ:", error);
+    trackBlockchainTx("propose_deduction", "failed", {
+      contractAddress,
+      amountWei,
+      isEarly,
+      message: getErrorMessage(error),
+    });
     throw error;
   }
 };
 
-// 5. Đồng ý kết thúc (Tenant)
-export const consentEndContract = async (contractAddress: string) => {
+export const consentEndContract = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
+    trackBlockchainTx("consent_end_contract", "started", { contractAddress });
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.consentEndContract();
-    await tx.wait();
-    return tx.hash;
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("consent_end_contract", contractAddress, tx.hash as string);
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("consent_end_contract", "confirmed", {
+      contractAddress,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
   } catch (error) {
-    console.error("Lỗi đồng ý kết thúc:", error);
+    trackBlockchainTx("consent_end_contract", "failed", {
+      contractAddress,
+      message: getErrorMessage(error),
+    });
     throw error;
   }
 };
 
-// 6. Thực thi kết thúc (Either or Backend)
-export const executeEndContract = async (contractAddress: string) => {
+export const executeEndContract = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
+    trackBlockchainTx("execute_end_contract", "started", { contractAddress });
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.endContract();
-    await tx.wait();
-    return tx.hash;
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("execute_end_contract", contractAddress, tx.hash as string);
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("execute_end_contract", "confirmed", {
+      contractAddress,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
   } catch (error) {
-    console.error("Lỗi thực thi kết thúc:", error);
+    trackBlockchainTx("execute_end_contract", "failed", {
+      contractAddress,
+      message: getErrorMessage(error),
+    });
     throw error;
   }
 };
 
-// 7. Rút tiền (Pull Payment)
-export const withdrawFunds = async (contractAddress: string) => {
+export const withdrawFunds = async (
+  contractAddress: string,
+  onHash?: (hash: string) => void
+) => {
   try {
+    trackBlockchainTx("withdraw_funds", "started", { contractAddress });
     const contract = await getSmartContract(contractAddress);
     const tx = await contract.withdraw();
-    await tx.wait();
-    return tx.hash;
+
+    if (onHash) onHash(tx.hash as string);
+    trackTxHash("withdraw_funds", contractAddress, tx.hash as string);
+
+    const receipt = await tx.wait();
+    trackBlockchainTx("withdraw_funds", "confirmed", {
+      contractAddress,
+      txHash: receipt.hash,
+    });
+    return receipt.hash;
   } catch (error) {
-    console.error("Lỗi rút tiền:", error);
+    trackBlockchainTx("withdraw_funds", "failed", {
+      contractAddress,
+      message: getErrorMessage(error),
+    });
     throw error;
   }
-};
+};

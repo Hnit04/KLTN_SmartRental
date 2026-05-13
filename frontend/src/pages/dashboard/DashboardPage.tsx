@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import {
   TrendingUp, Users, Home as HomeIcon, AlertCircle,
   Wallet, ArrowUpRight, ArrowDownRight, Clock

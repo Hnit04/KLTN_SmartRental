@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+﻿import { useEffect, useState, useMemo } from 'react';
 import { aiApi } from '@/api/aiApi';
 import { toast } from 'sonner';
 import {
@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { DashboardPanel } from '@/components/dashboard';
 import StatusBadge from '@/components/shared/StatusBadge';
+import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
 
 interface CacheEntry {
   id: number;
@@ -94,6 +95,8 @@ export default function AiAnalyticsPage() {
   const [editSql, setEditSql] = useState('');
   const [savingId, setSavingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -116,7 +119,11 @@ export default function AiAnalyticsPage() {
   };
 
   const handleClearCache = async () => {
-    if (!confirm('Bạn có chắc muốn xoá toàn bộ bộ nhớ đệm AI? Hệ thống sẽ mất hết tri thức đã học.')) return;
+    setIsClearConfirmOpen(true);
+  };
+
+  const executeClearCache = async () => {
+    setIsClearConfirmOpen(false);
     setClearing(true);
     try {
       await aiApi.clearCache();
@@ -147,7 +154,13 @@ export default function AiAnalyticsPage() {
   };
 
   const handleDeleteEntry = async (id: number) => {
-    if (!confirm(`Xoá câu hỏi #${id} khỏi bộ nhớ AI?`)) return;
+    setDeleteTargetId(id);
+  };
+
+  const executeDeleteEntry = async () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     try {
       setDeletingId(id);
       await aiApi.deleteCache(id);
@@ -506,6 +519,31 @@ export default function AiAnalyticsPage() {
           </div>
         )}
       </DashboardPanel>
+
+      <ConfirmActionDialog
+        open={isClearConfirmOpen}
+        onOpenChange={setIsClearConfirmOpen}
+        title="Xoá toàn bộ cache AI?"
+        description="Hệ thống sẽ mất toàn bộ tri thức AI đã học từ các truy vấn trước đó."
+        confirmLabel="Xoá cache"
+        tone="danger"
+        onConfirm={executeClearCache}
+        isLoading={clearing}
+      />
+
+      <ConfirmActionDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        title="Xoá câu hỏi khỏi bộ nhớ AI?"
+        description={deleteTargetId ? `Bạn sắp xoá mục #${deleteTargetId}. Thao tác này không thể hoàn tác.` : "Thao tác này không thể hoàn tác."}
+        confirmLabel="Xoá mục"
+        tone="danger"
+        onConfirm={executeDeleteEntry}
+        isLoading={deletingId !== null}
+      />
     </div>
   );
 }
+

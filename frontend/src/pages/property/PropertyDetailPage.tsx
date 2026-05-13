@@ -127,7 +127,7 @@ export default function PropertyDetailPage() {
   };
 
   const handleCall = () => {
-    const phone = (property as any)?.landlordPhone;
+    const phone = property?.landlordPhone;
     if (!phone) return toast.error("Chủ nhà chưa cập nhật số điện thoại liên hệ.");
 
     if (!isAuthenticated && !showFullPhone) {
@@ -138,7 +138,7 @@ export default function PropertyDetailPage() {
   };
 
   const handleZalo = () => {
-    const phone = (property as any)?.landlordPhone;
+    const phone = property?.landlordPhone;
     if (!phone) return toast.error("Chủ nhà chưa cập nhật số điện thoại Zalo.");
 
     if (!isAuthenticated && !showFullPhone) {
@@ -492,6 +492,19 @@ export default function PropertyDetailPage() {
                         <Bot className="h-4 w-4" /> Hỏi AI về khu trọ này
                       </Button>
                     </>
+                  )}
+
+                  {property.landlordUsername && (
+                    <Link to={`/landlord/${property.landlordUsername}/properties`} className="block">
+                      <Button variant="outline" className="w-full gap-2 border-[#A67C52]/30 text-[#8b6540] hover:bg-[#A67C52]/5 h-11 rounded-xl">
+                        <User className="h-4 w-4" /> Xem tất cả khu trọ của chủ này
+                      </Button>
+                    </Link>
+                  )}
+                  {!property.landlordUsername && (
+                    <p className="px-1 text-xs text-muted-foreground">
+                      Chủ trọ chưa công khai hồ sơ khu trọ.
+                    </p>
                   )}
                 </div>
               </div>

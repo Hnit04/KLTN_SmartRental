@@ -9,8 +9,10 @@ import { propertyApi } from "@/api/propertyApi";
 import { contractApi } from "@/api/contractApi";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useAuth } from "@/context/AuthContext";
-import type { CreateContractPayload } from "@/types";
+import type { ContractSignMethod, CreateContractPayload } from "@/types";
 import { StepIndicator } from "@/components/ui/StepIndicator";
+import { ContractMethodSelector } from "@/features/contract/components/method-selector";
+import { trackEvent } from "@/utils/analytics";
 
 const WIZARD_STEPS = [
   { title: "Thông tin & thời hạn" },
@@ -37,7 +39,8 @@ export default function CreateContractPage() {
     duration: 6, 
     tenantEmail: "", 
     landlordRules: "",
-    tenantRequests: ""
+    tenantRequests: "",
+    signMethod: "TRADITIONAL" as ContractSignMethod,
   });
 
   const TENANT_SUGGESTED_TERMS = [
@@ -146,7 +149,7 @@ export default function CreateContractPage() {
           startDate: formData.startDate,
           endDate: endDateStr, 
           depositAmount: room.price, 
-          signMethod: 'TRADITIONAL', 
+          signMethod: formData.signMethod,
           additionalTerms: combinedTerms,
           tenantEmail: user?.role === 'LANDLORD' ? formData.tenantEmail : undefined 
       };
@@ -253,18 +256,18 @@ export default function CreateContractPage() {
                       <p className="text-lg font-bold text-primary">{room.name}</p>
                       <p className="text-sm text-muted-foreground">{room.propertyName || room.property?.address || 'Đang cập nhật địa chỉ'}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="min-w-0 rounded-lg border border-border/60 bg-background/60 p-2.5">
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                           <CreditCard className="h-3 w-3" /> Giá thuê
                         </span>
-                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng</p>
+                        <p className="mt-1 break-words font-semibold leading-snug text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ/tháng</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 rounded-lg border border-border/60 bg-background/60 p-2.5">
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                           <ShieldCheck className="h-3 w-3" /> Tiền cọc
                         </span>
-                        <p className="font-semibold text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)</p>
+                        <p className="mt-1 break-words font-semibold leading-snug text-foreground">{new Intl.NumberFormat('vi-VN').format(room.price)}đ (1 tháng)</p>
                       </div>
                     </div>
                     <div className="mt-2 border-t border-border/60 pt-3">
@@ -344,6 +347,18 @@ export default function CreateContractPage() {
                         </select>
                       </div>
                     </div>
+
+                    <ContractMethodSelector
+                      value={formData.signMethod}
+                      onChange={(method) => {
+                        setFormData((prev) => ({ ...prev, signMethod: method }));
+                        trackEvent("contract_method_selected", {
+                          method,
+                          role: user?.role || "UNKNOWN",
+                          roomId: Number(roomId),
+                        });
+                      }}
+                    />
                   </div>
                 </div>
               </div>

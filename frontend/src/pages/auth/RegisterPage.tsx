@@ -11,7 +11,6 @@ import {
   Eye,
   EyeOff,
   UserPlus,
-  Wallet,
   CheckCircle2,
   ArrowLeft,
   RefreshCw,
@@ -118,7 +117,6 @@ export default function RegisterPage() {
     password: "",
     fullName: "",
     email: "",
-    walletAddress: "",
     role: "TENANT",
   });
 
@@ -137,11 +135,6 @@ export default function RegisterPage() {
     if ((formData.password || "").length < 6) {
       toast.error("Mật khẩu phải có ít nhất 6 ký tự."); return false;
     }
-    if (formData.walletAddress && formData.walletAddress.trim() !== "") {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.walletAddress)) {
-        toast.error("Địa chỉ ví không hợp lệ."); return false;
-      }
-    }
     return true;
   };
 
@@ -154,7 +147,7 @@ export default function RegisterPage() {
         ...formData,
         username: formData.username.trim(),
         email: formData.email.trim(),
-        walletAddress: formData.walletAddress?.trim() || ""
+        walletAddress: ""
       });
       toast.success("Mã xác thực đã được gửi!");
       setIsVerifying(true);
@@ -298,14 +291,20 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Wallet */}
+                {/* Deferred Wallet Onboarding */}
                 <div style={{ marginBottom: "1.125rem" }}>
-                  <label htmlFor="walletAddress" className="auth-label">
-                    Địa chỉ ví <span style={{ color: "hsl(25, 5%, 55%)", fontWeight: 500 }}>(Tùy chọn)</span>
-                  </label>
-                  <div className="auth-input-group">
-                    <Wallet size={15} className="auth-input-icon" />
-                    <input id="walletAddress" placeholder="0x..." value={formData.walletAddress} onChange={handleChange} className="auth-input-field" />
+                  <div
+                    style={{
+                      border: "1px solid hsl(30, 12%, 84%)",
+                      background: "hsl(36, 45%, 97%)",
+                      borderRadius: "12px",
+                      padding: "12px 14px",
+                      fontSize: "0.82rem",
+                      color: "hsl(24, 14%, 30%)",
+                      lineHeight: 1.45
+                    }}
+                  >
+                    Kết nối ví để kích hoạt xác minh blockchain. Bạn có thể thực hiện sau khi tạo tài khoản.
                   </div>
                 </div>
 

@@ -16,8 +16,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { DashboardPanel } from '@/components/dashboard';
 import StatusBadge from '@/components/shared/StatusBadge';
+import { useSystemConfig } from '@/context/SystemConfigContext';
+import { getBlockchainRuntimeConfig } from '@/config/blockchainConfig';
 
-const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
 const ETH_TO_VND = 80_000_000;
 const WEI_PRECISION = 10 ** 18;
 
@@ -96,6 +97,9 @@ const formatDisplayValue = (field: string, value: string) => {
 };
 
 export default function BlockchainLogsPage() {
+  const { config } = useSystemConfig();
+  const runtimeBlockchainConfig = getBlockchainRuntimeConfig(config);
+  const chainLabel = `${runtimeBlockchainConfig.chainName} · Chain ID ${runtimeBlockchainConfig.chainId}`;
   const [contracts, setContracts] = useState<ContractLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,7 +272,7 @@ export default function BlockchainLogsPage() {
     <div className="mx-auto min-w-0 max-w-[1400px] space-y-6 overflow-x-hidden pb-10">
       <PageHeader
         title="Blockchain logs & audit"
-        description="Giám sát hợp đồng, hash và smart contract trên Sepolia — xác minh toàn vẹn dữ liệu."
+        description={`Giám sát hợp đồng, hash và smart contract trên ${runtimeBlockchainConfig.chainName} — xác minh toàn vẹn dữ liệu.`}
         actions={
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <Button
@@ -388,7 +392,7 @@ export default function BlockchainLogsPage() {
       ) : (
         <DashboardPanel
           title="Danh sách hợp đồng"
-          description={`${filtered.length} / ${totalContracts} bản ghi — Sepolia · Chain ID 11155111`}
+          description={`${filtered.length} / ${totalContracts} bản ghi — ${chainLabel}`}
         >
           <TableShell className="rounded-none border-0 border-t-0 shadow-none bg-transparent">
           <table className="w-full min-w-[960px] text-sm">
@@ -435,7 +439,7 @@ export default function BlockchainLogsPage() {
                           <div className="flex items-center gap-1.5">
                             <code className="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono text-primary">{shortenAddress(c.smartContractAddress)}</code>
                             <button onClick={() => copyToClipboard(c.smartContractAddress)} title="Copy" className="text-gray-400 hover:text-indigo-600 transition"><Copy className="h-3.5 w-3.5" /></button>
-                            <a href={`${ETHERSCAN_BASE}/address/${c.smartContractAddress}`} target="_blank" rel="noopener noreferrer" title="Xem trên Etherscan" className="text-gray-400 hover:text-indigo-600 transition"><ExternalLink className="h-3.5 w-3.5" /></a>
+                            <a href={`${runtimeBlockchainConfig.explorerUrl}/address/${c.smartContractAddress}`} target="_blank" rel="noopener noreferrer" title="Xem trên blockchain explorer" className="text-gray-400 hover:text-indigo-600 transition"><ExternalLink className="h-3.5 w-3.5" /></a>
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400 italic">Không có</span>
@@ -481,7 +485,7 @@ export default function BlockchainLogsPage() {
             Hiển thị {filtered.length} / {totalContracts} hợp đồng
           </span>
           <span className="flex items-center gap-1">
-            <Blocks className="h-3 w-3 shrink-0" /> Sepolia testnet · Chain ID 11155111
+            <Blocks className="h-3 w-3 shrink-0" /> {chainLabel}
           </span>
         </div>
         </DashboardPanel>
@@ -575,11 +579,11 @@ export default function BlockchainLogsPage() {
                     )}
                   </div>
 
-                  {/* Etherscan Link */}
+                  {/* Explorer Link */}
                   {diffModal.data.smartContractAddress && (
-                    <a href={`${ETHERSCAN_BASE}/address/${diffModal.data.smartContractAddress}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`${runtimeBlockchainConfig.explorerUrl}/address/${diffModal.data.smartContractAddress}`} target="_blank" rel="noopener noreferrer"
                       className="mt-3 inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 transition">
-                      <ExternalLink className="h-3.5 w-3.5" /> Xem trên Etherscan Sepolia
+                      <ExternalLink className="h-3.5 w-3.5" /> Xem trên blockchain explorer
                     </a>
                   )}
                 </>

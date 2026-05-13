@@ -1,58 +1,56 @@
+@import "./styles/tokens.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* --- TONE NÂU ẤM (WARM BROWN / ELEGANT) --- */
-    
-    /* Nền màu kem phấn nhạt (thay vì trắng tinh) */
-    --background: 35 30% 98%;
-    /* Chữ màu nâu đậm (thay vì đen tuyền) */
-    --foreground: 20 14% 15%;
+    /* Core semantic tokens (hsl channels) */
+    --background: var(--color-background-hsl);
+    --foreground: var(--color-secondary-hsl);
 
-    --card: 35 30% 99%;
-    --card-foreground: 20 14% 15%;
+    --card: var(--color-surface-hsl);
+    --card-foreground: var(--color-secondary-hsl);
 
-    --popover: 35 30% 99%;
-    --popover-foreground: 20 14% 15%;
+    --popover: var(--color-surface-hsl);
+    --popover-foreground: var(--color-secondary-hsl);
 
-    /* MÀU CHỦ ĐẠO: Nâu đồng/Nâu đất ấm */
-    --primary: 28 45% 45%;
-    --primary-foreground: 35 30% 98%; /* Chữ trắng kem trên nền nâu */
+    --primary: var(--color-primary-hsl);
+    --primary-foreground: 0 0% 100%;
 
-    /* Màu phụ: Nâu be nhạt */
-    --secondary: 30 25% 94%;
-    --secondary-foreground: 28 45% 45%;
+    --secondary: 215 28% 95%;
+    --secondary-foreground: var(--color-secondary-hsl);
 
-    --muted: 30 20% 94%;
-    --muted-foreground: 25 5% 45%;
+    --muted: 210 35% 95%;
+    --muted-foreground: 215 16% 45%;
 
-    --accent: 30 25% 94%;
-    --accent-foreground: 28 45% 45%;
+    --accent: 210 35% 95%;
+    --accent-foreground: var(--color-secondary-hsl);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: var(--color-error-hsl);
+    --destructive-foreground: 0 0% 100%;
 
-    /* Viền màu nâu nhạt */
-    --border: 30 15% 88%;
-    --input: 30 15% 88%;
-    
-    --ring: 28 45% 45%; /* Viền focus trùng màu chủ đạo */
-    
-    --radius: 0.625rem; /* Bo góc mềm mại hơn (10px) */
+    --trust: var(--color-trust-hsl);
+    --success: var(--color-success-hsl);
+    --warning: var(--color-warning-hsl);
+    --error: var(--color-error-hsl);
+    --surface-2: var(--color-surface-2-hsl);
 
-    /* Sidebar Variables */
-    --sidebar-background: 35 30% 97%;
-    --sidebar-foreground: 20 14% 15%;
-    --sidebar-primary: 28 45% 45%;
-    --sidebar-primary-foreground: 35 30% 98%;
-    --sidebar-accent: 30 20% 92%;
-    --sidebar-accent-foreground: 28 45% 45%;
-    --sidebar-border: 30 15% 88%;
-    --sidebar-ring: 28 45% 45%;
+    --border: 214 28% 88%;
+    --input: 214 28% 88%;
+    --ring: var(--color-primary-hsl);
 
-    /* Design system — spacing (rem) */
+    --radius: var(--radius-md);
+
+    --sidebar-background: var(--color-surface-hsl);
+    --sidebar-foreground: var(--color-secondary-hsl);
+    --sidebar-primary: var(--color-primary-hsl);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 35% 95%;
+    --sidebar-accent-foreground: var(--color-secondary-hsl);
+    --sidebar-border: 214 28% 88%;
+    --sidebar-ring: var(--color-primary-hsl);
+
     --space-1: 0.25rem;
     --space-2: 0.5rem;
     --space-3: 0.75rem;
@@ -61,58 +59,58 @@
     --space-6: 1.5rem;
     --space-8: 2rem;
     --space-10: 2.5rem;
-    /* Motion */
-    --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
-    --duration-fast: 150ms;
-    --duration: 200ms;
-    --duration-slow: 280ms;
-    /* Elevation */
-    --shadow-xs: 0 1px 2px hsl(20 14% 15% / 0.04);
-    --shadow-sm: 0 1px 3px hsl(20 14% 15% / 0.06), 0 1px 2px hsl(20 14% 15% / 0.04);
-    --shadow-md: 0 4px 12px hsl(20 14% 15% / 0.07), 0 2px 4px hsl(20 14% 15% / 0.04);
+
+    --ease-out: var(--ease-standard);
+    --duration-fast: var(--motion-hover);
+    --duration: var(--motion-press);
+    --duration-slow: var(--motion-page);
   }
 
   .dark {
-    /* Dark mode cho tone nâu (Nâu Chocolate đậm) */
-    --background: 20 14% 8%;
-    --foreground: 35 30% 98%;
+    --background: 222 47% 9%;
+    --foreground: 210 40% 98%;
 
-    --card: 20 14% 10%;
-    --card-foreground: 35 30% 98%;
+    --card: 222 36% 12%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 20 14% 10%;
-    --popover-foreground: 35 30% 98%;
+    --popover: 222 36% 12%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 28 45% 55%; /* Nâu sáng hơn chút trên nền tối */
-    --primary-foreground: 20 14% 8%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 20 14% 16%;
-    --secondary-foreground: 35 30% 98%;
+    --secondary: 222 28% 16%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 20 14% 16%;
-    --muted-foreground: 30 10% 65%;
+    --muted: 222 28% 16%;
+    --muted-foreground: 215 20% 70%;
 
-    --accent: 20 14% 16%;
-    --accent-foreground: 35 30% 98%;
+    --accent: 222 28% 16%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 20 14% 16%;
-    --input: 20 14% 16%;
-    --ring: 28 45% 55%;
-    
-    --sidebar-background: 20 14% 9%;
-    --sidebar-foreground: 35 30% 98%;
-    --sidebar-primary: 28 45% 55%;
-    --sidebar-primary-foreground: 20 14% 8%;
-    --sidebar-accent: 20 14% 16%;
-    --sidebar-accent-foreground: 35 30% 98%;
-    --sidebar-border: 20 14% 16%;
-    --sidebar-ring: 28 45% 55%;
+    --trust: 178 72% 44%;
+    --success: 142 70% 44%;
+    --warning: 38 95% 58%;
+    --error: 0 82% 64%;
+    --surface-2: 222 24% 20%;
+
+    --border: 222 20% 24%;
+    --input: 222 20% 24%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 34% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 28% 16%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 20% 24%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
-
 @layer components {
   .page-shell {
     @apply mx-auto w-full max-w-7xl px-3 sm:px-4 md:px-6;
@@ -130,12 +128,12 @@
     @apply rounded-2xl border border-border/80 bg-card shadow-sm shadow-black/[0.03];
   }
 
-  /* Khối nội dung chính — gọn, căn max-width thống nhất */
+  /* Khá»‘i ná»™i dung chĂ­nh â€” gá»n, cÄƒn max-width thá»‘ng nháº¥t */
   .app-panel {
     @apply mx-auto w-full max-w-3xl;
   }
 
-  /* Nền phụ trong card (thông tin cố định, bảng…) */
+  /* Ná»n phá»¥ trong card (thĂ´ng tin cá»‘ Ä‘á»‹nh, báº£ngâ€¦) */
   .muted-surface {
     @apply rounded-xl border border-border/60 bg-muted/30;
   }
@@ -144,17 +142,17 @@
     @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
   }
 
-  /* Bảng / danh sách trong khung SaaS */
+  /* Báº£ng / danh sĂ¡ch trong khung SaaS */
   .data-shell {
     @apply overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm shadow-black/[0.03];
   }
 
-  /* Liên kết trong nội dung prose */
+  /* LiĂªn káº¿t trong ná»™i dung prose */
   .link-subtle {
     @apply font-medium text-primary underline-offset-4 transition-colors hover:text-primary/80 hover:underline;
   }
 
-  /* Native select — đồng bộ với Input */
+  /* Native select â€” Ä‘á»“ng bá»™ vá»›i Input */
   .select-native {
     @apply flex h-11 w-full cursor-pointer appearance-none rounded-lg border border-input bg-background py-2 pl-9 pr-8 text-sm font-medium text-foreground shadow-xs transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
@@ -174,8 +172,15 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
   }
 
   ::selection {
@@ -184,7 +189,7 @@
   }
 }
 
-/* ─── CUSTOM KEYFRAMES ─────────────────────────────────────────── */
+/* â”€â”€â”€ CUSTOM KEYFRAMES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes bell-shake {
   0%, 100% { transform: rotate(0deg); }
   15%       { transform: rotate(15deg); }
@@ -195,11 +200,11 @@
   90%       { transform: rotate(-3deg); }
 }
 
-/* Ẩn scrollbar nhưng vẫn scroll được */
+/* áº¨n scrollbar nhÆ°ng váº«n scroll Ä‘Æ°á»£c */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Panel thông báo — thanh cuộn mảnh, không chiếm diện tích quá lớn */
+/* Panel thĂ´ng bĂ¡o â€” thanh cuá»™n máº£nh, khĂ´ng chiáº¿m diá»‡n tĂ­ch quĂ¡ lá»›n */
 .notif-panel-scroll {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -220,7 +225,7 @@
   background-color: rgb(120 113 108 / 0.55);
 }
 
-/* Skeleton — chuyển động nhẹ (tôn trọng prefers-reduced-motion) */
+/* Skeleton â€” chuyá»ƒn Ä‘á»™ng nháº¹ (tĂ´n trá»ng prefers-reduced-motion) */
 @keyframes sr-shimmer {
   0% {
     background-position: 200% 0;
@@ -243,19 +248,19 @@
   }
 }
 
-/* ─── GLOBAL INTERACTIVE TRANSITIONS ───────────────────────────── */
+/* â”€â”€â”€ GLOBAL INTERACTIVE TRANSITIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (prefers-reduced-motion: no-preference) {
   a, button, [role="button"], input, select, textarea {
     transition-property: color, background-color, border-color, box-shadow, opacity, transform;
-    transition-duration: 180ms;
-    transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+    transition-duration: var(--motion-hover);
+    transition-timing-function: var(--ease-standard);
   }
 }
 
-/* ─── UTILITY CLASSES ──────────────────────────────────────────── */
+/* â”€â”€â”€ UTILITY CLASSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Card / element lift effect */
 .hover-lift {
-  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+  transition: transform var(--motion-hover) var(--ease-out), box-shadow var(--motion-hover) var(--ease-out);
 }
 .hover-lift:hover {
   transform: translateY(-2px);
@@ -265,7 +270,23 @@
 /* Button press feedback */
 .press-effect:active {
   transform: scale(0.97);
-  transition-duration: 80ms;
+  transition-duration: var(--motion-press);
+}
+
+.motion-hover {
+  transition-duration: var(--motion-hover);
+}
+
+.motion-press {
+  transition-duration: var(--motion-press);
+}
+
+.motion-modal {
+  transition-duration: var(--motion-modal);
+}
+
+.motion-page {
+  transition-duration: var(--motion-page);
 }
 
 /* Glassmorphism surface */
@@ -276,7 +297,7 @@
   border: 1px solid hsl(var(--border) / 0.5);
 }
 
-/* Focus ring — consistent across system */
+/* Focus ring â€” consistent across system */
 .focus-ring {
   outline: none;
 }
@@ -284,7 +305,7 @@
   box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.5);
 }
 
-/* ─── ADDITIONAL KEYFRAMES ─────────────────────────────────────── */
+/* â”€â”€â”€ ADDITIONAL KEYFRAMES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -323,7 +344,7 @@
 .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
 
-/* ─── GLOBAL SCROLLBAR POLISH ──────────────────────────────────── */
+/* â”€â”€â”€ GLOBAL SCROLLBAR POLISH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
@@ -343,7 +364,7 @@
   background-color: hsl(var(--muted-foreground) / 0.35);
 }
 
-/* ─── DARK MODE TRANSITION ─────────────────────────────────────── */
+/* â”€â”€â”€ DARK MODE TRANSITION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 html.transitioning-theme,
 html.transitioning-theme *,
 html.transitioning-theme *::before,
@@ -351,7 +372,7 @@ html.transitioning-theme *::after {
   transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, box-shadow 300ms ease !important;
 }
 
-/* ─── GLOBAL PAGE-LEVEL POLISH (cascades to ALL pages) ─────────── */
+/* â”€â”€â”€ GLOBAL PAGE-LEVEL POLISH (cascades to ALL pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Section cards: subtle hover shadow lift */
 .section-card {

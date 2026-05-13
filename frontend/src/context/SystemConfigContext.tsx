@@ -12,6 +12,10 @@ export const SystemConfigProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [config, setConfig] = useState<SystemConfigResponse>({
     vndEthRate: 80000000, // Default fallback
     networkName: 'Sepolia Testnet',
+    chainId: 11155111,
+    chainIdHex: '0xaa36a7',
+    rpcUrl: 'https://rpc.sepolia.org',
+    explorerUrl: 'https://sepolia.etherscan.io',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -23,13 +27,20 @@ export const SystemConfigProvider: React.FC<{ children: ReactNode }> = ({ childr
         return;
       }
       try {
-        const response = await configApi.getExchangeRate();
+        const response = await configApi.getBlockchainConfig();
         if (response.data) {
           setConfig(response.data);
         }
       } catch (error: any) {
-        if (error.response?.status !== 403) {
-          console.error('Failed to fetch system config:', error);
+        try {
+          const fallbackRes = await configApi.getExchangeRate();
+          if (fallbackRes.data) {
+            setConfig((prev) => ({ ...prev, ...fallbackRes.data }));
+          }
+        } catch (fallbackError: any) {
+          if (fallbackError.response?.status !== 403) {
+            console.error('Failed to fetch system config:', fallbackError);
+          }
         }
       } finally {
         setIsLoading(false);

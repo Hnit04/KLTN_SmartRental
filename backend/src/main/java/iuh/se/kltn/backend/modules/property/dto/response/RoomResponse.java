@@ -22,7 +22,11 @@ public class RoomResponse {
     private Integer maxOccupants;
     private String propertyName;
     private String propertyAddress;
+    private String landlordUsername;
     private String landlordName;
+    private String landlordPhone;
+    private String landlordAvatar;
+    private Integer landlordReputationScore;
     private Double elecPrice;
     private Long propertyId;
     private Double waterPrice;

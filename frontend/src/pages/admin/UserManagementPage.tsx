@@ -123,7 +123,7 @@ export default function UserManagementPage() {
     },
     onError: (err: any) => {
       const errorMessage = err.response?.data?.message || err.message;
-      alert('Lỗi khi khóa: ' + errorMessage);
+      toast.error('Lỗi khi khóa: ' + errorMessage);
     },
   });
 
@@ -149,7 +149,7 @@ export default function UserManagementPage() {
       });
     },
     onError: (err: any) => {
-      alert('Lỗi khi mở khóa: ' + (err.response?.data?.message || err.message));
+      toast.error('Lỗi khi mở khóa: ' + (err.response?.data?.message || err.message));
     },
   });
 
@@ -161,13 +161,13 @@ export default function UserManagementPage() {
       setSelectedUser(user);
       setShowHistoryModal(true);
     } catch (err: any) {
-      alert('Không thể tải lịch sử: ' + (err.response?.data?.message || err.message));
+      toast.error('Không thể tải lịch sử: ' + (err.response?.data?.message || err.message));
     }
   };
 
   const confirmLock = () => {
     if (lockReasons.length === 0) {
-      alert('Vui lòng chọn ít nhất một lý do khóa tài khoản');
+      toast.warning('Vui lòng chọn ít nhất một lý do khóa tài khoản');
       return;
     }
 
@@ -186,12 +186,12 @@ export default function UserManagementPage() {
           },
           onError: (error: any) => {
             console.error("Lỗi khi khóa tài khoản:", error);
-            alert("Có lỗi xảy ra khi thực hiện khóa tài khoản. Vui lòng thử lại.");
+            toast.error("Có lỗi xảy ra khi thực hiện khóa tài khoản. Vui lòng thử lại.");
           }
         }
       );
     } else {
-      alert("Không tìm thấy thông tin người dùng hợp lệ");
+      toast.error("Không tìm thấy thông tin người dùng hợp lệ");
     }
   };
 

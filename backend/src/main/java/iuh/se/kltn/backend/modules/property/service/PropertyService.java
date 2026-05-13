@@ -206,6 +206,7 @@ public class PropertyService {
 
         if (p.getLandlord() != null) {
             res.setLandlordId(p.getLandlord().getId());
+            res.setLandlordUsername(p.getLandlord().getUsername());
             res.setLandlordName(p.getLandlord().getFullName());
             res.setLandlordPhone(p.getLandlord().getPhoneNumber());
             res.setLandlordAvatar(p.getLandlord().getAvatarUrl());
@@ -253,7 +254,11 @@ public class PropertyService {
             res.setWaterPrice(r.getProperty().getWaterPrice());
             res.setInternetPrice(r.getProperty().getInternetPrice());
             if (r.getProperty().getLandlord() != null) {
+                res.setLandlordUsername(r.getProperty().getLandlord().getUsername());
                 res.setLandlordName(r.getProperty().getLandlord().getFullName());
+                res.setLandlordPhone(r.getProperty().getLandlord().getPhoneNumber());
+                res.setLandlordAvatar(r.getProperty().getLandlord().getAvatarUrl());
+                res.setLandlordReputationScore(r.getProperty().getLandlord().getReputationScore());
             }
         }
         return res;

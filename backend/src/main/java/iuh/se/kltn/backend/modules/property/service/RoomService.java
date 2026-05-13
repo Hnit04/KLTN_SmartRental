@@ -75,7 +75,11 @@ public class RoomService {
             res.setInternetPrice(r.getProperty().getInternetPrice());
 
             if (r.getProperty().getLandlord() != null) {
+                res.setLandlordUsername(r.getProperty().getLandlord().getUsername());
                 res.setLandlordName(r.getProperty().getLandlord().getFullName());
+                res.setLandlordPhone(r.getProperty().getLandlord().getPhoneNumber());
+                res.setLandlordAvatar(r.getProperty().getLandlord().getAvatarUrl());
+                res.setLandlordReputationScore(r.getProperty().getLandlord().getReputationScore());
             }
         }
         res.setApprovalStatus(r.getApprovalStatus());

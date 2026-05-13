@@ -55,15 +55,16 @@ fpt:
     api-key: "${FPT_AI_KEY:}"
     url: "https://api.fpt.ai/vision/idr/vnm"
 blockchain:
-  # Mặc định: Polygon Amoy Testnet (Layer-2). Override bằng biến môi trường nếu cần.
-  rpc-url: "${BLOCKCHAIN_RPC_URL:https://rpc-amoy.polygon.technology}"
+  # Mặc định: Sepolia Testnet. Override bằng biến môi trường nếu cần.
+  rpc-url: "${BLOCKCHAIN_RPC_URL:https://ethereum-sepolia-rpc.publicnode.com}"
+  explorer-url: "${BLOCKCHAIN_EXPLORER_URL:https://sepolia.etherscan.io}"
   # Private Key ví Admin/Chủ hệ thống
   private-key: "${BLOCKCHAIN_PRIVATE_KEY:}"
   fallback-landlord-wallet: "${BLOCKCHAIN_FALLBACK_LANDLORD:0x5B38Da6a701c568545dCfcB03FcB875f56beddC4}"
   fallback-tenant-wallet: "${BLOCKCHAIN_FALLBACK_TENANT:0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2}"
 
-  # Chain ID: Polygon Amoy = 80002 (Sepolia = 11155111)
-  chain-id: ${BLOCKCHAIN_CHAIN_ID:80002}
+  # Chain ID: Sepolia = 11155111
+  chain-id: ${BLOCKCHAIN_CHAIN_ID:11155111}
 
   # Tỷ giá cố định VND/ETH
   vnd-eth-rate: ${BLOCKCHAIN_VND_ETH_RATE:80000000}
