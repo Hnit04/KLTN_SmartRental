@@ -31,7 +31,7 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
     return R * c;
   };
 
-  const trustScore = Number(data.trustEffectiveScore ?? data.landlordReputationScore ?? 0);
+  const trustScore = Number(data.landlordReputationScore ?? 0);
   const trustToneClass =
     trustScore >= 85
       ? "bg-green-50 text-green-700 border-green-200"
@@ -45,7 +45,7 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
       : userLocation && data.latitude != null && data.longitude != null
       ? calculateDistanceKm(userLocation[0], userLocation[1], data.latitude, data.longitude)
       : null;
-  const ratingValue = Number(data.ratingBayesScore ?? data.averageRating ?? 0);
+  const ratingValue = Number(data.averageRating ?? 0);
   const reviewCount = Number(data.reviewCount ?? 0);
 
   // Lấy ảnh đầu tiên hoặc ảnh placeholder
@@ -103,7 +103,7 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${trustToneClass}`}>
             <ShieldCheck className="h-3.5 w-3.5" />
-            Uy tín {trustScore}/100
+            Uy tín {Math.round(trustScore)}/100
           </span>
           {ratingValue > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">

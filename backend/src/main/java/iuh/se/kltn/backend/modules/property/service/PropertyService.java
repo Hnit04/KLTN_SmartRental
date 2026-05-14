@@ -200,6 +200,7 @@ public class PropertyService {
 
         double reviewCount = Math.max(0, ratingAggregate.reviewCount());
         double rawAverage = ratingAggregate.averageRating() > 0 ? ratingAggregate.averageRating() : systemAverageRating;
+        double averageForDisplay = reviewCount > 0 ? ratingAggregate.averageRating() : 0.0;
         double bayesRaw = ((reviewCount / (reviewCount + RATING_PRIOR_COUNT)) * rawAverage)
                 + ((RATING_PRIOR_COUNT / (reviewCount + RATING_PRIOR_COUNT)) * systemAverageRating);
         double ratingBayesNormalized = clamp01(bayesRaw / 5.0);
@@ -220,7 +221,7 @@ public class PropertyService {
                     + (ratingBayesNormalized * WEIGHT_RATING_NO_LOCATION);
 
         return new RankingResult(
-                rawAverage,
+                averageForDisplay,
                 (int) reviewCount,
                 landlordEvidence.trustEvidence() * 100.0,
                 trustEffective * 100.0,
@@ -454,16 +455,21 @@ public class PropertyService {
 
         List<Room> rooms = p.getRooms();
         if (rooms != null && !rooms.isEmpty()) {
-            double min = rooms.stream().mapToDouble(Room::getPrice).min().orElse(0.0);
-            double max = rooms.stream().mapToDouble(Room::getPrice).max().orElse(0.0);
-            long available = rooms.stream()
+            List<Room> approvedRooms = rooms.stream()
+                    .filter(r -> r.getApprovalStatus() == PropertyStatus.APPROVED)
+                    .toList();
+            List<Room> availableApprovedRooms = approvedRooms.stream()
                     .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
-                    .count();
+                    .toList();
+
+            double min = availableApprovedRooms.stream().mapToDouble(Room::getPrice).min().orElse(0.0);
+            double max = availableApprovedRooms.stream().mapToDouble(Room::getPrice).max().orElse(0.0);
+            long available = availableApprovedRooms.size();
 
             res.setMinPrice(min);
             res.setMaxPrice(max);
             res.setAvailableRooms((int) available);
-            res.setTotalRooms(rooms.size());
+            res.setTotalRooms(approvedRooms.size());
         } else {
             res.setMinPrice(0.0);
             res.setMaxPrice(0.0);
