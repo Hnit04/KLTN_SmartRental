@@ -10,7 +10,21 @@ export interface PaginatedResponse<T> {
 }
 
 export const propertyApi = {
-  getAll: (page: number = 0, size: number = 12) => axiosClient.get<PaginatedResponse<Property>>(`/properties?page=${page}&size=${size}`),
+  getAll: (
+    page: number = 0,
+    size: number = 12,
+    location?: { lat: number; lng: number } | null
+  ) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+    });
+    if (location && Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
+      params.set("lat", String(location.lat));
+      params.set("lng", String(location.lng));
+    }
+    return axiosClient.get<PaginatedResponse<Property>>(`/properties?${params.toString()}`);
+  },
   getDetail: (id: number | string) => axiosClient.get<Property>(`/properties/${id}`),
   getRooms: (id: number | string) => axiosClient.get<Room[]>(`/properties/${id}/rooms`),
   getRoomDetail: (roomId: number | string) => axiosClient.get<Room>(`/rooms/${roomId}`),

@@ -6,14 +6,19 @@ import iuh.se.kltn.backend.modules.property.dto.request.PropertyRequest;
 import iuh.se.kltn.backend.modules.property.dto.request.RoomRequest;
 import iuh.se.kltn.backend.modules.property.dto.response.PropertyResponse;
 import iuh.se.kltn.backend.modules.property.dto.response.RoomResponse;
+import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
+import iuh.se.kltn.backend.modules.contract.repository.BillRepository;
+import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Property;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.enums.PropertyStatus;
+import iuh.se.kltn.backend.modules.interaction.repository.ReviewRepository;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
 import iuh.se.kltn.backend.modules.user.entity.Landlord;
 import iuh.se.kltn.backend.modules.user.entity.User;
+import iuh.se.kltn.backend.modules.user.enums.KYCStatus;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
 import iuh.se.kltn.backend.modules.ai.service.ModerationService;
@@ -31,8 +36,17 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,13 +66,232 @@ public class PropertyService {
     private NotificationService notificationService;
     @Autowired
     private VipSubscriptionService vipSubscriptionService;
+    @Autowired
+    private ReviewRepository reviewRepository;
+    @Autowired
+    private ContractRepository contractRepository;
+    @Autowired
+    private BillRepository billRepository;
 
     // 1. API MỚI: Lấy tất cả danh sách nhà trọ (Public) - CHỈ LẤY "APPROVED"
+    private static final double FALLBACK_SYSTEM_AVERAGE_RATING = 4.2;
+    private static final double DISTANCE_MAX_KM = 20.0;
+    private static final double RATING_PRIOR_COUNT = 12.0;
+    private static final double WEIGHT_DISTANCE = 0.40;
+    private static final double WEIGHT_TRUST_WITH_LOCATION = 0.35;
+    private static final double WEIGHT_RATING_WITH_LOCATION = 0.25;
+    private static final double WEIGHT_TRUST_NO_LOCATION = 0.55;
+    private static final double WEIGHT_RATING_NO_LOCATION = 0.45;
+    private static final EnumSet<ContractStatus> TRUST_EVIDENCE_CONTRACT_STATUSES =
+            EnumSet.of(ContractStatus.ACTIVE, ContractStatus.EXPIRED, ContractStatus.TERMINATED_EARLY);
+
     @Transactional(readOnly = true)
-    public Page<PropertyResponse> getAllProperties(Pageable pageable) {
-        Page<Property> properties = propertyRepository.findByStatus(PropertyStatus.APPROVED, pageable);
-        return properties.map(this::mapToPropertyResponse);
+    public Page<PropertyResponse> getAllProperties(Pageable pageable, Double lat, Double lng) {
+        List<Property> approvedProperties = propertyRepository.findByStatus(PropertyStatus.APPROVED);
+        if (approvedProperties.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<Long> propertyIds = approvedProperties.stream().map(Property::getId).toList();
+        Map<Long, RatingAggregate> ratingsByProperty = buildRatingAggregateMap(propertyIds);
+        double systemAverageRating = resolveSystemAverageRating();
+        Map<Long, LandlordEvidence> landlordEvidenceById = buildLandlordEvidenceMap(approvedProperties);
+
+        List<PropertyResponse> rankedResponses = new ArrayList<>(approvedProperties.size());
+        for (Property property : approvedProperties) {
+            RatingAggregate ratingAggregate = ratingsByProperty.getOrDefault(property.getId(), RatingAggregate.empty());
+            Long landlordId = property.getLandlord() == null ? null : property.getLandlord().getId();
+            LandlordEvidence landlordEvidence = landlordId == null
+                    ? LandlordEvidence.empty()
+                    : landlordEvidenceById.getOrDefault(landlordId, LandlordEvidence.empty());
+            RankingResult rankingResult = computeRanking(property, ratingAggregate, landlordEvidence, systemAverageRating, lat, lng);
+            rankedResponses.add(mapToPropertyResponse(property, rankingResult));
+        }
+
+        rankedResponses.sort(
+                Comparator.comparing((PropertyResponse p) -> safeDouble(p.getRankScore())).reversed()
+                        .thenComparing((PropertyResponse p) -> safeInt(p.getAvailableRooms()), Comparator.reverseOrder())
+                        .thenComparing(p -> safeDouble(p.getMinPrice()))
+                        .thenComparing((PropertyResponse p) -> safeLong(p.getId()), Comparator.reverseOrder())
+        );
+
+        int fromIndex = (int) pageable.getOffset();
+        if (fromIndex >= rankedResponses.size()) {
+            return new PageImpl<>(Collections.emptyList(), pageable, rankedResponses.size());
+        }
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), rankedResponses.size());
+        return new PageImpl<>(rankedResponses.subList(fromIndex, toIndex), pageable, rankedResponses.size());
     }
+
+    private Map<Long, RatingAggregate> buildRatingAggregateMap(List<Long> propertyIds) {
+        if (propertyIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, RatingAggregate> result = new HashMap<>();
+        for (Object[] row : reviewRepository.aggregateRatingsByPropertyIds(propertyIds)) {
+            Long propertyId = row[0] != null ? ((Number) row[0]).longValue() : null;
+            if (propertyId == null) {
+                continue;
+            }
+            double avgRating = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            int reviewCount = row[2] != null ? ((Number) row[2]).intValue() : 0;
+            result.put(propertyId, new RatingAggregate(avgRating, reviewCount));
+        }
+        return result;
+    }
+
+    private Map<Long, LandlordEvidence> buildLandlordEvidenceMap(List<Property> properties) {
+        Map<Long, LandlordEvidence> result = new HashMap<>();
+        for (Property property : properties) {
+            if (property.getLandlord() == null || property.getLandlord().getId() == null) {
+                continue;
+            }
+            Long landlordId = property.getLandlord().getId();
+            if (result.containsKey(landlordId)) {
+                continue;
+            }
+
+            long completedContracts = safeLong(
+                    contractRepository.countByRoom_Property_Landlord_IdAndStatusIn(
+                            landlordId,
+                            TRUST_EVIDENCE_CONTRACT_STATUSES
+                    )
+            );
+            long onTimePaidBills = safeLong(billRepository.countOnTimePaidBillsByLandlordId(landlordId));
+            KYCStatus kycStatus = property.getLandlord().getKycStatus();
+            LocalDateTime createdAt = property.getLandlord().getCreatedAt();
+
+            double kycFactor;
+            if (kycStatus == KYCStatus.VERIFIED) {
+                kycFactor = 1.0;
+            } else if (kycStatus == KYCStatus.PENDING) {
+                kycFactor = 0.85;
+            } else {
+                kycFactor = 0.70;
+            }
+
+            long activeMonths = createdAt == null
+                    ? 0
+                    : Math.max(0, ChronoUnit.MONTHS.between(createdAt, LocalDateTime.now()));
+            double tenureFactor = clamp01(activeMonths / 24.0);
+            double historyFactor = clamp01(
+                    Math.log1p(completedContracts + (onTimePaidBills * 0.35)) / Math.log1p(120.0)
+            );
+
+            double trustEvidence = clamp01((historyFactor * 0.70) + (tenureFactor * 0.20) + (kycFactor * 0.10));
+
+            result.put(landlordId, new LandlordEvidence(completedContracts, onTimePaidBills, trustEvidence));
+        }
+        return result;
+    }
+
+    private RankingResult computeRanking(
+            Property property,
+            RatingAggregate ratingAggregate,
+            LandlordEvidence landlordEvidence,
+            double systemAverageRating,
+            Double lat,
+            Double lng
+    ) {
+        double landlordReputation = property.getLandlord() == null ? 50.0 : property.getLandlord().getReputationScore();
+        double trustRaw = clamp01(landlordReputation / 100.0);
+        double trustEffective = clamp01(trustRaw * (0.75 + (0.25 * landlordEvidence.trustEvidence())));
+
+        double reviewCount = Math.max(0, ratingAggregate.reviewCount());
+        double rawAverage = ratingAggregate.averageRating() > 0 ? ratingAggregate.averageRating() : systemAverageRating;
+        double bayesRaw = ((reviewCount / (reviewCount + RATING_PRIOR_COUNT)) * rawAverage)
+                + ((RATING_PRIOR_COUNT / (reviewCount + RATING_PRIOR_COUNT)) * systemAverageRating);
+        double ratingBayesNormalized = clamp01(bayesRaw / 5.0);
+
+        Double distanceKm = null;
+        double distanceScoreNormalized = 0.0;
+        boolean hasLocation = lat != null && lng != null && property.getLatitude() != null && property.getLongitude() != null;
+        if (hasLocation) {
+            distanceKm = haversineKm(lat, lng, property.getLatitude(), property.getLongitude());
+            distanceScoreNormalized = clamp01(1.0 - (Math.min(distanceKm, DISTANCE_MAX_KM) / DISTANCE_MAX_KM));
+        }
+
+        double rankScoreNormalized = hasLocation
+                ? (distanceScoreNormalized * WEIGHT_DISTANCE)
+                    + (trustEffective * WEIGHT_TRUST_WITH_LOCATION)
+                    + (ratingBayesNormalized * WEIGHT_RATING_WITH_LOCATION)
+                : (trustEffective * WEIGHT_TRUST_NO_LOCATION)
+                    + (ratingBayesNormalized * WEIGHT_RATING_NO_LOCATION);
+
+        return new RankingResult(
+                rawAverage,
+                (int) reviewCount,
+                landlordEvidence.trustEvidence() * 100.0,
+                trustEffective * 100.0,
+                bayesRaw,
+                distanceKm,
+                distanceScoreNormalized * 100.0,
+                rankScoreNormalized * 100.0
+        );
+    }
+
+    private double resolveSystemAverageRating() {
+        Double avg = reviewRepository.findSystemAverageRating();
+        if (avg == null || avg <= 0) {
+            return FALLBACK_SYSTEM_AVERAGE_RATING;
+        }
+        return avg;
+    }
+
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double earthRadius = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadius * c;
+    }
+
+    private double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private double safeDouble(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
+    private int safeInt(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private long safeLong(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private record RatingAggregate(double averageRating, int reviewCount) {
+        private static RatingAggregate empty() {
+            return new RatingAggregate(0.0, 0);
+        }
+    }
+
+    private record LandlordEvidence(long completedContracts, long onTimePaidBills, double trustEvidence) {
+        private static LandlordEvidence empty() {
+            return new LandlordEvidence(0L, 0L, 0.0);
+        }
+    }
+
+    private record RankingResult(
+            double averageRating,
+            int reviewCount,
+            double trustEvidence,
+            double trustEffectiveScore,
+            double ratingBayesScore,
+            Double distanceKm,
+            double distanceScore,
+            double rankScore
+    ) {}
 
     private String buildPropertyContentCheck(PropertyRequest request) {
         return String.format("Tên khu trọ: %s\nĐịa chỉ: %s, %s, %s\nMô tả: %s\nGiá điện: %s\nGiá nước: %s\nInternet: %s",
@@ -201,6 +434,10 @@ public class PropertyService {
 
     // === MAPPER & TÍNH TOÁN LOGIC ===
     private PropertyResponse mapToPropertyResponse(Property p) {
+        return mapToPropertyResponse(p, null);
+    }
+
+    private PropertyResponse mapToPropertyResponse(Property p, RankingResult ranking) {
         PropertyResponse res = modelMapper.map(p, PropertyResponse.class);
         res.setImages(JsonUtil.convertJsonToList(p.getImages()));
 
@@ -232,6 +469,17 @@ public class PropertyService {
             res.setMaxPrice(0.0);
             res.setAvailableRooms(0);
             res.setTotalRooms(0);
+        }
+
+        if (ranking != null) {
+            res.setAverageRating(round2(ranking.averageRating()));
+            res.setReviewCount(ranking.reviewCount());
+            res.setTrustEvidence(round2(ranking.trustEvidence()));
+            res.setTrustEffectiveScore(round2(ranking.trustEffectiveScore()));
+            res.setRatingBayesScore(round2(ranking.ratingBayesScore()));
+            res.setDistanceKm(ranking.distanceKm() == null ? null : round2(ranking.distanceKm()));
+            res.setDistanceScore(round2(ranking.distanceScore()));
+            res.setRankScore(round2(ranking.rankScore()));
         }
 
         res.setSafetyScore(p.getSafetyScore());

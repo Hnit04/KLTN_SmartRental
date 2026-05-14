@@ -39,6 +39,14 @@ public class PropertyResponse {
     private Double maxPrice;
     private Integer availableRooms;
     private Integer totalRooms;
+    private Double averageRating;
+    private Integer reviewCount;
+    private Double trustEvidence;
+    private Double trustEffectiveScore;
+    private Double ratingBayesScore;
+    private Double distanceKm;
+    private Double distanceScore;
+    private Double rankScore;
 
     private Integer safetyScore;
     private String moderationReason;

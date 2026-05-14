@@ -41,10 +41,12 @@ public class PropertyController {
     @GetMapping
     public ResponseEntity<?> getAllProperties(
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size
+            @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) @DecimalMin(value = "-90.0") @DecimalMax(value = "90.0") Double lat,
+            @RequestParam(required = false) @DecimalMin(value = "-180.0") @DecimalMax(value = "180.0") Double lng
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        return ResponseEntity.ok(propertyService.getAllProperties(pageable));
+        return ResponseEntity.ok(propertyService.getAllProperties(pageable, lat, lng));
     }
 
     // === ADMIN Duyệt tin (Thêm lên trên /{id} để tránh lỗi Type Mismatch) ===

@@ -41,6 +41,10 @@ export default function PropertiesPage() {
     );
   }, []);
 
+  useEffect(() => {
+    setPage(0);
+  }, [userLocation?.[0], userLocation?.[1]]);
+
   // --- FETCH DATA ---
   useEffect(() => {
     const fetchData = async () => {
@@ -48,7 +52,11 @@ export default function PropertiesPage() {
         if (page === 0) setIsLoading(true);
         // Chạy song song cả hai API
         const [propsRes, recRoomsRes] = await Promise.allSettled([
-          propertyApi.getAll(page, 24),
+          propertyApi.getAll(
+            page,
+            24,
+            userLocation ? { lat: userLocation[0], lng: userLocation[1] } : null
+          ),
           (page === 0 && isAuthenticated) ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
         
@@ -79,7 +87,7 @@ export default function PropertiesPage() {
       }
     };
     fetchData();
-  }, [page]);
+  }, [page, isAuthenticated, userLocation?.[0], userLocation?.[1]]);
 
   // --- FILTER LOGIC ---
   const filteredProperties = useMemo(() => {
@@ -119,12 +127,10 @@ export default function PropertiesPage() {
         break;
     }
 
-    // Luôn ưu tiên hiển thị chủ trọ uy tín cao trước.
-    // Sort của người dùng vẫn giữ vai trò phụ trong cùng mức uy tín (stable sort).
-    result.sort((a, b) => Number(b.landlordReputationScore || 0) - Number(a.landlordReputationScore || 0));
-
+    // Thu tu mac dinh den tu backend rankScore (trust + rating + distance).
+    // Client chi can sap xep khi nguoi dung chon sort cu the.
     return result;
-  }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy]);
+  }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy, isAvailableOnly]);
 
   const activeFilterCount = [
     searchTerm !== "",
@@ -392,7 +398,7 @@ export default function PropertiesPage() {
         <h2 className="mb-4 flex flex-col gap-2 border-b border-border pb-2 text-base font-bold text-foreground sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xl">
             <div className="min-w-0">
               <span className="leading-tight">Khám phá khu trọ</span>
-              <p className="mt-1 text-xs font-medium text-muted-foreground">Ưu tiên hiển thị chủ trọ có điểm uy tín cao.</p>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">Ưu tiên theo uy tín chủ trọ, đánh giá thực tế và khoảng cách gần bạn.</p>
             </div>
             <div className="flex w-full max-w-full shrink-0 rounded-lg bg-gray-100 p-0.5 sm:w-fit sm:p-1">
               <button 

@@ -78,6 +78,12 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     List<Bill> findByContractIdInAndStatus(Collection<Long> contractIds, BillStatus status);
 
+    @Query("SELECT COUNT(b) FROM Bill b " +
+           "WHERE b.contract.room.property.landlord.id = :landlordId " +
+           "AND b.status = 'PAID' " +
+           "AND (b.deadline IS NULL OR (b.paidAt IS NOT NULL AND b.paidAt <= b.deadline))")
+    Long countOnTimePaidBillsByLandlordId(@Param("landlordId") Long landlordId);
+
     List<Bill> findAllByContract_Room_Property_Landlord_IdAndStatusIn(Long landlordId, Collection<BillStatus> statuses);
 
     List<Bill> findAllByContract_Room_Property_Landlord_IdOrderByYearDescMonthDesc(Long landlordId);

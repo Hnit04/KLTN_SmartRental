@@ -1,6 +1,6 @@
 // src/components/shared/PropertyCard.tsx
 import { useNavigate } from "react-router-dom";
-import { MapPin, Zap, Droplets, Wifi, ShieldCheck, Navigation } from "lucide-react";
+import { MapPin, Zap, Droplets, Wifi, ShieldCheck, Navigation, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import StatusBadge from "@/components/shared/StatusBadge";
 import type { Property } from "@/types/index";
@@ -31,7 +31,7 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
     return R * c;
   };
 
-  const trustScore = Number(data.landlordReputationScore ?? 0);
+  const trustScore = Number(data.trustEffectiveScore ?? data.landlordReputationScore ?? 0);
   const trustToneClass =
     trustScore >= 85
       ? "bg-green-50 text-green-700 border-green-200"
@@ -40,9 +40,13 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
         : "bg-slate-100 text-slate-600 border-slate-200";
 
   const distanceKm =
-    userLocation && data.latitude != null && data.longitude != null
+    data.distanceKm != null
+      ? Number(data.distanceKm)
+      : userLocation && data.latitude != null && data.longitude != null
       ? calculateDistanceKm(userLocation[0], userLocation[1], data.latitude, data.longitude)
       : null;
+  const ratingValue = Number(data.ratingBayesScore ?? data.averageRating ?? 0);
+  const reviewCount = Number(data.reviewCount ?? 0);
 
   // Lấy ảnh đầu tiên hoặc ảnh placeholder
   const thumbnail = data.images && data.images.length > 0 
@@ -101,6 +105,12 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
             <ShieldCheck className="h-3.5 w-3.5" />
             Uy tín {trustScore}/100
           </span>
+          {ratingValue > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+              <Star className="h-3.5 w-3.5" />
+              {ratingValue.toFixed(1)} ({reviewCount})
+            </span>
+          )}
           {distanceKm !== null && (
             <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
               <Navigation className="h-3.5 w-3.5" />
