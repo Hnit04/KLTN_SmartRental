@@ -5,18 +5,21 @@ import iuh.se.kltn.backend.modules.contract.dto.request.ResidentRequestDTO;
 import iuh.se.kltn.backend.modules.contract.dto.request.ResidentRemoveRequestDTO;
 import iuh.se.kltn.backend.modules.contract.enums.RequestStatus;
 import iuh.se.kltn.backend.modules.contract.service.ResidentRequestService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/resident-requests")
+@Validated
 public class ResidentRequestController {
     @Autowired private ResidentRequestService residentRequestService;
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody ResidentRequestDTO dto, @AuthenticationPrincipal UserPrincipal currentUser) {
+    public ResponseEntity<?> create(@Valid @RequestBody ResidentRequestDTO dto, @AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(residentRequestService.createRequest(
             dto.getContractId(), 
             currentUser.getId(), 
@@ -26,7 +29,7 @@ public class ResidentRequestController {
     }
 
     @PostMapping("/remove")
-    public ResponseEntity<?> remove(@RequestBody ResidentRemoveRequestDTO dto, @AuthenticationPrincipal UserPrincipal currentUser) {
+    public ResponseEntity<?> remove(@Valid @RequestBody ResidentRemoveRequestDTO dto, @AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(residentRequestService.createRemoveRequest(
             dto.getContractId(),
             currentUser.getId(),

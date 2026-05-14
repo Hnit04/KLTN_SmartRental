@@ -1,10 +1,14 @@
 package iuh.se.kltn.backend.modules.ai.controller;
 
+import iuh.se.kltn.backend.modules.ai.dto.request.*;
 import iuh.se.kltn.backend.modules.ai.service.AiOrchestratorService;
 import iuh.se.kltn.backend.modules.ai.service.SmartRentalAi;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -27,6 +31,7 @@ import iuh.se.kltn.backend.modules.ai.service.AnomalyAi;
 
 @RestController
 @RequestMapping("/api/ai")
+@Validated
 public class AiController {
 
     @Autowired
@@ -62,11 +67,11 @@ public class AiController {
 
     @PostMapping("/chat")
     public ResponseEntity<?> chatWithAi(
-            @RequestBody Map<String, String> request,
+            @Valid @RequestBody AiChatRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        String message = request.get("message");
-        String sessionId = request.getOrDefault("sessionId", "default-user");
+        String message = request.getMessage();
+        String sessionId = request.getSessionId() != null ? request.getSessionId() : "default-user";
         
         String roleStr = "GUEST (Khách vãng lai chưa đăng nhập)";
         String userName = "Khách hàng";
@@ -127,10 +132,10 @@ public class AiController {
 
     @PostMapping("/query-data")
     public ResponseEntity<?> queryDataWithAi(
-            @RequestBody Map<String, String> request,
+            @Valid @RequestBody AiDataQueryRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        String question = request.get("question");
+        String question = request.getQuestion();
 
         if (question == null || question.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Câu hỏi không được để trống"));
@@ -171,8 +176,8 @@ public class AiController {
 
     // Admin: Update câu SQL bị AI sinh sai
     @PutMapping("/admin/cache/{id}")
-    public ResponseEntity<?> updateCache(@PathVariable Long id, @RequestBody Map<String, String> request) {
-        String newSql = request.get("generatedSql");
+    public ResponseEntity<?> updateCache(@PathVariable Long id, @Valid @RequestBody AiUpdateCacheRequest request) {
+        String newSql = request.getGeneratedSql();
         if (newSql == null || newSql.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "SQL không được để trống"));
         }
@@ -197,9 +202,9 @@ public class AiController {
 
     // Admin: Thêm mới 1 FAQ vào Tri thức
     @PostMapping("/admin/faq")
-    public ResponseEntity<?> addFaqCache(@RequestBody Map<String, String> request) {
-        String question = request.get("question");
-        String answer = request.get("answer");
+    public ResponseEntity<?> addFaqCache(@Valid @RequestBody AiFaqRequest request) {
+        String question = request.getQuestion();
+        String answer = request.getAnswer();
         if (question == null || answer == null) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Thiếu câu hỏi hoặc câu trả lời"));
         }
@@ -400,15 +405,15 @@ public class AiController {
     }
 
     @PostMapping("/actions/send-reminders")
-    public ResponseEntity<?> sendReminders(@RequestBody List<Map<String, Object>> approvedReminders,
+    public ResponseEntity<?> sendReminders(@Valid @RequestBody @NotEmpty List<AiReminderApprovalRequest> approvedReminders,
                                            @AuthenticationPrincipal UserPrincipal currentUser) {
         try {
             int count = 0;
-            for (Map<String, Object> reminder : approvedReminders) {
-                Long tenantId = Long.parseLong(reminder.get("tenantId").toString());
-                Long billId = Long.parseLong(reminder.get("billId").toString());
-                String message = reminder.get("draftedMessage").toString();
-                String roomName = reminder.get("roomName").toString();
+            for (AiReminderApprovalRequest reminder : approvedReminders) {
+                Long tenantId = reminder.getTenantId();
+                Long billId = reminder.getBillId();
+                String message = reminder.getDraftedMessage();
+                String roomName = reminder.getRoomName();
 
                 iuh.se.kltn.backend.modules.user.entity.User tenant = userRepository.findById(tenantId).orElse(null);
                 
@@ -444,8 +449,8 @@ public class AiController {
      * Frontend gửi keywords (tên phòng, diện tích, giá, tiện ích) → AI viết mô tả chuẩn SEO.
      */
     @PostMapping("/generate-room-description")
-    public ResponseEntity<?> generateRoomDescription(@RequestBody Map<String, String> request) {
-        String prompt = request.get("prompt");
+    public ResponseEntity<?> generateRoomDescription(@Valid @RequestBody AiRoomDescriptionRequest request) {
+        String prompt = request.getPrompt();
         if (prompt == null || prompt.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Vui lòng cung cấp thông tin phòng"));
         }
@@ -470,16 +475,15 @@ public class AiController {
 
     @PostMapping("/suggest-room-price")
     public ResponseEntity<?> suggestRoomPrice(
-            @RequestBody Map<String, Object> request,
+            @Valid @RequestBody AiSuggestRoomPriceRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         long startTime = System.currentTimeMillis();
-        String district = (String) request.get("district");
-        String city = (String) request.get("city");
-        Double area = Double.valueOf(request.get("area").toString());
-        String type = (String) request.get("type");
-        @SuppressWarnings("unchecked")
-        List<String> amenities = (List<String>) request.get("amenities");
+        String district = request.getDistrict();
+        String city = request.getCity();
+        Double area = request.getArea();
+        String type = request.getType();
+        List<String> amenities = request.getAmenities();
 
         String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Không có";
         

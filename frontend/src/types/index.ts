@@ -159,6 +159,14 @@ export interface Property {
   maxPrice?: number;
   totalRooms?: number;
   availableRooms?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  trustEvidence?: number;
+  trustEffectiveScore?: number;
+  ratingBayesScore?: number;
+  distanceKm?: number;
+  distanceScore?: number;
+  rankScore?: number;
   status?: "PENDING" | "APPROVED" | "REJECTED" | "HIDDEN";
   safetyScore?: number;
   moderationReason?: string;

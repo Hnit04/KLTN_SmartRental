@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { propertyApi } from "@/api/propertyApi";
 import { userApi } from "@/api/userApi";
 import type { Property, User } from "@/types/index";
 import PropertyCard from "@/features/property/components/PropertyCard";
 import { Button } from "@/components/ui/Button";
-import { ArrowLeft, ShieldCheck, Mail, Phone, Building2, Star } from "lucide-react";
+import { ShieldCheck, Mail, Phone, Building2, Star } from "lucide-react";
 
 export default function LandlordPropertiesPage() {
   const { username } = useParams<{ username: string }>();
@@ -48,10 +48,6 @@ export default function LandlordPropertiesPage() {
       {/* --- HERO / LANDLORD INFO --- */}
       <div className="bg-white border-b pt-24 pb-12">
         <div className="page-shell">
-          <Link to="/top-landlords" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-8">
-            <ArrowLeft className="h-4 w-4" /> Quay lại Bảng Xếp Hạng
-          </Link>
-
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
             {/* Avatar */}
             <div className="relative shrink-0">
@@ -150,3 +146,4 @@ export default function LandlordPropertiesPage() {
     </div>
   );
 }
+

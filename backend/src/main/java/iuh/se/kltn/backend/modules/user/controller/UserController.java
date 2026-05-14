@@ -14,6 +14,11 @@ import iuh.se.kltn.backend.modules.user.dto.response.ReputationHistoryResponse;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
 import iuh.se.kltn.backend.modules.user.service.UserService;
 import jakarta.persistence.EntityManager;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.transaction.annotation.Transactional;
 import org.hibernate.envers.AuditReader;
 import org.hibernate.envers.AuditReaderFactory;
@@ -24,6 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,6 +42,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
+@Validated
 public class UserController {
 
     @Autowired
@@ -81,7 +88,7 @@ public class UserController {
         return ResponseEntity.ok(history);
     }
     @GetMapping("/username")
-    public UserProfileResponse findByUsername(String username) {
+    public UserProfileResponse findByUsername(@RequestParam @NotBlank String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -100,7 +107,7 @@ public class UserController {
     @PutMapping("/profile")
     public ResponseEntity<UserProfileResponse> updateProfile(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestBody UpdateProfileRequest request) {
+            @Valid @RequestBody UpdateProfileRequest request) {
 
         UserProfileResponse response = userService.updateUserProfile(currentUser.getId(), request);
         return ResponseEntity.ok(response);
@@ -108,7 +115,10 @@ public class UserController {
 
     @PutMapping("/wallet")
     public ResponseEntity<?> updateWallet(@AuthenticationPrincipal UserPrincipal currentUser,
-                                          @RequestParam String address) {
+                                          @RequestParam
+                                          @NotBlank
+                                          @Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Wallet address must be a valid EVM address")
+                                          String address) {
         userService.updateWalletAddress(currentUser.getId(), address);
         return ResponseEntity.ok("Cập nhật ví thành công!");
     }
@@ -230,7 +240,7 @@ public class UserController {
 
     @PostMapping("/kyc/{userId}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> rejectKYC(@PathVariable Long userId, @RequestParam String reason) {
+    public ResponseEntity<?> rejectKYC(@PathVariable Long userId, @RequestParam @NotBlank String reason) {
         try {
             userService.rejectKYCAdmin(userId, reason);
             return ResponseEntity.ok("Đã từ chối định danh người dùng ID " + userId + ". Lý do: " + reason);
@@ -249,7 +259,8 @@ public class UserController {
     }
 
     @GetMapping("/top-landlords")
-    public ResponseEntity<List<UserProfileResponse>> getTopLandlords(@RequestParam(defaultValue = "10") int limit) {
+    public ResponseEntity<List<UserProfileResponse>> getTopLandlords(
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int limit) {
         List<UserProfileResponse> topLandlords = userService.getTopLandlords(limit);
         return ResponseEntity.ok(topLandlords);
     }
@@ -259,7 +270,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> lockUser(
             @PathVariable Long userId,
-            @RequestParam int durationDays,
+            @RequestParam @Min(1) int durationDays,
             @RequestParam List<String> reason,
             @AuthenticationPrincipal UserPrincipal admin) {
 
@@ -341,7 +352,7 @@ public class UserController {
         return ResponseEntity.ok(filteredHistory);
     }
     @GetMapping("/userId")
-    public Optional<User> findById(String username){
+    public Optional<User> findById(@RequestParam @NotBlank String username){
         return userRepository.findByUsername(username);
     }
 }

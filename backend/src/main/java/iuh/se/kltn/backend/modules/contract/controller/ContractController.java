@@ -2,12 +2,17 @@ package iuh.se.kltn.backend.modules.contract.controller;
 
 import iuh.se.kltn.backend.common.security.UserPrincipal;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.ContractTermsRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.RejectReasonRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.TransactionHashRequest;
 import iuh.se.kltn.backend.modules.contract.service.ContractChangeService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import iuh.se.kltn.backend.modules.contract.dto.request.ChangeRequestDTO;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
@@ -16,6 +21,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/contracts")
+@Validated
 public class ContractController {
 
     @Autowired
@@ -26,7 +32,7 @@ public class ContractController {
     // 1. Tạo hợp đồng
     @PostMapping
     public ResponseEntity<?> createContract(@AuthenticationPrincipal UserPrincipal currentUser,
-                                            @RequestBody ContractRequest request) {
+                                            @Valid @RequestBody ContractRequest request) {
         return ResponseEntity.ok(contractService.createContract(currentUser.getId(), request));
     }
 
@@ -94,15 +100,15 @@ public class ContractController {
     @PostMapping("/{id}/sign")
     public ResponseEntity<?> signContract(@AuthenticationPrincipal UserPrincipal currentUser,
                                           @PathVariable Long id,
-                                          @RequestBody SignContractRequest request) {
+                                          @Valid @RequestBody SignContractRequest request) {
         return ResponseEntity.ok(contractService.signContract(id, request, currentUser.getId()));
     }
 
     @PostMapping("/{id}/reject")
     public ResponseEntity<?> rejectContract(@AuthenticationPrincipal UserPrincipal currentUser,
                                           @PathVariable Long id,
-                                          @RequestBody(required = false) java.util.Map<String, String> request) {
-        String reason = (request != null) ? request.get("reason") : null;
+                                          @Valid @RequestBody(required = false) RejectReasonRequest request) {
+        String reason = (request != null) ? request.getReason() : null;
         return ResponseEntity.ok(contractService.rejectContract(id, currentUser.getId(), reason));
     }
 
@@ -110,7 +116,7 @@ public class ContractController {
     @PostMapping("/{id}/change-requests")
     public ResponseEntity<?> requestChange(@AuthenticationPrincipal UserPrincipal currentUser,
                                            @PathVariable Long id,
-                                           @RequestBody ChangeRequestDTO requestDTO) {
+                                           @Valid @RequestBody ChangeRequestDTO requestDTO) {
         return ResponseEntity.ok(contractChangeService.createChangeRequest(id, requestDTO, currentUser.getId()));
     }
 
@@ -140,12 +146,12 @@ public class ContractController {
     public ResponseEntity<?> analyzeTerms(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
-            @RequestBody(required = false) java.util.Map<String, String> request) {
+            @Valid @RequestBody(required = false) ContractTermsRequest request) {
         
         iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse contract = contractService.getContractById(id);
         
         StringBuilder context = new StringBuilder();
-        String reqTerms = (request != null && request.containsKey("terms")) ? request.get("terms") : null;
+        String reqTerms = request != null ? request.getTerms() : null;
         
         if (reqTerms != null && !reqTerms.trim().isEmpty() && !reqTerms.equals(contract.getAdditionalTerms())) {
              context.append(reqTerms); 
@@ -174,9 +180,9 @@ public class ContractController {
     public ResponseEntity<?> updateContractTerms(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
-            @RequestBody java.util.Map<String, String> request) {
+            @Valid @RequestBody ContractTermsRequest request) {
         
-        String newTerms = (request != null && request.containsKey("terms")) ? request.get("terms") : "";
+        String newTerms = request.getTerms() != null ? request.getTerms() : "";
         try {
             return ResponseEntity.ok(contractService.updateContractTerms(id, newTerms, currentUser.getId()));
         } catch (Exception e) {
@@ -201,8 +207,8 @@ public class ContractController {
     public ResponseEntity<?> confirmWeb3Deposit(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
-            @RequestBody java.util.Map<String, String> request) {
-        String txHash = request.get("txHash");
+            @Valid @RequestBody TransactionHashRequest request) {
+        String txHash = request.getTxHash();
         try {
             return ResponseEntity.ok(contractService.confirmWeb3Deposit(id, txHash, currentUser.getId()));
         } catch (Exception e) {
@@ -227,7 +233,7 @@ public class ContractController {
     public ResponseEntity<?> proposeSettlement(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
-            @RequestBody iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest request) {
+            @Valid @RequestBody iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest request) {
         return ResponseEntity.ok(contractService.proposeSettlement(id, currentUser.getId(), request));
     }
 

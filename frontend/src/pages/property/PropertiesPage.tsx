@@ -29,8 +29,21 @@ export default function PropertiesPage() {
   const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
   const [isAvailableOnly, setIsAvailableOnly] = useState(true);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 
   const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => setUserLocation([position.coords.latitude, position.coords.longitude]),
+      () => setUserLocation(null)
+    );
+  }, []);
+
+  useEffect(() => {
+    setPage(0);
+  }, [userLocation?.[0], userLocation?.[1]]);
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -39,7 +52,11 @@ export default function PropertiesPage() {
         if (page === 0) setIsLoading(true);
         // Chạy song song cả hai API
         const [propsRes, recRoomsRes] = await Promise.allSettled([
-          propertyApi.getAll(page, 24),
+          propertyApi.getAll(
+            page,
+            24,
+            userLocation ? { lat: userLocation[0], lng: userLocation[1] } : null
+          ),
           (page === 0 && isAuthenticated) ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
         ]);
         
@@ -70,7 +87,7 @@ export default function PropertiesPage() {
       }
     };
     fetchData();
-  }, [page]);
+  }, [page, isAuthenticated, userLocation?.[0], userLocation?.[1]]);
 
   // --- FILTER LOGIC ---
   const filteredProperties = useMemo(() => {
@@ -110,8 +127,10 @@ export default function PropertiesPage() {
         break;
     }
 
+    // Thu tu mac dinh den tu backend rankScore (trust + rating + distance).
+    // Client chi can sap xep khi nguoi dung chon sort cu the.
     return result;
-  }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy]);
+  }, [properties, searchTerm, selectedCity, maxPrice, selectedAmenities, sortBy, isAvailableOnly]);
 
   const activeFilterCount = [
     searchTerm !== "",
@@ -377,7 +396,10 @@ export default function PropertiesPage() {
       {/* --- MAIN CONTENT --- */}
       <div className="page-shell py-5 sm:py-8">
         <h2 className="mb-4 flex flex-col gap-2 border-b border-border pb-2 text-base font-bold text-foreground sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xl">
-            <span className="min-w-0 leading-tight">Khám phá khu trọ</span>
+            <div className="min-w-0">
+              <span className="leading-tight">Khám phá khu trọ</span>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">Ưu tiên theo uy tín chủ trọ, đánh giá thực tế và khoảng cách gần bạn.</p>
+            </div>
             <div className="flex w-full max-w-full shrink-0 rounded-lg bg-gray-100 p-0.5 sm:w-fit sm:p-1">
               <button 
                 onClick={() => setViewMode("list")} 
@@ -414,7 +436,7 @@ export default function PropertiesPage() {
             {viewMode === "list" ? (
               <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProperties.map((property) => (
-                  <PropertyCard key={property.id} data={property} />
+                  <PropertyCard key={property.id} data={property} userLocation={userLocation} />
                 ))}
               </div>
             ) : (

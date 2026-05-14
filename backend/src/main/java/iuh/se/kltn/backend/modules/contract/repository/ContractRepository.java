@@ -22,6 +22,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findContractsByLandlordId(@Param("landlordId") Long landlordId);
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
     List<Contract> findByRoom_Property_Landlord_IdAndStatus(Long landlordId, ContractStatus status);
+    Long countByRoom_Property_Landlord_IdAndStatusIn(Long landlordId, java.util.Collection<ContractStatus> statuses);
 
     // ✅ Lấy hợp đồng ACTIVE hiện tại của một phòng
     Optional<Contract> findFirstByRoomIdAndStatusOrderByEndDateDesc(Long roomId, ContractStatus status);

@@ -1,15 +1,16 @@
 // src/components/shared/PropertyCard.tsx
 import { useNavigate } from "react-router-dom";
-import { MapPin, Zap, Droplets, Wifi } from "lucide-react";
+import { MapPin, Zap, Droplets, Wifi, ShieldCheck, Navigation, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import StatusBadge from "@/components/shared/StatusBadge";
 import type { Property } from "@/types/index";
 
 interface PropertyCardProps {
   data: Property;
+  userLocation?: [number, number] | null;
 }
 
-export default function PropertyCard({ data }: PropertyCardProps) {
+export default function PropertyCard({ data, userLocation = null }: PropertyCardProps) {
   const navigate = useNavigate();
 
   // Hàm format tiền Việt
@@ -17,6 +18,35 @@ export default function PropertyCard({ data }: PropertyCardProps) {
     if (!price) return "Liên hệ";
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
+
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const trustScore = Number(data.trustEffectiveScore ?? data.landlordReputationScore ?? 0);
+  const trustToneClass =
+    trustScore >= 85
+      ? "bg-green-50 text-green-700 border-green-200"
+      : trustScore >= 70
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-slate-100 text-slate-600 border-slate-200";
+
+  const distanceKm =
+    data.distanceKm != null
+      ? Number(data.distanceKm)
+      : userLocation && data.latitude != null && data.longitude != null
+      ? calculateDistanceKm(userLocation[0], userLocation[1], data.latitude, data.longitude)
+      : null;
+  const ratingValue = Number(data.ratingBayesScore ?? data.averageRating ?? 0);
+  const reviewCount = Number(data.reviewCount ?? 0);
 
   // Lấy ảnh đầu tiên hoặc ảnh placeholder
   const thumbnail = data.images && data.images.length > 0 
@@ -68,6 +98,25 @@ export default function PropertyCard({ data }: PropertyCardProps) {
           <span className="line-clamp-2">
             {data.address}, {data.district}, {data.city}
           </span>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${trustToneClass}`}>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Uy tín {trustScore}/100
+          </span>
+          {ratingValue > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+              <Star className="h-3.5 w-3.5" />
+              {ratingValue.toFixed(1)} ({reviewCount})
+            </span>
+          )}
+          {distanceKm !== null && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+              <Navigation className="h-3.5 w-3.5" />
+              {distanceKm < 1 ? "< 1 km" : `${distanceKm.toFixed(1)} km`}
+            </span>
+          )}
         </div>
 
         {/* Thông tin dịch vụ (Điện/Nước/Net) */}

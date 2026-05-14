@@ -9,6 +9,7 @@ import iuh.se.kltn.backend.modules.contract.service.BillService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
+import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -132,7 +133,7 @@ public class PaymentController {
     public ResponseEntity<?> handleSePayWebhook(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestHeader(value = "Apikey", required = false) String apiKeyHeader,
-            @RequestBody SePayWebhookRequest request) {
+            @Valid @RequestBody SePayWebhookRequest request) {
 
         System.out.println("🔔 [SePay Webhook] Nhận request: " + request.getTransactionContent());
 
