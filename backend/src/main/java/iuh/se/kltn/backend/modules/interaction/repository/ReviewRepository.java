@@ -1,4 +1,4 @@
-﻿package iuh.se.kltn.backend.modules.interaction.repository;
+package iuh.se.kltn.backend.modules.interaction.repository;
 
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.interaction.entity.Review;
