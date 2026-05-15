@@ -787,11 +787,11 @@ public class AiOrchestratorService {
             }
 
             String priceStr = normalizePriceForCard(row.get("price"));
-            Object distance = row.get("distance_km");
+            String distanceStr = normalizeDistanceForCard(row.get("distance_km"));
             String firstImg = extractFirstImage(row.get("images"));
 
             responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
-                    roomId, name, priceStr, firstImg, distance));
+                    roomId, name, priceStr, firstImg, distanceStr));
         }
 
         saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
@@ -850,6 +850,35 @@ public class AiOrchestratorService {
         }
 
         return "0";
+    }
+
+    private String normalizeDistanceForCard(Object distanceObj) {
+        if (distanceObj == null) {
+            return "?";
+        }
+        if (distanceObj instanceof Number number) {
+            double value = number.doubleValue();
+            if (Double.isNaN(value) || Double.isInfinite(value)) {
+                return "?";
+            }
+            return java.math.BigDecimal.valueOf(value)
+                    .setScale(1, java.math.RoundingMode.HALF_UP)
+                    .stripTrailingZeros()
+                    .toPlainString();
+        }
+
+        String raw = distanceObj.toString();
+        if (raw == null || raw.trim().isEmpty()) {
+            return "?";
+        }
+        try {
+            return new java.math.BigDecimal(raw.trim())
+                    .setScale(1, java.math.RoundingMode.HALF_UP)
+                    .stripTrailingZeros()
+                    .toPlainString();
+        } catch (Exception ignored) {
+            return raw.trim();
+        }
     }
 
     /**
