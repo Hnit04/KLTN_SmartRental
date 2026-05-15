@@ -39,12 +39,12 @@ export const authApi = {
 
   // Gửi lại mã OTP
   resendOtp: async (email: string): Promise<string> => {
-    // API resend-otp nhận body là Map<String, String> { "email": "..." }
+    // Backend typed DTO: EmailOnlyRequest { email }
     const response = await axiosClient.post('/auth/resend-otp', { email });
     return response.data;
   },
   forgotPassword: async (email: string): Promise<string> => {
-    // Backend nhận: Map<String, String> body = body.get("email")
+    // Backend typed DTO: EmailOnlyRequest { email }
     const response = await axiosClient.post('/auth/forgot-password', { email });
     return response.data;
   },

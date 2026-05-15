@@ -31,23 +31,28 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
      * - Trả về tối đa 10 kết quả
      */
     @Query(value = """
-        SELECT r.id AS room_id, r.name, r.price, r.images, r.area, r.status AS room_status,
-               p.name AS property_name, p.address, p.district, p.city,
-               p.latitude, p.longitude,
-               ROUND(
-                 6371 * ACOS(
-                   LEAST(1.0, COS(RADIANS(:lat)) * COS(RADIANS(p.latitude)) *
-                   COS(RADIANS(p.longitude) - RADIANS(:lng)) +
-                   SIN(RADIANS(:lat)) * SIN(RADIANS(p.latitude)))
-                 ), 2
-               ) AS distance_km
-        FROM rooms r
-        JOIN properties p ON r.property_id = p.id
-        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
-          AND r.status = 'AVAILABLE'
-          AND p.status = 'APPROVED'
-        HAVING distance_km <= :radius
-        ORDER BY distance_km ASC
+        SELECT *
+        FROM (
+            SELECT r.id AS room_id, r.name, r.price, r.images, r.area, r.status AS room_status,
+                   p.name AS property_name, p.address, p.district, p.city,
+                   p.latitude, p.longitude,
+                   ROUND(
+                     (
+                       6371 * ACOS(
+                         LEAST(1.0, COS(RADIANS(:lat)) * COS(RADIANS(p.latitude)) *
+                         COS(RADIANS(p.longitude) - RADIANS(:lng)) +
+                         SIN(RADIANS(:lat)) * SIN(RADIANS(p.latitude)))
+                       )
+                     )::numeric, 2
+                   ) AS distance_km
+            FROM rooms r
+            JOIN properties p ON r.property_id = p.id
+            WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+              AND r.status = 'AVAILABLE'
+              AND p.status = 'APPROVED'
+        ) nearby
+        WHERE nearby.distance_km <= :radius
+        ORDER BY nearby.distance_km ASC
         LIMIT 10
         """, nativeQuery = true)
     List<Map<String, Object>> findNearbyRooms(
