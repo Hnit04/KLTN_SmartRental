@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin, Sparkles, ChevronRight } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin, Sparkles, ChevronRight, ShieldCheck, Clock3 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { aiApi } from "../../api/aiApi";
@@ -17,6 +17,10 @@ type Message = {
   isDataQuery?: boolean;
   hasReminderAction?: boolean;
   sourceLabel?: string;
+  queryAt?: string;
+  roomCardCount?: number;
+  missingDistanceCount?: number;
+  locationReferenceType?: "user" | "landmark" | "none";
 };
 
 export default function AiChatBot() {
@@ -185,6 +189,36 @@ export default function AiChatBot() {
   const formatVnd = (value: number): string =>
     value > 0 ? `${value.toLocaleString("vi-VN")}đ` : "Liên hệ";
 
+  const getRoomCardCount = (text: string): number => {
+    const matches = text.match(/\[ROOM_CARD:/g);
+    return matches ? matches.length : 0;
+  };
+
+  const getMissingDistanceCount = (text: string): number => {
+    const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|\]]*?)(?:\s*\|\s*([^\]]*))?\]/g;
+    let missing = 0;
+    let match: RegExpExecArray | null = null;
+
+    while ((match = regex.exec(text)) !== null) {
+      const distance = match[5]?.trim();
+      if (!distance) {
+        missing += 1;
+      }
+    }
+
+    return missing;
+  };
+
+  const formatQueryTime = (isoTime?: string): string => {
+    if (!isoTime) return "";
+    const parsed = new Date(isoTime);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const renderMessageWithCards = (text: string): ReactNode => {
     // Regex tìm chuỗi [ROOM_CARD: id | name | price | imageUrl | distance(optional)]
     const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|\]]*?)(?:\s*\|\s*([^\]]*))?\]/g;
@@ -240,11 +274,10 @@ export default function AiChatBot() {
             <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
               Dữ liệu giá từ hệ thống SmartRental
             </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] mb-4">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] mb-2">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Đang còn trống • Sẵn sàng dọn vào
             </div>
-            
             <div className="grid grid-cols-2 gap-2 mb-1">
               <Button
                 size="sm"
@@ -260,10 +293,10 @@ export default function AiChatBot() {
                 className="w-full flex items-center gap-2 text-[11px] h-9 border-primary/20 hover:bg-primary/5 text-primary"
                 onClick={() => {
                    setIsOpen(false);
-                   window.location.href = `/rooms/${roomId.trim()}`;
+                   window.location.href = `/rooms/${roomId.trim()}?action=book`;
                 }}
               >
-                Liên hệ chủ
+                Đặt lịch xem
               </Button>
             </div>
           </div>
@@ -370,6 +403,27 @@ export default function AiChatBot() {
     const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) && 
         dataKeywords.some(keyword => normalizedMsg.includes(keyword.normalize('NFC').toLowerCase()));
 
+    const userLocationKeywords = [
+      "gần tôi",
+      "quanh tôi",
+      "quanh đây",
+      "xung quanh tôi",
+      "near me",
+      "vị trí của tôi",
+      "vi tri cua toi",
+      "gần chỗ tôi",
+      "gan toi",
+    ];
+    const isUserLocationQuery = userLocationKeywords.some((keyword) =>
+      normalizedMsg.includes(keyword)
+    );
+    const isLandmarkLocationQuery =
+      !isUserLocationQuery &&
+      (normalizedMsg.includes("gần") ||
+        normalizedMsg.includes("quanh") ||
+        normalizedMsg.includes("nearby") ||
+        normalizedMsg.includes("landmark"));
+
     // Hiển thị tin nhắn ngắn trong UI (nếu có displayText), nhưng gửi fullMsg cho AI
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -417,6 +471,13 @@ export default function AiChatBot() {
           replyText = error.response?.data?.message || "Xin lỗi, mình đang gặp sự cố kết nối. Vui lòng thử lại sau.";
         }
       }
+      const roomCardCount = getRoomCardCount(replyText);
+      const missingDistanceCount = getMissingDistanceCount(replyText);
+      const locationReferenceType: Message["locationReferenceType"] = isUserLocationQuery
+        ? "user"
+        : isLandmarkLocationQuery
+          ? "landmark"
+          : "none";
 
       setMessages((prev) => [
         ...prev,
@@ -426,6 +487,10 @@ export default function AiChatBot() {
           sender: "ai",
           isDataQuery,
           sourceLabel,
+          queryAt: isDataQuery ? new Date().toISOString() : undefined,
+          roomCardCount,
+          missingDistanceCount,
+          locationReferenceType,
           hasReminderAction: isLandlord && isDataQuery && (normalizedMsg.includes("nợ") || normalizedMsg.includes("chưa đóng") || normalizedMsg.includes("trễ"))
         },
       ]);
@@ -507,8 +572,48 @@ export default function AiChatBot() {
                 className={`px-5 py-4 min-h-[44px] text-[14.5px] leading-relaxed relative ${msg.sender === "user" ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-sm shadow-md' : 'bg-white border border-border shadow-sm rounded-2xl rounded-tl-sm text-foreground'}`}
               >
                   {msg.sender === "ai" && msg.isDataQuery && (
-                    <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                      {msg.sourceLabel || "Đã đối soát từ dữ liệu hệ thống"}
+                    <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {msg.sourceLabel || "Đã đối soát từ dữ liệu hệ thống"}
+                        </div>
+                        {msg.queryAt && (
+                          <div className="inline-flex items-center gap-1 text-[10px] text-emerald-700/80">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {formatQueryTime(msg.queryAt)}
+                          </div>
+                        )}
+                      </div>
+                      {typeof msg.roomCardCount === "number" && msg.roomCardCount > 0 && (
+                        <div className="mt-1 text-[11px] text-emerald-800/90">
+                          Tìm thấy {msg.roomCardCount} kết quả phù hợp.
+                        </div>
+                      )}
+                      {typeof msg.missingDistanceCount === "number" && msg.missingDistanceCount > 0 && msg.locationReferenceType !== "none" && (
+                        <div className="mt-1 text-[11px] text-emerald-700/90">
+                          {msg.locationReferenceType === "user"
+                            ? (msg.roomCardCount === msg.missingDistanceCount
+                              ? "Chưa lấy được khoảng cách từ vị trí hiện tại của bạn."
+                              : `Còn ${msg.missingDistanceCount} kết quả chưa có khoảng cách từ vị trí của bạn.`)
+                            : (msg.roomCardCount === msg.missingDistanceCount
+                              ? "Chưa tính được khoảng cách từ địa điểm bạn nhập. Đang hiển thị kết quả theo điều kiện còn lại."
+                              : `Khoảng cách được tính theo địa điểm bạn nhập; còn ${msg.missingDistanceCount} kết quả chưa có dữ liệu khoảng cách.`)}
+                        </div>
+                      )}
+                      {typeof msg.roomCardCount === "number" && msg.roomCardCount <= 1 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-8 border-emerald-300 bg-white text-[11px] text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+                          onClick={() => {
+                            setIsOpen(false);
+                            window.location.href = "/properties";
+                          }}
+                        >
+                          Xem thêm phòng phù hợp
+                        </Button>
+                      )}
                     </div>
                   )}
                   {msg.sender === "ai" ? renderMessageWithCards(msg.text) : msg.text}

@@ -244,6 +244,28 @@ public class AiOrchestratorService {
         boolean fallbackUsed = false;
         boolean success = false;
 
+        // Heuristic guard: câu có "gần <địa điểm>" sẽ ưu tiên luồng LOCATION_SEARCH
+        // để luôn có distance_km thay vì trả danh sách thường thiếu khoảng cách.
+        String heuristicLocation = tryExtractLocationForNearbySearch(question, role);
+        if (heuristicLocation != null) {
+            Double heuristicRadius = extractRadiusKm(question);
+            String heuristicResponse = handleLocationSearchFlow(
+                    heuristicLocation,
+                    heuristicRadius,
+                    question,
+                    role,
+                    userId,
+                    "LOCATION_SEARCH_HEURISTIC",
+                    1.0,
+                    startTime,
+                    true
+            );
+            if (heuristicResponse != null) {
+                return heuristicResponse;
+            }
+            System.out.println("⚠️ [HEURISTIC] Fallback to intent pipeline because geocode miss for: " + heuristicLocation);
+        }
+
         try {
             System.out.println("🤖 [HYBRID AI] Calling Intent Extractor...");
             String rawJson = intentExtractorAi.extractIntent(question, role);
@@ -292,60 +314,17 @@ public class AiOrchestratorService {
                             radius = Double.parseDouble(extraction.getParams().get("radius").toString());
                         } catch (Exception e) {}
                     }
-                    
-                    System.out.println("📍 [HYBRID AI] LOCATION_SEARCH -> location='" + locationName + "', radius=" + radius + "km");
-                    
-                    if (locationName == null || locationName.trim().isEmpty()) {
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                        return "Dạ, bạn có thể cho mình biết tên địa điểm cụ thể bạn muốn tìm phòng gần đó không ạ?";
-                    }
-
-                    GeocodingService.GeoResult geoResult = geocodingService.geocode(locationName);
-                    if (geoResult == null) {
-                        System.out.println("❌ [HYBRID AI] GeoCache MISS -> '" + locationName + "'");
-                        List<String> topSuggestions = geocodingService.getSmartSuggestions(locationName, 3);
-                        StringBuilder sb = new StringBuilder("Dạ, mình không tìm thấy địa điểm '" + locationName + "'.\n");
-                        if (!topSuggestions.isEmpty()) {
-                            sb.append("Bạn có muốn tìm phòng gần các địa điểm sau không?\n");
-                            for (String sugg : topSuggestions) {
-                                sb.append("- ").append(sugg).append("\n");
-                            }
-                        }
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                        return sb.toString();
-                    }
-
-                    List<Map<String, Object>> results = propertyRepository.findNearbyRooms(geoResult.latitude, geoResult.longitude, radius);
-                    if (results.isEmpty()) {
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                        return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + radius.intValue() + "km quanh '" + geoResult.displayName + "'.";
-                    }
-
-                    StringBuilder responseStr = new StringBuilder();
-                    responseStr.append("Dạ, mình tìm được ").append(results.size())
-                            .append(" phòng trống gần '").append(geoResult.displayName)
-                            .append("' (trong bán kính ").append(radius.intValue()).append("km):\n\n");
-
-                    int limit = Math.min(results.size(), 5);
-                    for (int i = 0; i < limit; i++) {
-                        Map<String, Object> row = results.get(i);
-                        Object roomId = row.get("room_id");
-                        Object nameObj = row.get("name");
-                        String name = nameObj != null ? nameObj.toString() : "";
-                        if (name.length() > 35) {
-                            name = name.substring(0, 32) + "...";
-                        }
-                        
-                        String priceStr = normalizePriceForCard(row.get("price"));
-
-                        Object distance = row.get("distance_km");
-                        String firstImg = extractFirstImage(row.get("images"));
-
-                        responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
-                                roomId, name, priceStr, firstImg, distance));
-                    }
-                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                    return responseStr.toString();
+                    return handleLocationSearchFlow(
+                            locationName,
+                            radius,
+                            question,
+                            role,
+                            userId,
+                            predictedIntent,
+                            confidence,
+                            startTime,
+                            false
+                    );
 
                 } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
                     System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
@@ -667,6 +646,156 @@ public class AiOrchestratorService {
 
         addFaqToVectorStore(question, answer);
         System.out.println("💾 Đã lưu FAQ mới vào DB và nạp lên Vector Store!");
+    }
+
+    private String tryExtractLocationForNearbySearch(String question, String role) {
+        if (question == null || question.trim().isEmpty()) {
+            return null;
+        }
+        // Chỉ ưu tiên heuristic cho luồng tìm phòng public
+        if (!("GUEST".equalsIgnoreCase(role) || "TENANT".equalsIgnoreCase(role))) {
+            return null;
+        }
+
+        String normalized = normalizeForHeuristic(question);
+        if (!normalized.matches(".*\\b(gan|near|quanh)\\b.*")) {
+            return null;
+        }
+        if (normalized.matches(".*\\b(hoa don|bill|hop dong|contract|doanh thu|revenue|thanh toan|payment|lich hen|appointment|no tien)\\b.*")) {
+            return null;
+        }
+
+        String locationPart = null;
+        java.util.regex.Matcher nearbyMatcher = java.util.regex.Pattern
+                .compile(".*\\b(?:gan|near|quanh)\\b\\s+(.+)")
+                .matcher(normalized);
+        if (nearbyMatcher.matches()) {
+            locationPart = nearbyMatcher.group(1).trim();
+        }
+
+        if (locationPart == null || locationPart.isEmpty()) {
+            return null;
+        }
+
+        if (locationPart.startsWith("dh ")) {
+            locationPart = "dai hoc " + locationPart.substring(3).trim();
+        }
+        locationPart = locationPart.replace("dh cong nghiep", "dai hoc cong nghiep");
+
+        // Cắt đuôi mô tả phụ để giữ tên địa điểm sạch hơn
+        String[] delimiters = new String[] {" voi ", " va ", ",", ".", "?"};
+        for (String delimiter : delimiters) {
+            int cut = locationPart.indexOf(delimiter);
+            if (cut > 0) {
+                locationPart = locationPart.substring(0, cut).trim();
+            }
+        }
+
+        if (locationPart.length() < 3) {
+            return null;
+        }
+        return locationPart;
+    }
+
+    private Double extractRadiusKm(String question) {
+        if (question == null) {
+            return 3.0;
+        }
+        String normalized = normalizeForHeuristic(question);
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(\\d+(?:[\\.,]\\d+)?)\\s*km")
+                .matcher(normalized);
+        if (m.find()) {
+            try {
+                return Double.parseDouble(m.group(1).replace(",", "."));
+            } catch (Exception ignored) {
+                // default below
+            }
+        }
+        if (normalized.contains("rat gan")) {
+            return 1.0;
+        }
+        if (normalized.contains("gan day")) {
+            return 3.0;
+        }
+        return 3.0;
+    }
+
+    private String normalizeForHeuristic(String text) {
+        if (text == null) {
+            return "";
+        }
+        String nfd = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD);
+        String noAccent = nfd.replaceAll("\\p{M}", "");
+        return (" " + noAccent.toLowerCase() + " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private String handleLocationSearchFlow(String locationName,
+                                            Double radius,
+                                            String question,
+                                            String role,
+                                            Long userId,
+                                            String predictedIntent,
+                                            Double confidence,
+                                            long startTime,
+                                            boolean fallbackOnGeoMiss) {
+        Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
+        System.out.println("📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km");
+
+        if (locationName == null || locationName.trim().isEmpty()) {
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            return "Dạ, bạn có thể cho mình biết tên địa điểm cụ thể bạn muốn tìm phòng gần đó không ạ?";
+        }
+
+        GeocodingService.GeoResult geoResult = geocodingService.geocode(locationName);
+        if (geoResult == null) {
+            if (fallbackOnGeoMiss) {
+                return null;
+            }
+            System.out.println("❌ [LOCATION FLOW] Geo miss -> '" + locationName + "'");
+            List<String> topSuggestions = geocodingService.getSmartSuggestions(locationName, 3);
+            StringBuilder sb = new StringBuilder("Dạ, mình không tìm thấy địa điểm '" + locationName + "'.\n");
+            if (!topSuggestions.isEmpty()) {
+                sb.append("Bạn có muốn tìm phòng gần các địa điểm sau không?\n");
+                for (String sugg : topSuggestions) {
+                    sb.append("- ").append(sugg).append("\n");
+                }
+            }
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            return sb.toString();
+        }
+
+        List<Map<String, Object>> results = propertyRepository.findNearbyRooms(geoResult.latitude, geoResult.longitude, safeRadius);
+        if (results.isEmpty()) {
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '" + geoResult.displayName + "'.";
+        }
+
+        StringBuilder responseStr = new StringBuilder();
+        responseStr.append("Dạ, mình tìm được ").append(results.size())
+                .append(" phòng trống gần '").append(geoResult.displayName)
+                .append("' (trong bán kính ").append(safeRadius.intValue()).append("km):\n\n");
+
+        int limit = Math.min(results.size(), 5);
+        for (int i = 0; i < limit; i++) {
+            Map<String, Object> row = results.get(i);
+            Object roomId = row.get("room_id");
+            Object nameObj = row.get("name");
+            String name = nameObj != null ? nameObj.toString() : "";
+            if (name.length() > 35) {
+                name = name.substring(0, 32) + "...";
+            }
+
+            String priceStr = normalizePriceForCard(row.get("price"));
+            Object distance = row.get("distance_km");
+            String firstImg = extractFirstImage(row.get("images"));
+
+            responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
+                    roomId, name, priceStr, firstImg, distance));
+        }
+
+        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+        return responseStr.toString();
     }
 
     private String extractFirstImage(Object imagesObj) {
