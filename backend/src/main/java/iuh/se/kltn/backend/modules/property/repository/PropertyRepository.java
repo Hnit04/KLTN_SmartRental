@@ -36,14 +36,12 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             SELECT r.id AS room_id, r.name, r.price, r.images, r.area, r.status AS room_status,
                    p.name AS property_name, p.address, p.district, p.city,
                    p.latitude, p.longitude,
-                   ROUND(
-                     (
-                       6371 * ACOS(
-                         LEAST(1.0, COS(RADIANS(:lat)) * COS(RADIANS(p.latitude)) *
-                         COS(RADIANS(p.longitude) - RADIANS(:lng)) +
-                         SIN(RADIANS(:lat)) * SIN(RADIANS(p.latitude)))
-                       )
-                     )::numeric, 2
+                   (
+                     6371 * ACOS(
+                       LEAST(1.0, COS(RADIANS(:lat)) * COS(RADIANS(p.latitude)) *
+                       COS(RADIANS(p.longitude) - RADIANS(:lng)) +
+                       SIN(RADIANS(:lat)) * SIN(RADIANS(p.latitude)))
+                     )
                    ) AS distance_km
             FROM rooms r
             JOIN properties p ON r.property_id = p.id
