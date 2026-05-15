@@ -249,9 +249,15 @@ public class AiOrchestratorService {
         String heuristicLocation = tryExtractLocationForNearbySearch(question, role);
         if (heuristicLocation != null) {
             Double heuristicRadius = extractRadiusKm(question);
+            Long heuristicMaxPrice = extractMaxPriceVnd(question);
+            Integer heuristicRequiredOccupants = extractRequiredOccupantsFromQuestion(question);
+            boolean heuristicRequirePetFriendly = extractRequirePetFriendly(question);
             String heuristicResponse = handleLocationSearchFlow(
                     heuristicLocation,
                     heuristicRadius,
+                    heuristicMaxPrice,
+                    heuristicRequiredOccupants,
+                    heuristicRequirePetFriendly,
                     question,
                     role,
                     userId,
@@ -314,9 +320,15 @@ public class AiOrchestratorService {
                             radius = Double.parseDouble(extraction.getParams().get("radius").toString());
                         } catch (Exception e) {}
                     }
+                    Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
+                    Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
+                    boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
                     return handleLocationSearchFlow(
                             locationName,
                             radius,
+                            maxPrice,
+                            requiredOccupants,
+                            requirePetFriendly,
                             question,
                             role,
                             userId,
@@ -721,6 +733,158 @@ public class AiOrchestratorService {
         return 3.0;
     }
 
+    private Long extractMaxPriceFromParams(Map<String, Object> params, String question) {
+        if (params != null) {
+            String[] keys = new String[] {"max_price", "maxPrice", "price_max", "budget_max"};
+            for (String key : keys) {
+                if (params.containsKey(key) && params.get(key) != null) {
+                    try {
+                        double raw = Double.parseDouble(params.get(key).toString());
+                        if (raw > 0) {
+                            // Nếu model trả "5" (hiểu là 5 triệu), tự quy đổi cho an toàn.
+                            if (raw <= 1000) {
+                                return Math.round(raw * 1_000_000d);
+                            }
+                            return Math.round(raw);
+                        }
+                    } catch (Exception ignored) {
+                        // fallback below
+                    }
+                }
+            }
+        }
+        return extractMaxPriceVnd(question);
+    }
+
+    private Long extractMaxPriceVnd(String question) {
+        if (question == null || question.trim().isEmpty()) {
+            return null;
+        }
+        String normalized = normalizeForHeuristic(question);
+
+        java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
+                java.util.regex.Pattern.compile("(?:duoi|toi da|khong qua|nho hon|under|<=)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?"),
+                java.util.regex.Pattern.compile("(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\s*(?:tro xuong|do lai|hoac thap hon|or less)")
+        };
+
+        for (java.util.regex.Pattern pattern : patterns) {
+            java.util.regex.Matcher matcher = pattern.matcher(normalized);
+            if (matcher.find()) {
+                double value = Double.parseDouble(matcher.group(1).replace(",", "."));
+                String unit = matcher.groupCount() >= 2 ? matcher.group(2) : null;
+                return convertToVnd(value, unit);
+            }
+        }
+
+        // "giá rẻ" không có ngưỡng cụ thể -> mặc định <= 3 triệu.
+        if (normalized.contains("gia re") || normalized.contains(" re ")) {
+            return 3_000_000L;
+        }
+        return null;
+    }
+
+    private Long convertToVnd(double value, String unit) {
+        if (value <= 0) {
+            return null;
+        }
+        if (unit == null || unit.isBlank()) {
+            return Math.round(value);
+        }
+        String u = unit.trim().toLowerCase();
+        if (u.equals("trieu") || u.equals("tr") || u.equals("cu")) {
+            return Math.round(value * 1_000_000d);
+        }
+        if (u.equals("k") || u.equals("nghin")) {
+            return Math.round(value * 1_000d);
+        }
+        return Math.round(value);
+    }
+
+    private Integer extractRequiredOccupantsFromParams(Map<String, Object> params, String question) {
+        if (params != null) {
+            String[] keys = new String[] {"occupants", "required_occupants", "people", "persons", "max_occupants"};
+            for (String key : keys) {
+                if (params.containsKey(key) && params.get(key) != null) {
+                    try {
+                        int value = Integer.parseInt(params.get(key).toString());
+                        if (value > 0) {
+                            return value;
+                        }
+                    } catch (Exception ignored) {
+                        // fallback below
+                    }
+                }
+            }
+        }
+        return extractRequiredOccupantsFromQuestion(question);
+    }
+
+    private Integer extractRequiredOccupantsFromQuestion(String question) {
+        if (question == null || question.trim().isEmpty()) {
+            return null;
+        }
+        String normalized = normalizeForHeuristic(question);
+        java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
+                java.util.regex.Pattern.compile("(?:cho|o|ở|toi da|toi uu|du cho)\\s*(\\d+)\\s*(?:nguoi|ng)"),
+                java.util.regex.Pattern.compile("(\\d+)\\s*(?:nguoi|ng)\\s*(?:o|ở)?")
+        };
+        for (java.util.regex.Pattern pattern : patterns) {
+            java.util.regex.Matcher matcher = pattern.matcher(normalized);
+            if (matcher.find()) {
+                try {
+                    int value = Integer.parseInt(matcher.group(1));
+                    if (value > 0 && value <= 20) {
+                        return value;
+                    }
+                } catch (Exception ignored) {
+                    // continue
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean extractRequirePetFriendlyFromParams(Map<String, Object> params, String question) {
+        if (params != null) {
+            String[] keys = new String[] {"pet_friendly", "allow_pets", "petAllowed", "has_pet"};
+            for (String key : keys) {
+                if (params.containsKey(key) && params.get(key) != null) {
+                    Object value = params.get(key);
+                    if (value instanceof Boolean b) {
+                        return b;
+                    }
+                    String text = value.toString().trim().toLowerCase();
+                    if (text.equals("true") || text.equals("yes") || text.equals("1")) {
+                        return true;
+                    }
+                    if (text.equals("false") || text.equals("no") || text.equals("0")) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return extractRequirePetFriendly(question);
+    }
+
+    private boolean extractRequirePetFriendly(String question) {
+        if (question == null || question.trim().isEmpty()) {
+            return false;
+        }
+        String normalized = normalizeForHeuristic(question);
+        // Ưu tiên nhận diện phủ định để tránh lọc sai.
+        if (normalized.contains("khong nuoi thu cung")
+                || normalized.contains("khong can thu cung")
+                || normalized.contains("khong co thu cung")
+                || normalized.contains("khong nuoi pet")) {
+            return false;
+        }
+        return normalized.contains("nuoi thu cung")
+                || normalized.contains("cho nuoi thu cung")
+                || normalized.contains("pet friendly")
+                || normalized.contains("cho phep thu cung")
+                || normalized.contains("cho phep nuoi pet");
+    }
+
     private String normalizeForHeuristic(String text) {
         if (text == null) {
             return "";
@@ -732,6 +896,9 @@ public class AiOrchestratorService {
 
     private String handleLocationSearchFlow(String locationName,
                                             Double radius,
+                                            Long maxPrice,
+                                            Integer requiredOccupants,
+                                            boolean requirePetFriendly,
                                             String question,
                                             String role,
                                             Long userId,
@@ -740,7 +907,8 @@ public class AiOrchestratorService {
                                             long startTime,
                                             boolean fallbackOnGeoMiss) {
         Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
-        System.out.println("📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km");
+        System.out.println("📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km, maxPrice=" + maxPrice
+                + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
 
         if (locationName == null || locationName.trim().isEmpty()) {
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
@@ -765,7 +933,14 @@ public class AiOrchestratorService {
             return sb.toString();
         }
 
-        List<Map<String, Object>> results = propertyRepository.findNearbyRooms(geoResult.latitude, geoResult.longitude, safeRadius);
+        List<Map<String, Object>> results = propertyRepository.findNearbyRoomsAdvanced(
+                geoResult.latitude,
+                geoResult.longitude,
+                safeRadius,
+                (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
+                (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
+                requirePetFriendly
+        );
         if (results.isEmpty()) {
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
             return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '" + geoResult.displayName + "'.";
