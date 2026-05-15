@@ -16,6 +16,7 @@ type Message = {
   sender: "user" | "ai";
   isDataQuery?: boolean;
   hasReminderAction?: boolean;
+  sourceLabel?: string;
 };
 
 export default function AiChatBot() {
@@ -153,6 +154,37 @@ export default function AiChatBot() {
     });
   };
 
+  const parseRoomCardPrice = (rawPrice: string): number => {
+    const cleaned = rawPrice
+      .trim()
+      .toLowerCase()
+      .replace(/(vnđ|vnd|đ)/g, "")
+      .replace(/\s+/g, "");
+
+    const unitMatch = cleaned.match(/^(\d+(?:[.,]\d+)?)\s*(tr|triệu|trieu|k)$/i);
+    if (unitMatch) {
+      const baseValue = Number(unitMatch[1].replace(",", "."));
+      const unit = unitMatch[2].toLowerCase();
+      if (Number.isFinite(baseValue)) {
+        if (unit === "k") return Math.round(baseValue * 1_000);
+        return Math.round(baseValue * 1_000_000);
+      }
+    }
+
+    if (/^\d+(\.\d+)?$/.test(cleaned)) {
+      return Math.round(Number(cleaned));
+    }
+    if (/^\d+(,\d+)?$/.test(cleaned)) {
+      return Math.round(Number(cleaned.replace(",", ".")));
+    }
+
+    const digits = cleaned.replace(/[^\d]/g, "");
+    return digits ? Number(digits) : 0;
+  };
+
+  const formatVnd = (value: number): string =>
+    value > 0 ? `${value.toLocaleString("vi-VN")}đ` : "Liên hệ";
+
   const renderMessageWithCards = (text: string): ReactNode => {
     // Regex tìm chuỗi [ROOM_CARD: id | name | price | imageUrl | distance(optional)]
     const regex = /\[ROOM_CARD:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|\]]*?)(?:\s*\|\s*([^\]]*))?\]/g;
@@ -167,7 +199,7 @@ export default function AiChatBot() {
 
       const [_, roomId, roomName, priceStr, imageUrl, distanceStr] = match;
       const cleanImgUrl = imageUrl.trim();
-      const cleanPrice = parseInt(priceStr.trim().replace(/\D/g, '')) || 0;
+      const cleanPrice = parseRoomCardPrice(priceStr);
       const distance = distanceStr ? distanceStr.trim() : null;
       
       parts.push(
@@ -188,7 +220,7 @@ export default function AiChatBot() {
             )}
             <div className="absolute top-3 right-3">
               <div className="bg-background/90 backdrop-blur-md px-3 py-1 rounded-full text-[12px] font-bold text-primary shadow-sm border border-primary/20">
-                {cleanPrice.toLocaleString()}đ
+                {formatVnd(cleanPrice)}
               </div>
             </div>
             {/* Badge khoảng cách - chỉ hiển thị khi có data location */}
@@ -205,6 +237,9 @@ export default function AiChatBot() {
           {/* Nội dung chi tiết */}
           <div className="p-4">
             <h4 className="font-bold text-foreground text-base mb-1 line-clamp-1">{roomName.trim()}</h4>
+            <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              Dữ liệu giá từ hệ thống SmartRental
+            </div>
             <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] mb-4">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Đang còn trống • Sẵn sàng dọn vào
@@ -351,6 +386,7 @@ export default function AiChatBot() {
 
     try {
       let replyText = "";
+      let sourceLabel: string | undefined;
 
       if (isAnomalyQuery) {
          try {
@@ -365,8 +401,12 @@ export default function AiChatBot() {
         try {
           const dataRes = await aiApi.queryData(userMsg);
           replyText = dataRes.data;
+          sourceLabel = dataRes.verifiable
+            ? "Đã đối soát từ dữ liệu hệ thống"
+            : "Nguồn dữ liệu cần kiểm tra thêm";
         } catch (error: any) {
           replyText = error.response?.data?.message || "Xin lỗi, hệ thống truy xuất dữ liệu đang bận.";
+          sourceLabel = "Không thể đối soát do lỗi truy vấn";
         }
       } else {
         // Chat thông thường (hỏi linh tinh, hỏi luật, phân tích phòng)
@@ -384,6 +424,8 @@ export default function AiChatBot() {
           id: (Date.now() + 1).toString(), 
           text: replyText, 
           sender: "ai",
+          isDataQuery,
+          sourceLabel,
           hasReminderAction: isLandlord && isDataQuery && (normalizedMsg.includes("nợ") || normalizedMsg.includes("chưa đóng") || normalizedMsg.includes("trễ"))
         },
       ]);
@@ -464,6 +506,11 @@ export default function AiChatBot() {
                 <div 
                 className={`px-5 py-4 min-h-[44px] text-[14.5px] leading-relaxed relative ${msg.sender === "user" ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-sm shadow-md' : 'bg-white border border-border shadow-sm rounded-2xl rounded-tl-sm text-foreground'}`}
               >
+                  {msg.sender === "ai" && msg.isDataQuery && (
+                    <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                      {msg.sourceLabel || "Đã đối soát từ dữ liệu hệ thống"}
+                    </div>
+                  )}
                   {msg.sender === "ai" ? renderMessageWithCards(msg.text) : msg.text}
                   {msg.hasReminderAction && (
                     <div className="mt-4 pt-3 border-t border-border/50 animate-in fade-in duration-500">

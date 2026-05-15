@@ -158,7 +158,9 @@ public class AiController {
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "question", question,
-                    "data", result
+                    "data", result,
+                    "source", "SYSTEM_DB",
+                    "verifiable", true
             ));
         } catch (Throwable t) {
             System.err.println("❌ [AI DATA ERROR] Lỗi khi xử lý truy vấn dữ liệu AI: " + t.getMessage());
