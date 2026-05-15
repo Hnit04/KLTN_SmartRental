@@ -336,17 +336,7 @@ public class AiOrchestratorService {
                             name = name.substring(0, 32) + "...";
                         }
                         
-                        Object priceObj = row.get("price");
-                        String priceStr = "0";
-                        if (priceObj instanceof Number) {
-                            priceStr = String.valueOf(((Number) priceObj).longValue());
-                        } else if (priceObj != null) {
-                            try {
-                                priceStr = String.valueOf(Double.valueOf(priceObj.toString()).longValue());
-                            } catch (Exception e) {
-                                priceStr = priceObj.toString();
-                            }
-                        }
+                        String priceStr = normalizePriceForCard(row.get("price"));
 
                         Object distance = row.get("distance_km");
                         String firstImg = extractFirstImage(row.get("images"));
@@ -551,8 +541,8 @@ public class AiOrchestratorService {
                     Object roomId = row.getOrDefault("room_id", row.get("id"));
                     if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
                         String firstImg = extractFirstImage(row.get("images"));
-                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n", 
-                            roomId, row.get("name"), row.get("price"), firstImg));
+                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n",
+                            roomId, row.get("name"), normalizePriceForCard(row.get("price")), firstImg));
                     } else {
                         fallbackResponse.append("- ").append(row.toString()).append("\n");
                     }
@@ -691,6 +681,46 @@ public class AiOrchestratorService {
             return matcher.group(1);
         }
         return "";
+    }
+
+    private String normalizePriceForCard(Object priceObj) {
+        if (priceObj == null) {
+            return "0";
+        }
+        if (priceObj instanceof Number number) {
+            return String.valueOf(number.longValue());
+        }
+
+        String raw = priceObj.toString();
+        if (raw == null) {
+            return "0";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return "0";
+        }
+
+        String normalized = trimmed
+                .replace("đ", "")
+                .replace("Đ", "")
+                .replace("vnđ", "")
+                .replace("VND", "")
+                .replace(" ", "");
+
+        try {
+            if (normalized.matches("^\\d+(\\.0+)?$")) {
+                return String.valueOf((long) Double.parseDouble(normalized));
+            }
+
+            String digitsOnly = normalized.replaceAll("[^0-9]", "");
+            if (!digitsOnly.isEmpty()) {
+                return String.valueOf(Long.parseLong(digitsOnly));
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+
+        return "0";
     }
 
     /**

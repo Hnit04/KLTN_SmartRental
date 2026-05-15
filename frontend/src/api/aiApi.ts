@@ -10,6 +10,8 @@ export interface QueryDataResponse {
   status: string;
   question: string;
   data: string;
+  source?: string;
+  verifiable?: boolean;
 }
 
 export const aiApi = {
