@@ -1,10 +1,11 @@
 import { Outlet, Link, NavLink, useLocation } from "react-router-dom";
 import { Button } from "../ui/Button";
-import { Home, Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, CheckCircle2, Heart, Menu, X } from "lucide-react";
+import { Star, LayoutDashboard, Mail, Facebook, Linkedin, Twitter, CheckCircle2, Heart, Menu, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { UserNav } from "../shared/UserNav"; 
 import NotificationBell from "../shared/NotificationBell";
 import { ThemeToggle } from "../shared/ThemeToggle";
+import Logo from "../shared/Logo";
 import { useState, useEffect } from "react"; 
 import { ArrowUp, ShieldCheck, Globe, CreditCard, Search, TrendingUp, Sparkles, BookOpen, MessageCircle, HelpCircle, Bug, Shield, Scale, ClipboardList } from "lucide-react";
 import { DASHBOARD_BY_ROLE, type AppRole } from "@/config/navigation";
@@ -77,11 +78,8 @@ export default function PublicLayout() {
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 min-w-0">
           {/* Logo */}
-          <Link to="/" className="flex min-w-0 items-center gap-2 shrink-0" onClick={() => setMobileMenuOpen(false)}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Home className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-lg sm:text-xl font-bold text-foreground truncate">SmartRental</span>
+          <Link to="/" className="flex min-w-0 items-center gap-2 shrink-0 rounded-lg px-1 py-0.5" onClick={() => setMobileMenuOpen(false)}>
+            <Logo size={44} variant="auto" showWordmark />
           </Link>
 
           {/* Menu Chinh co Focus */}
@@ -315,10 +313,7 @@ export default function PublicLayout() {
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <div className="mb-5 flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                  <Home className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <span className="text-2xl font-bold tracking-tight text-white">SmartRental</span>
+                <Logo size={40} variant="dark" showWordmark />
               </div>
               <p className="max-w-xs text-sm leading-relaxed text-slate-300/85">
                 Nền tảng thuê phòng thông minh, mang lại sự tiện nghi và an tâm rõ ràng cho cả Chủ trọ và Người thuê.
@@ -437,7 +432,7 @@ export default function PublicLayout() {
               <div className="space-y-3">
                 <button className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-left transition-all duration-300 hover:border-primary/50 hover:bg-primary/20">
                   <div className="flex items-center gap-3">
-                    <Home className="h-5 w-5 text-slate-200" />
+                    <Logo size={20} variant="dark" />
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-slate-400">Download on</p>
                       <p className="text-sm font-bold text-white">App Store</p>
@@ -446,7 +441,7 @@ export default function PublicLayout() {
                 </button>
                 <button className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-left transition-all duration-300 hover:border-primary/50 hover:bg-primary/20">
                   <div className="flex items-center gap-3">
-                    <Home className="h-5 w-5 text-slate-200" />
+                    <Logo size={20} variant="dark" />
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-slate-400">Get it on</p>
                       <p className="text-sm font-bold text-white">Google Play</p>
