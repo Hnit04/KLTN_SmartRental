@@ -1,12 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  Home, 
   LogOut,
   UserCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/utils/cn';
 import { ROLE_NAV_ITEMS, type AppRole } from '@/config/navigation';
+import Logo from '@/components/shared/Logo';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -28,8 +28,7 @@ const Sidebar = () => {
       {/* Logo Area */}
       <div className="flex shrink-0 flex-col gap-2 border-b border-sidebar-border px-4 py-3">
         <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-primary transition-opacity hover:opacity-85" title="Về trang chủ">
-          <Home className="h-5 w-5 shrink-0" />
-          <span>SmartRental</span>
+          <Logo size={34} variant="auto" showWordmark />
         </Link>
         <div className="flex items-center gap-2">
           <span

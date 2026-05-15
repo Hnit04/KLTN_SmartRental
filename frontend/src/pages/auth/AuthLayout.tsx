@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import "./auth.css";
+import Logo from "@/components/shared/Logo";
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -103,9 +104,7 @@ export default function AuthLayout({ children, variant = "login" }: AuthLayoutPr
         >
           {/* Logo */}
           <div className="auth-brand-logo">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <Logo size={36} variant="dark" showWordmark />
           </div>
 
           <h1 className="auth-brand-title">{config.title}</h1>
@@ -139,9 +138,7 @@ export default function AuthLayout({ children, variant = "login" }: AuthLayoutPr
           {/* Mobile logo (hidden on desktop) */}
           <motion.div className="auth-mobile-logo" variants={itemVariants}>
             <div className="auth-mobile-logo-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
+              <Logo size={20} variant="auto" />
             </div>
             <span className="auth-mobile-logo-text">SmartRental</span>
           </motion.div>

@@ -34,12 +34,48 @@ const ROOM_TYPE_LABELS: Record<RoomType, string> = {
 };
 
 // Danh sách gợi ý điều khoản dành cho chủ trọ
-const LANDLORD_SUGGESTED_TERMS = [
-  "Không nuôi thú cưng (chó, mèo...).",
-  "Giữ yên tĩnh chung sau 22h00 đêm.",
-  "Báo trước 30 ngày trước khi trả phòng.",
-  "Bồi thường 100% nếu làm hỏng tài sản phòng.",
-  "Chậm tiền nhà quá 5 ngày phạt 5%."
+const RULE_CATEGORIES = [
+  {
+    label: '🐾 Thú cưng',
+    color: 'amber',
+    rules: [
+      { text: 'Cho nuôi thú cưng (chó, mèo).', toggle: 'Không cho nuôi thú cưng (chó, mèo).' },
+    ],
+  },
+  {
+    label: '🔇 Sinh hoạt',
+    color: 'blue',
+    rules: [
+      { text: 'Giữ yên tĩnh chung sau 22h00 đêm.' },
+      { text: 'Không hút thuốc trong phòng.' },
+      { text: 'Giữ gìn vệ sinh khu vực chung.' },
+      { text: 'Không mang người lạ về ở qua đêm.' },
+    ],
+  },
+  {
+    label: '💰 Tài chính',
+    color: 'emerald',
+    rules: [
+      { text: 'Chậm tiền nhà quá 5 ngày phạt 5%.' },
+      { text: 'Thanh toán tiền nhà trước ngày 5 hàng tháng.' },
+    ],
+  },
+  {
+    label: '📋 Hợp đồng',
+    color: 'violet',
+    rules: [
+      { text: 'Báo trước 30 ngày trước khi trả phòng.' },
+      { text: 'Không được sang nhượng phòng cho người khác.' },
+    ],
+  },
+  {
+    label: '🔧 Tài sản',
+    color: 'rose',
+    rules: [
+      { text: 'Bồi thường 100% nếu làm hỏng tài sản phòng.' },
+      { text: 'Không tự ý sửa chữa, khoan tường.' },
+    ],
+  },
 ];
 
 export default function PropertyRoomDetailPage() {
@@ -206,6 +242,34 @@ export default function PropertyRoomDetailPage() {
       defaultTerms: prev.defaultTerms
         ? `${prev.defaultTerms}\n- ${term}`
         : `- ${term}`
+    }));
+  };
+
+  const handleToggleRule = (positiveText: string, negativeText: string) => {
+    const hasPositive = formData.defaultTerms.includes(positiveText);
+    const hasNegative = formData.defaultTerms.includes(negativeText);
+
+    setFormData(prev => {
+      let newTerms = prev.defaultTerms;
+      if (hasPositive) {
+        newTerms = newTerms.replace(`- ${positiveText}`, `- ${negativeText}`);
+      } else if (hasNegative) {
+        newTerms = newTerms.replace(`- ${negativeText}`, `- ${positiveText}`);
+      } else {
+        newTerms = newTerms ? `${newTerms}\n- ${positiveText}` : `- ${positiveText}`;
+      }
+      return { ...prev, defaultTerms: newTerms };
+    });
+  };
+
+  const handleRemoveRule = (ruleText: string) => {
+    setFormData(prev => ({
+      ...prev,
+      defaultTerms: prev.defaultTerms
+        .replace(`\n- ${ruleText}`, '')
+        .replace(`- ${ruleText}\n`, '')
+        .replace(`- ${ruleText}`, '')
+        .trim()
     }));
   };
 
@@ -910,44 +974,94 @@ export default function PropertyRoomDetailPage() {
 
                   {/* Điều khoản & Nội quy mẫu */}
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
-                    <div className="flex justify-between items-end mb-2">
+                    <div className="flex justify-between items-end mb-3">
                       <label className="block text-sm font-bold text-blue-900 flex items-center gap-1">
-                        <ScrollText className="h-4 w-4" /> Điều khoản & Nội quy mẫu
+                        <ScrollText className="h-4 w-4" /> Nội quy phòng
                       </label>
                     </div>
                     
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {LANDLORD_SUGGESTED_TERMS.map((term, idx) => {
-                        const isAdded = formData.defaultTerms.includes(term);
-                        return (
-                          <span
-                            key={idx}
-                            onClick={() => !isAdded && handleAddTerm(term)}
-                            className={`text-[11px] px-2.5 py-1 rounded-full transition-all shadow-sm flex items-center gap-1 border ${
-                              isAdded 
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
-                            }`}
-                          >
-                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-blue-600'}`}>
-                              {isAdded ? '✓' : '+'}
-                            </span> 
-                            {term.substring(0, 30)}...
-                          </span>
-                        );
-                      })}
+                    <div className="space-y-3 mb-4">
+                      {RULE_CATEGORIES.map((cat, catIdx) => (
+                        <div key={catIdx}>
+                          <p className="text-xs font-bold text-gray-600 mb-1.5">{cat.label}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {cat.rules.map((rule, rIdx) => {
+                              const isToggle = !!rule.toggle;
+                              const hasPositive = formData.defaultTerms.includes(rule.text);
+                              const hasNegative = isToggle && formData.defaultTerms.includes(rule.toggle!);
+                              const isActive = hasPositive || hasNegative;
+
+                              if (isToggle) {
+                                return (
+                                  <div key={rIdx} className="flex items-center gap-0 rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleRule(rule.text, rule.toggle!)}
+                                      className={`text-[11px] px-2.5 py-1.5 transition-all font-medium ${
+                                        hasPositive
+                                          ? 'bg-green-500 text-white'
+                                          : 'bg-white text-gray-500 hover:bg-green-50'
+                                      }`}
+                                    >
+                                      ✓ Cho phép
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (hasNegative) { handleRemoveRule(rule.toggle!); }
+                                        else { handleToggleRule(rule.toggle!, rule.text); }
+                                      }}
+                                      className={`text-[11px] px-2.5 py-1.5 transition-all font-medium ${
+                                        hasNegative
+                                          ? 'bg-red-500 text-white'
+                                          : 'bg-white text-gray-500 hover:bg-red-50'
+                                      }`}
+                                    >
+                                      ✗ Cấm
+                                    </button>
+                                    <span className="text-[11px] px-2 py-1.5 bg-gray-50 text-gray-600 border-l">Thú cưng</span>
+                                    {isActive && (
+                                      <button type="button" onClick={() => handleRemoveRule(hasPositive ? rule.text : rule.toggle!)} className="px-1.5 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition">
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <span
+                                  key={rIdx}
+                                  onClick={() => {
+                                    if (hasPositive) { handleRemoveRule(rule.text); }
+                                    else { handleAddTerm(rule.text); }
+                                  }}
+                                  className={`text-[11px] px-2.5 py-1.5 rounded-lg transition-all shadow-sm flex items-center gap-1 border cursor-pointer select-none ${
+                                    hasPositive 
+                                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                      : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300 active:scale-95'
+                                  }`}
+                                >
+                                  <span className="font-bold text-[10px]">
+                                    {hasPositive ? '✓' : '+'}
+                                  </span> 
+                                  {rule.text.replace(/\.$/, '')}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
 
                     <textarea 
-                      rows={6} 
+                      rows={5} 
                       value={formData.defaultTerms} 
                       onChange={e => setFormData({...formData, defaultTerms: e.target.value})} 
                       className="w-full flex-1 border-blue-200 p-3 rounded-md focus:ring-2 focus:ring-blue-400 outline-none bg-white resize-none text-sm leading-relaxed" 
-                      placeholder="VD: Không nuôi chó mèo. Thanh toán tiền mùng 5 hàng tháng..." 
+                      placeholder="Nội quy sẽ hiển thị ở đây. Bạn cũng có thể gõ thêm nội quy riêng..." 
                     />
-                    <p className="text-[11px] text-blue-600 mt-2 italic">
-                      Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê phòng này.
-                    </p>
+                    <p className="text-[11px] text-blue-600 mt-2 italic">💡 Nội dung này sẽ tự động điền vào hợp đồng khi có khách thuê. Khách thuê có thể tìm phòng dựa trên nội quy.</p>
                   </div>
                 </div>
 

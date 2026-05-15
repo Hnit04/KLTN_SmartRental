@@ -58,7 +58,9 @@ public class DynamicQueryEngine {
     private List<Map<String, Object>> handleSearchRoom(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
                 "SELECT r.id AS room_id, r.name, r.price, r.area, r.type, r.images, " +
-                "r.has_mezzanine, r.has_balcony, p.name AS property_name, p.address, p.district, " +
+                "r.has_mezzanine, r.has_balcony, r.max_occupants, r.current_occupants, " +
+                "r.amenities, r.default_terms, r.description, " +
+                "p.name AS property_name, p.address, p.district, " +
                 "p.elec_price AS elecPrice, p.water_price AS waterPrice, p.internet_price AS internetPrice " +
                 "FROM rooms r JOIN properties p ON r.property_id = p.id " +
                 "WHERE r.status = 'AVAILABLE' AND p.status = 'APPROVED'"
@@ -89,11 +91,32 @@ public class DynamicQueryEngine {
                 sql.append(" AND r.type = ?");
                 queryParams.add(params.get("room_type").toString());
             }
-            if (params.containsKey("has_mezzanine") && Boolean.TRUE.equals(params.get("has_mezzanine"))) {
+            if (params.containsKey("has_mezzanine") && Boolean.TRUE.equals(toBoolean(params.get("has_mezzanine")))) {
                 sql.append(" AND r.has_mezzanine = TRUE");
             }
-            if (params.containsKey("has_balcony") && Boolean.TRUE.equals(params.get("has_balcony"))) {
+            if (params.containsKey("has_balcony") && Boolean.TRUE.equals(toBoolean(params.get("has_balcony")))) {
                 sql.append(" AND r.has_balcony = TRUE");
+            }
+            // Số người ở: lọc phòng có max_occupants >= số người yêu cầu
+            if (params.containsKey("occupants")) {
+                int occupants = toInt(params.get("occupants"));
+                if (occupants > 0) {
+                    sql.append(" AND (r.max_occupants IS NULL OR r.max_occupants >= ?)");
+                    queryParams.add(occupants);
+                }
+            }
+            // Cho nuôi thú cưng: text-search default_terms, description, amenities
+            if (params.containsKey("pet_friendly") && toBoolean(params.get("pet_friendly"))) {
+                sql.append(" AND (" +
+                        "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuôi thú cưng%' OR " +
+                        "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuoi thu cung%' OR " +
+                        "LOWER(COALESCE(r.description,'')) LIKE '%cho nuôi thú cưng%' OR " +
+                        "LOWER(COALESCE(r.description,'')) LIKE '%cho nuoi thu cung%' OR " +
+                        "LOWER(COALESCE(r.amenities,'')) LIKE '%pet friendly%'" +
+                        ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%không cho nuôi thú cưng%'" +
+                        " AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khong cho nuoi thu cung%'" +
+                        " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%không cho nuôi thú cưng%'" +
+                        " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khong cho nuoi thu cung%'");
             }
         }
         sql.append(" ORDER BY r.price ASC LIMIT 10");
@@ -342,5 +365,12 @@ public class DynamicQueryEngine {
     private int toInt(Object obj) {
         if (obj instanceof Number) return ((Number) obj).intValue();
         try { return Integer.parseInt(obj.toString()); } catch (Exception e) { return 0; }
+    }
+
+    private boolean toBoolean(Object obj) {
+        if (obj instanceof Boolean) return (Boolean) obj;
+        if (obj == null) return false;
+        String text = obj.toString().trim().toLowerCase();
+        return text.equals("true") || text.equals("yes") || text.equals("1");
     }
 }
