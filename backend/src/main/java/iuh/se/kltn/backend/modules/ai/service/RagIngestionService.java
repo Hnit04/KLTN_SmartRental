@@ -49,7 +49,8 @@ public class RagIngestionService {
     }
 
     /**
-     * Auto-seed knowledge documents if table is empty (mirrors AiOrchestratorService.seedInitialDataIfEmpty()).
+     * Auto-seed knowledge documents from TSV if table is empty.
+     * Format: id\ttitle\tcontent\tsource\tversion\tstatus (tab-separated, first line = header)
      */
     private void seedKnowledgeDataIfEmpty() {
         long count = knowledgeDocumentRepository.count();
@@ -57,27 +58,38 @@ public class RagIngestionService {
             System.out.println("ℹ️ RAG knowledge đã có " + count + " tài liệu, bỏ qua seed.");
             return;
         }
-        System.out.println("🌱 RAG knowledge trống! Đang nạp dữ liệu mẫu từ seed_knowledge_data.sql...");
+        System.out.println("🌱 RAG knowledge trống! Đang nạp dữ liệu mẫu từ seed_knowledge_data.tsv...");
         try {
             org.springframework.core.io.ClassPathResource resource =
-                    new org.springframework.core.io.ClassPathResource("data/seed_knowledge_data.sql");
-            String sql = new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            String[] statements = sql.split(";");
-            int executed = 0;
-            for (String stmt : statements) {
-                String trimmed = stmt.trim();
-                if (trimmed.toUpperCase().startsWith("INSERT")) {
-                    try {
-                        jdbcTemplate.execute(trimmed);
-                        executed++;
-                    } catch (Exception e) {
-                        System.err.println("⚠️ Lỗi seed knowledge: " + e.getMessage());
-                    }
-                }
+                    new org.springframework.core.io.ClassPathResource("data/seed_knowledge_data.tsv");
+            String tsv = new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            String[] lines = tsv.split("\n");
+            int saved = 0;
+            for (int i = 1; i < lines.length; i++) { // Skip header
+                String line = lines[i].trim();
+                if (line.isEmpty()) continue;
+                String[] cols = line.split("\t", 6);
+                if (cols.length < 6) continue;
+
+                String content = cols[2].replace("\\n", "\n"); // Unescape newlines
+                String hash = Integer.toHexString(content.hashCode());
+
+                KnowledgeDocument doc = KnowledgeDocument.builder()
+                        .id(cols[0].trim())
+                        .title(cols[1].trim())
+                        .content(content)
+                        .source(cols[3].trim())
+                        .version(cols[4].trim())
+                        .status(cols[5].trim())
+                        .contentHash(hash)
+                        .build();
+                knowledgeDocumentRepository.save(doc);
+                saved++;
             }
-            System.out.println("✅ Đã seed thành công " + executed + " tài liệu tri thức vào knowledge_documents!");
+            System.out.println("✅ Đã seed thành công " + saved + " tài liệu tri thức vào knowledge_documents!");
         } catch (Exception e) {
-            System.err.println("❌ Lỗi đọc file seed_knowledge_data.sql: " + e.getMessage());
+            System.err.println("❌ Lỗi đọc file seed_knowledge_data.tsv: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
