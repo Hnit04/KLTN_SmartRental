@@ -378,8 +378,8 @@ public class AiOrchestratorService {
                 } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
                     System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
 
-                    // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params Hash
-                    String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role);
+                    // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params + Question fingerprint
+                    String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role, question);
                     Cache resultCache = cacheManager.getCache("aiQueryResults");
                     if (resultCache != null) {
                         Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
@@ -1187,13 +1187,17 @@ public class AiOrchestratorService {
     }
 
     /**
-     * Sinh Cache Key xác định (deterministic) từ Intent + Params + UserId + Role.
+     * Sinh Cache Key xác định (deterministic) từ Intent + Params + UserId + Role +
+     * Question fingerprint.
      * Dùng TreeMap để đảm bảo thứ tự params luôn nhất quán bất kể thứ tự nhập.
-     * VD: "AI_CACHE::SEARCH_ROOM::GUEST::0::{district=Gò Vấp, max_price=3000000}"
+     * Dùng câu hỏi đã normalize để tránh đụng key khi intent/params giống nhau nhưng
+     * ý định truy vấn khác.
      */
-    private String buildCacheKey(String intent, Map<String, Object> params, Long userId, String role) {
+    private String buildCacheKey(String intent, Map<String, Object> params, Long userId, String role, String question) {
         Map<String, Object> sortedParams = params != null ? new TreeMap<>(params) : new TreeMap<>();
-        return "AI_CACHE::" + intent + "::" + role + "::" + userId + "::" + sortedParams.toString();
+        String normalizedQuestion = normalizeText(question).replaceAll("\\s+", " ").trim();
+        return "AI_CACHE::" + intent + "::" + role + "::" + userId + "::" + sortedParams + "::Q="
+                + Integer.toHexString(normalizedQuestion.hashCode());
     }
 
     /**
