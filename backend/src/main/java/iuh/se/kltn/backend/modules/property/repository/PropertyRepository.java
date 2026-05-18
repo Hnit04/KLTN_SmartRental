@@ -116,8 +116,12 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
                     (
                       (
                         LOWER(COALESCE(r.default_terms, '')) LIKE '%cho nuoi thu cung%' OR
+                        LOWER(COALESCE(r.default_terms, '')) LIKE '%nuoi cho%' OR
+                        LOWER(COALESCE(r.default_terms, '')) LIKE '%nuoi meo%' OR
                         LOWER(COALESCE(r.default_terms, '')) LIKE '%cho nuôi thú cưng%' OR
                         LOWER(COALESCE(r.description, '')) LIKE '%cho nuoi thu cung%' OR
+                        LOWER(COALESCE(r.description, '')) LIKE '%nuoi cho%' OR
+                        LOWER(COALESCE(r.description, '')) LIKE '%nuoi meo%' OR
                         LOWER(COALESCE(r.description, '')) LIKE '%cho nuôi thú cưng%' OR
                         LOWER(COALESCE(r.amenities, '')) LIKE '%pet friendly%'
                       )

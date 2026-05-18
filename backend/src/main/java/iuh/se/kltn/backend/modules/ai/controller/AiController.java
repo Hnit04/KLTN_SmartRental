@@ -3,6 +3,7 @@ package iuh.se.kltn.backend.modules.ai.controller;
 import iuh.se.kltn.backend.modules.ai.dto.request.*;
 import iuh.se.kltn.backend.modules.ai.service.AiOrchestratorService;
 import iuh.se.kltn.backend.modules.ai.service.SmartRentalAi;
+import iuh.se.kltn.backend.modules.ai.service.RagKnowledgeService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -63,6 +64,9 @@ public class AiController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private RagKnowledgeService ragKnowledgeService;
 
 
     @PostMapping("/chat")
@@ -219,6 +223,61 @@ public class AiController {
     }
 
     // Admin: Khởi tạo dữ liệu Vector mẫu (Để test)
+    @PostMapping("/admin/rag/documents")
+    public ResponseEntity<?> createRagDocument(@Valid @RequestBody RagDocumentRequest request) {
+        try {
+            return ResponseEntity.ok(ragKnowledgeService.createDocument(request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/rag/documents/{docId}")
+    public ResponseEntity<?> updateRagDocument(@PathVariable String docId, @Valid @RequestBody RagDocumentRequest request) {
+        try {
+            return ResponseEntity.ok(ragKnowledgeService.updateDocument(docId, request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/rag/documents/{docId}")
+    public ResponseEntity<?> deleteRagDocument(@PathVariable String docId) {
+        try {
+            return ResponseEntity.ok(ragKnowledgeService.softDeleteDocument(docId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/rag/documents")
+    public ResponseEntity<?> listRagDocuments(@RequestParam(defaultValue = "false") boolean includeDeleted) {
+        return ResponseEntity.ok(ragKnowledgeService.listDocuments(includeDeleted));
+    }
+
+    @PostMapping("/admin/rag/reindex")
+    public ResponseEntity<?> reindexAllRagDocuments() {
+        try {
+            return ResponseEntity.ok(ragKnowledgeService.reindexAll());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/rag/reindex/{docId}")
+    public ResponseEntity<?> reindexOneRagDocument(@PathVariable String docId) {
+        try {
+            return ResponseEntity.ok(ragKnowledgeService.reindexOne(docId));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/rag/status")
+    public ResponseEntity<?> getRagStatus() {
+        return ResponseEntity.ok(ragKnowledgeService.ragStatus());
+    }
+
     @PostMapping("/admin/init-data")
     public ResponseEntity<?> initSampleData() {
         // Code ở đây

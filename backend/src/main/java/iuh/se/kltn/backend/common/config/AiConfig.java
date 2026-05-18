@@ -28,7 +28,7 @@ public class AiConfig {
                 .apiKey(apiKey)
                 .modelName("gemini-2.5-flash")
                 .temperature(0.7)
-                .timeout(java.time.Duration.ofSeconds(120)) // Cực kỳ quan trọng để ko bị timeout khi phân tích văn bản dài
+                .timeout(java.time.Duration.ofSeconds(120)) // Longer timeout for long-form analysis
                 .build();
     }
 
@@ -38,14 +38,13 @@ public class AiConfig {
     }
 
     @Bean
-    @Lazy
     public EmbeddingModel embeddingModel() {
         return new AllMiniLmL6V2EmbeddingModel();
     }
 
     /**
-     * 🧠 PHASE 3: Thay InMemoryEmbeddingStore bằng PgVector.
-     * Embeddings persist qua restarts và share giữa các instances.
+     * PHASE 3: replace InMemoryEmbeddingStore with PgVector.
+     * Embeddings are persisted and shared across instances.
      */
     @Bean
     public EmbeddingStore<TextSegment> embeddingStore(JdbcTemplate jdbcTemplate) {
@@ -53,14 +52,13 @@ public class AiConfig {
     }
 
     @Bean
-    @Lazy
     public ContentRetriever contentRetriever(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel) {
         return EmbeddingStoreContentRetriever.builder()
                 .embeddingStore(embeddingStore)
                 .embeddingModel(embeddingModel)
-                .maxResults(2) // Lấy ra 2 đoạn văn bản liên quan nhất
-                .minScore(0.7) // Phải giống ý nghĩa từ 70% trở lên mới lấy
-                .filter(metadataKey("type").isEqualTo("document")) // CỰC KỲ QUAN TRỌNG: Chỉ quét văn bản, bỏ qua SQL
+                .maxResults(2) // Retrieve top-2 relevant chunks
+                .minScore(0.7) // Similarity threshold for document retrieval
+                .filter(metadataKey("type").isEqualTo("document")) // Restrict RAG to document chunks
                 .build();
     }
 }

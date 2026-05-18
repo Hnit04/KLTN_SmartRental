@@ -634,7 +634,9 @@ public class AiOrchestratorService {
     // Load lại toàn bộ Vector Store từ DB đã được filter valid=true
     private void reloadVectorCache() {
         System.out.println("🔄 Đang load lại Vector Store sau khi có thay đổi từ Admin...");
-        embeddingStore.removeAll();
+        // Chỉ reload cache nghiệp vụ (SQL/FAQ), giữ nguyên document chunks của RAG.
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("SQL"));
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("FAQ"));
         initVectorCache(); // Gọi lại Logic Load mặc định
     }
 
@@ -642,8 +644,9 @@ public class AiOrchestratorService {
     public void clearSqlCache() {
         System.out.println("🧹 Đang xoá bộ nhớ đệm SQL (Cache)...");
         cacheRepository.deleteAll(); // Xoá trong DB
-        embeddingStore.removeAll(); // Xoá trên RAM (Vector Store)
-        System.out.println("✅ Đã xoá sạch Cache AI.");
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("SQL"));
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("FAQ"));
+        System.out.println("✅ Đã xoá sạch SQL/FAQ Cache (giữ nguyên RAG documents).");
     }
 
     @Transactional
@@ -824,6 +827,9 @@ public class AiOrchestratorService {
             return null;
         }
         String normalized = normalizeForHeuristic(question);
+        if (normalized.contains("1 minh") || normalized.contains("mot minh") || normalized.contains("o rieng 1 nguoi")) {
+            return 1;
+        }
         java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
                 java.util.regex.Pattern.compile("(?:cho|o|ở|toi da|toi uu|du cho)\\s*(\\d+)\\s*(?:nguoi|ng)"),
                 java.util.regex.Pattern.compile("(\\d+)\\s*(?:nguoi|ng)\\s*(?:o|ở)?")
@@ -882,7 +888,11 @@ public class AiOrchestratorService {
                 || normalized.contains("cho nuoi thu cung")
                 || normalized.contains("pet friendly")
                 || normalized.contains("cho phep thu cung")
-                || normalized.contains("cho phep nuoi pet");
+                || normalized.contains("cho phep nuoi pet")
+                || normalized.contains("nuoi cho")
+                || normalized.contains("nuoi meo")
+                || normalized.contains("co cho")
+                || normalized.contains("co meo");
     }
 
     private String normalizeForHeuristic(String text) {

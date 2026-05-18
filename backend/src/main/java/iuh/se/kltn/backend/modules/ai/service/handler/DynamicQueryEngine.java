@@ -98,15 +98,17 @@ public class DynamicQueryEngine {
                 sql.append(" AND r.has_balcony = TRUE");
             }
             // Số người ở: lọc phòng có max_occupants >= số người yêu cầu
-            if (params.containsKey("occupants")) {
-                int occupants = toInt(params.get("occupants"));
+            Object occupantsParam = firstPresent(params, "occupants", "required_occupants", "people", "persons", "max_occupants");
+            if (occupantsParam != null) {
+                int occupants = toInt(occupantsParam);
                 if (occupants > 0) {
                     sql.append(" AND (r.max_occupants IS NULL OR r.max_occupants >= ?)");
                     queryParams.add(occupants);
                 }
             }
             // Cho nuôi thú cưng: text-search default_terms, description, amenities
-            if (params.containsKey("pet_friendly") && toBoolean(params.get("pet_friendly"))) {
+            Object petParam = firstPresent(params, "pet_friendly", "allow_pets", "petAllowed", "has_pet");
+            if (petParam != null && toBoolean(petParam)) {
                 sql.append(" AND (" +
                         "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuôi thú cưng%' OR " +
                         "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuoi thu cung%' OR " +
@@ -372,5 +374,14 @@ public class DynamicQueryEngine {
         if (obj == null) return false;
         String text = obj.toString().trim().toLowerCase();
         return text.equals("true") || text.equals("yes") || text.equals("1");
+    }
+
+    private Object firstPresent(Map<String, Object> params, String... keys) {
+        for (String key : keys) {
+            if (params.containsKey(key) && params.get(key) != null) {
+                return params.get(key);
+            }
+        }
+        return null;
     }
 }
