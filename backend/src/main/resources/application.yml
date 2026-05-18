@@ -71,6 +71,20 @@ blockchain:
 gemini:
   api:
     key: "${GEMINI_API_KEY:}"
+ai:
+  rag:
+    embedding:
+      # all-minilm-l6-v2 | onnx-custom | onnx-multilingual
+      model: ${AI_RAG_EMBEDDING_MODEL:all-minilm-l6-v2}
+      onnx:
+        # Dùng khi model=onnx-custom/onnx-multilingual (ví dụ multilingual-e5-small ONNX 384 dims)
+        model-path: ${AI_RAG_ONNX_MODEL_PATH:}
+        tokenizer-path: ${AI_RAG_ONNX_TOKENIZER_PATH:}
+        pooling-mode: ${AI_RAG_ONNX_POOLING_MODE:MEAN}
+    retrieval:
+      # Tối ưu recall tiếng Việt: tăng số chunk và giảm ngưỡng so với mặc định cũ
+      max-results: ${AI_RAG_RETRIEVAL_MAX_RESULTS:4}
+      min-score: ${AI_RAG_RETRIEVAL_MIN_SCORE:0.55}
 brevo:
   api:
     key: "${BREVO_API_KEY:}"
