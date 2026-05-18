@@ -1,4 +1,4 @@
-package iuh.se.kltn.backend.modules.ai.service.handler;
+﻿package iuh.se.kltn.backend.modules.ai.service.handler;
 
 import iuh.se.kltn.backend.modules.ai.dto.IntentExtractionResult;
 import iuh.se.kltn.backend.modules.ai.enums.SystemIntent;
@@ -52,8 +52,8 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // GUEST: Tìm phòng trọ công khai
-    // Nghiệp vụ: Chỉ hiển thị phòng AVAILABLE thuộc khu trọ đã APPROVED.
+    // GUEST: TĂ¬m phĂ²ng trá» cĂ´ng khai
+    // Nghiá»‡p vá»¥: Chá»‰ hiá»ƒn thá»‹ phĂ²ng AVAILABLE thuá»™c khu trá» Ä‘Ă£ APPROVED.
     // ========================================================================
     private List<Map<String, Object>> handleSearchRoom(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -97,7 +97,7 @@ public class DynamicQueryEngine {
             if (params.containsKey("has_balcony") && Boolean.TRUE.equals(toBoolean(params.get("has_balcony")))) {
                 sql.append(" AND r.has_balcony = TRUE");
             }
-            // Số người ở: lọc phòng có max_occupants >= số người yêu cầu
+            // Sá»‘ ngÆ°á»i á»Ÿ: lá»c phĂ²ng cĂ³ max_occupants >= sá»‘ ngÆ°á»i yĂªu cáº§u
             Object occupantsParam = firstPresent(params, "occupants", "required_occupants", "people", "persons", "max_occupants");
             if (occupantsParam != null) {
                 int occupants = toInt(occupantsParam);
@@ -106,18 +106,18 @@ public class DynamicQueryEngine {
                     queryParams.add(occupants);
                 }
             }
-            // Cho nuôi thú cưng: text-search default_terms, description, amenities
+            // Cho nuĂ´i thĂº cÆ°ng: text-search default_terms, description, amenities
             Object petParam = firstPresent(params, "pet_friendly", "allow_pets", "petAllowed", "has_pet");
             if (petParam != null && toBoolean(petParam)) {
                 sql.append(" AND (" +
-                        "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuôi thú cưng%' OR " +
+                        "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuĂ´i thĂº cÆ°ng%' OR " +
                         "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuoi thu cung%' OR " +
-                        "LOWER(COALESCE(r.description,'')) LIKE '%cho nuôi thú cưng%' OR " +
+                        "LOWER(COALESCE(r.description,'')) LIKE '%cho nuĂ´i thĂº cÆ°ng%' OR " +
                         "LOWER(COALESCE(r.description,'')) LIKE '%cho nuoi thu cung%' OR " +
                         "LOWER(COALESCE(r.amenities,'')) LIKE '%pet friendly%'" +
-                        ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%không cho nuôi thú cưng%'" +
+                        ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khĂ´ng cho nuĂ´i thĂº cÆ°ng%'" +
                         " AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khong cho nuoi thu cung%'" +
-                        " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%không cho nuôi thú cưng%'" +
+                        " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khĂ´ng cho nuĂ´i thĂº cÆ°ng%'" +
                         " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khong cho nuoi thu cung%'");
             }
         }
@@ -126,9 +126,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem hóa đơn của chính mình
-    // Nghiệp vụ: bills KHÔNG có tenant_id → BẮT BUỘC JOIN qua contracts.
-    // Hiển thị thông tin phòng kèm theo để khách biết hóa đơn thuộc phòng nào.
+    // TENANT: Xem hĂ³a Ä‘Æ¡n cá»§a chĂ­nh mĂ¬nh
+    // Nghiá»‡p vá»¥: bills KHĂ”NG cĂ³ tenant_id â†’ Báº®T BUá»˜C JOIN qua contracts.
+    // Hiá»ƒn thá»‹ thĂ´ng tin phĂ²ng kĂ¨m theo Ä‘á»ƒ khĂ¡ch biáº¿t hĂ³a Ä‘Æ¡n thuá»™c phĂ²ng nĂ o.
     // ========================================================================
     private List<Map<String, Object>> handleViewBill(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -164,9 +164,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem nợ chưa đóng
-    // Nghiệp vụ: Nợ = hóa đơn có status UNPAID hoặc LATE.
-    // Đây là tính năng cảnh báo nên hiển thị thêm deadline và tiền phạt.
+    // TENANT: Xem ná»£ chÆ°a Ä‘Ă³ng
+    // Nghiá»‡p vá»¥: Ná»£ = hĂ³a Ä‘Æ¡n cĂ³ status UNPAID hoáº·c LATE.
+    // ÄĂ¢y lĂ  tĂ­nh nÄƒng cáº£nh bĂ¡o nĂªn hiá»ƒn thá»‹ thĂªm deadline vĂ  tiá»n pháº¡t.
     // ========================================================================
     private List<Map<String, Object>> handleViewDebt(IntentExtractionResult intentData, Long userId, String role) {
         String sql =
@@ -182,16 +182,16 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem hợp đồng
-    // Nghiệp vụ: Hiển thị giá thuê thực tế (actual_price), tiền cọc, ngày
-    // hết hạn, trạng thái ký. Nếu khách hỏi "hợp đồng còn bao lâu" thì
-    // DATEDIFF sẽ trả về số ngày còn lại rất trực quan.
+    // TENANT: Xem há»£p Ä‘á»“ng
+    // Nghiá»‡p vá»¥: Hiá»ƒn thá»‹ giĂ¡ thuĂª thá»±c táº¿ (actual_price), tiá»n cá»c, ngĂ y
+    // háº¿t háº¡n, tráº¡ng thĂ¡i kĂ½. Náº¿u khĂ¡ch há»i "há»£p Ä‘á»“ng cĂ²n bao lĂ¢u" thĂ¬
+    // PostgreSQL date subtraction sáº½ tráº£ vá» sá»‘ ngĂ y cĂ²n láº¡i ráº¥t trá»±c quan.
     // ========================================================================
     private List<Map<String, Object>> handleViewContract(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
                 "SELECT c.id AS contract_id, c.actual_price, c.deposit_amount, " +
                 "c.start_date, c.end_date, c.status, c.is_tenant_signed, c.is_landlord_signed, " +
-                "DATEDIFF(c.end_date, CURRENT_DATE) AS days_remaining, " +
+                "(c.end_date - CURRENT_DATE) AS days_remaining, " +
                 "r.name AS room_name, p.name AS property_name, p.address " +
                 "FROM contracts c " +
                 "JOIN rooms r ON c.room_id = r.id " +
@@ -211,9 +211,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem lịch hẹn xem phòng
-    // Nghiệp vụ: Lịch hẹn có tenant_id trực tiếp. Kèm thông tin phòng
-    // và meeting_link để khách có thể tham gia ngay.
+    // TENANT: Xem lá»‹ch háº¹n xem phĂ²ng
+    // Nghiá»‡p vá»¥: Lá»‹ch háº¹n cĂ³ tenant_id trá»±c tiáº¿p. KĂ¨m thĂ´ng tin phĂ²ng
+    // vĂ  meeting_link Ä‘á»ƒ khĂ¡ch cĂ³ thá»ƒ tham gia ngay.
     // ========================================================================
     private List<Map<String, Object>> handleViewAppointment(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -248,9 +248,9 @@ public class DynamicQueryEngine {
 
     // ========================================================================
     // LANDLORD: Xem doanh thu
-    // Nghiệp vụ SỐNG CÒN: Doanh thu = CHỈ tính hóa đơn đã PAID.
-    // Tuyệt đối không được cộng gộp hóa đơn UNPAID/LATE/PENDING vào.
-    // JOIN chuỗi: bills → contracts → rooms → properties (lọc landlord_id).
+    // Nghiá»‡p vá»¥ Sá»NG CĂ’N: Doanh thu = CHá»ˆ tĂ­nh hĂ³a Ä‘Æ¡n Ä‘Ă£ PAID.
+    // Tuyá»‡t Ä‘á»‘i khĂ´ng Ä‘Æ°á»£c cá»™ng gá»™p hĂ³a Ä‘Æ¡n UNPAID/LATE/PENDING vĂ o.
+    // JOIN chuá»—i: bills â†’ contracts â†’ rooms â†’ properties (lá»c landlord_id).
     // ========================================================================
     private List<Map<String, Object>> handleViewRevenue(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -284,10 +284,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Xem danh sách khách nợ tiền
-    // Nghiệp vụ: Nợ = bills.status IN ('UNPAID', 'LATE').
-    // Hiển thị tên khách, SĐT, tên phòng, số tiền nợ để chủ trọ liên hệ.
-    // JOIN chuỗi: bills → contracts → users (lấy tên khách) + rooms + properties.
+    // LANDLORD: Xem danh sĂ¡ch khĂ¡ch ná»£ tiá»n
+    // Nghiá»‡p vá»¥: Ná»£ = bills.status IN ('UNPAID', 'LATE').
+    // Hiá»ƒn thá»‹ tĂªn khĂ¡ch, SÄT, tĂªn phĂ²ng, sá»‘ tiá»n ná»£ Ä‘á»ƒ chá»§ trá» liĂªn há»‡.
+    // JOIN chuá»—i: bills â†’ contracts â†’ users (láº¥y tĂªn khĂ¡ch) + rooms + properties.
     // ========================================================================
     private List<Map<String, Object>> handleViewDebtors(IntentExtractionResult intentData, Long userId, String role) {
         String sql =
@@ -305,10 +305,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Xem tỷ lệ lấp đầy phòng
-    // Nghiệp vụ: Đếm số phòng theo từng trạng thái (AVAILABLE, RENTED,
-    // MAINTENANCE, RESERVED) để chủ biết tổng quan "sức khỏe" tài sản.
-    // Có thể lọc theo tên khu trọ cụ thể nếu chủ có nhiều khu.
+    // LANDLORD: Xem tá»· lá»‡ láº¥p Ä‘áº§y phĂ²ng
+    // Nghiá»‡p vá»¥: Äáº¿m sá»‘ phĂ²ng theo tá»«ng tráº¡ng thĂ¡i (AVAILABLE, RENTED,
+    // MAINTENANCE, RESERVED) Ä‘á»ƒ chá»§ biáº¿t tá»•ng quan "sá»©c khá»e" tĂ i sáº£n.
+    // CĂ³ thá»ƒ lá»c theo tĂªn khu trá» cá»¥ thá»ƒ náº¿u chá»§ cĂ³ nhiá»u khu.
     // ========================================================================
     private List<Map<String, Object>> handleViewOccupancy(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -330,9 +330,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Cảnh báo hợp đồng sắp hết hạn (Rủi ro trống phòng)
-    // Nghiệp vụ: Chỉ xét hợp đồng ACTIVE có end_date trong vòng N ngày tới
-    // (mặc định 30 ngày). Hiển thị tên khách + SĐT để chủ trọ liên hệ gia hạn.
+    // LANDLORD: Cáº£nh bĂ¡o há»£p Ä‘á»“ng sáº¯p háº¿t háº¡n (Rá»§i ro trá»‘ng phĂ²ng)
+    // Nghiá»‡p vá»¥: Chá»‰ xĂ©t há»£p Ä‘á»“ng ACTIVE cĂ³ end_date trong vĂ²ng N ngĂ y tá»›i
+    // (máº·c Ä‘á»‹nh 30 ngĂ y). Hiá»ƒn thá»‹ tĂªn khĂ¡ch + SÄT Ä‘á»ƒ chá»§ trá» liĂªn há»‡ gia háº¡n.
     // ========================================================================
     private List<Map<String, Object>> handleViewRisk(IntentExtractionResult intentData, Long userId, String role) {
         int daysAhead = 30;
@@ -343,7 +343,7 @@ public class DynamicQueryEngine {
 
         String sql =
                 "SELECT c.id AS contract_id, c.end_date, " +
-                "DATEDIFF(c.end_date, CURRENT_DATE) AS days_remaining, " +
+                "(c.end_date - CURRENT_DATE) AS days_remaining, " +
                 "u.full_name AS tenant_name, u.phone_number, " +
                 "r.name AS room_name, p.name AS property_name " +
                 "FROM contracts c " +
@@ -351,13 +351,13 @@ public class DynamicQueryEngine {
                 "JOIN properties p ON r.property_id = p.id " +
                 "JOIN users u ON c.tenant_id = u.id " +
                 "WHERE p.landlord_id = ? AND c.status = 'ACTIVE' " +
-                "AND c.end_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL ? DAY) " +
+                "AND c.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + CAST(? || ' days' AS INTERVAL)) " +
                 "ORDER BY c.end_date ASC";
         return jdbcTemplate.queryForList(sql, userId, daysAhead);
     }
 
     // ========================================================================
-    // Utility: Chuyển đổi kiểu an toàn (LLM đôi khi trả Number dạng String)
+    // Utility: Chuyá»ƒn Ä‘á»•i kiá»ƒu an toĂ n (LLM Ä‘Ă´i khi tráº£ Number dáº¡ng String)
     // ========================================================================
     private double toDouble(Object obj) {
         if (obj instanceof Number) return ((Number) obj).doubleValue();
