@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,15 +32,21 @@ class KnowledgeSeedConsistencyTest {
     }
 
     @Test
-    void seedKnowledge_shouldUseRealContractStatusEnums() throws Exception {
+    void seedKnowledge_shouldDescribeContractStatusesInUserFriendlyLanguage() throws Exception {
         Map<String, SeedRow> rows = loadKnowledgeRows();
         String guideLandlord = rows.get("guide-landlord").content();
-        String expectedContractStatuses = Arrays.stream(ContractStatus.values())
-                .map(Enum::name)
-                .collect(Collectors.joining(", "));
+        String normalized = normalizeAscii(guideLandlord);
 
-        assertThat(guideLandlord).contains(expectedContractStatuses);
-        assertThat(guideLandlord).doesNotContain("DRAFT, PENDING, ACTIVE, EXPIRED, TERMINATED");
+        Arrays.stream(ContractStatus.values())
+                .map(Enum::name)
+                .forEach(statusCode -> assertThat(guideLandlord).doesNotContain(statusCode));
+
+        assertThat(normalized).contains("cho ky");
+        assertThat(normalized).contains("cho đat coc");
+        assertThat(normalized).contains("đang hieu luc");
+        assertThat(normalized).contains("đa het han");
+        assertThat(normalized).contains("đa cham dut som");
+        assertThat(normalized).contains("đa huy");
     }
 
     @Test
@@ -50,7 +55,8 @@ class KnowledgeSeedConsistencyTest {
         String moderationPolicy = rows.get("policy-moderation").content();
         String normalized = normalizeAscii(moderationPolicy);
 
-        assertThat(normalized).contains("trang thai pending");
+        assertThat(normalized).contains("trang thai cho duyet");
+        assertThat(normalized).doesNotContain("pending");
         assertThat(normalized).doesNotContain("duyet tu dong");
     }
 
@@ -62,6 +68,29 @@ class KnowledgeSeedConsistencyTest {
 
         assertThat(normalized).contains("deadline");
         assertThat(normalized).doesNotContain("mung 5");
+    }
+
+    @Test
+    void seedKnowledge_ekycShouldMatchCurrentSystemFlow() throws Exception {
+        Map<String, SeedRow> rows = loadKnowledgeRows();
+        String ekycPolicy = rows.get("policy-ekyc").content();
+        String normalized = normalizeAscii(ekycPolicy);
+
+        assertThat(normalized).contains("cho duyet");
+        assertThat(normalized).contains("admin");
+        assertThat(normalized).doesNotContain("selfie");
+        assertThat(normalized).doesNotContain("30 giay");
+        assertThat(normalized).doesNotContain("aes-256");
+    }
+
+    @Test
+    void seedKnowledge_shouldAvoidTechnicalBillStatusCodesInUserContent() throws Exception {
+        Map<String, SeedRow> rows = loadKnowledgeRows();
+        String paymentPolicy = rows.get("policy-payment").content();
+        String guideTenant = rows.get("guide-tenant").content();
+
+        assertThat(paymentPolicy).doesNotContain("LATE");
+        assertThat(guideTenant).doesNotContain("PAID");
     }
 
     private Map<String, SeedRow> loadKnowledgeRows() throws Exception {

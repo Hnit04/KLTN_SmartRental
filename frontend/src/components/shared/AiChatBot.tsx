@@ -601,7 +601,7 @@ export default function AiChatBot() {
                               : `Khoảng cách được tính theo địa điểm bạn nhập; còn ${msg.missingDistanceCount} kết quả chưa có dữ liệu khoảng cách.`)}
                         </div>
                       )}
-                      {typeof msg.roomCardCount === "number" && msg.roomCardCount <= 1 && (
+                      {typeof msg.roomCardCount === "number" && msg.roomCardCount > 0 && msg.roomCardCount <= 1 && (
                         <Button
                           size="sm"
                           variant="outline"

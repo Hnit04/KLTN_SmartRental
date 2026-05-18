@@ -387,14 +387,16 @@ public class AiOrchestratorService {
                             System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
                             success = true;
                             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                            return cachedResult.get();
+                            return sanitizeUserFacingResponse(cachedResult.get());
                         }
                     }
 
                     List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
                     String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
                     try {
-                        Object response = dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+                        Object response = sanitizeUserFacingResponse(
+                                dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
+                        );
                         // 💾 Ghi cache kết quả
                         if (resultCache != null) {
                             resultCache.put(cacheKey, response);
@@ -423,7 +425,7 @@ public class AiOrchestratorService {
                                 }
                             }
                         }
-                        return sb.toString();
+                        return sanitizeUserFacingText(sb.toString());
                     }
                 }
             } else {
@@ -574,7 +576,9 @@ public class AiOrchestratorService {
             System.out.println("Dữ liệu thô: " + rawDataStr);
 
             try {
-                return dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+                return sanitizeUserFacingResponse(
+                        dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
+                );
             } catch (Exception llmEx) {
                 System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ (Hết Token/Timeout): " + llmEx.getMessage());
                 if (results.isEmpty()) {
@@ -593,7 +597,7 @@ public class AiOrchestratorService {
                         fallbackResponse.append("- ").append(row.toString()).append("\n");
                     }
                 }
-                return fallbackResponse.toString();
+                return sanitizeUserFacingText(fallbackResponse.toString());
             }
 
         } catch (Exception e) {
@@ -605,6 +609,57 @@ public class AiOrchestratorService {
     }
 
     // Admin: Thống kê AI NLP
+    public String sanitizeForUserFacing(String text) {
+        return sanitizeUserFacingText(text);
+    }
+
+    private Object sanitizeUserFacingResponse(Object response) {
+        if (response instanceof String text) {
+            return sanitizeUserFacingText(text);
+        }
+        return response;
+    }
+
+    private String sanitizeUserFacingText(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+
+        String sanitized = text;
+        String[][] statusReplacements = new String[][] {
+                {"PENDING_SIGNATURE", "chờ ký"},
+                {"AWAITING_DEPOSIT", "chờ đặt cọc"},
+                {"TERMINATED_EARLY", "đã chấm dứt sớm"},
+                {"UNPAID", "chưa thanh toán"},
+                {"PAID", "đã thanh toán"},
+                {"LATE", "trễ hạn"},
+                {"PENDING", "đang chờ xử lý"},
+                {"APPROVED", "đã duyệt"},
+                {"REJECTED", "từ chối"},
+                {"COMPLETED", "đã hoàn tất"},
+                {"CANCELLED", "đã hủy"},
+                {"EXPIRED", "đã hết hạn"},
+                {"ACTIVE", "đang hiệu lực"},
+                {"AVAILABLE", "còn trống"},
+                {"RENTED", "đã cho thuê"},
+                {"MAINTENANCE", "bảo trì"},
+                {"RESERVED", "đã giữ chỗ"},
+                {"HIDDEN", "đang ẩn"}
+        };
+
+        for (String[] replacement : statusReplacements) {
+            String statusCode = replacement[0];
+            String friendlyLabel = replacement[1];
+            sanitized = sanitized.replaceAll("(?i)\\b" + java.util.regex.Pattern.quote(statusCode) + "\\b", friendlyLabel);
+        }
+
+        sanitized = sanitized.replaceAll("\\(\\s*(?i:PENDING_SIGNATURE|AWAITING_DEPOSIT|TERMINATED_EARLY|UNPAID|PAID|LATE|PENDING|APPROVED|REJECTED|COMPLETED|CANCELLED|EXPIRED|ACTIVE|AVAILABLE|RENTED|MAINTENANCE|RESERVED|HIDDEN)\\s*\\)", "");
+        sanitized = sanitized.replaceAll("(?i)\\b(trễ hạn|đã thanh toán|chưa thanh toán|đang chờ xử lý|đã duyệt|từ chối|đã hủy|đã hoàn tất|đã hết hạn|đang hiệu lực|còn trống|đã cho thuê|bảo trì|đã giữ chỗ|đang ẩn)\\s*\\(\\s*\\1\\s*\\)", "$1");
+        sanitized = sanitized.replaceAll("\\s{2,}", " ").trim();
+
+        return sanitized;
+    }
+
     public Map<String, Object> getAnalytics() {
         List<AiSqlCache> allCaches = cacheRepository.findAll();
         long totalQueries = allCaches.size();
