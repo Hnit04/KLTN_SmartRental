@@ -101,10 +101,11 @@ public class AiController {
         if (!isRoomAnalysis) {
             String faqAnswer = aiOrchestratorService.searchFaq(message);
             if (faqAnswer != null) {
+                String safeFaqAnswer = aiOrchestratorService.sanitizeForUserFacing(faqAnswer);
                 return ResponseEntity.ok(Map.of(
                         "status", "success",
                         "sessionId", sessionId,
-                        "reply", faqAnswer,
+                        "reply", safeFaqAnswer,
                         "source", "FAQ_CACHE"
                 ));
             }
@@ -115,11 +116,12 @@ public class AiController {
         // B2: Nếu không thấy, gọi mô hình LLM
         try {
             String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
+            String safeResponse = aiOrchestratorService.sanitizeForUserFacing(response);
             
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "sessionId", sessionId,
-                    "reply", response,
+                    "reply", safeResponse,
                     "source", "GEMINI_AI"
             ));
         } catch (Throwable t) {
@@ -158,6 +160,9 @@ public class AiController {
 
         try {
             Object result = aiOrchestratorService.processDataQuery(question, role, userId);
+            if (result instanceof String textResult) {
+                result = aiOrchestratorService.sanitizeForUserFacing(textResult);
+            }
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
