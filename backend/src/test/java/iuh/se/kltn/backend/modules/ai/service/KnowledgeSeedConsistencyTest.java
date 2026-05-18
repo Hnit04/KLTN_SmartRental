@@ -64,6 +64,19 @@ class KnowledgeSeedConsistencyTest {
         assertThat(normalized).doesNotContain("mung 5");
     }
 
+    @Test
+    void seedKnowledge_ekycShouldMatchCurrentSystemFlow() throws Exception {
+        Map<String, SeedRow> rows = loadKnowledgeRows();
+        String ekycPolicy = rows.get("policy-ekyc").content();
+        String normalized = normalizeAscii(ekycPolicy);
+
+        assertThat(normalized).contains("pending");
+        assertThat(normalized).contains("admin");
+        assertThat(normalized).doesNotContain("selfie");
+        assertThat(normalized).doesNotContain("30 giay");
+        assertThat(normalized).doesNotContain("aes-256");
+    }
+
     private Map<String, SeedRow> loadKnowledgeRows() throws Exception {
         ClassPathResource resource = new ClassPathResource("data/seed_knowledge_data.tsv");
         String tsv = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
