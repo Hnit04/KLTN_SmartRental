@@ -1,4 +1,4 @@
-﻿package iuh.se.kltn.backend.modules.ai.service.handler;
+package iuh.se.kltn.backend.modules.ai.service.handler;
 
 import iuh.se.kltn.backend.modules.ai.dto.IntentExtractionResult;
 import iuh.se.kltn.backend.modules.ai.enums.SystemIntent;
@@ -52,8 +52,8 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // GUEST: TĂ¬m phĂ²ng trá» cĂ´ng khai
-    // Nghiá»‡p vá»¥: Chá»‰ hiá»ƒn thá»‹ phĂ²ng AVAILABLE thuá»™c khu trá» Ä‘Ă£ APPROVED.
+    // GUEST: Tim phong tro cong khai
+    // Chi hien thi phong AVAILABLE thuoc khu tro da APPROVED.
     // ========================================================================
     private List<Map<String, Object>> handleSearchRoom(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -97,7 +97,7 @@ public class DynamicQueryEngine {
             if (params.containsKey("has_balcony") && Boolean.TRUE.equals(toBoolean(params.get("has_balcony")))) {
                 sql.append(" AND r.has_balcony = TRUE");
             }
-            // Sá»‘ ngÆ°á»i á»Ÿ: lá»c phĂ²ng cĂ³ max_occupants >= sá»‘ ngÆ°á»i yĂªu cáº§u
+            // So nguoi o: loc phong co max_occupants >= so nguoi yeu cau
             Object occupantsParam = firstPresent(params, "occupants", "required_occupants", "people", "persons", "max_occupants");
             if (occupantsParam != null) {
                 int occupants = toInt(occupantsParam);
@@ -106,18 +106,14 @@ public class DynamicQueryEngine {
                     queryParams.add(occupants);
                 }
             }
-            // Cho nuĂ´i thĂº cÆ°ng: text-search default_terms, description, amenities
+            // Pet friendly: text-search default_terms, description, amenities
             Object petParam = firstPresent(params, "pet_friendly", "allow_pets", "petAllowed", "has_pet");
             if (petParam != null && toBoolean(petParam)) {
                 sql.append(" AND (" +
-                        "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuĂ´i thĂº cÆ°ng%' OR " +
                         "LOWER(COALESCE(r.default_terms,'')) LIKE '%cho nuoi thu cung%' OR " +
-                        "LOWER(COALESCE(r.description,'')) LIKE '%cho nuĂ´i thĂº cÆ°ng%' OR " +
                         "LOWER(COALESCE(r.description,'')) LIKE '%cho nuoi thu cung%' OR " +
                         "LOWER(COALESCE(r.amenities,'')) LIKE '%pet friendly%'" +
-                        ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khĂ´ng cho nuĂ´i thĂº cÆ°ng%'" +
-                        " AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khong cho nuoi thu cung%'" +
-                        " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khĂ´ng cho nuĂ´i thĂº cÆ°ng%'" +
+                        ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khong cho nuoi thu cung%'" +
                         " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khong cho nuoi thu cung%'");
             }
         }
@@ -126,9 +122,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem hĂ³a Ä‘Æ¡n cá»§a chĂ­nh mĂ¬nh
-    // Nghiá»‡p vá»¥: bills KHĂ”NG cĂ³ tenant_id â†’ Báº®T BUá»˜C JOIN qua contracts.
-    // Hiá»ƒn thá»‹ thĂ´ng tin phĂ²ng kĂ¨m theo Ä‘á»ƒ khĂ¡ch biáº¿t hĂ³a Ä‘Æ¡n thuá»™c phĂ²ng nĂ o.
+    // TENANT: Xem hoa don cua chinh minh
+    // bills KHONG co tenant_id -> BAT BUOC JOIN qua contracts.
+    // Hien thi thong tin phong kem theo de khach biet hoa don thuoc phong nao.
     // ========================================================================
     private List<Map<String, Object>> handleViewBill(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -164,9 +160,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem ná»£ chÆ°a Ä‘Ă³ng
-    // Nghiá»‡p vá»¥: Ná»£ = hĂ³a Ä‘Æ¡n cĂ³ status UNPAID hoáº·c LATE.
-    // ÄĂ¢y lĂ  tĂ­nh nÄƒng cáº£nh bĂ¡o nĂªn hiá»ƒn thá»‹ thĂªm deadline vĂ  tiá»n pháº¡t.
+    // TENANT: Xem no chua dong
+    // No = hoa don co status UNPAID hoac LATE.
+    // Day la tinh nang canh bao nen hien thi them deadline va tien phat.
     // ========================================================================
     private List<Map<String, Object>> handleViewDebt(IntentExtractionResult intentData, Long userId, String role) {
         String sql =
@@ -182,10 +178,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem há»£p Ä‘á»“ng
-    // Nghiá»‡p vá»¥: Hiá»ƒn thá»‹ giĂ¡ thuĂª thá»±c táº¿ (actual_price), tiá»n cá»c, ngĂ y
-    // háº¿t háº¡n, tráº¡ng thĂ¡i kĂ½. Náº¿u khĂ¡ch há»i "há»£p Ä‘á»“ng cĂ²n bao lĂ¢u" thĂ¬
-    // PostgreSQL date subtraction sáº½ tráº£ vá» sá»‘ ngĂ y cĂ²n láº¡i ráº¥t trá»±c quan.
+    // TENANT: Xem hop dong
+    // Hien thi gia thue thuc te (actual_price), tien coc, ngay het han,
+    // trang thai ky. Neu khach hoi "hop dong con bao lau" thi
+    // PostgreSQL date subtraction se tra ve so ngay con lai rat truc quan.
     // ========================================================================
     private List<Map<String, Object>> handleViewContract(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -211,9 +207,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem lá»‹ch háº¹n xem phĂ²ng
-    // Nghiá»‡p vá»¥: Lá»‹ch háº¹n cĂ³ tenant_id trá»±c tiáº¿p. KĂ¨m thĂ´ng tin phĂ²ng
-    // vĂ  meeting_link Ä‘á»ƒ khĂ¡ch cĂ³ thá»ƒ tham gia ngay.
+    // TENANT: Xem lich hen xem phong
+    // Lich hen co tenant_id truc tiep. Kem thong tin phong
+    // va meeting_link de khach co the tham gia ngay.
     // ========================================================================
     private List<Map<String, Object>> handleViewAppointment(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -248,9 +244,9 @@ public class DynamicQueryEngine {
 
     // ========================================================================
     // LANDLORD: Xem doanh thu
-    // Nghiá»‡p vá»¥ Sá»NG CĂ’N: Doanh thu = CHá»ˆ tĂ­nh hĂ³a Ä‘Æ¡n Ä‘Ă£ PAID.
-    // Tuyá»‡t Ä‘á»‘i khĂ´ng Ä‘Æ°á»£c cá»™ng gá»™p hĂ³a Ä‘Æ¡n UNPAID/LATE/PENDING vĂ o.
-    // JOIN chuá»—i: bills â†’ contracts â†’ rooms â†’ properties (lá»c landlord_id).
+    // SONG CON: Doanh thu = CHI tinh hoa don da PAID.
+    // Tuyet doi khong duoc cong gop hoa don UNPAID/LATE/PENDING vao.
+    // JOIN chuoi: bills -> contracts -> rooms -> properties (loc landlord_id).
     // ========================================================================
     private List<Map<String, Object>> handleViewRevenue(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -284,10 +280,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Xem danh sĂ¡ch khĂ¡ch ná»£ tiá»n
-    // Nghiá»‡p vá»¥: Ná»£ = bills.status IN ('UNPAID', 'LATE').
-    // Hiá»ƒn thá»‹ tĂªn khĂ¡ch, SÄT, tĂªn phĂ²ng, sá»‘ tiá»n ná»£ Ä‘á»ƒ chá»§ trá» liĂªn há»‡.
-    // JOIN chuá»—i: bills â†’ contracts â†’ users (láº¥y tĂªn khĂ¡ch) + rooms + properties.
+    // LANDLORD: Xem danh sach khach no tien
+    // No = bills.status IN ('UNPAID', 'LATE').
+    // Hien thi ten khach, SDT, ten phong, so tien no de chu tro lien he.
+    // JOIN chuoi: bills -> contracts -> users (lay ten khach) + rooms + properties.
     // ========================================================================
     private List<Map<String, Object>> handleViewDebtors(IntentExtractionResult intentData, Long userId, String role) {
         String sql =
@@ -305,10 +301,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Xem tá»· lá»‡ láº¥p Ä‘áº§y phĂ²ng
-    // Nghiá»‡p vá»¥: Äáº¿m sá»‘ phĂ²ng theo tá»«ng tráº¡ng thĂ¡i (AVAILABLE, RENTED,
-    // MAINTENANCE, RESERVED) Ä‘á»ƒ chá»§ biáº¿t tá»•ng quan "sá»©c khá»e" tĂ i sáº£n.
-    // CĂ³ thá»ƒ lá»c theo tĂªn khu trá» cá»¥ thá»ƒ náº¿u chá»§ cĂ³ nhiá»u khu.
+    // LANDLORD: Xem ty le lap day phong
+    // Dem so phong theo tung trang thai (AVAILABLE, RENTED, MAINTENANCE,
+    // RESERVED) de chu biet tong quan "suc khoe" tai san.
+    // Co the loc theo ten khu tro cu the neu chu co nhieu khu.
     // ========================================================================
     private List<Map<String, Object>> handleViewOccupancy(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -330,9 +326,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // LANDLORD: Cáº£nh bĂ¡o há»£p Ä‘á»“ng sáº¯p háº¿t háº¡n (Rá»§i ro trá»‘ng phĂ²ng)
-    // Nghiá»‡p vá»¥: Chá»‰ xĂ©t há»£p Ä‘á»“ng ACTIVE cĂ³ end_date trong vĂ²ng N ngĂ y tá»›i
-    // (máº·c Ä‘á»‹nh 30 ngĂ y). Hiá»ƒn thá»‹ tĂªn khĂ¡ch + SÄT Ä‘á»ƒ chá»§ trá» liĂªn há»‡ gia háº¡n.
+    // LANDLORD: Canh bao hop dong sap het han (Rui ro trong phong)
+    // Chi xet hop dong ACTIVE co end_date trong vong N ngay toi
+    // (mac dinh 30 ngay). Hien thi ten khach + SDT de chu tro lien he gia han.
     // ========================================================================
     private List<Map<String, Object>> handleViewRisk(IntentExtractionResult intentData, Long userId, String role) {
         int daysAhead = 30;
@@ -357,7 +353,7 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // Utility: Chuyá»ƒn Ä‘á»•i kiá»ƒu an toĂ n (LLM Ä‘Ă´i khi tráº£ Number dáº¡ng String)
+    // Utility: Chuyen doi kieu an toan (LLM doi khi tra Number dang String)
     // ========================================================================
     private double toDouble(Object obj) {
         if (obj instanceof Number) return ((Number) obj).doubleValue();

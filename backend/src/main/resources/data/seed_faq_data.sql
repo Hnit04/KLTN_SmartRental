@@ -18,10 +18,10 @@ INSERT IGNORE INTO ai_sql_cache (question, generated_sql, type, answer, is_valid
 ('Phòng có nội thất không?', NULL, 'FAQ', 'Thông tin nội thất được ghi trong phần tiện nghi của mỗi phòng. Bạn xem chi tiết tại trang phòng trọ.', 1),
 ('Có thể xem phòng trực tuyến không?', NULL, 'FAQ', 'Dạ có, mỗi phòng đều có hình ảnh chi tiết. Bạn cũng có thể đặt lịch hẹn online để xem phòng trực tiếp.', 1),
 ('Làm sao đặt lịch xem phòng?', NULL, 'FAQ', 'Bạn vào trang chi tiết phòng, bấm nút Đặt lịch hẹn, chọn thời gian phù hợp. Chủ trọ sẽ xác nhận qua thông báo.', 1),
-('Làm sao liên hệ chủ trọ?', NULL, 'FAQ', 'Sau khi đăng nhập, bạn có thể đặt lịch hẹn xem phòng qua app. Hệ thống sẽ tự động kết nối bạn với chủ trọ.', 1),
+('Làm sao liên hệ chủ trọ?', NULL, 'FAQ', 'Sau khi đăng nhập, bạn có thể đặt lịch hẹn xem phòng qua app và theo dõi phản hồi của chủ trọ trong mục lịch hẹn.', 1),
 ('Có cần đặt cọc không?', NULL, 'FAQ', 'Tiền cọc do chủ trọ quy định, thường bằng 1-2 tháng tiền thuê. Chi tiết sẽ được ghi rõ trong hợp đồng.', 1),
 ('Hợp đồng thuê kéo dài bao lâu?', NULL, 'FAQ', 'Thời hạn hợp đồng tùy thỏa thuận giữa bạn và chủ trọ, thường từ 6 tháng đến 1 năm.', 1),
-('Thanh toán tiền phòng bằng cách nào?', NULL, 'FAQ', 'Hệ thống hỗ trợ thanh toán qua blockchain và chuyển khoản. Chi tiết sẽ được hướng dẫn sau khi ký hợp đồng.', 1),
+('Thanh toán tiền phòng bằng cách nào?', NULL, 'FAQ', 'Hệ thống hỗ trợ thanh toán qua blockchain và chuyển khoản. Sau khi giao dịch được xác nhận, hóa đơn sẽ được cập nhật trạng thái tương ứng trên hệ thống.', 1),
 ('Làm sao đăng ký tài khoản?', NULL, 'FAQ', 'Bạn bấm Đăng ký trên app, điền thông tin cá nhân và xác minh email hoặc số điện thoại. Sau đó có thể đăng nhập ngay.', 1),
 ('Tôi cần đăng nhập để làm gì?', NULL, 'FAQ', 'Đăng nhập giúp bạn đặt lịch xem phòng, xem hợp đồng, theo dõi hóa đơn, nhận thông báo và sử dụng đầy đủ tính năng AI.', 1),
 ('Tôi quên mật khẩu thì làm sao?', NULL, 'FAQ', 'Bấm Quên mật khẩu ở trang đăng nhập, nhập email để nhận link đặt lại mật khẩu mới.', 1),
@@ -50,11 +50,11 @@ INSERT IGNORE INTO ai_sql_cache (question, generated_sql, type, answer, is_valid
 
 -- A3. LANDLORD (15 câu)
 INSERT IGNORE INTO ai_sql_cache (question, generated_sql, type, answer, is_valid) VALUES
-('Làm sao đăng phòng cho thuê?', NULL, 'FAQ', 'Vào Quản lý phòng, bấm Thêm phòng. Điền thông tin, ảnh, giá thuê. AI sẽ tự động kiểm duyệt nội dung.', 1),
-('Làm sao tạo khu trọ mới?', NULL, 'FAQ', 'Vào Quản lý khu trọ, bấm Thêm khu trọ. Điền địa chỉ, giá dịch vụ, ảnh. Admin sẽ duyệt trước khi hiển thị.', 1),
+('Làm sao đăng phòng cho thuê?', NULL, 'FAQ', 'Vào Quản lý phòng, bấm Thêm phòng và điền thông tin. Hệ thống hiện dùng AI để chấm điểm nội dung; bài đăng sẽ ở trạng thái chờ Admin duyệt trước khi hiển thị công khai.', 1),
+('Làm sao tạo khu trọ mới?', NULL, 'FAQ', 'Vào Quản lý khu trọ, bấm Thêm khu trọ và điền đầy đủ thông tin. Hệ thống hiện ghi nhận bài đăng ở trạng thái chờ Admin duyệt trước khi hiển thị.', 1),
 ('Làm sao sửa thông tin phòng?', NULL, 'FAQ', 'Vào Quản lý phòng, chọn phòng cần sửa, bấm Chỉnh sửa. Cập nhật giá, mô tả, tiện nghi rồi lưu.', 1),
-('AI kiểm duyệt nội dung như nào?', NULL, 'FAQ', 'AI Gemini kiểm tra văn bản và ảnh phòng, chấm điểm 0-100. Nội dung rác hoặc lừa đảo sẽ bị từ chối tự động.', 1),
-('Làm sao tạo hóa đơn hàng tháng?', NULL, 'FAQ', 'Vào Quản lý hóa đơn, bấm Tạo hóa đơn. Nhập chỉ số điện nước mới, hệ thống tự tính tổng tiền.', 1),
+('AI kiểm duyệt nội dung như nào?', NULL, 'FAQ', 'AI Gemini kiểm tra văn bản và ảnh để chấm điểm 0-100 và ghi nhận lý do. Hệ thống hiện lưu kết quả để Admin duyệt/từ chối, không tự động duyệt công khai theo điểm.', 1),
+('Làm sao tạo hóa đơn hàng tháng?', NULL, 'FAQ', 'Vào Quản lý hóa đơn, bấm Tạo hóa đơn, nhập chỉ số mới và hạn thanh toán (deadline). Hệ thống hiện tính tổng tiền theo dữ liệu đã nhập.', 1),
 ('Doanh thu tính như thế nào?', NULL, 'FAQ', 'Doanh thu chỉ tính từ hóa đơn đã thanh toán (PAID). Hóa đơn chưa thu không được cộng vào tổng doanh thu.', 1),
 ('Làm sao nhắc khách đóng tiền?', NULL, 'FAQ', 'Vào Dashboard, bấm AI Nhắc nợ. AI sẽ soạn tin nhắn cá nhân hóa theo mức độ trễ hạn, bạn duyệt rồi gửi.', 1),
 ('Khách không ký hợp đồng thì sao?', NULL, 'FAQ', 'Hợp đồng cần cả hai bên ký. Bạn có thể gửi thông báo nhắc khách qua hệ thống hoặc hủy hợp đồng nháp.', 1),
@@ -256,3 +256,4 @@ INSERT IGNORE INTO ai_sql_cache (question, generated_sql, type, answer, is_valid
 ('Khach nao sap het hop dong?', 'SELECT u.full_name AS tenant_name, u.phone_number, c.end_date, DATEDIFF(c.end_date, CURRENT_DATE) AS days_remaining, r.name AS room_name FROM contracts c JOIN rooms r ON c.room_id = r.id JOIN properties p ON r.property_id = p.id JOIN users u ON c.tenant_id = u.id WHERE p.landlord_id = USER_ID_PLACEHOLDER AND c.status = ''ACTIVE'' AND c.end_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY) ORDER BY c.end_date ASC', 'SQL', NULL, 1),
 ('Hop dong nao can gia han?', 'SELECT c.id AS contract_id, c.end_date, DATEDIFF(c.end_date, CURRENT_DATE) AS days_remaining, u.full_name AS tenant_name, r.name AS room_name FROM contracts c JOIN rooms r ON c.room_id = r.id JOIN properties p ON r.property_id = p.id JOIN users u ON c.tenant_id = u.id WHERE p.landlord_id = USER_ID_PLACEHOLDER AND c.status = ''ACTIVE'' AND c.end_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY) ORDER BY c.end_date ASC', 'SQL', NULL, 1),
 ('Rui ro trong phong thang toi', 'SELECT c.id AS contract_id, c.end_date, DATEDIFF(c.end_date, CURRENT_DATE) AS days_remaining, u.full_name AS tenant_name, u.phone_number, r.name AS room_name, p.name AS property_name FROM contracts c JOIN rooms r ON c.room_id = r.id JOIN properties p ON r.property_id = p.id JOIN users u ON c.tenant_id = u.id WHERE p.landlord_id = USER_ID_PLACEHOLDER AND c.status = ''ACTIVE'' AND c.end_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY) ORDER BY c.end_date ASC', 'SQL', NULL, 1);
+

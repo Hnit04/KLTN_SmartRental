@@ -1,4 +1,4 @@
-﻿package iuh.se.kltn.backend.modules.ai.service;
+package iuh.se.kltn.backend.modules.ai.service;
 
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
@@ -66,8 +66,6 @@ public class AiOrchestratorService {
     @Autowired
     private PropertyRepository propertyRepository;
 
-
-
     /**
      * Tự động chạy khi Spring Boot khởi động.
      * Đọc toàn bộ SQL từ MariaDB, biến thành Vector và đưa lên RAM.
@@ -101,7 +99,8 @@ public class AiOrchestratorService {
     }
 
     /**
-     * Tự động nạp dữ liệu seed (204 FAQ + SQL Cache) nếu bảng ai_sql_cache đang trống.
+     * Tự động nạp dữ liệu seed (204 FAQ + SQL Cache) nếu bảng ai_sql_cache đang
+     * trống.
      */
     private void seedInitialDataIfEmpty() {
         long count = cacheRepository.count();
@@ -111,8 +110,8 @@ public class AiOrchestratorService {
         }
         System.out.println("🌱 Kho tri thức trống! Đang nạp dữ liệu mẫu từ seed_faq_data.sql...");
         try {
-            org.springframework.core.io.ClassPathResource resource =
-                    new org.springframework.core.io.ClassPathResource("data/seed_faq_data.sql");
+            org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource(
+                    "data/seed_faq_data.sql");
             String sql = new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             String[] statements = sql.split(";");
             int executed = 0;
@@ -173,10 +172,12 @@ public class AiOrchestratorService {
         return null; // Không tìm thấy FAQ tương tự
     }
 
-    // Legacy Location Query has been removed and integrated into IntentExtractor pipeline
+    // Legacy Location Query has been removed and integrated into IntentExtractor
+    // pipeline
 
     private String normalizeText(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         // Chuyển về NFC (Canonical Composition) để đồng nhất các loại dấu tiếng Việt
         return java.text.Normalizer.normalize(text.toLowerCase(), java.text.Normalizer.Form.NFC);
     }
@@ -200,9 +201,11 @@ public class AiOrchestratorService {
     public Object processDataQuery(String question, String role, Long userId) {
         String normalizedQuestion = normalizeText(question);
 
-        // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính xác tuyệt đối
+        // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính
+        // xác tuyệt đối
         if (role.equalsIgnoreCase("GUEST")) {
-            // Regex kiểm tra các từ khóa nhạy cảm: hóa đơn, hợp đồng, lịch hẹn, doanh thu, nợ, thanh toán, của tôi/mình
+            // Regex kiểm tra các từ khóa nhạy cảm: hóa đơn, hợp đồng, lịch hẹn, doanh thu,
+            // nợ, thanh toán, của tôi/mình
             String sensitivePattern = ".*(hóa đơn|hoá đơn|bill|hợp đồng|contract|lịch hẹn|appointment|doanh thu|revenue|của tôi|của mình|nợ|thanh toán|trễ|quá hạn|phí).*";
             if (normalizedQuestion.matches(sensitivePattern)) {
                 System.out.println("🛡️ [SECURITY GUEST] Chặn truy vấn nhạy cảm: " + question);
@@ -213,14 +216,18 @@ public class AiOrchestratorService {
         String sqlToExecute = null;
 
         String schemaGeneral = "Sơ đồ cơ sở dữ liệu thực tế:\n" +
-            "- properties: id, landlord_id, name, address, district, city, latitude, longitude, description, elec_price, water_price, internet_price, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED')\n" +
-            "- rooms: id, property_id, name, price, area, max_occupants, current_occupants, type (ENUM: 'STUDIO', 'ONE_BEDROOM', 'TWO_BEDROOM', 'SINGLE_ROOM', 'SHARED_ROOM', 'MEZZANINE_ROOM'), has_mezzanine, has_balcony, status (ENUM: 'AVAILABLE', 'RENTED', 'MAINTENANCE', 'RESERVED', 'HIDDEN'), amenities, default_terms\n";
+                "- properties: id, landlord_id, name, address, district, city, latitude, longitude, description, elec_price, water_price, internet_price, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED')\n"
+                +
+                "- rooms: id, property_id, name, price, area, max_occupants, current_occupants, type (ENUM: 'STUDIO', 'ONE_BEDROOM', 'TWO_BEDROOM', 'SINGLE_ROOM', 'SHARED_ROOM', 'MEZZANINE_ROOM'), has_mezzanine, has_balcony, status (ENUM: 'AVAILABLE', 'RENTED', 'MAINTENANCE', 'RESERVED', 'HIDDEN'), amenities, default_terms\n";
 
         String schemaTenantAndLandlord = schemaGeneral +
-            "- contracts: id, tenant_id, room_id, actual_price, sign_date, start_date, end_date, deposit_amount, status (ENUM: 'PENDING_SIGNATURE', 'AWAITING_DEPOSIT', 'ACTIVE', 'EXPIRED', 'TERMINATED_EARLY'), is_tenant_signed, is_landlord_signed\n" +
-            "- bills: id, contract_id, month, year, old_elec_index, new_elec_index, old_water_index, new_water_index, total_amount, payment_tx_hash, status (ENUM: 'UNPAID', 'PAID', 'LATE', 'PENDING'), penalty_fee, paid_at, additional_fee, discount_amount\n" +
-            "- appointments: id, tenant_id, landlord_id, room_id, meet_time, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'), meeting_link\n" +
-            "- reviews: id, contract_id, reviewer_id, target_id, rating, comment, created_at\n";
+                "- contracts: id, tenant_id, room_id, actual_price, sign_date, start_date, end_date, deposit_amount, status (ENUM: 'PENDING_SIGNATURE', 'AWAITING_DEPOSIT', 'ACTIVE', 'EXPIRED', 'TERMINATED_EARLY'), is_tenant_signed, is_landlord_signed\n"
+                +
+                "- bills: id, contract_id, month, year, old_elec_index, new_elec_index, old_water_index, new_water_index, total_amount, payment_tx_hash, status (ENUM: 'UNPAID', 'PAID', 'LATE', 'PENDING'), penalty_fee, paid_at, additional_fee, discount_amount\n"
+                +
+                "- appointments: id, tenant_id, landlord_id, room_id, meet_time, status (ENUM: 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'), meeting_link\n"
+                +
+                "- reviews: id, contract_id, reviewer_id, target_id, rating, comment, created_at\n";
 
         String schemaLandlordSpecial = "- users: id, username, full_name, email, phone_number, role, reputation_score, kyc_status\n";
 
@@ -230,26 +237,36 @@ public class AiOrchestratorService {
         if (role.equalsIgnoreCase("TENANT")) {
             schemaContext = schemaTenantAndLandlord;
             roleRules = "1. HỌ KHÔNG ĐƯỢC XEM DOANH THU CỦA CHỦ TRỌ.\n" +
-                    "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC. (Nhớ điều kiện rooms.status='AVAILABLE').\n" +
-                    "3. Tuy nhiên, nếu họ hỏi về hóa đơn (bills) hay hợp đồng (contracts), BẮT BUỘC phải lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật).\n" +
-                    "4. ĐỐI VỚI BẢNG LỊCH HẸN (appointments): BẮT BUỘC chèn điều kiện lọc `appointments.tenant_id = USER_ID_PLACEHOLDER`.\n" +
-                    "5. ĐỐI VỚI BẢNG BILLS: Bảng bills không có cột tenant_id. BẮT BUỘC phải JOIN bills với contracts RỒI MỚI lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER`. Nếu khách hỏi NỢ TIỀN CHƯA ĐÓNG, lọc thêm bills.status IN ('UNPAID', 'LATE').\n" +
+                    "2. Khi họ tìm kiếm thông tin về TẤT CẢ PHÒNG TRỐNG hoặc GIÁ PHÒNG, ĐÂY LÀ DỮ LIỆU CÔNG KHAI, KHÔNG CẦN CHÈN ĐIỀU KIỆN LỌC. (Nhớ điều kiện rooms.status='AVAILABLE').\n"
+                    +
+                    "3. Tuy nhiên, nếu họ hỏi về hóa đơn (bills) hay hợp đồng (contracts), BẮT BUỘC phải lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER` (viết chính xác cụm USER_ID_PLACEHOLDER, không tự điền ID thật).\n"
+                    +
+                    "4. ĐỐI VỚI BẢNG LỊCH HẸN (appointments): BẮT BUỘC chèn điều kiện lọc `appointments.tenant_id = USER_ID_PLACEHOLDER`.\n"
+                    +
+                    "5. ĐỐI VỚI BẢNG BILLS: Bảng bills không có cột tenant_id. BẮT BUỘC phải JOIN bills với contracts RỒI MỚI lọc bằng `contracts.tenant_id = USER_ID_PLACEHOLDER`. Nếu khách hỏi NỢ TIỀN CHƯA ĐÓNG, lọc thêm bills.status IN ('UNPAID', 'LATE').\n"
+                    +
                     "6. Nếu họ thắc mắc về các phòng không thuộc quyền sở hữu của họ, chỉ trả về dữ liệu cơ bản.\n" +
-                    "7. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm, BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n" +
+                    "7. MẸO JOIN BẢNG: Nếu cần truy vấn địa điểm, BẮT BUỘC phải JOIN bảng `rooms` với bảng `properties` (`rooms.property_id = properties.id`).\n"
+                    +
                     "8. CHÚ Ý TỪ KHÓA 'cho tôi': Dù Khách thuê nói 'tìm phòng cho tôi', nếu đó là yêu cầu tìm Phòng Trống chung chung, KHÔNG ĐƯỢC lọc theo `contracts.tenant_id`.";
         } else if (role.equalsIgnoreCase("LANDLORD")) {
             schemaContext = schemaTenantAndLandlord + schemaLandlordSpecial;
-            roleRules = "1. BẮT BUỘC phải thêm điều kiện lọc `landlord_id = USER_ID_PLACEHOLDER` vào MỌI truy vấn cá nhân. Đối với bảng `appointments` nó có sẵn cột `landlord_id`. Đối với `rooms`, `contracts`, `bills` thì BẮT BUỘC phải JOIN qua `properties` để lấy cột `properties.landlord_id = USER_ID_PLACEHOLDER`.\n" +
+            roleRules = "1. BẮT BUỘC phải thêm điều kiện lọc `landlord_id = USER_ID_PLACEHOLDER` vào MỌI truy vấn cá nhân. Đối với bảng `appointments` nó có sẵn cột `landlord_id`. Đối với `rooms`, `contracts`, `bills` thì BẮT BUỘC phải JOIN qua `properties` để lấy cột `properties.landlord_id = USER_ID_PLACEHOLDER`.\n"
+                    +
                     "2. LUÔN LUÔN dùng LIKE khi tra cứu địa điểm.\n" +
-                    "3. NGUYÊN TẮC DOANH THU (Revenue): Nếu hỏi DOANH THU, BẮT BUỘC dùng hàm SUM(bills.total_amount) VÀ ĐIỀU KIỆN bills.status = 'PAID'. (Tuyệt đối không cộng gộp hóa đơn chưa thanh toán).\n" +
+                    "3. NGUYÊN TẮC DOANH THU (Revenue): Nếu hỏi DOANH THU, BẮT BUỘC dùng hàm SUM(bills.total_amount) VÀ ĐIỀU KIỆN bills.status = 'PAID'. (Tuyệt đối không cộng gộp hóa đơn chưa thanh toán).\n"
+                    +
                     "4. NGUYÊN TẮC CON NỢ (Debtors): Nếu hỏi KHÁCH NỢ TIỀN, lọc bills.status IN ('UNPAID', 'LATE').\n" +
                     "5. NGUYÊN TẮC HỢP ĐỒNG: Nếu hỏi hợp đồng sắp hết hạn, kiểm tra contracts.status = 'ACTIVE'.";
         } else {
             schemaContext = schemaGeneral;
-            roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n" +
-                        "2. Nếu câu hỏi yêu cầu xem hóa đơn, hợp đồng, lịch hẹn hoặc doanh thu, BẮT BUỘC CHỈ TRẢ VỀ CHỮ: UNAUTHORIZED.\n" +
-                        "3. Khi truy vấn phòng trống theo yêu cầu khách, BẮT BUỘC kèm theo điều kiện kép: `rooms.status = 'AVAILABLE'` VÀ `properties.status = 'APPROVED'` để không lấy phòng ảo/đã có người.\n" +
-                        "4. Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
+            roleRules = "1. ĐÂY LÀ KHÁCH VÃNG LAI (GUEST). BẮT BUỘC KHÔNG ĐƯỢC truy cập bảng contracts, bills, hay users.\n"
+                    +
+                    "2. Nếu câu hỏi yêu cầu xem hóa đơn, hợp đồng, lịch hẹn hoặc doanh thu, BẮT BUỘC CHỈ TRẢ VỀ CHỮ: UNAUTHORIZED.\n"
+                    +
+                    "3. Khi truy vấn phòng trống theo yêu cầu khách, BẮT BUỘC kèm theo điều kiện kép: `rooms.status = 'AVAILABLE'` VÀ `properties.status = 'APPROVED'` để không lấy phòng ảo/đã có người.\n"
+                    +
+                    "4. Luôn lấy cột r.images để GUEST có thể xem ảnh phòng.";
         }
 
         // 🌟 NEW HYBRID AI PIPELINE (Strangler Fig Pattern)
@@ -279,12 +296,12 @@ public class AiOrchestratorService {
                     "LOCATION_SEARCH_HEURISTIC",
                     1.0,
                     startTime,
-                    true
-            );
+                    true);
             if (heuristicResponse != null) {
                 return heuristicResponse;
             }
-            System.out.println("⚠️ [HEURISTIC] Fallback to intent pipeline because geocode miss for: " + heuristicLocation);
+            System.out.println(
+                    "⚠️ [HEURISTIC] Fallback to intent pipeline because geocode miss for: " + heuristicLocation);
         }
 
         try {
@@ -307,9 +324,12 @@ public class AiOrchestratorService {
             if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
                 jsonNode.get("params").fields().forEachRemaining(entry -> {
                     com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
-                    if (val.isNumber()) extractedParams.put(entry.getKey(), val.numberValue());
-                    else if (val.isBoolean()) extractedParams.put(entry.getKey(), val.booleanValue());
-                    else extractedParams.put(entry.getKey(), val.asText());
+                    if (val.isNumber())
+                        extractedParams.put(entry.getKey(), val.numberValue());
+                    else if (val.isBoolean())
+                        extractedParams.put(entry.getKey(), val.booleanValue());
+                    else
+                        extractedParams.put(entry.getKey(), val.asText());
                 });
             }
 
@@ -328,12 +348,15 @@ public class AiOrchestratorService {
                 if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
                     System.out.println("✅ [HYBRID AI] Intent match LOCATION_SEARCH! Bypassing LLM generation...");
                     success = true;
-                    String locationName = extraction.getParams().containsKey("location") ? extraction.getParams().get("location").toString() : null;
+                    String locationName = extraction.getParams().containsKey("location")
+                            ? extraction.getParams().get("location").toString()
+                            : null;
                     Double radius = 3.0;
                     if (extraction.getParams().containsKey("radius")) {
                         try {
                             radius = Double.parseDouble(extraction.getParams().get("radius").toString());
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                        }
                     }
                     Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
                     Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
@@ -350,65 +373,68 @@ public class AiOrchestratorService {
                             predictedIntent,
                             confidence,
                             startTime,
-                            false
-                    );
+                            false);
 
                 } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
                     System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
 
-                // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params Hash
-                String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role);
-                Cache resultCache = cacheManager.getCache("aiQueryResults");
-                if (resultCache != null) {
-                    Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
-                    if (cachedResult != null) {
-                        System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
-                        success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                        return cachedResult.get();
-                    }
-                }
-
-                List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
-                String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
-                try {
-                    Object response = dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
-                    // 💾 Ghi cache kết quả
+                    // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params Hash
+                    String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role);
+                    Cache resultCache = cacheManager.getCache("aiQueryResults");
                     if (resultCache != null) {
-                        resultCache.put(cacheKey, response);
-                        System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
-                    }
-                    success = true;
-                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                    return response;
-                } catch (Exception llmEx) {
-                    System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: " + llmEx.getMessage());
-                    success = true;
-                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-                    // Trả về dữ liệu thô nhưng format dễ đọc hơn
-                    if (results.isEmpty()) {
-                        return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
-                    }
-                    StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
-                    for (int i = 0; i < results.size(); i++) {
-                        Map<String, Object> row = results.get(i);
-                        sb.append("\n--- ").append(i + 1).append(" ---\n");
-                        for (Map.Entry<String, Object> entry : row.entrySet()) {
-                            if (entry.getValue() != null) {
-                                sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
-                            }
+                        Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
+                        if (cachedResult != null) {
+                            System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
+                            success = true;
+                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                            return cachedResult.get();
                         }
                     }
-                    return sb.toString();
-                }
+
+                    List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
+                    String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
+                    try {
+                        Object response = dataPresenterAi.generateNaturalResponse(question, rawDataStr, role);
+                        // 💾 Ghi cache kết quả
+                        if (resultCache != null) {
+                            resultCache.put(cacheKey, response);
+                            System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
+                        }
+                        success = true;
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        return response;
+                    } catch (Exception llmEx) {
+                        System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: "
+                                + llmEx.getMessage());
+                        success = true;
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        // Trả về dữ liệu thô nhưng format dễ đọc hơn
+                        if (results.isEmpty()) {
+                            return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
+                        }
+                        StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
+                        for (int i = 0; i < results.size(); i++) {
+                            Map<String, Object> row = results.get(i);
+                            sb.append("\n--- ").append(i + 1).append(" ---\n");
+                            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                                if (entry.getValue() != null) {
+                                    sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue())
+                                            .append("\n");
+                                }
+                            }
+                        }
+                        return sb.toString();
+                    }
                 }
             } else {
                 fallbackUsed = true;
-                System.out.println("⚠️ [HYBRID AI] Intent not fully supported or Confidence too low (" + confidence + "). Fallback to SqlGeneratorAi.");
+                System.out.println("⚠️ [HYBRID AI] Intent not fully supported or Confidence too low (" + confidence
+                        + "). Fallback to SqlGeneratorAi.");
             }
         } catch (Exception e) {
             fallbackUsed = true;
-            System.err.println("❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
+            System.err.println(
+                    "❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
         }
 
         // 📝 Ghi log cho luồng Fallback trước khi đi xuống Legacy Pipeline
@@ -445,7 +471,7 @@ public class AiOrchestratorService {
             return "Dạ, em chưa tạo được truy vấn phù hợp từ câu hỏi này. Bạn vui lòng diễn đạt rõ hơn để em hỗ trợ chính xác hơn nhé.";
         }
 
-                sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
+        sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
         int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
         if (selectIndex >= 0) {
             sqlToExecute = sqlToExecute.substring(selectIndex);
@@ -459,7 +485,8 @@ public class AiOrchestratorService {
         // 🛡️ LỚP BẢO VỆ 3: JAVA VALIDATOR (CHỐT CHẶN TRƯỚC KHI CHẠY DATABASE)
         // ====================================================================
 
-        // Chặn 1: Nếu AI phát hiện Khách thuê hỏi sai quyền hạn và trả về chữ UNAUTHORIZED
+        // Chặn 1: Nếu AI phát hiện Khách thuê hỏi sai quyền hạn và trả về chữ
+        // UNAUTHORIZED
         if (sqlToExecute.trim().equalsIgnoreCase("UNAUTHORIZED")) {
             return "Dạ, em chỉ là trợ lý ảo nên không có quyền cung cấp thông tin bảo mật này cho khách thuê ạ.";
         }
@@ -467,8 +494,8 @@ public class AiOrchestratorService {
         // Chặn 2: Ngăn bảo mật cho GUEST (Khách vãng lai)
         if (role.equalsIgnoreCase("GUEST")) {
             String upperSql = sqlToExecute.toUpperCase();
-            if (upperSql.contains("USERS") || upperSql.contains("BILLS") || 
-                upperSql.contains("CONTRACTS") || upperSql.contains("APPOINTMENTS")) {
+            if (upperSql.contains("USERS") || upperSql.contains("BILLS") ||
+                    upperSql.contains("CONTRACTS") || upperSql.contains("APPOINTMENTS")) {
                 System.err.println("🚨 SECURITY ALERT: GUEST tried to access restricted tables!");
                 return "Dạ, vì lý do bảo mật, khách vãng lai chỉ có thể tra cứu thông tin phòng và khu trọ công khai thôi ạ. Bạn vui lòng đăng nhập để xem các thông tin cá nhân nhé!";
             }
@@ -480,7 +507,7 @@ public class AiOrchestratorService {
                 return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
             }
         }
-        
+
         String upperCaseSql = sqlToExecute.toUpperCase();
         if (upperCaseSql.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE)\\b.*")) {
             System.err.println("🚨 [SECURITY ALERT] Phát hiện lệnh cấm mạo danh AI: " + sqlToExecute);
@@ -490,25 +517,29 @@ public class AiOrchestratorService {
         // Chặn 5: Java Regex Security Gate cho SQL (Đảm bảo ID Isolation)
         if (role.equalsIgnoreCase("LANDLORD") && !upperCaseSql.contains("UNAUTHORIZED")) {
             if (!upperCaseSql.contains("LANDLORD_ID")) {
-                System.err.println("🚨 [HARD SECURITY ALERT] SQL của Chủ trọ thiếu điều kiện phân quyền: " + sqlToExecute);
+                System.err.println(
+                        "🚨 [HARD SECURITY ALERT] SQL của Chủ trọ thiếu điều kiện phân quyền: " + sqlToExecute);
                 return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm luồng bảo mật dữ liệu.";
             }
         } else if (role.equalsIgnoreCase("TENANT") && !upperCaseSql.contains("UNAUTHORIZED")) {
-            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS") || upperCaseSql.contains("APPOINTMENTS")) && !upperCaseSql.contains("TENANT_ID")) {
-                System.err.println("🚨 [HARD SECURITY ALERT] SQL của Khách thuê truy cập bảng nhạy cảm mà thiếu tenant_id: " + sqlToExecute);
+            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS")
+                    || upperCaseSql.contains("APPOINTMENTS")) && !upperCaseSql.contains("TENANT_ID")) {
+                System.err.println(
+                        "🚨 [HARD SECURITY ALERT] SQL của Khách thuê truy cập bảng nhạy cảm mà thiếu tenant_id: "
+                                + sqlToExecute);
                 return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm quyền riêng tư của khách hàng khác.";
             }
         }
         // ====================================================================
 
-
         // Cập nhật Placeholder thành User ID thật sự (Tiết kiệm Token hoàn hảo!)
         String finalSql = sqlToExecute.replace("USER_ID_PLACEHOLDER", userId.toString());
 
-        // 🛡️ LỚP BẢO VỆ 4: Chặn truy cập cột nhạy cảm (chống data exfiltration qua subquery/alias)
+        // 🛡️ LỚP BẢO VỆ 4: Chặn truy cập cột nhạy cảm (chống data exfiltration qua
+        // subquery/alias)
         String upperFinalSql = finalSql.toUpperCase();
-        String[] sensitiveColumns = {"PASSWORD", "VERIFICATION_CODE", "VERIFICATION_EXPIRY", 
-                                      "WALLET_ADDRESS", "BLOCKCHAIN_PRIVATE", "REFRESH_TOKEN"};
+        String[] sensitiveColumns = { "PASSWORD", "VERIFICATION_CODE", "VERIFICATION_EXPIRY",
+                "WALLET_ADDRESS", "BLOCKCHAIN_PRIVATE", "REFRESH_TOKEN" };
         for (String col : sensitiveColumns) {
             if (upperFinalSql.contains(col)) {
                 System.err.println("🚨 [AI SECURITY] SQL chứa cột nhạy cảm: " + col);
@@ -549,14 +580,15 @@ public class AiOrchestratorService {
                 if (results.isEmpty()) {
                     return "Dạ hiện AI đang quá tải, nhưng hệ thống ghi nhận không có dữ liệu nào khớp với yêu cầu của bạn ạ.";
                 }
-                
-                StringBuilder fallbackResponse = new StringBuilder("Dạ hiện AI đang quá tải (Hóa đơn Token), em xin trích xuất kết quả từ hệ thống cho bạn nhé:\n\n");
+
+                StringBuilder fallbackResponse = new StringBuilder(
+                        "Dạ hiện AI đang quá tải (Hóa đơn Token), em xin trích xuất kết quả từ hệ thống cho bạn nhé:\n\n");
                 for (Map<String, Object> row : results) {
                     Object roomId = row.getOrDefault("room_id", row.get("id"));
                     if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
                         String firstImg = extractFirstImage(row.get("images"));
                         fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n",
-                            roomId, row.get("name"), normalizePriceForCard(row.get("price")), firstImg));
+                                roomId, row.get("name"), normalizePriceForCard(row.get("price")), firstImg));
                     } else {
                         fallbackResponse.append("- ").append(row.toString()).append("\n");
                     }
@@ -571,6 +603,7 @@ public class AiOrchestratorService {
             jdbcTemplate.setQueryTimeout(0); // Reset timeout về mặc định cho các nghiệp vụ khác
         }
     }
+
     // Admin: Thống kê AI NLP
     public Map<String, Object> getAnalytics() {
         List<AiSqlCache> allCaches = cacheRepository.findAll();
@@ -611,7 +644,8 @@ public class AiOrchestratorService {
         categories.put("Hợp đồng", contractQueries);
         categories.put("Hoá đơn/Doanh thu", billQueries);
         categories.put("Địa điểm", locationQueries);
-        categories.put("Khác", totalQueries - roomQueries - priceQueries - contractQueries - billQueries - locationQueries);
+        categories.put("Khác",
+                totalQueries - roomQueries - priceQueries - contractQueries - billQueries - locationQueries);
         result.put("categories", categories);
 
         // Cache entries
@@ -634,11 +668,11 @@ public class AiOrchestratorService {
     public void updateCacheEntry(Long id, String newSql) {
         AiSqlCache cache = cacheRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy câu hỏi trong Cache (ID: " + id + ")"));
-        
+
         cache.setGeneratedSql(newSql);
         cache.setValid(true); // Đã sửa bằng tay thì coi như valid
         cacheRepository.save(cache);
-        
+
         System.out.println("✏️ Admin đã sửa SQL cho câu hỏi ID " + id);
         reloadVectorCache();
     }
@@ -699,7 +733,8 @@ public class AiOrchestratorService {
         if (!normalized.matches(".*\\b(gan|near|quanh)\\b.*")) {
             return null;
         }
-        if (normalized.matches(".*\\b(hoa don|bill|hop dong|contract|doanh thu|revenue|thanh toan|payment|lich hen|appointment|no tien)\\b.*")) {
+        if (normalized.matches(
+                ".*\\b(hoa don|bill|hop dong|contract|doanh thu|revenue|thanh toan|payment|lich hen|appointment|no tien)\\b.*")) {
             return null;
         }
 
@@ -721,7 +756,7 @@ public class AiOrchestratorService {
         locationPart = locationPart.replace("dh cong nghiep", "dai hoc cong nghiep");
 
         // Cắt đuôi mô tả phụ để giữ tên địa điểm sạch hơn
-        String[] delimiters = new String[] {" voi ", " va ", ",", ".", "?"};
+        String[] delimiters = new String[] { " voi ", " va ", ",", ".", "?" };
         for (String delimiter : delimiters) {
             int cut = locationPart.indexOf(delimiter);
             if (cut > 0) {
@@ -761,7 +796,7 @@ public class AiOrchestratorService {
 
     private Long extractMaxPriceFromParams(Map<String, Object> params, String question) {
         if (params != null) {
-            String[] keys = new String[] {"max_price", "maxPrice", "price_max", "budget_max"};
+            String[] keys = new String[] { "max_price", "maxPrice", "price_max", "budget_max" };
             for (String key : keys) {
                 if (params.containsKey(key) && params.get(key) != null) {
                     try {
@@ -789,8 +824,10 @@ public class AiOrchestratorService {
         String normalized = normalizeForHeuristic(question);
 
         java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
-                java.util.regex.Pattern.compile("(?:duoi|toi da|khong qua|nho hon|under|<=)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?"),
-                java.util.regex.Pattern.compile("(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\s*(?:tro xuong|do lai|hoac thap hon|or less)")
+                java.util.regex.Pattern.compile(
+                        "(?:duoi|toi da|khong qua|nho hon|under|<=)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?"),
+                java.util.regex.Pattern.compile(
+                        "(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\s*(?:tro xuong|do lai|hoac thap hon|or less)")
         };
 
         for (java.util.regex.Pattern pattern : patterns) {
@@ -828,7 +865,7 @@ public class AiOrchestratorService {
 
     private Integer extractRequiredOccupantsFromParams(Map<String, Object> params, String question) {
         if (params != null) {
-            String[] keys = new String[] {"occupants", "required_occupants", "people", "persons", "max_occupants"};
+            String[] keys = new String[] { "occupants", "required_occupants", "people", "persons", "max_occupants" };
             for (String key : keys) {
                 if (params.containsKey(key) && params.get(key) != null) {
                     try {
@@ -850,7 +887,8 @@ public class AiOrchestratorService {
             return null;
         }
         String normalized = normalizeForHeuristic(question);
-        if (normalized.contains("1 minh") || normalized.contains("mot minh") || normalized.contains("o rieng 1 nguoi")) {
+        if (normalized.contains("1 minh") || normalized.contains("mot minh")
+                || normalized.contains("o rieng 1 nguoi")) {
             return 1;
         }
         java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
@@ -875,7 +913,7 @@ public class AiOrchestratorService {
 
     private boolean extractRequirePetFriendlyFromParams(Map<String, Object> params, String question) {
         if (params != null) {
-            String[] keys = new String[] {"pet_friendly", "allow_pets", "petAllowed", "has_pet"};
+            String[] keys = new String[] { "pet_friendly", "allow_pets", "petAllowed", "has_pet" };
             for (String key : keys) {
                 if (params.containsKey(key) && params.get(key) != null) {
                     Object value = params.get(key);
@@ -928,20 +966,21 @@ public class AiOrchestratorService {
     }
 
     private String handleLocationSearchFlow(String locationName,
-                                            Double radius,
-                                            Long maxPrice,
-                                            Integer requiredOccupants,
-                                            boolean requirePetFriendly,
-                                            String question,
-                                            String role,
-                                            Long userId,
-                                            String predictedIntent,
-                                            Double confidence,
-                                            long startTime,
-                                            boolean fallbackOnGeoMiss) {
+            Double radius,
+            Long maxPrice,
+            Integer requiredOccupants,
+            boolean requirePetFriendly,
+            String question,
+            String role,
+            Long userId,
+            String predictedIntent,
+            Double confidence,
+            long startTime,
+            boolean fallbackOnGeoMiss) {
         Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
-        System.out.println("📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km, maxPrice=" + maxPrice
-                + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
+        System.out.println(
+                "📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km, maxPrice=" + maxPrice
+                        + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
 
         if (locationName == null || locationName.trim().isEmpty()) {
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
@@ -972,11 +1011,11 @@ public class AiOrchestratorService {
                 safeRadius,
                 (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
                 (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
-                requirePetFriendly
-        );
+                requirePetFriendly);
         if (results.isEmpty()) {
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
-            return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '" + geoResult.displayName + "'.";
+            return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '"
+                    + geoResult.displayName + "'.";
         }
 
         StringBuilder responseStr = new StringBuilder();
@@ -1007,11 +1046,14 @@ public class AiOrchestratorService {
     }
 
     private String extractFirstImage(Object imagesObj) {
-        if (imagesObj == null) return "";
+        if (imagesObj == null)
+            return "";
         String imagesStr = imagesObj.toString();
-        if (imagesStr.isEmpty() || imagesStr.equals("[]")) return "";
-        
-        // Regex đơn giản để lấy nội dung trong dấu ngoặc kép đầu tiên của JSON Array ["url",...]
+        if (imagesStr.isEmpty() || imagesStr.equals("[]"))
+            return "";
+
+        // Regex đơn giản để lấy nội dung trong dấu ngoặc kép đầu tiên của JSON Array
+        // ["url",...]
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"([^\"]+)\"");
         java.util.regex.Matcher matcher = pattern.matcher(imagesStr);
         if (matcher.find()) {
@@ -1103,8 +1145,8 @@ public class AiOrchestratorService {
      * Ghi bản ghi Observability vào DB (chạy async để không block response).
      */
     private void saveActionLog(Long userId, String role, String rawQuery,
-                               String predictedIntent, Double confidenceScore,
-                               boolean fallbackUsed, long startTime, boolean isSuccess) {
+            String predictedIntent, Double confidenceScore,
+            boolean fallbackUsed, long startTime, boolean isSuccess) {
         try {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             AiActionLog log = AiActionLog.builder()
@@ -1124,5 +1166,3 @@ public class AiOrchestratorService {
         }
     }
 }
-
-
