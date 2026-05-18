@@ -1,4 +1,4 @@
-package iuh.se.kltn.backend.modules.ai.service;
+﻿package iuh.se.kltn.backend.modules.ai.service;
 
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
@@ -179,6 +179,21 @@ public class AiOrchestratorService {
         if (text == null) return "";
         // Chuyển về NFC (Canonical Composition) để đồng nhất các loại dấu tiếng Việt
         return java.text.Normalizer.normalize(text.toLowerCase(), java.text.Normalizer.Form.NFC);
+    }
+
+    private boolean isSafeSelectSql(String sql) {
+        if (sql == null) {
+            return false;
+        }
+        String trimmed = sql.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        String upper = trimmed.toUpperCase();
+        if (!upper.startsWith("SELECT") && !upper.startsWith("WITH")) {
+            return false;
+        }
+        return !upper.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE)\\b.*");
     }
 
     // 1. Thêm 2 tham số role và userId vào hàm
@@ -426,10 +441,18 @@ public class AiOrchestratorService {
             }
         }
 
-        sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
+        if (sqlToExecute == null || sqlToExecute.isBlank()) {
+            return "Dạ, em chưa tạo được truy vấn phù hợp từ câu hỏi này. Bạn vui lòng diễn đạt rõ hơn để em hỗ trợ chính xác hơn nhé.";
+        }
+
+                sqlToExecute = sqlToExecute.replace("```sql", "").replace("```", "").trim();
         int selectIndex = sqlToExecute.toUpperCase().indexOf("SELECT");
         if (selectIndex >= 0) {
             sqlToExecute = sqlToExecute.substring(selectIndex);
+        }
+        if (!isSafeSelectSql(sqlToExecute)) {
+            System.err.println("⚠️ [AI SQL GUARD] Non-SELECT or invalid SQL payload from model: " + sqlToExecute);
+            return "Dạ, yêu cầu này thiên về tư vấn/chính sách nên không thể chuyển thành truy vấn dữ liệu an toàn. Bạn vui lòng hỏi rõ theo dạng dữ liệu cần tra cứu (ví dụ: hóa đơn tháng, hợp đồng hiện tại, phòng trống).";
         }
 
         // ====================================================================
@@ -1101,3 +1124,5 @@ public class AiOrchestratorService {
         }
     }
 }
+
+
