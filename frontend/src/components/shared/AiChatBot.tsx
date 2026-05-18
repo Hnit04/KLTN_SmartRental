@@ -21,6 +21,7 @@ type Message = {
   roomCardCount?: number;
   missingDistanceCount?: number;
   locationReferenceType?: "user" | "landmark" | "none";
+  roomActionEligible?: boolean;
 };
 
 export default function AiChatBot() {
@@ -400,8 +401,39 @@ export default function AiChatBot() {
         "hết hạn", "gia hạn", "tiền cọc", "deposit"
     ];
     
-    const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) && 
-        dataKeywords.some(keyword => normalizedMsg.includes(keyword.normalize('NFC').toLowerCase()));
+    const policyKeywords = [
+      "la gi",
+      "là gì",
+      "nhu the nao",
+      "như thế nào",
+      "ra sao",
+      "quy dinh",
+      "quy định",
+      "chinh sach",
+      "chính sách"
+    ];
+    const hasPolicyStyle = policyKeywords.some((keyword) =>
+      normalizedMsg.includes(keyword.normalize("NFC").toLowerCase())
+    );
+    const personalDataMarkers = [
+      "cua toi",
+      "của tôi",
+      "toi con",
+      "tôi còn",
+      "hien tai",
+      "hiện tại",
+      "thang nay",
+      "tháng này",
+      "thang ",
+      "tháng "
+    ];
+    const hasPersonalDataMarker = personalDataMarkers.some((marker) =>
+      normalizedMsg.includes(marker.normalize("NFC").toLowerCase())
+    );
+
+    const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) &&
+        dataKeywords.some(keyword => normalizedMsg.includes(keyword.normalize('NFC').toLowerCase())) &&
+        !(hasPolicyStyle && !hasPersonalDataMarker);
 
     const userLocationKeywords = [
       "gần tôi",
@@ -478,6 +510,14 @@ export default function AiChatBot() {
         : isLandmarkLocationQuery
           ? "landmark"
           : "none";
+      const roomActionEligible =
+        isDataQuery &&
+        (isUserLocationQuery ||
+          isLandmarkLocationQuery ||
+          normalizedMsg.includes("tim phong") ||
+          normalizedMsg.includes("tìm phòng") ||
+          normalizedMsg.includes("phong trong") ||
+          normalizedMsg.includes("phòng trống"));
 
       setMessages((prev) => [
         ...prev,
@@ -491,6 +531,7 @@ export default function AiChatBot() {
           roomCardCount,
           missingDistanceCount,
           locationReferenceType,
+          roomActionEligible,
           hasReminderAction: isLandlord && isDataQuery && (normalizedMsg.includes("nợ") || normalizedMsg.includes("chưa đóng") || normalizedMsg.includes("trễ"))
         },
       ]);
@@ -601,7 +642,7 @@ export default function AiChatBot() {
                               : `Khoảng cách được tính theo địa điểm bạn nhập; còn ${msg.missingDistanceCount} kết quả chưa có dữ liệu khoảng cách.`)}
                         </div>
                       )}
-                      {typeof msg.roomCardCount === "number" && msg.roomCardCount > 0 && msg.roomCardCount <= 1 && (
+                      {msg.roomActionEligible && typeof msg.roomCardCount === "number" && msg.roomCardCount > 0 && msg.roomCardCount <= 1 && (
                         <Button
                           size="sm"
                           variant="outline"

@@ -160,16 +160,19 @@ public class AiController {
 
         try {
             Object result = aiOrchestratorService.processDataQuery(question, role, userId);
+            boolean verifiable = true;
             if (result instanceof String textResult) {
-                result = aiOrchestratorService.sanitizeForUserFacing(textResult);
+                String sanitized = aiOrchestratorService.sanitizeForUserFacing(textResult);
+                result = sanitized;
+                verifiable = isLikelyVerifiableDataAnswer(sanitized);
             }
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "question", question,
                     "data", result,
-                    "source", "SYSTEM_DB",
-                    "verifiable", true
+                    "source", verifiable ? "SYSTEM_DB" : "SYSTEM_DB_FALLBACK",
+                    "verifiable", verifiable
             ));
         } catch (Throwable t) {
             System.err.println("❌ [AI DATA ERROR] Lỗi khi xử lý truy vấn dữ liệu AI: " + t.getMessage());
@@ -618,5 +621,32 @@ public class AiController {
     private Long userIdFrom(UserPrincipal user) { return user != null ? user.getId() : -1L; }
     private String roleFrom(UserPrincipal user) { 
         return user != null ? user.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "") : "GUEST"; 
+    }
+
+    private boolean isLikelyVerifiableDataAnswer(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase();
+
+        String[] fallbackSignals = new String[] {
+                "khong the chuyen thanh truy van",
+                "chua tao duoc truy van",
+                "dang gap chut kho khan",
+                "may chu ai hien tai dang qua tai",
+                "he thong dang gap chut kho khan",
+                "khong the phan tich du lieu luc nay",
+                "vui long thu lai sau",
+                "khong the tra cuu thong tin nay"
+        };
+
+        for (String signal : fallbackSignals) {
+            if (normalized.contains(signal)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

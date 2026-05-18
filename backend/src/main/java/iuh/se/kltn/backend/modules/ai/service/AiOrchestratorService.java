@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -211,6 +212,17 @@ public class AiOrchestratorService {
                 System.out.println("🛡️ [SECURITY GUEST] Chặn truy vấn nhạy cảm: " + question);
                 return "Dạ, vì lý do bảo mật, các thông tin cá nhân như hóa đơn, hợp đồng và lịch hẹn chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng các tính năng này nhé!";
             }
+        }
+
+        // Query-data chi nen tra cuu du lieu co cau truc. Cau hoi mang tinh chinh sach/quy trinh
+        // (khong gan voi tai khoan cu the) se duoc uu tien dung FAQ de tranh "lac cau hoi".
+        if (isPolicyStyleQuestion(question) && !hasPersonalDataCue(question)) {
+            String faqAnswer = searchFaq(question);
+            if (faqAnswer != null && !faqAnswer.isBlank()) {
+                return sanitizeUserFacingText(faqAnswer);
+            }
+            return "Dạ, câu hỏi này đang thuộc nhóm chính sách/hướng dẫn. "
+                    + "Bạn vui lòng dùng mục chat tư vấn để mình trả lời theo tài liệu hệ thống mới nhất nhé.";
         }
 
         String sqlToExecute = null;
@@ -457,10 +469,19 @@ public class AiOrchestratorService {
 
         sqlToExecute = null;
         if (!matches.isEmpty()) {
-            sqlToExecute = matches.get(0).embedded().metadata().getString("sql");
-            System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + matches.get(0).score());
+            String candidateSql = matches.get(0).embedded().metadata().getString("sql");
+            if (isLikelySemanticSqlMatch(question, candidateSql, role)) {
+                sqlToExecute = candidateSql;
+                System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + matches.get(0).score());
+            } else {
+                System.out.println("⚠️ [SEMANTIC CACHE MISMATCH] Bỏ qua cache vì lệch ngữ nghĩa câu hỏi.");
+            }
         } else {
             System.out.println("🐌 [CACHE MISS] Câu hỏi mới, gọi Gemini sinh SQL...");
+        }
+
+        if (sqlToExecute == null || sqlToExecute.isBlank()) {
+            System.out.println("🤖 [SQL GENERATION] Cache không phù hợp, gọi Gemini sinh SQL...");
             try {
                 sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, schemaContext, roleRules);
             } catch (Exception llmEx) {
@@ -478,6 +499,7 @@ public class AiOrchestratorService {
         if (selectIndex >= 0) {
             sqlToExecute = sqlToExecute.substring(selectIndex);
         }
+        sqlToExecute = normalizeSqlDialectForPostgres(sqlToExecute);
         if (!isSafeSelectSql(sqlToExecute)) {
             System.err.println("⚠️ [AI SQL GUARD] Non-SELECT or invalid SQL payload from model: " + sqlToExecute);
             return "Dạ, yêu cầu này thiên về tư vấn/chính sách nên không thể chuyển thành truy vấn dữ liệu an toàn. Bạn vui lòng hỏi rõ theo dạng dữ liệu cần tra cứu (ví dụ: hóa đơn tháng, hợp đồng hiện tại, phòng trống).";
@@ -505,7 +527,9 @@ public class AiOrchestratorService {
 
         if (role.equalsIgnoreCase("TENANT")) {
             String upperSql = sqlToExecute.toUpperCase();
-            if (upperSql.contains("SUM(") || upperSql.contains("REVENUE")) {
+            // Chặn truy vấn thiên về doanh thu nội bộ của chủ trọ, nhưng vẫn cho phép tenant
+            // tổng hợp dữ liệu cá nhân khi có tenant_id.
+            if (upperSql.contains("REVENUE") || (upperSql.contains("SUM(") && !upperSql.contains("TENANT_ID"))) {
                 return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
             }
         }
@@ -1018,6 +1042,163 @@ public class AiOrchestratorService {
         String nfd = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD);
         String noAccent = nfd.replaceAll("\\p{M}", "");
         return (" " + noAccent.toLowerCase() + " ").replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Chuẩn hóa một số cú pháp SQL kiểu MySQL thường gặp trong seed/cached SQL sang PostgreSQL.
+     * Mục tiêu là giảm tỷ lệ query fail do khác biệt dialect.
+     */
+    private String normalizeSqlDialectForPostgres(String sql) {
+        if (sql == null || sql.isBlank()) {
+            return sql;
+        }
+        String normalized = sql;
+
+        // YEAR(CURRENT_DATE), MONTH(CURRENT_DATE) -> PostgreSQL EXTRACT
+        normalized = normalized.replaceAll("(?i)\\bYEAR\\s*\\(\\s*CURRENT_DATE\\s*\\)",
+                "EXTRACT(YEAR FROM CURRENT_DATE)::int");
+        normalized = normalized.replaceAll("(?i)\\bMONTH\\s*\\(\\s*CURRENT_DATE\\s*\\)",
+                "EXTRACT(MONTH FROM CURRENT_DATE)::int");
+
+        // YEAR/MONTH trên DATE_SUB(CURRENT_DATE, INTERVAL n MONTH)
+        normalized = normalized.replaceAll(
+                "(?i)\\bYEAR\\s*\\(\\s*DATE_SUB\\s*\\(\\s*CURRENT_DATE\\s*,\\s*INTERVAL\\s+(\\d+)\\s+MONTH\\s*\\)\\s*\\)",
+                "EXTRACT(YEAR FROM (CURRENT_DATE - INTERVAL '$1 month'))::int");
+        normalized = normalized.replaceAll(
+                "(?i)\\bMONTH\\s*\\(\\s*DATE_SUB\\s*\\(\\s*CURRENT_DATE\\s*,\\s*INTERVAL\\s+(\\d+)\\s+MONTH\\s*\\)\\s*\\)",
+                "EXTRACT(MONTH FROM (CURRENT_DATE - INTERVAL '$1 month'))::int");
+
+        // DATE_SUB(CURRENT_DATE, INTERVAL n DAY/MONTH) -> CURRENT_DATE - INTERVAL 'n unit'
+        normalized = normalized.replaceAll(
+                "(?i)\\bDATE_SUB\\s*\\(\\s*CURRENT_DATE\\s*,\\s*INTERVAL\\s+(\\d+)\\s+DAY\\s*\\)",
+                "(CURRENT_DATE - INTERVAL '$1 day')");
+        normalized = normalized.replaceAll(
+                "(?i)\\bDATE_SUB\\s*\\(\\s*CURRENT_DATE\\s*,\\s*INTERVAL\\s+(\\d+)\\s+MONTH\\s*\\)",
+                "(CURRENT_DATE - INTERVAL '$1 month')");
+
+        // DATE_ADD(CURRENT_DATE, INTERVAL N DAY) -> CURRENT_DATE + INTERVAL 'N day'
+        normalized = normalized.replaceAll("(?i)\\bDATE_ADD\\s*\\(\\s*CURRENT_DATE\\s*,\\s*INTERVAL\\s+(\\d+)\\s+DAY\\s*\\)",
+                "(CURRENT_DATE + INTERVAL '$1 day')");
+
+        // YEAR(expr), MONTH(expr) với expr đơn giản (không lồng hàm) -> EXTRACT
+        normalized = normalized.replaceAll("(?i)\\bYEAR\\s*\\(\\s*([^\\(\\)]+?)\\s*\\)",
+                "EXTRACT(YEAR FROM $1)::int");
+        normalized = normalized.replaceAll("(?i)\\bMONTH\\s*\\(\\s*([^\\(\\)]+?)\\s*\\)",
+                "EXTRACT(MONTH FROM $1)::int");
+
+        // DATEDIFF(date_expr, CURRENT_DATE) -> (date_expr::date - CURRENT_DATE)
+        normalized = normalized.replaceAll("(?i)\\bDATEDIFF\\s*\\(\\s*([^,]+?)\\s*,\\s*CURRENT_DATE\\s*\\)",
+                "($1::date - CURRENT_DATE)");
+        // DATEDIFF(date_expr_1, date_expr_2) -> (date_expr_1::date - date_expr_2::date)
+        normalized = normalized.replaceAll("(?i)\\bDATEDIFF\\s*\\(\\s*([^,\\)]+?)\\s*,\\s*([^\\)]+?)\\s*\\)",
+                "($1::date - $2::date)");
+
+        return normalized;
+    }
+
+    /**
+     * Chặn semantic cache hit sai ngữ cảnh: câu hỏi "tổng còn phải trả" nhưng SQL lại là
+     * "lịch sử đã thanh toán", hoặc câu hỏi "hợp đồng" lại match SQL hóa đơn,...
+     */
+    private boolean isLikelySemanticSqlMatch(String question, String sql, String role) {
+        if (question == null || question.isBlank() || sql == null || sql.isBlank()) {
+            return false;
+        }
+
+        String normalizedQuestion = normalizeForHeuristic(question);
+        String upperSql = sql.toUpperCase(Locale.ROOT);
+
+        // Nhóm hỏi nợ/cần thanh toán -> phải bám UNPAID/LATE hoặc tổng nợ.
+        if (containsAny(normalizedQuestion, "con no", "dang no", "can thanh toan", "chua tra", "tong no", "thieu tien")) {
+            boolean looksDebtSql = upperSql.contains("UNPAID") || upperSql.contains("LATE") || upperSql.contains("TONG_NO");
+            if (!looksDebtSql) {
+                return false;
+            }
+        }
+
+        // Nhóm hỏi đã thanh toán/lịch sử thanh toán -> phải bám PAID.
+        if (containsAny(normalizedQuestion, "da thanh toan", "lich su thanh toan", "da tra")) {
+            if (!upperSql.contains("PAID")) {
+                return false;
+            }
+        }
+
+        // Nhóm hỏi hợp đồng -> SQL phải động tới contracts.
+        if (containsAny(normalizedQuestion, "hop dong")) {
+            if (!upperSql.contains("CONTRACT")) {
+                return false;
+            }
+        }
+
+        // Nhóm hỏi lịch hẹn -> SQL phải động tới appointments.
+        if (containsAny(normalizedQuestion, "lich hen", "xem phong")) {
+            if (!upperSql.contains("APPOINTMENT")) {
+                return false;
+            }
+        }
+
+        // Nhóm hỏi doanh thu (landlord) -> cần SUM + PAID.
+        if (containsAny(normalizedQuestion, "doanh thu", "tong thu", "thu nhap")) {
+            if (!(upperSql.contains("SUM(") && upperSql.contains("PAID"))) {
+                return false;
+            }
+        }
+
+        // Nhóm hỏi phòng trống/tìm phòng -> SQL nên bám rooms/properties.
+        if (containsAny(normalizedQuestion, "tim phong", "phong trong", "khu tro", "quan ")) {
+            boolean looksRoomSql = upperSql.contains("FROM ROOMS") || (upperSql.contains("JOIN ROOMS") && upperSql.contains("PROPERTIES"));
+            if (!looksRoomSql) {
+                return false;
+            }
+        }
+
+        // Tenant không nên match SQL doanh thu nội bộ chung.
+        if ("TENANT".equalsIgnoreCase(role) && containsAny(normalizedQuestion, "doanh thu", "tong thu")) {
+            return upperSql.contains("TENANT_ID");
+        }
+
+        return true;
+    }
+
+    private boolean isPolicyStyleQuestion(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        String q = normalizeForHeuristic(question);
+        return containsAny(q,
+                "la gi",
+                "nhu the nao",
+                "ra sao",
+                "quy dinh",
+                "chinh sach",
+                "co che");
+    }
+
+    private boolean hasPersonalDataCue(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        String q = normalizeForHeuristic(question);
+        return containsAny(q,
+                "cua toi",
+                "toi con",
+                "hien tai",
+                "thang nay",
+                "thang ",
+                "hop dong cua toi",
+                "hoa don cua toi");
+    }
+
+    private boolean containsAny(String text, String... tokens) {
+        if (text == null || text.isBlank() || tokens == null) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (token != null && !token.isBlank() && text.contains(token)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String handleLocationSearchFlow(String locationName,
