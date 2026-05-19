@@ -14,14 +14,27 @@ export interface QueryDataResponse {
   verifiable?: boolean;
 }
 
+export interface QueryDataLocationPayload {
+  lat: number;
+  lng: number;
+}
+
 export const aiApi = {
   chat: async (message: string, sessionId?: string): Promise<ChatResponse> => {
     const response = await axiosClient.post('/ai/chat', { message, sessionId });
     return response.data;
   },
 
-  queryData: async (question: string): Promise<QueryDataResponse> => {
-    const response = await axiosClient.post('/ai/query-data', { question });
+  queryData: async (
+    question: string,
+    location?: QueryDataLocationPayload | null
+  ): Promise<QueryDataResponse> => {
+    const payload: { question: string; lat?: number; lng?: number } = { question };
+    if (location) {
+      payload.lat = location.lat;
+      payload.lng = location.lng;
+    }
+    const response = await axiosClient.post('/ai/query-data', payload);
     return response.data;
   },
 

@@ -13,4 +13,10 @@ public class AiDataQueryRequest {
     @Size(max = 5000, message = "Question is too long")
     @JsonAlias({"query", "message"})
     private String question;
+
+    @JsonAlias({"lat", "latitude"})
+    private Double latitude;
+
+    @JsonAlias({"lng", "longitude"})
+    private Double longitude;
 }

@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { MessageCircle, X, Send, Bot, User, Loader2, Home, ExternalLink, MapPin, Sparkles, ChevronRight, ShieldCheck, Clock3 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { aiApi } from "../../api/aiApi";
+import { aiApi, type QueryDataLocationPayload } from "../../api/aiApi";
 import { useAuth } from "../../context/AuthContext";
 import { cn } from "@/utils/cn";
 import { useMobileLayer } from "@/context/MobileLayerContext";
@@ -322,6 +322,28 @@ export default function AiChatBot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  const getCurrentQueryLocation = async (): Promise<QueryDataLocationPayload | null> => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => resolve(null),
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 120000,
+        }
+      );
+    });
+  };
 
   // --- ACTIONS CHO TÍNH NĂNG NHẮC NỢ ---
   const handleGenerateReminders = async () => {
@@ -434,27 +456,32 @@ export default function AiChatBot() {
     const isDataQuery = (!isGeneralAnalysis && !isAnomalyQuery) &&
         dataKeywords.some(keyword => normalizedMsg.includes(keyword.normalize('NFC').toLowerCase())) &&
         !(hasPolicyStyle && !hasPersonalDataMarker);
+    const normalizedMsgNoAccent = normalizedMsg
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
 
     const userLocationKeywords = [
-      "gần tôi",
-      "quanh tôi",
-      "quanh đây",
-      "xung quanh tôi",
-      "near me",
-      "vị trí của tôi",
-      "vi tri cua toi",
-      "gần chỗ tôi",
       "gan toi",
+      "gan day",
+      "quanh toi",
+      "quanh day",
+      "xung quanh toi",
+      "xung quanh day",
+      "near me",
+      "around me",
+      "vi tri cua toi",
+      "vi tri cua ban",
+      "vi tri hien tai"
     ];
     const isUserLocationQuery = userLocationKeywords.some((keyword) =>
-      normalizedMsg.includes(keyword)
+      normalizedMsgNoAccent.includes(keyword)
     );
     const isLandmarkLocationQuery =
       !isUserLocationQuery &&
-      (normalizedMsg.includes("gần") ||
-        normalizedMsg.includes("quanh") ||
-        normalizedMsg.includes("nearby") ||
-        normalizedMsg.includes("landmark"));
+      (normalizedMsgNoAccent.includes("gan") ||
+        normalizedMsgNoAccent.includes("quanh") ||
+        normalizedMsgNoAccent.includes("nearby") ||
+        normalizedMsgNoAccent.includes("landmark"));
 
     // Hiển thị tin nhắn ngắn trong UI (nếu có displayText), nhưng gửi fullMsg cho AI
     const newMessage: Message = {
@@ -485,7 +512,11 @@ export default function AiChatBot() {
         // Gửi truy vấn dữ liệu cho cả GUEST và User. 
         // Backend sẽ tự động chặn các bảng nhạy cảm (bills, contracts) cho GUEST.
         try {
-          const dataRes = await aiApi.queryData(userMsg);
+          let queryLocation: QueryDataLocationPayload | null = null;
+          if (isUserLocationQuery) {
+            queryLocation = await getCurrentQueryLocation();
+          }
+          const dataRes = await aiApi.queryData(userMsg, queryLocation);
           replyText = dataRes.data;
           sourceLabel = dataRes.verifiable
             ? "Đã đối soát từ dữ liệu hệ thống"
@@ -807,3 +838,4 @@ export default function AiChatBot() {
     </>
   );
 }
+
