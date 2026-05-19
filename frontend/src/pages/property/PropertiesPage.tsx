@@ -1,24 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, MapPin, Frown, Filter, Sparkles, ChevronDown, Bot, ArrowUpDown, X, List, Map as MapIcon } from "lucide-react";
+import { Search, MapPin, Frown, Filter, ChevronDown, ArrowUpDown, X, List, Map as MapIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import PropertyCard from "@/features/property/components/PropertyCard";
 import PropertyMap from "@/features/property/components/PropertyMap";
-import RoomCard from "@/features/property/components/RoomCard";
 import { propertyApi } from "@/api/propertyApi";
-import { useAuth } from "@/context/AuthContext";
-import type { Property, Room } from "@/types/index";
+import type { Property } from "@/types/index";
 import { toast } from "sonner";
 
 export default function PropertiesPage() {
-  const { isAuthenticated } = useAuth();
   // --- STATE ---
   const [properties, setProperties] = useState<Property[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
-  const [recommendedRooms, setRecommendedRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter States
@@ -50,44 +46,32 @@ export default function PropertiesPage() {
     const fetchData = async () => {
       try {
         if (page === 0) setIsLoading(true);
-        // Chạy song song cả hai API
-        const [propsRes, recRoomsRes] = await Promise.allSettled([
-          propertyApi.getAll(
-            page,
-            24,
-            userLocation ? { lat: userLocation[0], lng: userLocation[1] } : null
-          ),
-          (page === 0 && isAuthenticated) ? propertyApi.getRecommendedRooms() : Promise.resolve({ data: [] })
-        ]);
+        // Fetch danh sach khu tro cho section kham pha chinh
+        const propsRes = await propertyApi.getAll(
+          page,
+          24,
+          userLocation ? { lat: userLocation[0], lng: userLocation[1] } : null
+        );
         
-        if (propsRes.status === "fulfilled") {
-            const pageData = propsRes.value.data as any;
-            if (page === 0) {
-                 setProperties(pageData.content || pageData); 
-            } else {
-                 setProperties(prev => [...prev, ...(pageData.content || [])]);
-            }
-            setTotalPages(pageData.totalPages || 1);
-        }
-
-        if (recRoomsRes.status === "fulfilled" && Array.isArray(recRoomsRes.value.data) && recRoomsRes.value.data.length > 0) {
-            const enrichedRooms = recRoomsRes.value.data.map((room: any) => ({
-                ...room,
-                matchScore: room.matchScore ? room.matchScore : 95,
-                matchReason: room.matchReason ? room.matchReason : "Phù hợp với mức giá và khu vực bạn chọn."
-            }));
-            setRecommendedRooms(enrichedRooms as any);
+        if (propsRes) {
+          const pageData = propsRes.data as any;
+          if (page === 0) {
+            setProperties(pageData.content || pageData);
+          } else {
+            setProperties((prev) => [...prev, ...(pageData.content || [])]);
+          }
+          setTotalPages(pageData.totalPages || 1);
         }
 
       } catch (error) {
-        console.error("Failed to fetch properties or recommendations:", error);
+        console.error("Failed to fetch properties:", error);
         toast.error("Không thể tải toàn bộ dữ liệu. Đã có lỗi xảy ra.");
       } finally {
         setTimeout(() => setIsLoading(false), 500);
       }
     };
     fetchData();
-  }, [page, isAuthenticated, userLocation?.[0], userLocation?.[1]]);
+  }, [page, userLocation?.[0], userLocation?.[1]]);
 
   // --- FILTER LOGIC ---
   const filteredProperties = useMemo(() => {
@@ -337,62 +321,6 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* --- AI RECOMMENDATIONS --- */}
-      {recommendedRooms.length > 0 && (
-        <div className="page-shell relative z-20 py-5 sm:py-8">
-          <div className="mb-4 flex items-start gap-2.5 border-b pb-3 sm:mb-6 sm:items-center sm:gap-3 sm:pb-4">
-            <div className="shrink-0 rounded-lg bg-gradient-to-br from-yellow-100 to-amber-100 p-1.5 text-amber-600 sm:p-2">
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent sm:text-2xl">
-                {isAuthenticated ? "Phòng Gợi Ý Cho Bạn" : "Phòng Trọ Nổi Bật"}
-              </h2>
-              <p className="mt-0.5 text-xs leading-snug text-muted-foreground sm:mt-1 sm:text-sm">
-                {isAuthenticated 
-                  ? `Dựa trên sở thích của bạn, AI đã chọn ra ${recommendedRooms.length} phòng tối ưu nhất.`
-                  : `Khám phá ${recommendedRooms.length} phòng trọ được đánh giá cao nhất bởi cộng đồng.`
-                }
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-4 snap-x sm:gap-4 sm:pb-6">
-            {recommendedRooms.map((room) => (
-              <div key={room.id} className="flex w-[min(85vw,280px)] shrink-0 snap-start flex-col gap-2 sm:w-[min(90vw,320px)] sm:gap-3 md:min-w-[350px] md:w-[350px]">
-                 <div className="relative flex-1">
-                   <RoomCard data={room} />
-                 </div>
-                 
-                 <Button 
-                   variant="outline" 
-                   className="w-full gap-2 border-primary/40 text-primary font-medium hover:bg-primary/5 shadow-sm h-10"
-                   onClick={() => {
-                     const amenitiesList = Array.isArray(room.amenities) ? room.amenities.join(', ') : '';
-                     const details = [
-                       `Tên phòng: "${room.name}"`,
-                       room.propertyName ? `Khu trọ: "${room.propertyName}"` : '',
-                       (room as any).propertyAddress || (room as any).address ? `Địa chỉ: ${(room as any).propertyAddress || (room as any).address}` : '',
-                       `Diện tích: ${room.area}m²`,
-                       `Giá thuê: ${room.price?.toLocaleString('vi-VN')}đ/tháng`,
-                       room.type ? `Loại: ${room.type}` : '',
-                       room.hasMezzanine ? 'Có gác lửng' : '',
-                       room.hasBalcony ? 'Có ban công' : '',
-                       amenitiesList ? `Tiện nghi: ${amenitiesList}` : '',
-                       room.description ? `Mô tả: ${room.description.substring(0, 200)}` : '',
-                     ].filter(Boolean).join('. ');
-                     const q = `Hãy phân tích chi tiết ưu điểm và nhược điểm của phòng trọ sau đây, đánh giá mức giá có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
-                     const shortText = `Phân tích phòng "${room.name}" tại "${room.propertyName || 'khu trọ này'}" giúp mình nhé! 🏠`;
-                     window.dispatchEvent(new CustomEvent('openAiChat', { detail: { question: q, autoSend: true, displayText: shortText } }));
-                   }}
-                 >
-                   <Bot className="h-4 w-4" /> Hỏi AI về phòng này
-                 </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* --- MAIN CONTENT --- */}
       <div className="page-shell py-5 sm:py-8">
         <h2 className="mb-4 flex flex-col gap-2 border-b border-border pb-2 text-base font-bold text-foreground sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xl">
@@ -475,3 +403,4 @@ export default function PropertiesPage() {
     </div>
   );
 }
+

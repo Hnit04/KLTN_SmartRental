@@ -200,6 +200,10 @@ public class AiOrchestratorService {
 
     // 1. Thêm 2 tham số role và userId vào hàm
     public Object processDataQuery(String question, String role, Long userId) {
+        return processDataQuery(question, role, userId, null, null);
+    }
+
+    public Object processDataQuery(String question, String role, Long userId, Double userLatitude, Double userLongitude) {
         String normalizedQuestion = normalizeText(question);
 
         // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính
@@ -288,6 +292,33 @@ public class AiOrchestratorService {
         boolean fallbackUsed = false;
         boolean success = false;
 
+        if (isNearCurrentLocationQuery(question, role)) {
+            if (hasValidCoordinates(userLatitude, userLongitude)) {
+                Double radius = extractRadiusKm(question);
+                Long maxPrice = extractMaxPriceVnd(question);
+                Integer requiredOccupants = extractRequiredOccupantsFromQuestion(question);
+                boolean requirePetFriendly = extractRequirePetFriendly(question);
+                String currentLocationResponse = handleLocationSearchByCoordinatesFlow(
+                        userLatitude,
+                        userLongitude,
+                        radius,
+                        maxPrice,
+                        requiredOccupants,
+                        requirePetFriendly,
+                        question,
+                        role,
+                        userId,
+                        "LOCATION_SEARCH_CURRENT_POSITION",
+                        1.0,
+                        startTime);
+                if (currentLocationResponse != null) {
+                    return currentLocationResponse;
+                }
+            }
+
+            saveActionLog(userId, role, question, "LOCATION_SEARCH_CURRENT_POSITION", 1.0, false, startTime, true);
+            return buildUserLocationRequiredMessage();
+        }
         // Heuristic guard: câu có "gần <địa điểm>" sẽ ưu tiên luồng LOCATION_SEARCH
         // để luôn có distance_km thay vì trả danh sách thường thiếu khoảng cách.
         String heuristicLocation = tryExtractLocationForNearbySearch(question, role);
@@ -373,6 +404,25 @@ public class AiOrchestratorService {
                     Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
                     Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
                     boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
+                    boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
+                    if (useCurrentLocation) {
+                        if (hasValidCoordinates(userLatitude, userLongitude)) {
+                            return handleLocationSearchByCoordinatesFlow(
+                                    userLatitude,
+                                    userLongitude,
+                                    radius,
+                                    maxPrice,
+                                    requiredOccupants,
+                                    requirePetFriendly,
+                                    question,
+                                    role,
+                                    userId,
+                                    predictedIntent,
+                                    confidence,
+                                    startTime);
+                        }
+                        return buildUserLocationRequiredMessage();
+                    }
                     return handleLocationSearchFlow(
                             locationName,
                             radius,
@@ -809,6 +859,9 @@ public class AiOrchestratorService {
         }
 
         String normalized = normalizeForHeuristic(question);
+        if (isNearCurrentLocationQuery(question, role)) {
+            return null;
+        }
         if (!normalized.matches(".*\\b(gan|near|quanh)\\b.*")) {
             return null;
         }
@@ -841,6 +894,10 @@ public class AiOrchestratorService {
             if (cut > 0) {
                 locationPart = locationPart.substring(0, cut).trim();
             }
+        }
+
+        if (isCurrentLocationCue(locationPart)) {
+            return null;
         }
 
         if (locationPart.length() < 3) {
@@ -1201,6 +1258,90 @@ public class AiOrchestratorService {
         return false;
     }
 
+    private boolean hasValidCoordinates(Double latitude, Double longitude) {
+        if (latitude == null || longitude == null) {
+            return false;
+        }
+        if (latitude.isNaN() || longitude.isNaN() || latitude.isInfinite() || longitude.isInfinite()) {
+            return false;
+        }
+        return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+    }
+
+    private boolean isNearCurrentLocationQuery(String question, String role) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        if (!("GUEST".equalsIgnoreCase(role) || "TENANT".equalsIgnoreCase(role))) {
+            return false;
+        }
+
+        String normalized = normalizeForHeuristic(question);
+        boolean hasCurrentLocationCue = containsAny(normalized,
+                "gan day",
+                "quanh day",
+                "xung quanh day",
+                "gan toi",
+                "quanh toi",
+                "xung quanh toi",
+                "near me",
+                "around me",
+                "vi tri cua toi",
+                "vi tri hien tai");
+        if (!hasCurrentLocationCue) {
+            return false;
+        }
+
+        boolean hasRoomIntent = containsAny(normalized,
+                "phong",
+                "room",
+                "khu tro",
+                "nha tro",
+                "tim phong",
+                "phong trong",
+                "can ho");
+        if (!hasRoomIntent) {
+            return false;
+        }
+
+        return !containsAny(normalized,
+                "hoa don",
+                "bill",
+                "hop dong",
+                "contract",
+                "doanh thu",
+                "thanh toan",
+                "lich hen",
+                "appointment");
+    }
+
+    private boolean isCurrentLocationCue(String locationText) {
+        if (locationText == null || locationText.isBlank()) {
+            return true;
+        }
+        String normalized = normalizeForHeuristic(locationText);
+        return containsAny(normalized,
+                "day",
+                "o day",
+                "tai day",
+                "gan day",
+                "quanh day",
+                "xung quanh day",
+                "gan toi",
+                "quanh toi",
+                "xung quanh toi",
+                "near me",
+                "around me",
+                "vi tri cua toi",
+                "vi tri hien tai",
+                "hien tai");
+    }
+
+    private String buildUserLocationRequiredMessage() {
+        return "Da, de tim phong 'gan day' chinh xac, ban vui long bat quyen vi tri tren trinh duyet roi thu lai nhe. "
+                + "Hoac ban co the nhap moc cu the, vi du: 'gan Dai hoc Cong nghiep'.";
+    }
+
     private String handleLocationSearchFlow(String locationName,
             Double radius,
             Long maxPrice,
@@ -1274,6 +1415,68 @@ public class AiOrchestratorService {
             String firstImg = extractFirstImage(row.get("images"));
 
             responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
+                    roomId, name, priceStr, firstImg, distanceStr));
+        }
+
+        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+        return responseStr.toString();
+    }
+
+    private String handleLocationSearchByCoordinatesFlow(Double latitude,
+            Double longitude,
+            Double radius,
+            Long maxPrice,
+            Integer requiredOccupants,
+            boolean requirePetFriendly,
+            String question,
+            String role,
+            Long userId,
+            String predictedIntent,
+            Double confidence,
+            long startTime) {
+        if (!hasValidCoordinates(latitude, longitude)) {
+            return null;
+        }
+
+        Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
+        System.out.println(
+                "[LOCATION FLOW] using current user coordinates, radius=" + safeRadius + "km, maxPrice=" + maxPrice
+                        + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
+
+        List<Map<String, Object>> results = propertyRepository.findNearbyRoomsAdvanced(
+                latitude,
+                longitude,
+                safeRadius,
+                (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
+                (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
+                requirePetFriendly);
+
+        if (results.isEmpty()) {
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            return "Hien tai khong tim thay phong trong nao trong ban kinh " + safeRadius.intValue()
+                    + "km gan vi tri hien tai cua ban.";
+        }
+
+        StringBuilder responseStr = new StringBuilder();
+        responseStr.append("Da, minh tim duoc ").append(results.size())
+                .append(" phong trong gan vi tri hien tai cua ban (trong ban kinh ")
+                .append(safeRadius.intValue()).append("km):\n\n");
+
+        int limit = Math.min(results.size(), 5);
+        for (int i = 0; i < limit; i++) {
+            Map<String, Object> row = results.get(i);
+            Object roomId = row.get("room_id");
+            Object nameObj = row.get("name");
+            String name = nameObj != null ? nameObj.toString() : "";
+            if (name.length() > 35) {
+                name = name.substring(0, 32) + "...";
+            }
+
+            String priceStr = normalizePriceForCard(row.get("price"));
+            String distanceStr = normalizeDistanceForCard(row.get("distance_km"));
+            String firstImg = extractFirstImage(row.get("images"));
+
+            responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cach %skm]\n",
                     roomId, name, priceStr, firstImg, distanceStr));
         }
 
@@ -1406,3 +1609,4 @@ public class AiOrchestratorService {
         }
     }
 }
+

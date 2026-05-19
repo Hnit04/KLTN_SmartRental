@@ -159,7 +159,13 @@ public class AiController {
         System.out.println("👤 Khách đang tra cứu: ID=" + userId + ", Role=" + role);
 
         try {
-            Object result = aiOrchestratorService.processDataQuery(question, role, userId);
+            Object result = aiOrchestratorService.processDataQuery(
+                    question,
+                    role,
+                    userId,
+                    request.getLatitude(),
+                    request.getLongitude()
+            );
             boolean verifiable = true;
             if (result instanceof String textResult) {
                 String sanitized = aiOrchestratorService.sanitizeForUserFacing(textResult);
