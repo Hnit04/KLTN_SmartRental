@@ -17,6 +17,10 @@ import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
@@ -25,6 +29,18 @@ public class AiConfig {
 
     @Value("${gemini.api.key}")
     private String apiKey;
+
+    @Value("${gemini.chat.primary-model:gemini-2.5-flash}")
+    private String primaryChatModel;
+
+    @Value("${gemini.chat.fallback-models:gemini-3.1-flash-lite,gemini-2.5-flash-lite}")
+    private String fallbackChatModels;
+
+    @Value("${gemini.chat.temperature:0.7}")
+    private double geminiChatTemperature;
+
+    @Value("${gemini.chat.timeout-seconds:120}")
+    private long geminiChatTimeoutSeconds;
 
     @Value("${ai.rag.embedding.model:all-minilm-l6-v2}")
     private String ragEmbeddingModel;
@@ -46,12 +62,20 @@ public class AiConfig {
 
     @Bean
     public ChatLanguageModel geminiChatModel() {
-        return GoogleAiGeminiChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("gemini-2.5-flash")
-                .temperature(0.7)
-                .timeout(java.time.Duration.ofSeconds(120)) // Longer timeout for long-form analysis
-                .build();
+        List<String> modelChain = buildChatModelChain();
+        List<FallbackChatLanguageModel.ModelDelegate> delegates = new ArrayList<>(modelChain.size());
+        for (String modelName : modelChain) {
+            delegates.add(new FallbackChatLanguageModel.ModelDelegate(modelName, buildGeminiModel(modelName)));
+        }
+
+        if (delegates.size() == 1) {
+            System.out.println("[AI MODEL ROUTING] primary=" + delegates.get(0).modelName() + ", fallback=none");
+            return delegates.get(0).model();
+        }
+
+        FallbackChatLanguageModel fallbackModel = new FallbackChatLanguageModel(delegates);
+        System.out.println("[AI MODEL ROUTING] chain=" + String.join(" -> ", fallbackModel.modelNames()));
+        return fallbackModel;
     }
 
     @Bean
@@ -117,6 +141,33 @@ public class AiConfig {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private ChatLanguageModel buildGeminiModel(String modelName) {
+        return GoogleAiGeminiChatModel.builder()
+                .apiKey(apiKey)
+                .modelName(modelName)
+                .temperature(geminiChatTemperature)
+                .timeout(Duration.ofSeconds(geminiChatTimeoutSeconds))
+                .build();
+    }
+
+    private List<String> buildChatModelChain() {
+        LinkedHashSet<String> uniqueNames = new LinkedHashSet<>();
+        if (!isBlank(primaryChatModel)) {
+            uniqueNames.add(primaryChatModel.trim());
+        }
+        if (!isBlank(fallbackChatModels)) {
+            for (String raw : fallbackChatModels.split(",")) {
+                if (raw != null && !raw.trim().isEmpty()) {
+                    uniqueNames.add(raw.trim());
+                }
+            }
+        }
+        if (uniqueNames.isEmpty()) {
+            uniqueNames.add("gemini-2.5-flash");
+        }
+        return List.copyOf(uniqueNames);
     }
 
     private void ensureEmbeddingDimension(EmbeddingModel model, int expectedDimension) {
