@@ -6,10 +6,11 @@ import {
   ChevronLeft, ChevronRight, ZoomIn, SlidersHorizontal, Home
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
+import { tenantPreferenceApi } from "@/api/tenantPreferenceApi";
 import { appointmentApi } from "@/api/appointmentApi";
 import { reviewApi } from '@/api/reviewApi';
 import { useAuth } from "@/context/AuthContext";
-import type { Property, Room, ReviewResponse } from "@/types/index";
+import type { Property, Room, ReviewResponse, TenantPreference } from "@/types/index";
 import RoomCard from "@/features/property/components/RoomCard";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +32,142 @@ const customMarkerIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const ROOM_PREF_WEIGHT_PRICE = 0.55;
+const ROOM_PREF_WEIGHT_AMENITY = 0.30;
+const ROOM_PREF_WEIGHT_PET = 0.15;
+
+const PET_FORBID_KEYWORDS = [
+  "khong nuoi thu cung",
+  "cam thu cung",
+  "khong cho nuoi pet",
+  "khong pet",
+  "khong duoc nuoi"
+];
+
+const PET_ALLOW_KEYWORDS = [
+  "cho nuoi thu cung",
+  "duoc nuoi thu cung",
+  "pet friendly",
+  "cho nuoi pet",
+  "duoc nuoi pet",
+  "co the nuoi thu cung"
+];
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeText(input?: string | null): string {
+  if (!input) return "";
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parsePreferenceAmenities(raw?: string): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[;,|]/)
+    .map(normalizeText)
+    .filter(Boolean);
+}
+
+function parseRoomAmenities(room: Room): string[] {
+  if (!room) return [];
+  if (Array.isArray(room.amenities)) {
+    return room.amenities.map((item) => normalizeText(String(item))).filter(Boolean);
+  }
+  if (typeof room.amenities === "string") {
+    try {
+      const parsed = JSON.parse(room.amenities);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => normalizeText(String(item))).filter(Boolean);
+      }
+    } catch {
+      return room.amenities
+        .split(/[;,|]/)
+        .map(normalizeText)
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function computeRoomPriceFit(roomPrice?: number, min?: number, max?: number): number {
+  if (roomPrice == null || min == null || max == null || max < min || min < 0) return 0;
+  const targetAvg = (min + max) / 2;
+  let effectiveRange = Math.max(max - min, targetAvg * 0.15);
+  if (effectiveRange <= 0) {
+    effectiveRange = Math.max(1, roomPrice * 0.15);
+  }
+  return clamp01(1 - Math.abs(roomPrice - targetAvg) / effectiveRange);
+}
+
+function computeRoomAmenityFit(room: Room, requestedAmenities: string[]): number {
+  if (!requestedAmenities.length) return 0;
+  const roomAmenities = parseRoomAmenities(room);
+  if (!roomAmenities.length) return 0;
+
+  let matched = 0;
+  for (const expected of requestedAmenities) {
+    const hit = roomAmenities.some((actual) => actual.includes(expected) || expected.includes(actual));
+    if (hit) matched++;
+  }
+  return clamp01(matched / requestedAmenities.length);
+}
+
+function computeRoomPetFit(room: Room): number {
+  const amenities = parseRoomAmenities(room).join(" ");
+  const combined = normalizeText(`${amenities} ${room.defaultTerms || ""} ${room.description || ""}`);
+
+  for (const keyword of PET_FORBID_KEYWORDS) {
+    if (combined.includes(keyword)) return 0;
+  }
+  for (const keyword of PET_ALLOW_KEYWORDS) {
+    if (combined.includes(keyword)) return 1;
+  }
+  return 0.5;
+}
+
+function computeRoomPreferenceScore(room: Room, preference: TenantPreference | null): number {
+  if (!preference) return 0;
+
+  let weighted = 0;
+  let activeWeightSum = 0;
+
+  const hasPricePref =
+    preference.targetPriceMin != null &&
+    preference.targetPriceMax != null &&
+    preference.targetPriceMax >= preference.targetPriceMin &&
+    preference.targetPriceMin >= 0;
+
+  if (hasPricePref) {
+    const priceFit = computeRoomPriceFit(room.price, preference.targetPriceMin, preference.targetPriceMax);
+    weighted += ROOM_PREF_WEIGHT_PRICE * priceFit;
+    activeWeightSum += ROOM_PREF_WEIGHT_PRICE;
+  }
+
+  const requestedAmenities = parsePreferenceAmenities(preference.amenitiesRef);
+  if (requestedAmenities.length) {
+    const amenityFit = computeRoomAmenityFit(room, requestedAmenities);
+    weighted += ROOM_PREF_WEIGHT_AMENITY * amenityFit;
+    activeWeightSum += ROOM_PREF_WEIGHT_AMENITY;
+  }
+
+  if (preference.hasPet === true) {
+    const petFit = computeRoomPetFit(room);
+    weighted += ROOM_PREF_WEIGHT_PET * petFit;
+    activeWeightSum += ROOM_PREF_WEIGHT_PET;
+  }
+
+  if (activeWeightSum <= 0) return 0;
+  return clamp01(weighted / activeWeightSum);
+}
+
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -38,6 +175,7 @@ export default function PropertyDetailPage() {
 
   const [property, setProperty] = useState<Property | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [tenantPreference, setTenantPreference] = useState<TenantPreference | null>(null);
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,14 +206,21 @@ export default function PropertyDetailPage() {
       if (!id) return;
       setIsLoading(true);
       try {
-        const [propRes, roomRes] = await Promise.all([
+        const preferencePromise =
+          isAuthenticated && user?.role === "TENANT"
+            ? tenantPreferenceApi.getPreference().catch(() => ({ data: null }))
+            : Promise.resolve({ data: null });
+
+        const [propRes, roomRes, prefRes] = await Promise.all([
           propertyApi.getDetail(id),
-          propertyApi.getRooms(id)
+          propertyApi.getRooms(id),
+          preferencePromise
         ]);
 
         const propertyData = propRes.data as any;
         setProperty(propertyData);
         setRooms(roomRes.data as any);
+        setTenantPreference((prefRes as any)?.data ?? null);
 
         // ✅ GỌI THẲNG API LẤY REVIEW THEO PROPERTY ID (KHU TRỌ)
         try {
@@ -105,7 +250,7 @@ export default function PropertyDetailPage() {
       }
     };
     fetchData();
-  }, [id]);
+  }, [id, isAuthenticated, user?.role]);
 
   // --- HANDLERS ---
   const maskPhone = (phone: string) => {
@@ -220,18 +365,60 @@ export default function PropertyDetailPage() {
   };
 
   // --- COMPUTED: FILTER & SORT PHÒNG ---
+  const hasRoomPreferenceSignals = useMemo(() => {
+    if (!tenantPreference) return false;
+    const hasPrice =
+      tenantPreference.targetPriceMin != null &&
+      tenantPreference.targetPriceMax != null &&
+      tenantPreference.targetPriceMax >= tenantPreference.targetPriceMin &&
+      tenantPreference.targetPriceMin >= 0;
+    const hasAmenities = parsePreferenceAmenities(tenantPreference.amenitiesRef).length > 0;
+    const hasPet = tenantPreference.hasPet === true;
+    return hasPrice || hasAmenities || hasPet;
+  }, [tenantPreference]);
+
+  const roomPreferenceScoreMap = useMemo(() => {
+    const scoreMap = new Map<number, number>();
+    for (const room of rooms) {
+      scoreMap.set(room.id, computeRoomPreferenceScore(room, tenantPreference));
+    }
+    return scoreMap;
+  }, [rooms, tenantPreference]);
+
   const filteredRooms = useMemo(() => {
     let result = [...rooms];
     if (roomStatusFilter !== "ALL") {
-      result = result.filter(r => r.status === roomStatusFilter);
+      result = result.filter((r) => r.status === roomStatusFilter);
     }
     switch (roomSortBy) {
-      case "price_asc": result.sort((a, b) => a.price - b.price); break;
-      case "price_desc": result.sort((a, b) => b.price - a.price); break;
-      case "area_asc": result.sort((a, b) => a.area - b.area); break;
+      case "price_asc":
+        result.sort((a, b) => a.price - b.price);
+        break;
+      case "price_desc":
+        result.sort((a, b) => b.price - a.price);
+        break;
+      case "area_asc":
+        result.sort((a, b) => a.area - b.area);
+        break;
+      case "default":
+      default:
+        if (hasRoomPreferenceSignals) {
+          result.sort((a, b) => {
+            const scoreA = roomPreferenceScoreMap.get(a.id) ?? 0;
+            const scoreB = roomPreferenceScoreMap.get(b.id) ?? 0;
+            if (scoreB !== scoreA) return scoreB - scoreA;
+
+            const availableA = a.status === "AVAILABLE" ? 1 : 0;
+            const availableB = b.status === "AVAILABLE" ? 1 : 0;
+            if (availableB !== availableA) return availableB - availableA;
+
+            return (a.price ?? 0) - (b.price ?? 0);
+          });
+        }
+        break;
     }
     return result;
-  }, [rooms, roomSortBy, roomStatusFilter]);
+  }, [rooms, roomSortBy, roomStatusFilter, hasRoomPreferenceSignals, roomPreferenceScoreMap]);
 
   // --- COMPUTED: RATING TỔNG HỢP ---
   const avgRating = reviews.length > 0
@@ -253,6 +440,9 @@ export default function PropertyDetailPage() {
   const activeRoomFilters = [
     roomStatusFilter !== "ALL" ? { key: "status", label: `Trang thai: ${roomStatusFilter}` } : null,
     roomSortBy !== "default" ? { key: "sort", label: `Sap xep: ${roomSortBy}` } : null,
+    (roomSortBy === "default" && hasRoomPreferenceSignals)
+      ? { key: "pref", label: "Uu tien phong phu hop so thich" }
+      : null,
   ].filter(Boolean) as { key: string; label: string }[];
 
   return (

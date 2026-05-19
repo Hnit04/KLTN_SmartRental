@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -17,8 +18,11 @@ public class RecommendationController {
     private RecommendationService recommendationService;
 
     @GetMapping("/rooms")
-    public ResponseEntity<?> getRecommendedRooms(@AuthenticationPrincipal UserPrincipal currentUser) {
-        // Chỉ TENANT mới có Recommendation. Nhưng để tránh lỗi, ta chỉ cần gọi tenantId = currentUser.getId()
-        return ResponseEntity.ok(recommendationService.getRecommendedRoomsForTenant(currentUser.getId()));
+    public ResponseEntity<?> getRecommendedRooms(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lng", required = false) Double lng) {
+        return ResponseEntity.ok(recommendationService.getRecommendedRoomsForTenant(currentUser.getId(), lat, lng));
     }
 }
+
