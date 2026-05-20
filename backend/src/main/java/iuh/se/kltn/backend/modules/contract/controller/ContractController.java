@@ -251,6 +251,15 @@ public class ContractController {
         return ResponseEntity.ok(contractService.executeSettlement(id, currentUser.getId()));
     }
 
+    @PostMapping("/{id}/settle/reject")
+    public ResponseEntity<?> rejectSettlement(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(contractService.rejectSettlement(id, currentUser.getId(), reason));
+    }
+
     private ResponseEntity<?> handleAiException(Exception e) {
         if (e.getMessage() != null && e.getMessage().contains("429")) {
             return ResponseEntity.status(429).body(java.util.Collections.singletonMap("message", "AI đang quá tải (Rate Limit). Vui lòng thử lại sau ít phút!"));

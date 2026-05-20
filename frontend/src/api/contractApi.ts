@@ -79,7 +79,21 @@ export const contractApi = {
   },
 
   // 💰 QUYẾT TOÁN HỢP ĐỒNG (Settlement)
-  proposeSettlement: (id: number | string, data: { deductionAmount: number, earlyTermination: boolean }) => {
+  proposeSettlement: (id: number | string, data: {
+    deductionAmount: number;
+    earlyTermination: boolean;
+    txHash?: string;
+    inspectionNote?: string;
+    utilityBill?: {
+      electricityUsage: number;
+      waterUsage: number;
+      electricityFee: number;
+      waterFee: number;
+      internetFee: number;
+      total: number;
+    };
+    items?: { reason: string; amount: number; type?: string; locked?: boolean }[];
+  }) => {
     return axiosClient.post<Contract>(`/contracts/${id}/settle/propose`, data);
   },
   consentSettlement: (id: number | string) => {
@@ -87,6 +101,9 @@ export const contractApi = {
   },
   executeSettlement: (id: number | string) => {
     return axiosClient.post<Contract>(`/contracts/${id}/settle/execute`);
+  },
+  rejectSettlement: (id: number | string, data?: { reason?: string }) => {
+    return axiosClient.post<Contract>(`/contracts/${id}/settle/reject`, data || {});
   },
 
   // 🛡️ ADMIN: BLOCKCHAIN MONITORING

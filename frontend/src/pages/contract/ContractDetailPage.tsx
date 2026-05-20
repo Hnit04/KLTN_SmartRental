@@ -168,6 +168,7 @@ export default function ContractDetailPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [residentRequests, setResidentRequests] = useState<ResidentRequestResponse[]>([]);
   const [isUpdatingResident, setIsUpdatingResident] = useState(false);
+  const [isApprovingRequest, setIsApprovingRequest] = useState<number | null>(null);
 
   const [isRemovalOpen, setIsRemovalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<ContractMemberResponse | null>(null);
@@ -639,7 +640,14 @@ export default function ContractDetailPage() {
   const [isConfirmingDeposit, setIsConfirmingDeposit] = useState(false);
 
   const handleConfirmWeb3Deposit = async () => {
-    if (!contract?.smartContractAddress || !window.ethereum) return;
+    if (!contract?.smartContractAddress) {
+      toast.info("Smart Contract đang được triển khai. Hệ thống sẽ tự động cập nhật trong 30–60 giây, vui lòng thử lại sau.");
+      return;
+    }
+    if (!window.ethereum) {
+      toast.error("Vui lòng cài đặt ví MetaMask!");
+      return;
+    }
     if (chainRiskMessage) {
       toast.error(chainRiskMessage);
       return;
@@ -758,12 +766,15 @@ export default function ContractDetailPage() {
   };
 
   const handleApproveRequest = async (reqId: number) => {
+    setIsApprovingRequest(reqId);
     try {
       await contractApi.approveChangeRequest(reqId);
       toast.success("Đã phê duyệt yêu cầu. Hợp đồng đã được cập nhật!");
       fetchContractData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Lỗi khi phê duyệt.");
+    } finally {
+      setIsApprovingRequest(null);
     }
   };
 
@@ -873,14 +884,26 @@ export default function ContractDetailPage() {
 
   const handleWithdrawFunds = async () => {
     if (!contract || !contract.smartContractAddress) return;
+    
+    // Check balance first to avoid confusing blockchain revert errors
+    if (withdrawableBalance <= 0) {
+      toast.info("Hiện tại chưa có khoản tiền nào chờ rút. Số dư sẽ cập nhật sau khi hợp đồng được quyết toán hoàn tất.");
+      return;
+    }
+    
     setIsWithdrawing(true);
     try {
       toast.info("Đang thực hiện rút tiền từ Smart Contract về ví...");
       await web3WithdrawFunds(contract.smartContractAddress);
       toast.success("Rút tiền thành công! Vui lòng kiểm tra ví MetaMask của bạn.");
-      setWithdrawableBalance(0); // Reset UI balance immediately
+      setWithdrawableBalance(0);
     } catch (err: any) {
-      toast.error(err.message || "Lỗi khi rút tiền");
+      const reason = err.reason || err.message || "";
+      if (reason.includes("Nothing")) {
+        toast.info("Chưa có khoản tiền nào chờ rút trong Smart Contract. Số dư sẽ cập nhật sau khi quyết toán hoàn tất trên Blockchain.");
+      } else {
+        toast.error(reason || "Lỗi khi rút tiền");
+      }
     } finally {
       setIsWithdrawing(false);
     }
@@ -1352,14 +1375,33 @@ export default function ContractDetailPage() {
                 <h3 className="text-xl font-black text-indigo-900 mb-4 flex items-center gap-2">
                   <LogOut className="h-6 w-6 text-indigo-600" /> Quyết toán & Trả phòng (Web3)
                 </h3>
-                {contract.status === 'ACTIVE' ? (
+                {(contract.status === 'ACTIVE' || ((contract.status === 'TERMINATED_EARLY' || contract.status === 'EXPIRED') && withdrawableBalance <= 0)) ? (
                   <div className="space-y-4">
+                    {/* Info banner for early termination that needs on-chain settlement */}
+                    {(contract.status === 'TERMINATED_EARLY' || contract.status === 'EXPIRED') && (
+                      <div className="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 shadow-md">
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400" />
+                        <div className="flex items-start gap-3 mt-1">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 shadow-sm">
+                            <AlertTriangle className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-amber-900">Cần quyết toán trên Blockchain</p>
+                            <p className="mt-1 text-xs leading-relaxed text-amber-700">
+                              Hợp đồng đã được chấm dứt trên hệ thống, nhưng tiền cọc vẫn nằm trong Smart Contract.
+                              Vui lòng hoàn tất quy trình quyết toán bên dưới để rút tiền về ví.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {contract.isProposalActive ? (
                       <div className="bg-white rounded-xl p-5 border border-indigo-200 shadow-sm">
                         <div className="flex justify-between items-start mb-4">
                            <div>
                               <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Số tiền đề xuất khấu trừ</p>
-                              <p className="text-2xl font-black text-rose-600">{contract.currentDeductionAmount?.toLocaleString()}đ</p>
+                              <p className="text-2xl font-black text-rose-600">{contract.currentDeductionAmount ? Math.round((contract.currentDeductionAmount / 1e18) * config.vndEthRate).toLocaleString() : 0}đ</p>
                            </div>
                            <StatusBadge label={contract.isEarlyTerminationProposal ? 'Kết thúc sớm' : 'Đúng hạn'} tone="warning" className="px-3 py-1" />
                         </div>
@@ -1513,6 +1555,7 @@ export default function ContractDetailPage() {
                             size="sm" 
                             onClick={() => handleRejectRequest(pendingRequest.id)} 
                             className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-bold"
+                            disabled={isApprovingRequest !== null}
                           >
                             <XCircle className="w-4 h-4 mr-2" /> Từ chối
                           </Button>
@@ -1521,6 +1564,7 @@ export default function ContractDetailPage() {
                             size="sm" 
                             onClick={() => handleCounterPropose(pendingRequest)} 
                             className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold"
+                            disabled={isApprovingRequest !== null}
                           >
                             <PenTool className="w-4 h-4 mr-2" /> Đề xuất lại
                           </Button>
@@ -1528,6 +1572,8 @@ export default function ContractDetailPage() {
                             size="sm" 
                             onClick={() => handleApproveRequest(pendingRequest.id)} 
                             className="bg-green-600 hover:bg-green-700 shadow-md shadow-green-100 font-bold px-6"
+                            isLoading={isApprovingRequest === pendingRequest.id}
+                            disabled={isApprovingRequest !== null}
                           >
                             <Check className="w-4 h-4 mr-2" /> Chấp nhận & Cập nhật
                           </Button>

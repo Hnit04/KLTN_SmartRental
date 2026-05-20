@@ -91,4 +91,20 @@ public class Contract {
 
     @Column(columnDefinition = "boolean default false")
     private Boolean settlementReminderSent = false;
+
+    // 💰 SETTLEMENT PROPOSAL FIELDS
+    @Column(columnDefinition = "TEXT")
+    private String settlementItemsJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String settlementInspectionNote;
+
+    private Double proposedDeductionAmount;
+
+    @Column(length = 30)
+    private String settlementProposalStatus; // PROPOSED, TENANT_ACCEPTED, TENANT_REJECTED, COMPLETED
+
+    private String settlementProposalTxHash;
+    private String settlementConsentTxHash;
+    private String settlementExecuteTxHash;
 }

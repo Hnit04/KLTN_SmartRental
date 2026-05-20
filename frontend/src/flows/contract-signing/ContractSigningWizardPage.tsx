@@ -253,6 +253,23 @@ export default function ContractSigningWizardPage() {
     }
   }, [context.step, contract, goToStep]);
 
+  // Poll for smart contract deployment when on PAYMENT step with BLOCKCHAIN method
+  // The outbox processor deploys the contract async (every 10s), so we need to
+  // refresh until smartContractAddress is available.
+  const isDeployPending =
+    context.step === "PAYMENT" &&
+    context.selectedMethod === "BLOCKCHAIN" &&
+    contract?.status === "AWAITING_DEPOSIT" &&
+    !contract?.smartContractAddress;
+
+  useEffect(() => {
+    if (!isDeployPending) return;
+    const interval = setInterval(() => {
+      fetchContract();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isDeployPending, fetchContract]);
+
   useEffect(() => {
     if (context.step !== "SIGN" || context.selectedMethod !== "BLOCKCHAIN") return;
     void refreshWalletGuideState();
@@ -550,6 +567,7 @@ export default function ContractSigningWizardPage() {
           note={paymentNote || context.lastError}
           updatedAt={lastSavedAt}
           isSubmitting={isQuickPaying}
+          isDeployPending={isDeployPending}
           onRetry={() => {
             setPaymentState("initiated");
             clearError();

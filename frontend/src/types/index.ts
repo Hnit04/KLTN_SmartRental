@@ -266,6 +266,15 @@ export interface Contract {
   hasLandlordConsented?: boolean;
   hasTenantConsented?: boolean;
   isProposalActive?: boolean;
+
+  // Settlement Proposal Details (from DB)
+  settlementItemsJson?: string;
+  settlementInspectionNote?: string;
+  proposedDeductionAmount?: number;
+  settlementProposalStatus?: string;
+  settlementProposalTxHash?: string;
+  settlementConsentTxHash?: string;
+  settlementExecuteTxHash?: string;
 }
 
 // Payload để tạo hợp đồng

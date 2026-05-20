@@ -11,6 +11,14 @@ export type ContractSettlementContext = {
     water: number;
     note?: string;
   };
+  utilityBill?: {
+    electricityUsage: number;
+    waterUsage: number;
+    electricityFee: number;
+    waterFee: number;
+    internetFee: number;
+    total: number;
+  };
   deductions: {
     reason: string;
     amount: number;
@@ -26,7 +34,7 @@ export type ContractSettlementEvent =
   | { type: "GO_TO"; step: ContractSettlementStep }
   | { type: "NEXT" }
   | { type: "BACK" }
-  | { type: "SUBMIT_INSPECTION"; reading: { electricity: number; water: number; note?: string } }
+  | { type: "SUBMIT_INSPECTION"; reading: { electricity: number; water: number; note?: string }; utilityBill?: { electricityUsage: number; waterUsage: number; electricityFee: number; waterFee: number; internetFee: number; total: number } }
   | { type: "SET_DEDUCTIONS"; items: { reason: string; amount: number }[] }
   | { type: "TENANT_ACTION"; agree: boolean }
   | { type: "SET_TX_HASH"; hash: string } // ✅ Event mới
@@ -83,6 +91,7 @@ export function contractSettlementTransition(
       return withUpdatedAt({
         ...current,
         lastReading: event.reading,
+        utilityBill: event.utilityBill,
         step: "DEDUCTION",
         lastError: null,
       });

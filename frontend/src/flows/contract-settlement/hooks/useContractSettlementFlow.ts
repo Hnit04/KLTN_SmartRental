@@ -96,8 +96,8 @@ export function useContractSettlementFlow(contractId: number) {
   );
   
   const submitInspection = useCallback(
-    (reading: { electricity: number; water: number; note?: string }) => 
-      dispatch({ type: "SUBMIT_INSPECTION", reading }),
+    (reading: { electricity: number; water: number; note?: string }, utilityBill?: any) => 
+      dispatch({ type: "SUBMIT_INSPECTION", reading, utilityBill }),
     [dispatch]
   );
 
