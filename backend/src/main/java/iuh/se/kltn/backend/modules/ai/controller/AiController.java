@@ -198,6 +198,75 @@ public class AiController {
         return ResponseEntity.ok(aiOrchestratorService.getAnalytics());
     }
 
+    // Admin: Observability — AI pipeline logs with responseSource distribution
+    @GetMapping("/admin/observability")
+    public ResponseEntity<?> getAiObservability(
+            @RequestParam(defaultValue = "50") int limit) {
+        try {
+            List<iuh.se.kltn.backend.modules.ai.entity.AiActionLog> logs =
+                    aiActionLogRepository.findAllByOrderByCreatedAtDesc(
+                            org.springframework.data.domain.PageRequest.of(0, Math.min(limit, 200)));
+
+            // Source distribution
+            Map<String, Long> sourceDistribution = logs.stream()
+                    .filter(l -> l.getResponseSource() != null)
+                    .collect(Collectors.groupingBy(
+                            iuh.se.kltn.backend.modules.ai.entity.AiActionLog::getResponseSource,
+                            Collectors.counting()));
+
+            // Security blocked queries
+            List<Map<String, Object>> blockedQueries = logs.stream()
+                    .filter(l -> "SECURITY_BLOCKED".equals(l.getResponseSource()))
+                    .map(l -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("query", l.getRawQuery());
+                        m.put("role", l.getUserRole());
+                        m.put("sql", l.getGeneratedSql());
+                        m.put("createdAt", l.getCreatedAt());
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+
+            // Average latency by source
+            Map<String, Double> avgLatencyBySource = logs.stream()
+                    .filter(l -> l.getResponseSource() != null && l.getExecutionTimeMs() != null)
+                    .collect(Collectors.groupingBy(
+                            iuh.se.kltn.backend.modules.ai.entity.AiActionLog::getResponseSource,
+                            Collectors.averagingLong(iuh.se.kltn.backend.modules.ai.entity.AiActionLog::getExecutionTimeMs)));
+
+            // Recent logs (simplified)
+            List<Map<String, Object>> recentLogs = logs.stream()
+                    .limit(20)
+                    .map(l -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("id", l.getId());
+                        m.put("query", l.getRawQuery());
+                        m.put("role", l.getUserRole());
+                        m.put("intent", l.getPredictedIntent());
+                        m.put("confidence", l.getConfidenceScore());
+                        m.put("source", l.getResponseSource());
+                        m.put("latencyMs", l.getExecutionTimeMs());
+                        m.put("success", l.isSuccess());
+                        m.put("rowCount", l.getResultRowCount());
+                        m.put("cacheScore", l.getCacheScore());
+                        m.put("locationSource", l.getLocationSource());
+                        m.put("createdAt", l.getCreatedAt());
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(Map.of(
+                    "sourceDistribution", sourceDistribution,
+                    "blockedQueries", blockedQueries,
+                    "avgLatencyBySource", avgLatencyBySource,
+                    "recentLogs", recentLogs,
+                    "totalLogs", logs.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
     // Admin: Update câu SQL bị AI sinh sai
     @PutMapping("/admin/cache/{id}")
     public ResponseEntity<?> updateCache(@PathVariable Long id, @Valid @RequestBody AiUpdateCacheRequest request) {

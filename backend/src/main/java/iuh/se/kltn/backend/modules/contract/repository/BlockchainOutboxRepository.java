@@ -30,5 +30,10 @@ public interface BlockchainOutboxRepository extends JpaRepository<BlockchainOutb
     List<BlockchainOutboxEvent> findByStatus(String status);
 
     long countByStatus(String status);
+
+    /**
+     * Kiểm tra idempotency: đã có event với correlationId chưa.
+     */
+    boolean existsByCorrelationId(String correlationId);
 }
 

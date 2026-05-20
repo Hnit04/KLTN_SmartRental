@@ -36,6 +36,9 @@ public class AiOrchestratorService {
     private SqlGeneratorAi sqlGeneratorAi;
 
     @Autowired
+    private SecurityGateService securityGateService;
+
+    @Autowired
     private IntentExtractorAi intentExtractorAi;
 
     @Autowired
@@ -366,7 +369,7 @@ public class AiOrchestratorService {
             }
 
             System.out.println("[LOCATION FLOW] selectedFlow=GPS_REQUIRED");
-            saveActionLog(userId, role, question, "LOCATION_SEARCH_CURRENT_POSITION", 1.0, false, startTime, true);
+            saveActionLog(userId, role, question, "LOCATION_SEARCH_CURRENT_POSITION", 1.0, false, startTime, true, "LOCATION_GPS", null, null, null, "GPS");
             return buildUserLocationRequiredMessage();
         }
         // Heuristic guard: câu có "gần <địa điểm>" sẽ ưu tiên luồng LOCATION_SEARCH
@@ -502,7 +505,8 @@ public class AiOrchestratorService {
                         if (cachedResult != null) {
                             System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
                             success = true;
-                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                            // 🛡️ Enhanced logging with responseSource
+                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "RESULT_CACHE_HIT", null, null, null, null);
                             return sanitizeUserFacingResponse(cachedResult.get());
                         }
                     }
@@ -519,13 +523,13 @@ public class AiOrchestratorService {
                             System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
                         }
                         success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
                         return response;
                     } catch (Exception llmEx) {
                         System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: "
                                 + llmEx.getMessage());
                         success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
                         // Trả về dữ liệu thô nhưng format dễ đọc hơn
                         if (results.isEmpty()) {
                             return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
@@ -555,8 +559,9 @@ public class AiOrchestratorService {
                     "❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
         }
 
-        // 📝 Ghi log cho luồng Fallback trước khi đi xuống Legacy Pipeline
-        saveActionLog(userId, role, question, predictedIntent, confidence, fallbackUsed, startTime, success);
+        // Fallback tracking variables
+        String fallbackResponseSource = null;
+        Double fallbackCacheScore = null;
 
         Embedding queryEmbedding = embeddingModel.embed(question).content();
 
@@ -576,6 +581,8 @@ public class AiOrchestratorService {
             String candidateSql = matches.get(0).embedded().metadata().getString("sql");
             if (isLikelySemanticSqlMatch(question, candidateSql, role)) {
                 sqlToExecute = candidateSql;
+                fallbackResponseSource = "SQL_CACHE_HIT";
+                fallbackCacheScore = (double) matches.get(0).score();
                 System.out.println("⚡ [SEMANTIC CACHE HIT] Độ tương đồng: " + matches.get(0).score());
             } else {
                 System.out.println("⚠️ [SEMANTIC CACHE MISMATCH] Bỏ qua cache vì lệch ngữ nghĩa câu hỏi.");
@@ -588,8 +595,11 @@ public class AiOrchestratorService {
             System.out.println("🤖 [SQL GENERATION] Cache không phù hợp, gọi Gemini sinh SQL...");
             try {
                 sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, schemaContext, roleRules);
+                fallbackResponseSource = "SQL_GENERATED";
             } catch (Exception llmEx) {
                 System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
+                saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                        "LLM_SQL_GENERATION_ERROR", null, null, null, null);
                 return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
             }
         }
@@ -604,83 +614,19 @@ public class AiOrchestratorService {
             sqlToExecute = sqlToExecute.substring(selectIndex);
         }
         sqlToExecute = normalizeSqlDialectForPostgres(sqlToExecute);
-        if (!isSafeSelectSql(sqlToExecute)) {
-            System.err.println("⚠️ [AI SQL GUARD] Non-SELECT or invalid SQL payload from model: " + sqlToExecute);
-            return "Dạ, yêu cầu này thiên về tư vấn/chính sách nên không thể chuyển thành truy vấn dữ liệu an toàn. Bạn vui lòng hỏi rõ theo dạng dữ liệu cần tra cứu (ví dụ: hóa đơn tháng, hợp đồng hiện tại, phòng trống).";
-        }
 
         // ====================================================================
-        // 🛡️ LỚP BẢO VỆ 3: JAVA VALIDATOR (CHỐT CHẶN TRƯỚC KHI CHẠY DATABASE)
+        // 🛡️ SECURITY GATE: Kiểm tra toàn bộ bảo mật qua SecurityGateService
         // ====================================================================
-
-        // Chặn 1: Nếu AI phát hiện Khách thuê hỏi sai quyền hạn và trả về chữ
-        // UNAUTHORIZED
-        if (sqlToExecute.trim().equalsIgnoreCase("UNAUTHORIZED")) {
-            return "Dạ, em chỉ là trợ lý ảo nên không có quyền cung cấp thông tin bảo mật này cho khách thuê ạ.";
+        SecurityGateService.SecurityResult securityResult = securityGateService.validateAndSanitize(sqlToExecute, role);
+        if (securityResult.isBlocked()) {
+            saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                    "SECURITY_BLOCKED", sqlToExecute, null, null, null);
+            return securityResult.getMessage();
         }
 
-        // Chặn 2: Ngăn bảo mật cho GUEST (Khách vãng lai)
-        if (role.equalsIgnoreCase("GUEST")) {
-            String upperSql = sqlToExecute.toUpperCase();
-            if (upperSql.contains("USERS") || upperSql.contains("BILLS") ||
-                    upperSql.contains("CONTRACTS") || upperSql.contains("APPOINTMENTS")) {
-                System.err.println("🚨 SECURITY ALERT: GUEST tried to access restricted tables!");
-                return "Dạ, vì lý do bảo mật, khách vãng lai chỉ có thể tra cứu thông tin phòng và khu trọ công khai thôi ạ. Bạn vui lòng đăng nhập để xem các thông tin cá nhân nhé!";
-            }
-        }
-
-        if (role.equalsIgnoreCase("TENANT")) {
-            String upperSql = sqlToExecute.toUpperCase();
-            // Chặn truy vấn thiên về doanh thu nội bộ của chủ trọ, nhưng vẫn cho phép tenant
-            // tổng hợp dữ liệu cá nhân khi có tenant_id.
-            if (upperSql.contains("REVENUE") || (upperSql.contains("SUM(") && !upperSql.contains("TENANT_ID"))) {
-                return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
-            }
-        }
-
-        String upperCaseSql = sqlToExecute.toUpperCase();
-        if (upperCaseSql.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE)\\b.*")) {
-            System.err.println("🚨 [SECURITY ALERT] Phát hiện lệnh cấm mạo danh AI: " + sqlToExecute);
-            return "Dạ, yêu cầu của bạn chứa truy vấn không an toàn. Hệ thống đã huỷ bỏ yêu cầu này để bảo mật dữ liệu.";
-        }
-
-        // Chặn 5: Java Regex Security Gate cho SQL (Đảm bảo ID Isolation)
-        if (role.equalsIgnoreCase("LANDLORD") && !upperCaseSql.contains("UNAUTHORIZED")) {
-            if (!upperCaseSql.contains("LANDLORD_ID")) {
-                System.err.println(
-                        "🚨 [HARD SECURITY ALERT] SQL của Chủ trọ thiếu điều kiện phân quyền: " + sqlToExecute);
-                return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm luồng bảo mật dữ liệu.";
-            }
-        } else if (role.equalsIgnoreCase("TENANT") && !upperCaseSql.contains("UNAUTHORIZED")) {
-            if ((upperCaseSql.contains("CONTRACTS") || upperCaseSql.contains("BILLS")
-                    || upperCaseSql.contains("APPOINTMENTS")) && !upperCaseSql.contains("TENANT_ID")) {
-                System.err.println(
-                        "🚨 [HARD SECURITY ALERT] SQL của Khách thuê truy cập bảng nhạy cảm mà thiếu tenant_id: "
-                                + sqlToExecute);
-                return "Dạ, yêu cầu tra cứu bị từ chối do vi phạm quyền riêng tư của khách hàng khác.";
-            }
-        }
-        // ====================================================================
-
-        // Cập nhật Placeholder thành User ID thật sự (Tiết kiệm Token hoàn hảo!)
-        String finalSql = sqlToExecute.replace("USER_ID_PLACEHOLDER", userId.toString());
-
-        // 🛡️ LỚP BẢO VỆ 4: Chặn truy cập cột nhạy cảm (chống data exfiltration qua
-        // subquery/alias)
-        String upperFinalSql = finalSql.toUpperCase();
-        String[] sensitiveColumns = { "PASSWORD", "VERIFICATION_CODE", "VERIFICATION_EXPIRY",
-                "WALLET_ADDRESS", "BLOCKCHAIN_PRIVATE", "REFRESH_TOKEN" };
-        for (String col : sensitiveColumns) {
-            if (upperFinalSql.contains(col)) {
-                System.err.println("🚨 [AI SECURITY] SQL chứa cột nhạy cảm: " + col);
-                return "Dạ, truy vấn chứa thông tin nhạy cảm bị hệ thống chặn. Vui lòng thử lại với câu hỏi khác.";
-            }
-        }
-
-        // 🛡️ LỚP BẢO VỆ 5: Giới hạn số dòng kết quả (chống data dumping)
-        if (!upperFinalSql.contains("LIMIT")) {
-            finalSql = finalSql.replaceAll(";\\s*$", "") + " LIMIT 50";
-        }
+        // Cập nhật Placeholder thành User ID thật sự
+        String finalSql = securityResult.getSanitizedSql().replace("USER_ID_PLACEHOLDER", userId.toString());
 
         // 3. THỰC THI SQL
         try {
@@ -702,6 +648,10 @@ public class AiOrchestratorService {
 
             String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
             System.out.println("Dữ liệu thô: " + rawDataStr);
+
+            // ✅ Log success cho fallback SQL pipeline
+            saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, true,
+                    fallbackResponseSource, finalSql, results.size(), fallbackCacheScore, null);
 
             try {
                 return sanitizeUserFacingResponse(
@@ -730,6 +680,8 @@ public class AiOrchestratorService {
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
+            saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                    "SQL_EXECUTION_ERROR", finalSql, null, fallbackCacheScore, null);
             return "Dạ, hệ thống đang gặp chút khó khăn khi tra cứu thông tin này. Bạn vui lòng thử lại sau nhé!";
         } finally {
             jdbcTemplate.setQueryTimeout(0); // Reset timeout về mặc định cho các nghiệp vụ khác
@@ -1418,7 +1370,7 @@ public class AiOrchestratorService {
                         + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
 
         if (locationName == null || locationName.trim().isEmpty()) {
-            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, null, null, "NONE");
             return "Dạ, bạn có thể cho mình biết tên địa điểm cụ thể bạn muốn tìm phòng gần đó không ạ?";
         }
 
@@ -1436,7 +1388,7 @@ public class AiOrchestratorService {
                     sb.append("- ").append(sugg).append("\n");
                 }
             }
-            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, null, null, "LANDMARK");
             return sb.toString();
         }
 
@@ -1457,14 +1409,14 @@ public class AiOrchestratorService {
                         (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
                         false);
                 if (!relaxedResults.isEmpty()) {
-                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, 0, null, "LANDMARK");
                     return "Hiện tại chưa có phòng trống cho nuôi thú cưng trong bán kính " + safeRadius.intValue()
                             + "km quanh '" + geoResult.displayName + "'. Tuy nhiên, mình có tìm thấy "
                             + relaxedResults.size()
                             + " phòng nếu bỏ điều kiện thú cưng. Bạn muốn mình hiển thị các phòng đó không?";
                 }
             }
-            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, 0, null, "LANDMARK");
             return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '"
                     + geoResult.displayName + "'.";
         }
@@ -1492,7 +1444,7 @@ public class AiOrchestratorService {
                     roomId, name, priceStr, firstImg, distanceStr));
         }
 
-        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, results.size(), null, "LANDMARK");
         return responseStr.toString();
     }
 
@@ -1535,14 +1487,14 @@ public class AiOrchestratorService {
                         (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
                         false);
                 if (!relaxedResults.isEmpty()) {
-                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, 0, null, "GPS");
                     return "Hien tai chua co phong trong cho nuoi thu cung trong ban kinh " + safeRadius.intValue()
                             + "km gan vi tri hien tai cua ban. Tuy nhien, minh co tim thay "
                             + relaxedResults.size()
                             + " phong neu bo dieu kien thu cung. Ban co muon xem cac phong do khong?";
                 }
             }
-            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, 0, null, "GPS");
             return "Hien tai khong tim thay phong trong nao trong ban kinh " + safeRadius.intValue()
                     + "km gan vi tri hien tai cua ban.";
         }
@@ -1570,7 +1522,7 @@ public class AiOrchestratorService {
                     roomId, name, priceStr, firstImg, distanceStr));
         }
 
-        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, results.size(), null, "GPS");
         return responseStr.toString();
     }
 
@@ -1677,9 +1629,24 @@ public class AiOrchestratorService {
     /**
      * Ghi bản ghi Observability vào DB (chạy async để không block response).
      */
+    /**
+     * Backward-compatible overload (giữ nguyên cho các callsite chưa cập nhật).
+     */
     private void saveActionLog(Long userId, String role, String rawQuery,
             String predictedIntent, Double confidenceScore,
             boolean fallbackUsed, long startTime, boolean isSuccess) {
+        saveActionLog(userId, role, rawQuery, predictedIntent, confidenceScore,
+                fallbackUsed, startTime, isSuccess, null, null, null, null, null);
+    }
+
+    /**
+     * 🛡️ Enhanced: Ghi bản ghi Observability với đầy đủ metadata.
+     */
+    private void saveActionLog(Long userId, String role, String rawQuery,
+            String predictedIntent, Double confidenceScore,
+            boolean fallbackUsed, long startTime, boolean isSuccess,
+            String responseSource, String generatedSql, Integer resultRowCount,
+            Double cacheScore, String locationSource) {
         try {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             AiActionLog log = AiActionLog.builder()
@@ -1691,6 +1658,11 @@ public class AiOrchestratorService {
                     .isFallbackUsed(fallbackUsed)
                     .executionTimeMs(executionTimeMs)
                     .isSuccess(isSuccess)
+                    .responseSource(responseSource)
+                    .generatedSql(generatedSql)
+                    .resultRowCount(resultRowCount)
+                    .cacheScore(cacheScore)
+                    .locationSource(locationSource)
                     .build();
             actionLogRepository.save(log);
         } catch (Exception e) {

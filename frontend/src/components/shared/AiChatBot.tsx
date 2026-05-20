@@ -507,12 +507,14 @@ export default function AiChatBot() {
     
     // Kiểm tra xem câu hỏi có mang tính truy vấn dữ liệu không (hỏi giá, hỏi nợ, hoá đơn)
     const dataKeywords = [
-        "hoá đơn", "hóa đơn", "bill", "tiền", "nợ", "phòng", "hợp đồng", "contract", 
-        "gần", "khu vực", "quanh", "nearby", "landmark", "lịch hẹn", "appointment",
-        "doanh thu", "revenue", "thanh toán", "trễ", "quá hạn", "phí",
-        "điện", "nước", "chỉ số", "tra cứu", "số điện", "số nước",
-        "khu trọ", "còn trống", "phòng trống", "tìm phòng",
-        "hết hạn", "gia hạn", "tiền cọc", "deposit"
+        "hoá đơn", "hóa đơn", "hoa don", "bill", "tiền", "tien", "nợ", "no",
+        "phòng", "phong", "hợp đồng", "hop dong", "contract",
+        "gần", "gan", "khu vực", "khu vuc", "quanh", "nearby", "landmark",
+        "lịch hẹn", "lich hen", "appointment",
+        "doanh thu", "revenue", "thanh toán", "thanh toan", "trễ", "tre", "quá hạn", "qua han", "phí", "phi",
+        "điện", "dien", "nước", "nuoc", "chỉ số", "chi so", "tra cứu", "tra cuu", "số điện", "so dien", "số nước", "so nuoc",
+        "khu trọ", "khu tro", "còn trống", "con trong", "phòng trống", "phong trong", "tìm phòng", "tim phong",
+        "hết hạn", "het han", "gia hạn", "gia han", "tiền cọc", "tien coc", "deposit"
     ];
     
     const policyKeywords = [

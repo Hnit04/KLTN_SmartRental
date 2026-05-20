@@ -488,8 +488,9 @@ public class BillService {
     }
 
     /**
-     * Đồng bộ hóa đơn cũ (chưa có trên chain) lên Blockchain.
+     * Đồng bộ hóa đơn cũ (chưa có trên chain) lên Blockchain qua Outbox.
      * Dùng cho các bill được tạo trước khi tích hợp registerExternalBill.
+     * Chuyển sang outbox pattern để nhất quán với luồng tạo bill mới.
      */
     @Transactional
     public void syncBillToBlockchain(Long billId) {
@@ -501,21 +502,33 @@ public class BillService {
             throw new RuntimeException("Hợp đồng này chưa có Smart Contract trên Blockchain!");
         }
 
-        try {
-            long EXCHANGE_RATE = vndEthRate;
-            java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
-            java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(bill.getTotalAmount()))
-                        .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
-
-            blockchainService.registerExternalBill(
-                    contract.getSmartContractAddress(),
-                    bill.getId(),
-                    billAmountWei
-            );
-            System.out.println("✅ Đã đồng bộ hóa đơn #" + bill.getId() + " lên Blockchain");
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi đăng ký hóa đơn lên Blockchain: " + e.getMessage());
+        // Kiểm tra idempotency: nếu đã có outbox event cho bill này thì bỏ qua
+        String correlationId = "sync-bill-" + bill.getId();
+        boolean alreadyQueued = outboxRepository.existsByCorrelationId(correlationId);
+        if (alreadyQueued) {
+            System.out.println("⚠️ Bill #" + billId + " đã có trong outbox, bỏ qua sync lại.");
+            return;
         }
+
+        long EXCHANGE_RATE = vndEthRate;
+        java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
+        java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(bill.getTotalAmount()))
+                    .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("smartContractAddress", contract.getSmartContractAddress());
+        payload.put("billId", bill.getId());
+        payload.put("amount", billAmountWei.toString());
+
+        iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event =
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                        .eventType("RECORD_BILL")
+                        .contractId(contract.getId())
+                        .correlationId(correlationId)
+                        .payload(payload)
+                        .build();
+        outboxRepository.save(event);
+        System.out.println("📤 Đã đưa hóa đơn #" + bill.getId() + " vào outbox để đồng bộ lên Blockchain");
     }
 
     @Transactional

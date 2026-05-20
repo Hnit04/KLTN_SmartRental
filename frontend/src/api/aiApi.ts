@@ -58,6 +58,11 @@ export const aiApi = {
     return axiosClient.post("/ai/clear-cache");
   },
 
+  // Admin: AI Observability (pipeline logs, source distribution, blocked queries)
+  getObservability: () => {
+    return axiosClient.get("/ai/admin/observability");
+  },
+
   // Actionable AI: generate reminder drafts for overdue or due-soon bills
   generateReminders: async (
     scope: "OVERDUE" | "DUE_SOON" = "OVERDUE",
