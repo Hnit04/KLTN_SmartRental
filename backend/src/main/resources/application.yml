@@ -66,6 +66,12 @@ blockchain:
   # Chain ID: Sepolia = 11155111
   chain-id: ${BLOCKCHAIN_CHAIN_ID:11155111}
 
+  # 🛡️ Phase 3: RPC Failover — danh sách RPC backup (phân cách dấu phẩy)
+  rpc-url-backup: "${BLOCKCHAIN_RPC_URL_BACKUP:}"
+
+  # 🛡️ Phase 3: Gas price threshold (Gwei) — từ chối giao dịch nếu gas vượt ngưỡng
+  gas-price-max-gwei: ${BLOCKCHAIN_GAS_PRICE_MAX_GWEI:100}
+
   # Tỷ giá cố định VND/ETH
   vnd-eth-rate: ${BLOCKCHAIN_VND_ETH_RATE:80000000}
 gemini:

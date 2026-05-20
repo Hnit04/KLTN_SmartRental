@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import {
   Blocks, ShieldCheck, ShieldAlert, ExternalLink, Copy, Search, RefreshCw,
   FileText, Loader2, CheckCircle2, XCircle, Clock, Landmark, Hash, ArrowUpDown,
-  ScanSearch, X, AlertTriangle, Database, Link2
+  ScanSearch, X, AlertTriangle, Database, Link2,
+  Activity, Inbox, MailWarning, Skull, Wrench, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -38,6 +39,26 @@ interface ContractLog {
   signDate: string;
   startDate: string;
   endDate: string;
+}
+
+interface OutboxMetrics {
+  pendingCount: number;
+  processingCount: number;
+  confirmedCount: number;
+  deadLetterCount: number;
+  rpcUrl: string;
+  rpcBackupCount: number;
+  chainId: number;
+  gasPriceMaxGwei: number;
+  walletAddress: string;
+  deadLetterEvents: Array<{
+    id: number;
+    eventType: string;
+    contractId: number;
+    retryCount: number;
+    errorMessage: string;
+    createdAt: string;
+  }>;
 }
 
 interface Comparison {
@@ -120,7 +141,12 @@ export default function BlockchainLogsPage() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditResults, setAuditResults] = useState<{ valid: number; invalid: number; errors: number }>({ valid: 0, invalid: 0, errors: 0 });
 
-  useEffect(() => { fetchData(); }, []);
+  // --- Outbox Metrics ---
+  const [outboxMetrics, setOutboxMetrics] = useState<OutboxMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [reconcilingNonce, setReconcilingNonce] = useState(false);
+
+  useEffect(() => { fetchData(); fetchMetrics(); }, []);
 
   const fetchData = async () => {
     try {
@@ -132,6 +158,32 @@ export default function BlockchainLogsPage() {
       toast.error('Không thể tải danh sách hợp đồng');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMetrics = async () => {
+    try {
+      setMetricsLoading(true);
+      const res = await contractApi.getBlockchainMetrics();
+      const data = (res as any).data || res;
+      setOutboxMetrics(data);
+    } catch {
+      // Silently fail — metrics are optional
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  const handleReconcileNonce = async () => {
+    setReconcilingNonce(true);
+    try {
+      await contractApi.reconcileNonce();
+      toast.success('Đã đồng bộ lại nonce thành công!');
+      fetchMetrics();
+    } catch {
+      toast.error('Lỗi khi đồng bộ nonce');
+    } finally {
+      setReconcilingNonce(false);
     }
   };
 
@@ -364,6 +416,121 @@ export default function BlockchainLogsPage() {
           description="VNĐ (ước lượng)"
         />
       </div>
+
+      {/* ============================================ */}
+      {/* === OUTBOX MONITORING SECTION === */}
+      {/* ============================================ */}
+      {outboxMetrics && (
+        <DashboardPanel
+          title="⛓ Blockchain Outbox Monitor"
+          description={`RPC: ${outboxMetrics.rpcUrl ? outboxMetrics.rpcUrl.replace(/https?:\/\//, '').split('/')[0] : '—'} · Gas max: ${outboxMetrics.gasPriceMaxGwei} Gwei · Backup: ${outboxMetrics.rpcBackupCount} RPC`}
+          action={
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleReconcileNonce} disabled={reconcilingNonce} className="gap-1.5 text-xs h-8">
+                {reconcilingNonce ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                Sync Nonce
+              </Button>
+              <Button size="sm" variant="outline" onClick={fetchMetrics} disabled={metricsLoading} className="gap-1.5 text-xs h-8">
+                {metricsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+          }
+        >
+          <div className="p-4 sm:p-5 space-y-4">
+            {/* Outbox KPI Cards */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                  <Inbox className="h-4.5 w-4.5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-amber-600">Pending</p>
+                  <p className="text-xl font-bold text-amber-700">{outboxMetrics.pendingCount}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                  <Activity className="h-4.5 w-4.5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-blue-600">Processing</p>
+                  <p className="text-xl font-bold text-blue-700">{outboxMetrics.processingCount}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                  <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-emerald-600">Confirmed</p>
+                  <p className="text-xl font-bold text-emerald-700">{outboxMetrics.confirmedCount}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50/60 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100">
+                  <Skull className="h-4.5 w-4.5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-red-600">Dead Letter</p>
+                  <p className="text-xl font-bold text-red-700">{outboxMetrics.deadLetterCount}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Wallet Info */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Zap className="h-3 w-3" /> Wallet:
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                  {outboxMetrics.walletAddress ? `${outboxMetrics.walletAddress.slice(0, 6)}...${outboxMetrics.walletAddress.slice(-4)}` : '—'}
+                </code>
+              </span>
+              <span>Chain ID: {outboxMetrics.chainId}</span>
+            </div>
+
+            {/* Dead Letter Events Table */}
+            {outboxMetrics.deadLetterEvents && outboxMetrics.deadLetterEvents.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-red-700">
+                  <MailWarning className="h-4 w-4" /> Dead Letter Events ({outboxMetrics.deadLetterEvents.length})
+                </h4>
+                <div className="rounded-xl border border-red-200 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-red-50/80">
+                        <th className="px-3 py-2 text-left font-semibold text-red-700">#</th>
+                        <th className="px-3 py-2 text-left font-semibold text-red-700">Event Type</th>
+                        <th className="px-3 py-2 text-left font-semibold text-red-700">Contract</th>
+                        <th className="px-3 py-2 text-center font-semibold text-red-700">Retries</th>
+                        <th className="px-3 py-2 text-left font-semibold text-red-700">Lỗi</th>
+                        <th className="px-3 py-2 text-left font-semibold text-red-700">Thời gian</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-red-100">
+                      {outboxMetrics.deadLetterEvents.map((evt) => (
+                        <tr key={evt.id} className="hover:bg-red-50/40 transition-colors">
+                          <td className="px-3 py-2 font-mono font-bold text-red-600">#{evt.id}</td>
+                          <td className="px-3 py-2">
+                            <code className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-mono text-red-700">{evt.eventType}</code>
+                          </td>
+                          <td className="px-3 py-2 font-mono">HĐ #{evt.contractId}</td>
+                          <td className="px-3 py-2 text-center font-bold text-red-600">{evt.retryCount}</td>
+                          <td className="px-3 py-2 max-w-[280px]">
+                            <span className="block truncate text-red-600" title={evt.errorMessage}>{evt.errorMessage}</span>
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                            {evt.createdAt ? new Date(evt.createdAt).toLocaleString('vi-VN') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </DashboardPanel>
+      )}
 
       <div className="section-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <SegmentedControl

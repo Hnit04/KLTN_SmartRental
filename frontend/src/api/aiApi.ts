@@ -58,9 +58,17 @@ export const aiApi = {
     return axiosClient.post("/ai/clear-cache");
   },
 
-  // Actionable AI: Nhắc đóng tiền hàng loạt
-  generateReminders: async () => {
-    const response = await axiosClient.post('/ai/actions/generate-reminders');
+  // Actionable AI: generate reminder drafts for overdue or due-soon bills
+  generateReminders: async (
+    scope: "OVERDUE" | "DUE_SOON" = "OVERDUE",
+    daysAhead = 3
+  ) => {
+    const response = await axiosClient.post('/ai/actions/generate-reminders', null, {
+      params: {
+        scope,
+        daysAhead,
+      },
+    });
     return response.data;
   },
 

@@ -17,6 +17,7 @@ import iuh.se.kltn.backend.modules.ai.service.handler.DynamicQueryEngine;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,9 @@ public class AiOrchestratorService {
     @Autowired
     private PropertyRepository propertyRepository;
 
+    @Value("${ai.sql-cache.startup.reindex:true}")
+    private boolean sqlCacheStartupReindex;
+
     /**
      * Tự động chạy khi Spring Boot khởi động.
      * Đọc toàn bộ SQL từ MariaDB, biến thành Vector và đưa lên RAM.
@@ -85,18 +89,59 @@ public class AiOrchestratorService {
         // 🌱 AUTO-SEED: Nếu DB trống, tự động nạp 204 câu hỏi mẫu
         seedInitialDataIfEmpty();
 
-        System.out.println("🔄 Đang nạp Kho tri thức (SQL & FAQ) vào Vector Store trên RAM...");
+        loadSqlFaqVectorCache(false);
+    }
+
+    private void loadSqlFaqVectorCache(boolean forceReindex) {
         List<AiSqlCache> allCaches = cacheRepository.findAll();
-        for (AiSqlCache cache : allCaches) {
-            if (cache.isValid()) {
-                if ("FAQ".equalsIgnoreCase(cache.getType())) {
-                    addFaqToVectorStore(cache.getQuestion(), cache.getAnswer());
-                } else {
-                    addQuestionToVectorStore(cache.getQuestion(), cache.getGeneratedSql());
-                }
+        List<AiSqlCache> validCaches = allCaches.stream().filter(AiSqlCache::isValid).toList();
+
+        int existingSqlFaqEmbeddings = countSqlFaqEmbeddings();
+        if (!forceReindex && !sqlCacheStartupReindex && existingSqlFaqEmbeddings > 0) {
+            System.out.println("[AI SQL/FAQ] Startup reindex disabled (ai.sql-cache.startup.reindex=false). Reusing "
+                    + existingSqlFaqEmbeddings + " existing embeddings.");
+            return;
+        }
+
+        System.out.println("[AI SQL/FAQ] Reindexing valid entries into PgVector: " + validCaches.size());
+
+        // Tránh phình dữ liệu do cộng dồn embedding sau mỗi lần restart.
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("SQL"));
+        embeddingStore.removeAll(metadataKey("type").isEqualTo("FAQ"));
+
+        long startedAt = System.currentTimeMillis();
+        int processed = 0;
+        int total = validCaches.size();
+
+        for (AiSqlCache cache : validCaches) {
+            if ("FAQ".equalsIgnoreCase(cache.getType())) {
+                addFaqToVectorStore(cache.getQuestion(), cache.getAnswer());
+            } else {
+                addQuestionToVectorStore(cache.getQuestion(), cache.getGeneratedSql());
+            }
+
+            processed++;
+            if (processed % 100 == 0 || processed == total) {
+                long elapsed = System.currentTimeMillis() - startedAt;
+                System.out.println("[AI SQL/FAQ] Progress " + processed + "/" + total + " (" + elapsed + " ms)");
             }
         }
-        System.out.println("✅ Đã nạp xong " + allCaches.size() + " câu vào Vector Store!");
+
+        long elapsed = System.currentTimeMillis() - startedAt;
+        System.out.println("[AI SQL/FAQ] Reindex completed: " + processed + "/" + total + " in " + elapsed + " ms.");
+    }
+
+    private int countSqlFaqEmbeddings() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ai_embeddings WHERE metadata_json ->> 'type' IN ('SQL','FAQ')",
+                    Integer.class
+            );
+            return count == null ? 0 : count;
+        } catch (Exception e) {
+            System.out.println("[AI SQL/FAQ] Cannot count existing embeddings: " + e.getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -205,6 +250,9 @@ public class AiOrchestratorService {
 
     public Object processDataQuery(String question, String role, Long userId, Double userLatitude, Double userLongitude) {
         String normalizedQuestion = normalizeText(question);
+        boolean currentLocationQuery = isNearCurrentLocationQuery(question, role);
+        System.out.println("[LOCATION INPUT] query='" + question + "', isCurrentLocationQuery=" + currentLocationQuery
+                + ", lat=" + userLatitude + ", lng=" + userLongitude);
 
         // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính
         // xác tuyệt đối
@@ -292,8 +340,9 @@ public class AiOrchestratorService {
         boolean fallbackUsed = false;
         boolean success = false;
 
-        if (isNearCurrentLocationQuery(question, role)) {
+        if (currentLocationQuery) {
             if (hasValidCoordinates(userLatitude, userLongitude)) {
+                System.out.println("[LOCATION FLOW] selectedFlow=COORDINATE_CURRENT_POSITION");
                 Double radius = extractRadiusKm(question);
                 Long maxPrice = extractMaxPriceVnd(question);
                 Integer requiredOccupants = extractRequiredOccupantsFromQuestion(question);
@@ -316,6 +365,7 @@ public class AiOrchestratorService {
                 }
             }
 
+            System.out.println("[LOCATION FLOW] selectedFlow=GPS_REQUIRED");
             saveActionLog(userId, role, question, "LOCATION_SEARCH_CURRENT_POSITION", 1.0, false, startTime, true);
             return buildUserLocationRequiredMessage();
         }
@@ -323,6 +373,7 @@ public class AiOrchestratorService {
         // để luôn có distance_km thay vì trả danh sách thường thiếu khoảng cách.
         String heuristicLocation = tryExtractLocationForNearbySearch(question, role);
         if (heuristicLocation != null) {
+            System.out.println("[LOCATION FLOW] selectedFlow=LANDMARK_HEURISTIC, heuristicLocation='" + heuristicLocation + "'");
             Double heuristicRadius = extractRadiusKm(question);
             Long heuristicMaxPrice = extractMaxPriceVnd(question);
             Integer heuristicRequiredOccupants = extractRequiredOccupantsFromQuestion(question);
@@ -407,6 +458,7 @@ public class AiOrchestratorService {
                     boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
                     if (useCurrentLocation) {
                         if (hasValidCoordinates(userLatitude, userLongitude)) {
+                            System.out.println("[LOCATION FLOW] selectedFlow=INTENT_CURRENT_POSITION");
                             return handleLocationSearchByCoordinatesFlow(
                                     userLatitude,
                                     userLongitude,
@@ -421,8 +473,10 @@ public class AiOrchestratorService {
                                     confidence,
                                     startTime);
                         }
+                        System.out.println("[LOCATION FLOW] selectedFlow=INTENT_GPS_REQUIRED");
                         return buildUserLocationRequiredMessage();
                     }
+                    System.out.println("[LOCATION FLOW] selectedFlow=INTENT_LANDMARK, location='" + locationName + "'");
                     return handleLocationSearchFlow(
                             locationName,
                             radius,
@@ -820,10 +874,7 @@ public class AiOrchestratorService {
     // Load lại toàn bộ Vector Store từ DB đã được filter valid=true
     private void reloadVectorCache() {
         System.out.println("🔄 Đang load lại Vector Store sau khi có thay đổi từ Admin...");
-        // Chỉ reload cache nghiệp vụ (SQL/FAQ), giữ nguyên document chunks của RAG.
-        embeddingStore.removeAll(metadataKey("type").isEqualTo("SQL"));
-        embeddingStore.removeAll(metadataKey("type").isEqualTo("FAQ"));
-        initVectorCache(); // Gọi lại Logic Load mặc định
+        loadSqlFaqVectorCache(true);
     }
 
     @Transactional
@@ -1098,7 +1149,8 @@ public class AiOrchestratorService {
         }
         String nfd = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD);
         String noAccent = nfd.replaceAll("\\p{M}", "");
-        return (" " + noAccent.toLowerCase() + " ").replaceAll("\\s+", " ").trim();
+        String asciiFriendly = noAccent.replace('\u0111', 'd').replace('\u0110', 'D');
+        return (" " + asciiFriendly.toLowerCase() + " ").replaceAll("\\s+", " ").trim();
     }
 
     /**
@@ -1282,10 +1334,13 @@ public class AiOrchestratorService {
                 "quanh day",
                 "xung quanh day",
                 "gan toi",
+                "o gan toi",
                 "quanh toi",
                 "xung quanh toi",
+                "gan vi tri hien tai",
                 "near me",
                 "around me",
+                "nearby",
                 "vi tri cua toi",
                 "vi tri hien tai");
         if (!hasCurrentLocationCue) {
@@ -1328,10 +1383,13 @@ public class AiOrchestratorService {
                 "quanh day",
                 "xung quanh day",
                 "gan toi",
+                "o gan toi",
                 "quanh toi",
                 "xung quanh toi",
+                "gan vi tri hien tai",
                 "near me",
                 "around me",
+                "nearby",
                 "vi tri cua toi",
                 "vi tri hien tai",
                 "hien tai");
@@ -1390,6 +1448,22 @@ public class AiOrchestratorService {
                 (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
                 requirePetFriendly);
         if (results.isEmpty()) {
+            if (requirePetFriendly) {
+                List<Map<String, Object>> relaxedResults = propertyRepository.findNearbyRoomsAdvanced(
+                        geoResult.latitude,
+                        geoResult.longitude,
+                        safeRadius,
+                        (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
+                        (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
+                        false);
+                if (!relaxedResults.isEmpty()) {
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    return "Hiện tại chưa có phòng trống cho nuôi thú cưng trong bán kính " + safeRadius.intValue()
+                            + "km quanh '" + geoResult.displayName + "'. Tuy nhiên, mình có tìm thấy "
+                            + relaxedResults.size()
+                            + " phòng nếu bỏ điều kiện thú cưng. Bạn muốn mình hiển thị các phòng đó không?";
+                }
+            }
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
             return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue() + "km quanh '"
                     + geoResult.displayName + "'.";
@@ -1452,6 +1526,22 @@ public class AiOrchestratorService {
                 requirePetFriendly);
 
         if (results.isEmpty()) {
+            if (requirePetFriendly) {
+                List<Map<String, Object>> relaxedResults = propertyRepository.findNearbyRoomsAdvanced(
+                        latitude,
+                        longitude,
+                        safeRadius,
+                        (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
+                        (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
+                        false);
+                if (!relaxedResults.isEmpty()) {
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
+                    return "Hien tai chua co phong trong cho nuoi thu cung trong ban kinh " + safeRadius.intValue()
+                            + "km gan vi tri hien tai cua ban. Tuy nhien, minh co tim thay "
+                            + relaxedResults.size()
+                            + " phong neu bo dieu kien thu cung. Ban co muon xem cac phong do khong?";
+                }
+            }
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true);
             return "Hien tai khong tim thay phong trong nao trong ban kinh " + safeRadius.intValue()
                     + "km gan vi tri hien tai cua ban.";
@@ -1609,4 +1699,3 @@ public class AiOrchestratorService {
         }
     }
 }
-

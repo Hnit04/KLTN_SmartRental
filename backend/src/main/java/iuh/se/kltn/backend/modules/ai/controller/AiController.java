@@ -27,7 +27,11 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import iuh.se.kltn.backend.modules.ai.service.AnomalyAi;
 
 @RestController
@@ -299,17 +303,39 @@ public class AiController {
     }
 
     @PostMapping("/actions/generate-reminders")
-    public ResponseEntity<?> generateReminders(@AuthenticationPrincipal UserPrincipal currentUser) {
+    public ResponseEntity<?> generateReminders(
+            @RequestParam(defaultValue = "OVERDUE") String scope,
+            @RequestParam(defaultValue = "3") Integer daysAhead,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
         try {
+            if (currentUser == null || !"LANDLORD".equalsIgnoreCase(roleFrom(currentUser))) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "status", "error",
+                        "message", "Chuc nang nhac hoa don chi danh cho chu tro."
+                ));
+            }
+
             Long landlordId = currentUser.getId();
-            List<Bill> dueBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndStatusIn(
-                    landlordId, Arrays.asList(BillStatus.UNPAID, BillStatus.LATE));
+            List<Bill> candidateBills = billRepository.findAllByContract_Room_Property_Landlord_IdAndStatusIn(
+                    landlordId, Arrays.asList(BillStatus.UNPAID, BillStatus.LATE, BillStatus.PENDING));
+
+            String normalizedScope = normalizeReminderScope(scope);
+            int safeDaysAhead = (daysAhead == null || daysAhead < 1) ? 3 : Math.min(daysAhead, 14);
+            LocalDateTime now = LocalDateTime.now();
+
+            List<Bill> dueBills = filterBillsByReminderScope(candidateBills, normalizedScope, safeDaysAhead, now);
+            sortBillsByReminderScope(dueBills, normalizedScope, now);
 
             if (dueBills.isEmpty()) {
+                String emptyMessage = "OVERDUE".equals(normalizedScope)
+                        ? "Khong co phong nao dang no hoac qua han thanh toan."
+                        : "Khong co hoa don nao sap den han trong khoang thoi gian da chon.";
                 return ResponseEntity.ok(Map.of(
                         "status", "success",
+                        "scope", normalizedScope,
+                        "daysAhead", safeDaysAhead,
                         "data", new ArrayList<>(),
-                        "message", "Không có phòng nào đang nợ tiền."
+                        "message", emptyMessage
                 ));
             }
 
@@ -324,19 +350,18 @@ public class AiController {
                 map.put("totalAmount", b.getTotalAmount() != null ? b.getTotalAmount() : 0);
                 map.put("deadline", b.getDeadline() != null ? b.getDeadline().toString() : "");
                 map.put("status", b.getStatus().toString());
+                map.put("reminderScope", normalizedScope);
+                map.put("daysToDeadline", calculateDaysToDeadline(now, b.getDeadline()));
                 billDataList.add(map);
             }
 
             String billsJson = objectMapper.writeValueAsString(billDataList);
             String aiResultString = draftReminderAi.generateReminders(billsJson);
-
-            // Clean up backticks if any
             aiResultString = aiResultString.replace("```json", "").replace("```", "").trim();
 
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> draftedReminders = objectMapper.readValue(aiResultString, List.class);
 
-            // Gộp thông tin tenantId và roomName lại cho Client dễ hiển thị
             for (Map<String, Object> draft : draftedReminders) {
                 Long billId = Long.valueOf(draft.get("billId").toString());
                 Map<String, Object> matchedBill = billDataList.stream()
@@ -350,14 +375,16 @@ public class AiController {
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
+                    "scope", normalizedScope,
+                    "daysAhead", safeDaysAhead,
                     "data", draftedReminders
             ));
 
         } catch (Exception e) {
-            System.err.println("❌ [AI REMINDER ERROR] " + e.getMessage());
+            System.err.println("[AI REMINDER ERROR] " + e.getMessage());
             return ResponseEntity.status(503).body(Map.of(
-                "status", "error", 
-                "message", "Dịch vụ AI soạn tin nhắn đang bận (503). Vui lòng thử lại sau giây lát."
+                "status", "error",
+                "message", "Dich vu AI soan tin nhan dang ban (503). Vui long thu lai sau giay lat."
             ));
         }
     }
@@ -483,12 +510,34 @@ public class AiController {
     public ResponseEntity<?> sendReminders(@Valid @RequestBody @NotEmpty List<AiReminderApprovalRequest> approvedReminders,
                                            @AuthenticationPrincipal UserPrincipal currentUser) {
         try {
+            if (currentUser == null || !"LANDLORD".equalsIgnoreCase(roleFrom(currentUser))) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "status", "error",
+                        "message", "Chuc nang gui nhac hoa don chi danh cho chu tro."
+                ));
+            }
+
+            Long landlordId = currentUser.getId();
             int count = 0;
+            int skipped = 0;
             for (AiReminderApprovalRequest reminder : approvedReminders) {
                 Long tenantId = reminder.getTenantId();
                 Long billId = reminder.getBillId();
                 String message = reminder.getDraftedMessage();
                 String roomName = reminder.getRoomName();
+
+                Bill bill = billRepository.findById(billId).orElse(null);
+                if (bill == null || !isBillOwnedByLandlord(bill, landlordId)) {
+                    skipped++;
+                    continue;
+                }
+                Long actualTenantId = bill.getContract() != null && bill.getContract().getTenant() != null
+                        ? bill.getContract().getTenant().getId()
+                        : null;
+                if (!Objects.equals(actualTenantId, tenantId)) {
+                    skipped++;
+                    continue;
+                }
 
                 iuh.se.kltn.backend.modules.user.entity.User tenant = userRepository.findById(tenantId).orElse(null);
                 
@@ -501,14 +550,22 @@ public class AiController {
                         billId
                     );
                     count++;
+                } else {
+                    skipped++;
                 }
             }
-            return ResponseEntity.ok(Map.of("status", "success", "message", "Đã gửi thông báo thành công cho " + count + " phòng!"));
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "sentCount", count,
+                    "skippedCount", skipped,
+                    "message", "Da gui thong bao thanh cong cho " + count + " phong."
+                            + (skipped > 0 ? " Bo qua " + skipped + " muc khong hop le." : "")
+            ));
         } catch (Exception e) {
-            System.err.println("❌ [AI REMINDER ERROR] " + e.getMessage());
+            System.err.println("[AI REMINDER ERROR] " + e.getMessage());
             return ResponseEntity.status(503).body(Map.of(
-                "status", "error", 
-                "message", "Dịch vụ AI soạn tin nhắn đang bận (503). Vui lòng thử lại sau giây lát."
+                "status", "error",
+                "message", "Dich vu AI soan tin nhan dang ban (503). Vui long thu lai sau giay lat."
             ));
         }
     }
@@ -627,6 +684,94 @@ public class AiController {
     private Long userIdFrom(UserPrincipal user) { return user != null ? user.getId() : -1L; }
     private String roleFrom(UserPrincipal user) { 
         return user != null ? user.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "") : "GUEST"; 
+    }
+
+    private String normalizeReminderScope(String scope) {
+        if (scope == null || scope.isBlank()) {
+            return "OVERDUE";
+        }
+        String normalized = scope.trim().toUpperCase();
+        return "DUE_SOON".equals(normalized) ? "DUE_SOON" : "OVERDUE";
+    }
+
+    private List<Bill> filterBillsByReminderScope(List<Bill> bills, String scope, int daysAhead, LocalDateTime now) {
+        if (bills == null || bills.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Bill> filtered = new ArrayList<>();
+        for (Bill bill : bills) {
+            if (bill == null || bill.getStatus() == BillStatus.PAID) {
+                continue;
+            }
+            if ("DUE_SOON".equals(scope)) {
+                if (isDueSoonBill(bill, now, daysAhead)) {
+                    filtered.add(bill);
+                }
+            } else if (isOverdueBill(bill, now)) {
+                filtered.add(bill);
+            }
+        }
+        return filtered;
+    }
+
+    private void sortBillsByReminderScope(List<Bill> bills, String scope, LocalDateTime now) {
+        if (bills == null || bills.isEmpty()) {
+            return;
+        }
+        if ("DUE_SOON".equals(scope)) {
+            bills.sort(Comparator.comparing(Bill::getDeadline, Comparator.nullsLast(Comparator.naturalOrder())));
+            return;
+        }
+        bills.sort((a, b) -> Long.compare(
+                overdueDays(now, b.getDeadline()),
+                overdueDays(now, a.getDeadline())
+        ));
+    }
+
+    private boolean isOverdueBill(Bill bill, LocalDateTime now) {
+        if (bill.getStatus() == BillStatus.LATE) {
+            return true;
+        }
+        LocalDateTime deadline = bill.getDeadline();
+        if (deadline == null) {
+            return false;
+        }
+        return (bill.getStatus() == BillStatus.UNPAID || bill.getStatus() == BillStatus.PENDING)
+                && deadline.isBefore(now);
+    }
+
+    private boolean isDueSoonBill(Bill bill, LocalDateTime now, int daysAhead) {
+        if (!(bill.getStatus() == BillStatus.UNPAID || bill.getStatus() == BillStatus.PENDING)) {
+            return false;
+        }
+        LocalDateTime deadline = bill.getDeadline();
+        if (deadline == null || deadline.isBefore(now)) {
+            return false;
+        }
+        return !deadline.isAfter(now.plusDays(daysAhead));
+    }
+
+    private long overdueDays(LocalDateTime now, LocalDateTime deadline) {
+        if (deadline == null || !deadline.isBefore(now)) {
+            return 0L;
+        }
+        return Math.max(0, ChronoUnit.DAYS.between(deadline.toLocalDate(), now.toLocalDate()));
+    }
+
+    private long calculateDaysToDeadline(LocalDateTime now, LocalDateTime deadline) {
+        if (deadline == null) {
+            return 0L;
+        }
+        return ChronoUnit.DAYS.between(now.toLocalDate(), deadline.toLocalDate());
+    }
+
+    private boolean isBillOwnedByLandlord(Bill bill, Long landlordId) {
+        if (bill == null || landlordId == null || bill.getContract() == null
+                || bill.getContract().getRoom() == null || bill.getContract().getRoom().getProperty() == null
+                || bill.getContract().getRoom().getProperty().getLandlord() == null) {
+            return false;
+        }
+        return Objects.equals(bill.getContract().getRoom().getProperty().getLandlord().getId(), landlordId);
     }
 
     private boolean isLikelyVerifiableDataAnswer(String text) {

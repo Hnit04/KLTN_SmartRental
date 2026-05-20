@@ -47,12 +47,23 @@ public class BillService {
 
     @Autowired
     private BlockchainService blockchainService;
+    @Autowired
+    private iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository outboxRepository;
 
     // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
     @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:false}")
     private boolean mockAmountOverride;
     @org.springframework.beans.factory.annotation.Value("${blockchain.vnd-eth-rate:80000000}")
     private long vndEthRate;
+
+    /**
+     * 🛡️ SECURITY: Chặn thao tác trên hợp đồng bị sai lệch dữ liệu.
+     */
+    private void ensureContractNotCompromised(Contract contract) {
+        if (Boolean.TRUE.equals(contract.getIsCompromised())) {
+            throw new RuntimeException("Hợp đồng #" + contract.getId() + " đã bị phát hiện sai lệch dữ liệu. Không thể thực hiện thao tác!");
+        }
+    }
 
     // tạo Hóa Đơn Tháng (Chủ trọ nhập số điện nước)
     @Transactional
@@ -69,6 +80,7 @@ public class BillService {
         if (contract.getStatus() != ContractStatus.ACTIVE) {
             throw new RuntimeException("Hợp đồng này không còn hiệu lực!");
         }
+        ensureContractNotCompromised(contract);
         // Ngăn chặn chốt sổ ở khoảng thời gian ảo (tương lai)
         LocalDate now = LocalDate.now();
         if (request.getYear() > now.getYear() || (request.getYear() == now.getYear() && request.getMonth() > now.getMonthValue())) {
@@ -151,7 +163,7 @@ public class BillService {
         }
 
         // =========================================================
-        // GHI HÓA ĐƠN LÊN BLOCKCHAIN (registerExternalBill)
+        // 🛡️ GHI HÓA ĐƠN LÊN BLOCKCHAIN (Outbox Pattern)
         // =========================================================
         try {
             if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
@@ -160,15 +172,24 @@ public class BillService {
                 java.math.BigInteger billAmountWei = java.math.BigInteger.valueOf(Math.round(savedBill.getTotalAmount()))
                         .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
 
-                blockchainService.registerExternalBill(
-                        contract.getSmartContractAddress(),
-                        savedBill.getId(),
-                        billAmountWei
-                );
-                System.out.println("✅ Đã đăng ký hóa đơn #" + savedBill.getId() + " lên Blockchain");
+                // ✅ FIX: Dùng Outbox Pattern thay vì gọi blockchain trực tiếp trong @Transactional
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("contractAddress", contract.getSmartContractAddress());
+                payload.put("billId", savedBill.getId());
+                payload.put("amount", billAmountWei.toString());
+
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event =
+                    iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                        .eventType("RECORD_BILL")
+                        .contractId(contract.getId())
+                        .correlationId("bill-" + savedBill.getId())
+                        .payload(payload)
+                        .build();
+                outboxRepository.save(event);
+                System.out.println("✅ Đã xếp hàng đăng ký hóa đơn #" + savedBill.getId() + " lên Blockchain (Outbox)");
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Lỗi ghi hóa đơn lên Blockchain (bill vẫn được lưu trong DB): " + e.getMessage());
+            System.err.println("⚠️ Lỗi xếp hàng ghi hóa đơn lên Blockchain (bill vẫn được lưu trong DB): " + e.getMessage());
         }
 
         return mapToResponse(savedBill, elecCost, waterCost, roomCost);
@@ -505,6 +526,7 @@ public class BillService {
         if (bill.getStatus() == BillStatus.PAID) {
             throw new RuntimeException("Hóa đơn này đã được thanh toán!");
         }
+        ensureContractNotCompromised(bill.getContract());
 
         // 🔍 PHASE 4: Hardened Web3 Verification for Bills
         long amountVal = bill.getTotalAmount() != null ? bill.getTotalAmount().longValue() : 0L;

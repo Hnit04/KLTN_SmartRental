@@ -9,6 +9,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ import java.util.Map;
 public class BlockchainOutboxProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BlockchainOutboxProcessor.class);
+    private static final int BATCH_SIZE = 20; // 🛡️ Phase 2: Batch limit
 
     @Autowired
     private BlockchainOutboxRepository outboxRepository;
@@ -43,12 +45,13 @@ public class BlockchainOutboxProcessor {
     /**
      * Poll every 10 seconds for pending blockchain events.
      * ShedLock ensures only one instance processes at a time.
+     * ✅ FIX: Batch limit + respects nextAttemptAt for exponential backoff.
      */
     @Scheduled(fixedDelay = 10000)
     @SchedulerLock(name = "outbox_processor", lockAtMostFor = "5m", lockAtLeastFor = "9s")
     @Transactional
     public void processOutboxEvents() {
-        List<BlockchainOutboxEvent> pendingEvents = outboxRepository.findPendingEventsForProcessing();
+        List<BlockchainOutboxEvent> pendingEvents = outboxRepository.findPendingEventsForProcessing(PageRequest.of(0, BATCH_SIZE));
 
         for (BlockchainOutboxEvent event : pendingEvents) {
             processEvent(event);
@@ -60,6 +63,9 @@ public class BlockchainOutboxProcessor {
         outboxRepository.save(event);
 
         try {
+            // 🛡️ Phase 3: Record tx submission timestamp for latency benchmark
+            event.setTxSubmittedAt(java.time.LocalDateTime.now());
+            
             String result = switch (event.getEventType()) {
                 case "DEPLOY_CONTRACT" -> handleDeployContract(event);
                 case "END_CONTRACT" -> handleEndContract(event);
@@ -71,7 +77,10 @@ public class BlockchainOutboxProcessor {
 
             event.markConfirmed(result);
             outboxRepository.save(event);
-            log.info("✅ [Outbox] Event #{} ({}) confirmed. Result: {}", event.getId(), event.getEventType(), result);
+            
+            // 🛡️ Phase 3: Log latency for monitoring
+            long latencyMs = java.time.Duration.between(event.getCreatedAt(), java.time.LocalDateTime.now()).toMillis();
+            log.info("✅ [Outbox] Event #{} ({}) confirmed in {}ms. Result: {}", event.getId(), event.getEventType(), latencyMs, result);
 
             // Post-confirmation: update contract state in DB
             postConfirmation(event, result);

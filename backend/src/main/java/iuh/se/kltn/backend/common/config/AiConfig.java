@@ -17,6 +17,8 @@ import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -92,10 +94,16 @@ public class AiConfig {
         }
 
         if ("onnx-custom".equals(model) || "onnx-multilingual".equals(model)) {
-            if (isBlank(ragOnnxModelPath) || isBlank(ragOnnxTokenizerPath)) {
-                throw new IllegalStateException(
-                        "ai.rag.embedding.onnx.model-path và ai.rag.embedding.onnx.tokenizer-path là bắt buộc khi dùng model ONNX tùy chỉnh"
-                );
+            // Graceful fallback: avoid startup failure when ONNX paths are invalid on local machine.
+            if (isBlank(ragOnnxModelPath) || !Files.exists(Paths.get(ragOnnxModelPath))) {
+                System.out.println("[AI EMBEDDING] WARNING: ONNX model file not found at '" + ragOnnxModelPath
+                        + "'. Falling back to bundled all-minilm-l6-v2 model.");
+                return new AllMiniLmL6V2EmbeddingModel();
+            }
+            if (isBlank(ragOnnxTokenizerPath) || !Files.exists(Paths.get(ragOnnxTokenizerPath))) {
+                System.out.println("[AI EMBEDDING] WARNING: ONNX tokenizer file not found at '" + ragOnnxTokenizerPath
+                        + "'. Falling back to bundled all-minilm-l6-v2 model.");
+                return new AllMiniLmL6V2EmbeddingModel();
             }
 
             PoolingMode poolingMode;
@@ -103,14 +111,21 @@ public class AiConfig {
                 poolingMode = PoolingMode.valueOf(ragOnnxPoolingMode.trim().toUpperCase(Locale.ROOT));
             } catch (Exception e) {
                 throw new IllegalStateException(
-                        "ai.rag.embedding.onnx.pooling-mode không hợp lệ. Giá trị hợp lệ: CLS, MEAN",
+                        "ai.rag.embedding.onnx.pooling-mode khong hop le. Gia tri hop le: CLS, MEAN",
                         e
                 );
             }
 
-            EmbeddingModel customModel = new OnnxEmbeddingModel(ragOnnxModelPath, ragOnnxTokenizerPath, poolingMode);
-            ensureEmbeddingDimension(customModel, 384);
-            return customModel;
+            try {
+                EmbeddingModel customModel = new OnnxEmbeddingModel(ragOnnxModelPath, ragOnnxTokenizerPath, poolingMode);
+                ensureEmbeddingDimension(customModel, 384);
+                return customModel;
+            } catch (Exception e) {
+                System.out.println("[AI EMBEDDING] WARNING: Failed to initialize ONNX embedding model (path='"
+                        + ragOnnxModelPath + "'). Falling back to bundled all-minilm-l6-v2 model. Cause: "
+                        + e.getMessage());
+                return new AllMiniLmL6V2EmbeddingModel();
+            }
         }
 
         throw new IllegalStateException(

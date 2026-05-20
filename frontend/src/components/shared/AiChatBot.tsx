@@ -16,12 +16,19 @@ type Message = {
   sender: "user" | "ai";
   isDataQuery?: boolean;
   hasReminderAction?: boolean;
+  reminderScope?: "OVERDUE" | "DUE_SOON";
   sourceLabel?: string;
   queryAt?: string;
   roomCardCount?: number;
   missingDistanceCount?: number;
   locationReferenceType?: "user" | "landmark" | "none";
   roomActionEligible?: boolean;
+};
+
+type LocationFetchResult = {
+  location: QueryDataLocationPayload | null;
+  errorCode?: number;
+  errorMessage?: string;
 };
 
 export default function AiChatBot() {
@@ -41,6 +48,7 @@ export default function AiChatBot() {
   const [draftedReminders, setDraftedReminders] = useState<any[]>([]);
   const [isGeneratingDrafts, setIsGeneratingDrafts] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [reminderScopeMode, setReminderScopeMode] = useState<"OVERDUE" | "DUE_SOON">("OVERDUE");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
@@ -322,39 +330,123 @@ export default function AiChatBot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  const getCurrentQueryLocation = async (): Promise<QueryDataLocationPayload | null> => {
+  const getCurrentQueryLocation = async (): Promise<LocationFetchResult> => {
     if (typeof window === "undefined" || !navigator.geolocation) {
-      return null;
+      return { location: null, errorMessage: "geolocation-unavailable" };
     }
 
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        () => resolve(null),
-        {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 120000,
-        }
-      );
+    const getPosition = (options: PositionOptions) =>
+      new Promise<LocationFetchResult>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              location: {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              },
+            });
+          },
+          (error) => {
+            console.warn("[GEO] getCurrentPosition failed:", error.code, error.message);
+            resolve({
+              location: null,
+              errorCode: error.code,
+              errorMessage: error.message,
+            });
+          },
+          options
+        );
+      });
+
+    const highAccuracy = await getPosition({
+      enableHighAccuracy: true,
+      timeout: 7000,
+      maximumAge: 0,
     });
+    if (highAccuracy.location) {
+      return highAccuracy;
+    }
+
+    const fallback = await getPosition({
+      enableHighAccuracy: false,
+      timeout: 12000,
+      maximumAge: 0,
+    });
+    if (fallback.location) {
+      return fallback;
+    }
+    return fallback.errorCode ? fallback : highAccuracy;
+  };
+
+  const isCurrentLocationQuery = (normalizedMsgNoAccent: string): boolean => {
+    const cues = [
+      "gan day",
+      "gan toi",
+      "quanh day",
+      "quanh toi",
+      "xung quanh toi",
+      "xung quanh day",
+      "o gan toi",
+      "gan vi tri hien tai",
+      "vi tri cua toi",
+      "vi tri hien tai",
+      "near me",
+      "around me",
+      "nearby",
+    ];
+    return cues.some((keyword) => normalizedMsgNoAccent.includes(keyword));
+  };
+
+  const buildLocationErrorMessage = (errorCode?: number): string => {
+    if (errorCode === 1) {
+      return "Chua nhan duoc GPS tu trinh duyet: ban dang chan quyen vi tri. Vui long cho phep Location cho tab nay roi thu lai.";
+    }
+    if (errorCode === 2) {
+      return "Chua nhan duoc GPS tu trinh duyet: thiet bi/trinh duyet chua lay duoc vi tri hien tai. Vui long thu lai sau.";
+    }
+    if (errorCode === 3) {
+      return "Chua nhan duoc GPS tu trinh duyet: da qua thoi gian lay vi tri. Vui long thu lai va kiem tra mang.";
+    }
+    return "Chua nhan duoc GPS tu trinh duyet. Vui long bat quyen vi tri cho tab nay va thu lai.";
+  };
+
+  const detectReminderScope = (normalizedMsgNoAccent: string): "OVERDUE" | "DUE_SOON" | null => {
+    const text = ` ${normalizedMsgNoAccent.replace(/\s+/g, " ").trim()} `;
+    const overdueCues = [" no tien ", " dang no ", " chua dong ", " tre han ", " qua han "];
+    if (overdueCues.some((cue) => text.includes(cue))) {
+      return "OVERDUE";
+    }
+
+    const dueSoonCues = [
+      " nhac hen hoa don ",
+      " nhac han hoa don ",
+      " sap den han ",
+      " den han thanh toan ",
+      " han thanh toan ",
+      " nhac thanh toan ",
+    ];
+    if (dueSoonCues.some((cue) => text.includes(cue))) {
+      return "DUE_SOON";
+    }
+    return null;
   };
 
   // --- ACTIONS CHO TÍNH NĂNG NHẮC NỢ ---
-  const handleGenerateReminders = async () => {
+  const handleGenerateReminders = async (scope: "OVERDUE" | "DUE_SOON" = "OVERDUE") => {
+    setReminderScopeMode(scope);
     setIsGeneratingDrafts(true);
     try {
-      const res = await aiApi.generateReminders();
+      const res = await aiApi.generateReminders(scope, 3);
       if (res.data && res.data.length > 0) {
         setDraftedReminders(res.data);
         setIsDraftModalOpen(true);
       } else {
-        toast.info(res.message || "Không có phòng nào đang nợ để nhắc nhở.");
+        toast.info(
+          res.message ||
+          (scope === "DUE_SOON"
+            ? "Khong co hoa don sap den han de nhac."
+            : "Khong co phong nao dang no de nhac.")
+        );
       }
     } catch (e: any) {
       toast.error("Lỗi khi nhờ AI soạn thông báo: " + (e.message || "Thử lại sau."));
@@ -458,29 +550,16 @@ export default function AiChatBot() {
         !(hasPolicyStyle && !hasPersonalDataMarker);
     const normalizedMsgNoAccent = normalizedMsg
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\u0111/g, "d")
+      .replace(/\u0110/g, "D");
 
-    const userLocationKeywords = [
-      "gan toi",
-      "gan day",
-      "quanh toi",
-      "quanh day",
-      "xung quanh toi",
-      "xung quanh day",
-      "near me",
-      "around me",
-      "vi tri cua toi",
-      "vi tri cua ban",
-      "vi tri hien tai"
-    ];
-    const isUserLocationQuery = userLocationKeywords.some((keyword) =>
-      normalizedMsgNoAccent.includes(keyword)
-    );
+    const isUserLocationQuery = isCurrentLocationQuery(normalizedMsgNoAccent);
+    const reminderScopeCandidate = detectReminderScope(normalizedMsgNoAccent);
     const isLandmarkLocationQuery =
       !isUserLocationQuery &&
       (normalizedMsgNoAccent.includes("gan") ||
         normalizedMsgNoAccent.includes("quanh") ||
-        normalizedMsgNoAccent.includes("nearby") ||
         normalizedMsgNoAccent.includes("landmark"));
 
     // Hiển thị tin nhắn ngắn trong UI (nếu có displayText), nhưng gửi fullMsg cho AI
@@ -513,14 +592,23 @@ export default function AiChatBot() {
         // Backend sẽ tự động chặn các bảng nhạy cảm (bills, contracts) cho GUEST.
         try {
           let queryLocation: QueryDataLocationPayload | null = null;
+          let skipBackendQuery = false;
           if (isUserLocationQuery) {
-            queryLocation = await getCurrentQueryLocation();
+            const geoResult = await getCurrentQueryLocation();
+            queryLocation = geoResult.location;
+            if (!queryLocation) {
+              skipBackendQuery = true;
+              replyText = buildLocationErrorMessage(geoResult.errorCode);
+              sourceLabel = "Chua nhan duoc GPS tu trinh duyet";
+            }
           }
-          const dataRes = await aiApi.queryData(userMsg, queryLocation);
-          replyText = dataRes.data;
-          sourceLabel = dataRes.verifiable
-            ? "Đã đối soát từ dữ liệu hệ thống"
-            : "Nguồn dữ liệu cần kiểm tra thêm";
+          if (!skipBackendQuery) {
+            const dataRes = await aiApi.queryData(userMsg, queryLocation);
+            replyText = dataRes.data;
+            sourceLabel = dataRes.verifiable
+              ? "Đã đối soát từ dữ liệu hệ thống"
+              : "Nguồn dữ liệu cần kiểm tra thêm";
+          }
         } catch (error: any) {
           replyText = error.response?.data?.message || "Xin lỗi, hệ thống truy xuất dữ liệu đang bận.";
           sourceLabel = "Không thể đối soát do lỗi truy vấn";
@@ -563,7 +651,8 @@ export default function AiChatBot() {
           missingDistanceCount,
           locationReferenceType,
           roomActionEligible,
-          hasReminderAction: isLandlord && isDataQuery && (normalizedMsg.includes("nợ") || normalizedMsg.includes("chưa đóng") || normalizedMsg.includes("trễ"))
+          hasReminderAction: isLandlord && isDataQuery && reminderScopeCandidate !== null,
+          reminderScope: reminderScopeCandidate ?? undefined
         },
       ]);
     } catch (error) {
@@ -693,12 +782,16 @@ export default function AiChatBot() {
                     <div className="mt-4 pt-3 border-t border-border/50 animate-in fade-in duration-500">
                       <Button 
                          variant="default"
-                         onClick={handleGenerateReminders} 
+                         onClick={() => handleGenerateReminders(msg.reminderScope || "OVERDUE")}
                          disabled={isGeneratingDrafts}
                          className="w-full flex items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white shadow-md rounded-xl transition-all h-10"
                       >
                          {isGeneratingDrafts ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
-                         {isGeneratingDrafts ? "AI đang soạn tin nhắn..." : "Nhờ AI soạn thông báo nhắc nợ"}
+                         {isGeneratingDrafts
+                           ? "AI đang soạn tin nhắn..."
+                           : (msg.reminderScope === "DUE_SOON"
+                             ? "Nhờ AI soạn thông báo nhắc đến hạn"
+                             : "Nhờ AI soạn thông báo nhắc nợ")}
                       </Button>
                     </div>
                   )}
@@ -788,7 +881,9 @@ export default function AiChatBot() {
             <div className="bg-indigo-600 text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-yellow-300" />
-                <h3 className="font-bold text-lg">AI Nhắc Nợ Hàng Loạt</h3>
+                <h3 className="font-bold text-lg">
+                  {reminderScopeMode === "DUE_SOON" ? "AI Nhắc Hạn Thanh Toán" : "AI Nhắc Nợ Hàng Loạt"}
+                </h3>
               </div>
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => setIsDraftModalOpen(false)}>
                 <X className="w-5 h-5" />
@@ -797,7 +892,9 @@ export default function AiChatBot() {
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/20">
               <p className="text-sm text-muted-foreground mb-4">
-                AI đã tự động soạn nội dung gửi đến <strong className="text-primary">{draftedReminders.length}</strong> phòng đang nợ tiền. Ngữ điệu đã được tinh chỉnh tùy theo số ngày trễ hạn. Bạn vui lòng kiểm tra lại trước khi gửi.
+                {reminderScopeMode === "DUE_SOON"
+                  ? <>AI đã soạn nội dung nhắc đến hạn cho <strong className="text-primary">{draftedReminders.length}</strong> phòng. Bạn kiểm tra lại trước khi gửi.</>
+                  : <>AI đã soạn nội dung gửi đến <strong className="text-primary">{draftedReminders.length}</strong> phòng đang nợ tiền. Bạn kiểm tra lại trước khi gửi.</>}
               </p>
               
               {draftedReminders.map((draft, idx) => (
@@ -838,4 +935,3 @@ export default function AiChatBot() {
     </>
   );
 }
-
