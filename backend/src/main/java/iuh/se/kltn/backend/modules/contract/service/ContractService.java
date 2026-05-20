@@ -845,9 +845,10 @@ public class ContractService {
                     res.setLandlordBankAccountHolder(contract.getRoom().getProperty().getLandlord().getBankAccountHolder());
                     res.setLandlordBankQrUrl(contract.getRoom().getProperty().getLandlord().getBankQrUrl());
                 }
-                res.setElecPrice(contract.getRoom().getProperty().getElecPrice());
-                res.setWaterPrice(contract.getRoom().getProperty().getWaterPrice());
-                res.setInternetPrice(contract.getRoom().getProperty().getInternetPrice());
+                // Ưu tiên dùng snapshot prices (giá lúc ký HĐ), fallback sang giá hiện tại
+                res.setElecPrice(contract.getElecPriceSnapshot() != null ? contract.getElecPriceSnapshot() : contract.getRoom().getProperty().getElecPrice());
+                res.setWaterPrice(contract.getWaterPriceSnapshot() != null ? contract.getWaterPriceSnapshot() : contract.getRoom().getProperty().getWaterPrice());
+                res.setInternetPrice(contract.getInternetPriceSnapshot() != null ? contract.getInternetPriceSnapshot() : contract.getRoom().getProperty().getInternetPrice());
             }
         }
         if (contract.getTenant() != null) {
@@ -868,7 +869,9 @@ public class ContractService {
 
         // 🔗 Fetch Blockchain Settlement Info
         if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty() 
-            && contract.getStatus() == ContractStatus.ACTIVE) {
+            && (contract.getStatus() == ContractStatus.ACTIVE 
+                || contract.getStatus() == ContractStatus.TERMINATED_EARLY
+                || contract.getStatus() == ContractStatus.EXPIRED)) {
             try {
                 var info = blockchainService.getSettlementInfo(
                     contract.getSmartContractAddress(),
@@ -886,6 +889,16 @@ public class ContractService {
                 log.warn("Lỗi đọc thông tin quyết toán từ Blockchain cho hợp đồng #{}: {}", contract.getId(), e.getMessage());
             }
         }
+
+        // 💰 Settlement Proposal mapping
+        res.setSettlementItemsJson(contract.getSettlementItemsJson());
+        res.setSettlementInspectionNote(contract.getSettlementInspectionNote());
+        res.setProposedDeductionAmount(contract.getProposedDeductionAmount());
+        res.setSettlementProposalStatus(contract.getSettlementProposalStatus());
+        res.setSettlementProposalTxHash(contract.getSettlementProposalTxHash());
+        res.setSettlementConsentTxHash(contract.getSettlementConsentTxHash());
+        res.setSettlementExecuteTxHash(contract.getSettlementExecuteTxHash());
+
         return res;
     }
 
@@ -1202,8 +1215,10 @@ public class ContractService {
             throw new RuntimeException("Chỉ Chủ trọ mới được đề xuất quyết toán!");
         }
 
-        if (contract.getStatus() != ContractStatus.ACTIVE) {
-            throw new RuntimeException("Chỉ có thể quyết toán hợp đồng đang hoạt động!");
+        if (contract.getStatus() != ContractStatus.ACTIVE 
+                && contract.getStatus() != ContractStatus.TERMINATED_EARLY
+                && contract.getStatus() != ContractStatus.EXPIRED) {
+            throw new RuntimeException("Chỉ có thể quyết toán hợp đồng đang hoạt động hoặc đã chấm dứt sớm!");
         }
 
         try {
@@ -1228,6 +1243,24 @@ public class ContractService {
             log.error("Lỗi gửi thông báo quyết toán: " + e.getMessage());
         }
 
+        // 💰 Lưu chi tiết proposal
+        contract.setProposedDeductionAmount(request.getDeductionAmount() != null ? request.getDeductionAmount().doubleValue() : 0.0);
+        contract.setSettlementProposalStatus("PROPOSED");
+        if (request.getInspectionNote() != null) {
+            contract.setSettlementInspectionNote(request.getInspectionNote());
+        }
+        if (request.getItems() != null) {
+            try {
+                contract.setSettlementItemsJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getItems()));
+            } catch (Exception e) {
+                log.warn("Lỗi serialize settlement items: {}", e.getMessage());
+            }
+        }
+        if (request.getTxHash() != null) {
+            contract.setSettlementProposalTxHash(request.getTxHash());
+        }
+        contractRepository.save(contract);
+
         return mapToResponse(contract, currentUserId);
     }
 
@@ -1240,14 +1273,45 @@ public class ContractService {
             throw new RuntimeException("Chỉ Khách thuê mới được chấp nhận quyết toán!");
         }
 
-        try {
-            // 🛡️ State is automatically fetched from Blockchain in mapToResponse.
-            // No DB update needed for consents.
-            log.info("✅ Đã ghi nhận đồng thuận quyết toán từ Blockchain cho HĐ #{}", contractId);
-        } catch (Exception e) {
-            log.error("Lỗi ghi nhận đồng thuận: " + e.getMessage());
+        contract.setSettlementProposalStatus("TENANT_ACCEPTED");
+        contractRepository.save(contract);
+        log.info("✅ Đã ghi nhận đồng thuận quyết toán từ Blockchain cho HĐ #{}", contractId);
+
+        return mapToResponse(contract, currentUserId);
+    }
+
+    @Transactional
+    public ContractResponse rejectSettlement(Long contractId, Long currentUserId, String reason) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (!contract.getTenant().getId().equals(currentUserId)) {
+            throw new RuntimeException("Chỉ Khách thuê mới được từ chối quyết toán!");
         }
 
+        contract.setSettlementProposalStatus("TENANT_REJECTED");
+        contractRepository.save(contract);
+
+        try {
+            iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService = 
+                org.springframework.web.context.support.WebApplicationContextUtils
+                    .getRequiredWebApplicationContext(
+                        ((org.springframework.web.context.request.ServletRequestAttributes) 
+                            org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest().getServletContext()
+                    ).getBean(iuh.se.kltn.backend.modules.interaction.service.NotificationService.class);
+                    
+            notificationService.createNotification(
+                contract.getRoom().getProperty().getLandlord(),
+                "Khách thuê từ chối quyết toán",
+                "Khách thuê đã từ chối đề xuất quyết toán" + (reason != null ? ": " + reason : "") + ". Vui lòng chỉnh sửa và gửi lại.",
+                iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                contract.getId()
+            );
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo từ chối quyết toán: {}", e.getMessage());
+        }
+
+        log.info("❌ Khách thuê từ chối quyết toán HĐ #{}, lý do: {}", contractId, reason);
         return mapToResponse(contract, currentUserId);
     }
 
@@ -1263,12 +1327,22 @@ public class ContractService {
             throw new RuntimeException("Bạn không có quyền thực thi quyết toán hợp đồng này!");
         }
 
+        // 🛡️ Kiểm tra consent cho blockchain contract
+        if (contract.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+            if (contract.getSettlementProposalStatus() != null 
+                && !"TENANT_ACCEPTED".equals(contract.getSettlementProposalStatus())
+                && !"PROPOSED".equals(contract.getSettlementProposalStatus())) {
+                throw new RuntimeException("Proposal đã bị từ chối hoặc chưa được gửi!");
+            }
+        }
+
         // Backend gọi thực thi
         try {
             // Cập nhật trạng thái DB thành kết thúc
             boolean isEarly = java.time.LocalDate.now().isBefore(contract.getEndDate());
             contract.setStatus(isEarly ? ContractStatus.TERMINATED_EARLY : ContractStatus.EXPIRED);
-            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED); // Đã giải ngân cọc
+            contract.setDepositStatus(iuh.se.kltn.backend.modules.contract.enums.DepositStatus.REFUNDED);
+            contract.setSettlementProposalStatus("COMPLETED");
             
             if (contract.getRoom() != null) {
                 contract.getRoom().setStatus(RoomStatus.AVAILABLE);

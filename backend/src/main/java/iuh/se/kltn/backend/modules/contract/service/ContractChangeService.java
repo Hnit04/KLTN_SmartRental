@@ -35,6 +35,7 @@ public class ContractChangeService {
     private final BlockchainService blockchainService;
     private final ContractService contractService;
     private final EmailService emailService;
+    private final iuh.se.kltn.backend.modules.property.repository.RoomRepository roomRepository;
 
     // 1. Gửi yêu cầu (Dành cho Tenant hoặc Landlord tùy logic)
     @Transactional
@@ -194,6 +195,7 @@ public class ContractChangeService {
                                 } else {
                                     room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
                                 }
+                                roomRepository.save(room); // ✅ Explicitly save room status
                             }
                         }
 
@@ -217,6 +219,7 @@ public class ContractChangeService {
                             } else {
                                 room.setStatus(iuh.se.kltn.backend.modules.property.enums.RoomStatus.AVAILABLE);
                             }
+                            roomRepository.save(room); // ✅ Explicitly save room status
                         }
                     }
                     break;

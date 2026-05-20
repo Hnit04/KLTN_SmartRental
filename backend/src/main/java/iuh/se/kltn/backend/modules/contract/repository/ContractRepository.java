@@ -94,4 +94,8 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
 
     @Query("SELECT c FROM Contract c WHERE c.signMethod = 'WEB3' AND c.depositStatus = 'PAID' AND c.endDate < :threshold AND c.settlementReminderSent = false AND c.status IN ('ACTIVE', 'EXPIRED', 'TERMINATED_EARLY')")
     List<Contract> findSettlementRemindersNeeded(@Param("threshold") LocalDate threshold);
+
+    // ✅ Kiểm tra phòng có HĐ đang sống không (dùng cho fixOrphanRooms)
+    @Query("SELECT COUNT(c) > 0 FROM Contract c WHERE c.room.id = :roomId AND c.status IN ('ACTIVE', 'AWAITING_DEPOSIT')")
+    boolean existsLiveContractByRoomId(@Param("roomId") Long roomId);
 }

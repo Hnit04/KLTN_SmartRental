@@ -96,6 +96,14 @@ public class ContractScheduler {
                 }
                 contractRepository.save(contract);
 
+                // 2b. Nhả phòng
+                Room room = contract.getRoom();
+                if (room != null && room.getStatus() != RoomStatus.AVAILABLE) {
+                    boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+                    room.setStatus(hasOtherLive ? RoomStatus.RESERVED : RoomStatus.AVAILABLE);
+                    roomRepository.save(room);
+                }
+
                 // 3. Phạt chủ trọ
                 User landlord = contract.getRoom().getProperty().getLandlord();
                 reputationService.processPoints(landlord, 
@@ -281,6 +289,33 @@ public class ContractScheduler {
                     "Hợp đồng phòng " + contract.getRoom().getName() + " của khách " + contract.getTenant().getFullName() + " sẽ hết hạn sau 15 ngày (" + contract.getEndDate() + "). Phòng đã được mở cho người khác đặt trước.",
                     iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE, contract.getId());
             }
+        }
+    }
+
+    // 🛠️ SỬA PHÒNG "MỒ CÔI" — Room status bị stuck RENTED dù không còn HĐ ACTIVE nào
+    // Chạy hàng ngày lúc 03:00 sáng
+    @Scheduled(cron = "0 0 3 * * ?")
+    @SchedulerLock(name = "fix_orphan_rooms", lockAtMostFor = "30m", lockAtLeastFor = "5m")
+    @Transactional
+    public void fixOrphanRooms() {
+        List<Room> rentedRooms = roomRepository.findByStatus(RoomStatus.RENTED);
+        int fixedCount = 0;
+
+        for (Room room : rentedRooms) {
+            // Kiểm tra xem có HĐ ACTIVE hoặc AWAITING_DEPOSIT nào cho phòng này không
+            boolean hasActiveContract = contractRepository.existsLiveContractByRoomId(room.getId());
+
+            if (!hasActiveContract) {
+                // Phòng RENTED nhưng không có HĐ nào đang hoạt động → nhả phòng
+                room.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(room);
+                fixedCount++;
+                System.out.println("🛠️ Đã nhả phòng mồ côi: " + room.getName() + " (ID: " + room.getId() + ")");
+            }
+        }
+
+        if (fixedCount > 0) {
+            System.out.println("🛠️ Tổng cộng đã sửa " + fixedCount + " phòng mồ côi.");
         }
     }
 }

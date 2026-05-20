@@ -69,4 +69,13 @@ public class ContractResponse {
     private Boolean hasLandlordConsented;
     private Boolean hasTenantConsented;
     private Boolean isProposalActive;
+
+    // 💰 Settlement Proposal Details
+    private String settlementItemsJson;
+    private String settlementInspectionNote;
+    private Double proposedDeductionAmount;
+    private String settlementProposalStatus;
+    private String settlementProposalTxHash;
+    private String settlementConsentTxHash;
+    private String settlementExecuteTxHash;
 }
