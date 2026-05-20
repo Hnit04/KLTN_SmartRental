@@ -80,6 +80,7 @@ contract RentalContract is ReentrancyGuard, Pausable {
     uint256 public externalBillCount;
     uint256 public constant MAX_EXTERNAL_BILLS = 50;
     uint256 public constant MAX_EXTERNAL_BILL_MULTIPLIER = 3;
+    uint256[] public externalBillIdList; // ✅ FIX H-02: Track external bill IDs for emergencyWithdraw
 
     // ===== EVENTS =====
     event ContractActivated(address indexed tenant, uint256 amount);
@@ -295,6 +296,7 @@ contract RentalContract is ReentrancyGuard, Pausable {
         externalBills[_backendBillId] = ExternalBill(_amount, false, true);
         unpaidBillCount++;
         externalBillCount++;
+        externalBillIdList.push(_backendBillId); // ✅ FIX H-02: Track ID for emergency loop
 
         emit ExternalBillCreated(_backendBillId, _amount);
     }
@@ -403,7 +405,7 @@ contract RentalContract is ReentrancyGuard, Pausable {
         emit ContractEnded(refund, _deduction);
     }
 
-    // ===== EMERGENCY WITHDRAW / AUTO-SETTLE (M-01 Fix) =====
+    // ===== EMERGENCY WITHDRAW / AUTO-SETTLE (M-01 + H-02 Fix) =====
     function emergencyWithdraw() 
         external 
         nonReentrant 
@@ -417,6 +419,13 @@ contract RentalContract is ReentrancyGuard, Pausable {
         for (uint256 i = 1; i <= billCount; i++) {
             if (!bills[i].isPaid) {
                 totalUnpaid += bills[i].amount + _penalty(bills[i]);
+            }
+        }
+        // ✅ FIX H-02: Check for unpaid external bills
+        for (uint256 j = 0; j < externalBillIdList.length; j++) {
+            uint256 extId = externalBillIdList[j];
+            if (!externalBills[extId].isPaid) {
+                totalUnpaid += externalBills[extId].amount;
             }
         }
         

@@ -87,5 +87,13 @@ export const contractApi = {
   },
   executeSettlement: (id: number | string) => {
     return axiosClient.post<Contract>(`/contracts/${id}/settle/execute`);
+  },
+
+  // 🛡️ ADMIN: BLOCKCHAIN MONITORING
+  getBlockchainMetrics: () => {
+    return axiosClient.get('/contracts/admin/blockchain/metrics');
+  },
+  reconcileNonce: () => {
+    return axiosClient.post('/contracts/admin/blockchain/reconcile-nonce');
   }
 };

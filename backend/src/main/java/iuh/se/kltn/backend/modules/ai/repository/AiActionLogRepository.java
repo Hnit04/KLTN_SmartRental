@@ -24,4 +24,14 @@ public interface AiActionLogRepository extends JpaRepository<AiActionLog, Long> 
      * Lấy những lần AI phải fallback về SQL cũ.
      */
     List<AiActionLog> findByIsFallbackUsedTrue();
+
+    /**
+     * Lấy 50 log gần nhất cho dashboard Observability.
+     */
+    List<AiActionLog> findTop50ByOrderByCreatedAtDesc();
+
+    /**
+     * Lấy log gần nhất với limit tùy chỉnh qua Pageable.
+     */
+    List<AiActionLog> findAllByOrderByCreatedAtDesc(org.springframework.data.domain.Pageable pageable);
 }

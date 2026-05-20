@@ -1,11 +1,12 @@
-﻿import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { aiApi } from '@/api/aiApi';
 import { toast } from 'sonner';
 import {
   Brain, Search, RefreshCw, Trash2, Loader2,
   CheckCircle2, XCircle, MessageSquareText, Code2,
   TrendingUp, Zap, Shield, Copy, ChevronDown, ChevronUp,
-  Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X
+  Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X,
+  Activity, ShieldBan, Clock3, BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -31,6 +32,19 @@ interface Analytics {
   invalidQueries: number;
   categories: Record<string, number>;
   entries: CacheEntry[];
+}
+
+interface ObservabilityData {
+  sourceDistribution: Record<string, number>;
+  blockedQueries: Array<{ query: string; role: string; sql: string; createdAt: string }>;
+  avgLatencyBySource: Record<string, number>;
+  recentLogs: Array<{
+    id: number; query: string; role: string; intent: string;
+    confidence: number; source: string; latencyMs: number;
+    success: boolean; rowCount: number; cacheScore: number;
+    locationSource: string; createdAt: string;
+  }>;
+  totalLogs: number;
 }
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -97,8 +111,9 @@ export default function AiAnalyticsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [obsData, setObsData] = useState<ObservabilityData | null>(null);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); fetchObservability(); }, []);
 
   const fetchData = async () => {
     try {
@@ -115,6 +130,16 @@ export default function AiAnalyticsPage() {
       toast.error('Không thể tải dữ liệu thống kê AI');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchObservability = async () => {
+    try {
+      const res = await aiApi.getObservability();
+      const d = (res as any).data || res;
+      setObsData(d);
+    } catch {
+      // optional, silently fail
     }
   };
 
@@ -192,7 +217,7 @@ export default function AiAnalyticsPage() {
       const q = searchQuery.toLowerCase();
       result = result.filter(e =>
         e.question.toLowerCase().includes(q) ||
-        e.generatedSql.toLowerCase().includes(q)
+        (e.generatedSql || '').toLowerCase().includes(q)
       );
     }
     return result;
@@ -354,6 +379,91 @@ export default function AiAnalyticsPage() {
         </DashboardPanel>
       </div>
 
+      {/* ============================================ */}
+      {/* === AI PIPELINE OBSERVABILITY === */}
+      {/* ============================================ */}
+      {obsData && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <DashboardPanel title="📊 Pipeline Source Distribution" description="Phân bổ nguồn trả lời AI — bao nhiêu % dùng cache, DQE, SQL gen, bị chặn...">
+            <div className="space-y-2.5 p-4 sm:p-5">
+              {Object.entries(obsData.sourceDistribution)
+                .sort(([, a], [, b]) => b - a)
+                .map(([source, count]) => {
+                  const maxCount = Math.max(...Object.values(obsData.sourceDistribution), 1);
+                  const pct = (count / maxCount) * 100;
+                  const colorMap: Record<string, string> = {
+                    DQE_HIT: 'bg-emerald-500', RESULT_CACHE_HIT: 'bg-sky-500',
+                    SQL_CACHE_HIT: 'bg-blue-500', SQL_GENERATED: 'bg-amber-500',
+                    SECURITY_BLOCKED: 'bg-red-500', LOCATION_GPS: 'bg-violet-500',
+                    LOCATION_LANDMARK: 'bg-purple-400', FAQ_HIT: 'bg-teal-500',
+                  };
+                  const barColor = colorMap[source] || 'bg-gray-400';
+                  return (
+                    <div key={source} className="flex items-center gap-3">
+                      <div className="flex w-44 shrink-0 items-center gap-1.5 truncate text-xs font-mono text-muted-foreground" title={source}>
+                        {source === 'SECURITY_BLOCKED' ? <ShieldBan className="h-3.5 w-3.5 text-red-500 shrink-0" /> : <Activity className="h-3.5 w-3.5 shrink-0" />}
+                        {source}
+                      </div>
+                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${Math.max(pct, 3)}%` }} />
+                      </div>
+                      <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums">{count}</span>
+                    </div>
+                  );
+                })}
+              {Object.keys(obsData.sourceDistribution).length === 0 && (
+                <p className="text-sm text-muted-foreground italic">Chưa có dữ liệu observability. Hãy thử hỏi AI vài câu.</p>
+              )}
+            </div>
+          </DashboardPanel>
+
+          <DashboardPanel title="⏱ Latency theo Source" description="Thời gian phản hồi trung bình (ms) theo từng pipeline path.">
+            <div className="space-y-2.5 p-4 sm:p-5">
+              {Object.entries(obsData.avgLatencyBySource)
+                .sort(([, a], [, b]) => b - a)
+                .map(([source, avgMs]) => (
+                  <div key={source} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                    <span className="text-xs font-mono font-medium text-foreground">{source}</span>
+                    <span className={`text-xs font-bold tabular-nums ${avgMs > 2000 ? 'text-red-600' : avgMs > 500 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {Math.round(avgMs)} ms
+                    </span>
+                  </div>
+                ))}
+              {Object.keys(obsData.avgLatencyBySource).length === 0 && (
+                <p className="text-sm text-muted-foreground italic">Chưa có dữ liệu latency.</p>
+              )}
+            </div>
+          </DashboardPanel>
+        </div>
+      )}
+
+      {obsData && obsData.blockedQueries.length > 0 && (
+        <DashboardPanel title="🚨 Security Blocked Queries" description="Các truy vấn bị SecurityGateService chặn — kiểm tra prompt injection hoặc lạm quyền.">
+          <div className="overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-red-50/60">
+                  <th className="px-3 py-2 text-left font-semibold text-red-700">Query</th>
+                  <th className="px-3 py-2 text-left font-semibold text-red-700">Role</th>
+                  <th className="px-3 py-2 text-left font-semibold text-red-700">SQL sinh ra</th>
+                  <th className="px-3 py-2 text-left font-semibold text-red-700">Thời gian</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-100">
+                {obsData.blockedQueries.slice(0, 10).map((bq, i) => (
+                  <tr key={i} className="hover:bg-red-50/40 transition-colors">
+                    <td className="px-3 py-2 max-w-[300px] truncate font-medium" title={bq.query}>{bq.query}</td>
+                    <td className="px-3 py-2"><code className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-mono text-red-700">{bq.role}</code></td>
+                    <td className="px-3 py-2 max-w-[250px] truncate font-mono text-[10px] text-muted-foreground" title={bq.sql}>{bq.sql || '—'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{bq.createdAt ? new Date(bq.createdAt).toLocaleString('vi-VN') : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DashboardPanel>
+      )}
+
       <DashboardPanel
         title={`Kho tri thức AI (${data.entries.length} mục)`}
         description="Mở rộng từng dòng để xem SQL; ưu tiên xử lý các mục invalid."
@@ -424,7 +534,7 @@ export default function AiAnalyticsPage() {
                       </p>
                       {!isExpanded && (
                         <p className="text-xs text-gray-400 mt-1.5 truncate font-mono opacity-80">
-                          {entry.generatedSql.slice(0, 100)}...
+                          {(entry.generatedSql || '').slice(0, 100)}...
                         </p>
                       )}
                     </div>
@@ -442,10 +552,10 @@ export default function AiAnalyticsPage() {
                         <div className="absolute top-3 right-3 flex items-center gap-2">
                           {!isEditing ? (
                             <>
-                              <button onClick={() => copyToClipboard(entry.generatedSql)} className="text-slate-400 hover:text-white hover:bg-slate-700 p-1.5 rounded-md transition-all active:scale-95" title="Copy SQL">
+                              <button onClick={() => copyToClipboard(entry.generatedSql || '')} className="text-slate-400 hover:text-white hover:bg-slate-700 p-1.5 rounded-md transition-all active:scale-95" title="Copy SQL">
                                 <Copy className="h-4 w-4" />
                               </button>
-                              <button onClick={() => { setEditingId(entry.id); setEditSql(entry.generatedSql); }} className="text-emerald-400 hover:text-white hover:bg-emerald-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold" title="Sửa SQL">
+                              <button onClick={() => { setEditingId(entry.id); setEditSql(entry.generatedSql || ''); }} className="text-emerald-400 hover:text-white hover:bg-emerald-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold" title="Sửa SQL">
                                 <Edit3 className="h-4 w-4" /> Dạy lại AI
                               </button>
                               <button onClick={() => handleDeleteEntry(entry.id)} disabled={deletingId === entry.id} className="text-red-400 hover:text-white hover:bg-red-900 p-1.5 rounded-md transition-all active:scale-95" title="Xoá">

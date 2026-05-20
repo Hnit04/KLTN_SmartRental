@@ -257,4 +257,61 @@ public class ContractController {
         }
         return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", "Lỗi AI: " + e.getMessage()));
     }
+
+    // ======================== 🛡️ PHASE 3: ADMIN BLOCKCHAIN MONITORING ========================
+
+    @Autowired
+    private iuh.se.kltn.backend.modules.contract.service.BlockchainService blockchainService;
+
+    @Autowired
+    private iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository outboxRepository;
+
+    /**
+     * 🛡️ Admin: Dashboard metrics cho Blockchain Outbox
+     */
+    @GetMapping("/admin/blockchain/metrics")
+    public ResponseEntity<?> getBlockchainMetrics() {
+        try {
+            java.util.Map<String, Object> metrics = new java.util.LinkedHashMap<>();
+            
+            // Outbox event counts
+            metrics.put("pendingCount", outboxRepository.countByStatus("PENDING"));
+            metrics.put("processingCount", outboxRepository.countByStatus("PROCESSING"));
+            metrics.put("confirmedCount", outboxRepository.countByStatus("CONFIRMED"));
+            metrics.put("deadLetterCount", outboxRepository.countByStatus("DEAD_LETTER"));
+            
+            // Blockchain service info
+            metrics.putAll(blockchainService.getOutboxMetrics());
+            
+            // Dead letter events for manual review
+            var deadLetters = outboxRepository.findByStatus("DEAD_LETTER");
+            metrics.put("deadLetterEvents", deadLetters.stream().map(e -> {
+                java.util.Map<String, Object> info = new java.util.LinkedHashMap<>();
+                info.put("id", e.getId());
+                info.put("eventType", e.getEventType());
+                info.put("contractId", e.getContractId());
+                info.put("retryCount", e.getRetryCount());
+                info.put("errorMessage", e.getErrorMessage());
+                info.put("createdAt", e.getCreatedAt());
+                return info;
+            }).collect(java.util.stream.Collectors.toList()));
+            
+            return ResponseEntity.ok(metrics);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 🛡️ Admin: Đồng bộ lại nonce blockchain
+     */
+    @PostMapping("/admin/blockchain/reconcile-nonce")
+    public ResponseEntity<?> reconcileNonce() {
+        try {
+            blockchainService.reconcileNonce();
+            return ResponseEntity.ok(java.util.Collections.singletonMap("message", "Đã đồng bộ lại nonce thành công."));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
 }

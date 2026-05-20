@@ -48,6 +48,26 @@ public class AiActionLog {
     @Column(name = "is_success")
     private boolean isSuccess;
 
+    /** Nguồn trả lời: FAQ_HIT, FAQ_SKIPPED, DQE_HIT, SQL_CACHE_HIT, SQL_GENERATED, SECURITY_BLOCKED, LOCATION_GPS, LOCATION_LANDMARK, RESULT_CACHE_HIT */
+    @Column(name = "response_source", length = 30)
+    private String responseSource;
+
+    /** SQL được sinh ra hoặc lấy từ cache (chỉ lưu khi đi qua SQL pipeline) */
+    @Column(name = "generated_sql", length = 2000)
+    private String generatedSql;
+
+    /** Số dòng kết quả trả về từ DB */
+    @Column(name = "result_row_count")
+    private Integer resultRowCount;
+
+    /** Score matching từ FAQ/SQL semantic cache (0.0 - 1.0) */
+    @Column(name = "cache_score")
+    private Double cacheScore;
+
+    /** Nguồn vị trí: GPS, LANDMARK, NONE */
+    @Column(name = "location_source", length = 15)
+    private String locationSource;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

@@ -580,6 +580,15 @@ public class ContractService {
         return result;
     }
 
+    /**
+     * 🛡️ SECURITY: Chặn mọi thao tác trên hợp đồng đã bị đánh dấu sai lệch dữ liệu.
+     */
+    private void ensureContractNotCompromised(Contract contract) {
+        if (Boolean.TRUE.equals(contract.getIsCompromised())) {
+            throw new RuntimeException("Hợp đồng #" + contract.getId() + " đã bị phát hiện sai lệch dữ liệu so với Blockchain. Không thể thực hiện thao tác này. Vui lòng liên hệ Admin!");
+        }
+    }
+
     private java.util.Map<String, Object> createComparison(String field, String dbValue, String onChainValue) {
         java.util.Map<String, Object> comp = new java.util.LinkedHashMap<>();
         comp.put("field", field);
@@ -600,6 +609,7 @@ public class ContractService {
     public ContractResponse updateContractTerms(Long contractId, String newTerms, Long userId) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        ensureContractNotCompromised(contract);
 
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
@@ -645,6 +655,7 @@ public class ContractService {
         // Lấy thông tin user đang thao tác
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        ensureContractNotCompromised(contract);
 
         // Nếu đã ở trạng thái nâng cao (ACTIVE hoặc AWAITING_DEPOSIT)
         if (contract.getStatus() == ContractStatus.ACTIVE || contract.getStatus() == ContractStatus.AWAITING_DEPOSIT) {
@@ -699,7 +710,8 @@ public class ContractService {
                     throw new RuntimeException("Cấu hình Blockchain (Private Key) đang trống! Không thể triển khai hợp đồng. Vui lòng liên hệ Admin.");
                 }
                 try {
-                    String contractHashData = "HASH-" + contract.getId() + "-" + UUID.randomUUID();
+                    // ✅ FIX #1: Dùng đúng SHA256 hash đã tính từ nội dung hợp đồng, không tạo UUID mới
+                    String contractHashData = contract.getContractHash();
                     
                     String tenantWallet = contract.getTenantWalletSnapshot() != null ? contract.getTenantWalletSnapshot() : contract.getTenant().getWalletAddress();
                     if (tenantWallet == null || tenantWallet.isEmpty()) {
@@ -764,6 +776,7 @@ public class ContractService {
                         iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
                             .eventType("DEPLOY_CONTRACT")
                             .contractId(contract.getId())
+                            .correlationId("deploy-" + contract.getId()) // 🛡️ Phase 2: Idempotency via unique constraint
                             .payload(payload)
                             .build();
                     outboxRepository.save(event);

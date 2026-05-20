@@ -17,6 +17,8 @@ import java.util.Map;
 @Table(name = "blockchain_outbox_events", indexes = {
     @Index(name = "idx_outbox_status", columnList = "status"),
     @Index(name = "idx_outbox_contract", columnList = "contractId")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uk_outbox_correlation", columnNames = "correlationId")
 })
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
@@ -67,6 +69,10 @@ public class BlockchainOutboxEvent {
     private LocalDateTime processedAt;
     private LocalDateTime confirmedAt;
 
+    // 🛡️ Phase 2: Exponential backoff support
+    private LocalDateTime nextAttemptAt;
+    private LocalDateTime txSubmittedAt;
+
     // Helper methods
     public boolean canRetry() {
         return retryCount < maxRetries;
@@ -89,7 +95,11 @@ public class BlockchainOutboxEvent {
         this.errorMessage = error;
         this.updatedAt = LocalDateTime.now();
         if (canRetry()) {
-            this.status = "PENDING"; // Will be retried
+            this.status = "PENDING";
+            // 🛡️ Exponential backoff: 10s, 30s, 2m
+            long[] delays = {10, 30, 120};
+            long delay = delays[Math.min(retryCount - 1, delays.length - 1)];
+            this.nextAttemptAt = LocalDateTime.now().plusSeconds(delay);
         } else {
             this.status = "DEAD_LETTER";
         }
