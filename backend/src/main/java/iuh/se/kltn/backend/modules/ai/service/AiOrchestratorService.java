@@ -260,9 +260,18 @@ public class AiOrchestratorService {
         // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính
         // xác tuyệt đối
         if (role.equalsIgnoreCase("GUEST")) {
-            // Regex kiểm tra các từ khóa nhạy cảm: hóa đơn, hợp đồng, lịch hẹn, doanh thu,
-            // nợ, thanh toán, của tôi/mình
-            String sensitivePattern = ".*(hóa đơn|hoá đơn|bill|hợp đồng|contract|lịch hẹn|appointment|doanh thu|revenue|của tôi|của mình|nợ|thanh toán|trễ|quá hạn|phí).*";
+            // Regex kiểm tra các từ khóa nhạy cảm — MỞ RỘNG để chặn mọi biến thể
+            String sensitivePattern = ".*(hóa đơn|hoá đơn|bill|hợp đồng|contract|lịch hẹn|appointment"
+                    + "|doanh thu|revenue|của tôi|của mình|nợ|thanh toán|trễ|quá hạn|phí"
+                    + "|đóng tiền|chưa đóng|tiền phòng|tiền thuê|tiền cọc|đặt cọc|cọc"
+                    + "|thành viên|member|người thuê|khách thuê|tenant"
+                    + "|chủ trọ|chủ nhà|landlord|người dùng|user"
+                    + "|hồ sơ|tài khoản|profile|account"
+                    + "|mật khẩu|password|ví|wallet|blockchain"
+                    + "|lịch sử|history|giao dịch|transaction"
+                    + "|kiểm kê|quyết toán|settlement|khấu trừ|deduction"
+                    + "|thông báo|notification|báo cáo|report"
+                    + "|id\\s*(?:là|=)\\s*\\d+|landlord_id|tenant_id).*";
             if (normalizedQuestion.matches(sensitivePattern)) {
                 System.out.println("🛡️ [SECURITY GUEST] Chặn truy vấn nhạy cảm: " + question);
                 return "Dạ, vì lý do bảo mật, các thông tin cá nhân như hóa đơn, hợp đồng và lịch hẹn chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng các tính năng này nhé!";
@@ -495,6 +504,24 @@ public class AiOrchestratorService {
                             false);
 
                 } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
+                    // 🛡️ ROLE GUARD: GUEST chỉ được phép SEARCH_ROOM
+                    if (role.equalsIgnoreCase("GUEST") && extraction.getIntent() != iuh.se.kltn.backend.modules.ai.enums.SystemIntent.SEARCH_ROOM) {
+                        System.err.println("🚨 [SECURITY] GUEST attempted restricted intent: " + extraction.getIntent());
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                        return "Dạ, vì lý do bảo mật, thông tin này chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng tính năng này nhé!";
+                    }
+                    // 🛡️ TENANT không được xem intent của LANDLORD
+                    if (role.equalsIgnoreCase("TENANT")) {
+                        iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent = extraction.getIntent();
+                        if (intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_REVENUE
+                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_DEBTORS
+                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_OCCUPANCY
+                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_RISK) {
+                            System.err.println("🚨 [SECURITY] TENANT attempted LANDLORD intent: " + intent);
+                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                            return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
+                        }
+                    }
                     System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
 
                     // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params + Question fingerprint

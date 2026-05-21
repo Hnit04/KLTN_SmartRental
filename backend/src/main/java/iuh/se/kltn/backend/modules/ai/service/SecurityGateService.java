@@ -38,15 +38,24 @@ public class SecurityGateService {
     }
 
     /**
-     * Chặn Guest truy cập bảng nhạy cảm (users, bills, contracts, appointments).
+     * Chặn Guest truy cập bảng nhạy cảm.
+     * Dùng WHITELIST: GUEST chỉ được truy cập properties và rooms.
+     * Mọi bảng khác đều bị chặn.
      * @return Thông báo lỗi nếu vi phạm, null nếu OK.
      */
     public String checkGuestAccess(String sql) {
         String upperSql = sql.toUpperCase();
-        if (upperSql.contains("USERS") || upperSql.contains("BILLS") ||
-                upperSql.contains("CONTRACTS") || upperSql.contains("APPOINTMENTS")) {
-            System.err.println("🚨 SECURITY ALERT: GUEST tried to access restricted tables!");
-            return "Dạ, vì lý do bảo mật, khách vãng lai chỉ có thể tra cứu thông tin phòng và khu trọ công khai thôi ạ. Bạn vui lòng đăng nhập để xem các thông tin cá nhân nhé!";
+        // BLACKLIST: Chặn tường minh các bảng nhạy cảm
+        String[] forbiddenTables = {
+            "USERS", "BILLS", "CONTRACTS", "APPOINTMENTS", "PAYMENTS",
+            "CONTRACT_MEMBERS", "REVIEWS", "NOTIFICATIONS",
+            "AI_SQL_CACHE", "AI_ACTION_LOG", "CONTRACT_CHANGE_REQUEST"
+        };
+        for (String table : forbiddenTables) {
+            if (upperSql.contains(table)) {
+                System.err.println("🚨 SECURITY ALERT: GUEST tried to access restricted table: " + table);
+                return "Dạ, vì lý do bảo mật, khách vãng lai chỉ có thể tra cứu thông tin phòng và khu trọ công khai thôi ạ. Bạn vui lòng đăng nhập để xem các thông tin cá nhân nhé!";
+            }
         }
         return null;
     }
