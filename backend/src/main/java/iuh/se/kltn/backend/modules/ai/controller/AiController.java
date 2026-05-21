@@ -293,6 +293,32 @@ public class AiController {
         }
     }
 
+    // Admin: Test chạy thử 1 SQL trong cache
+    @PostMapping("/admin/cache/{id}/test")
+    public ResponseEntity<?> testCacheSql(@PathVariable Long id) {
+        try {
+            var result = aiOrchestratorService.testCacheEntry(id);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of(
+                    "status", "error", "message", e.getMessage()
+            ));
+        }
+    }
+
+    // Admin: Batch validate - kiểm tra tất cả SQL entries
+    @PostMapping("/admin/cache/validate-all")
+    public ResponseEntity<?> validateAllCache() {
+        try {
+            var result = aiOrchestratorService.batchValidateCache();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "status", "error", "message", e.getMessage()
+            ));
+        }
+    }
+
     // Admin: Thêm mới 1 FAQ vào Tri thức
     @PostMapping("/admin/faq")
     public ResponseEntity<?> addFaqCache(@Valid @RequestBody AiFaqRequest request) {

@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, MessageSquareText, Code2,
   TrendingUp, Shield, Copy, ChevronDown, ChevronUp,
   Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X,
-  Activity, ShieldBan, Clock3, BarChart3
+  Activity, ShieldBan, Clock3, BarChart3, PlayCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -116,6 +116,12 @@ export default function AiAnalyticsPage() {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [obsData, setObsData] = useState<ObservabilityData | null>(null);
+
+  // Validate & Test
+  const [validating, setValidating] = useState(false);
+  const [validateResult, setValidateResult] = useState<any>(null);
+  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testResult, setTestResult] = useState<Record<number, any>>({});
 
   useEffect(() => { fetchData(); fetchObservability(); }, []);
 
@@ -615,9 +621,87 @@ export default function AiAnalyticsPage() {
                 className="pl-9"
               />
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
+              disabled={validating}
+              onClick={async () => {
+                setValidating(true);
+                setValidateResult(null);
+                try {
+                  const res = await aiApi.validateAllCache();
+                  const d = (res as any).data || res;
+                  setValidateResult(d);
+                  toast.success(d.message);
+                  fetchData();
+                } catch {
+                  toast.error('Lỗi validate');
+                } finally {
+                  setValidating(false);
+                }
+              }}
+            >
+              {validating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Shield className="h-4 w-4 mr-1" />}
+              Kiểm tra tất cả SQL
+            </Button>
           </div>
         }
       >
+        {/* Validate Result Summary */}
+        {validateResult && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-bold text-amber-800">📊 Kết quả kiểm tra SQL</h4>
+              <button onClick={() => setValidateResult(null)} className="text-amber-400 hover:text-amber-600"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <div className="bg-white rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-emerald-600">{validateResult.sqlOk}</div>
+                <div className="text-muted-foreground">SQL OK</div>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-red-600">{validateResult.sqlError}</div>
+                <div className="text-muted-foreground">Lỗi SQL</div>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-amber-600">{validateResult.sqlEmpty}</div>
+                <div className="text-muted-foreground">SQL rỗng</div>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-teal-600">{validateResult.faqEntries}</div>
+                <div className="text-muted-foreground">FAQ</div>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-indigo-600">{validateResult.totalEntries}</div>
+                <div className="text-muted-foreground">Tổng</div>
+              </div>
+            </div>
+            {validateResult.failedEntries?.length > 0 && (
+              <details className="mt-3">
+                <summary className="text-xs font-semibold text-red-700 cursor-pointer hover:text-red-900">
+                  ⚠️ {validateResult.failedEntries.length} mục lỗi — bấm để xem chi tiết
+                </summary>
+                <div className="mt-2 max-h-[200px] overflow-y-auto space-y-1">
+                  {validateResult.failedEntries.map((f: any) => (
+                    <div key={f.id} className="flex items-center justify-between bg-red-50 rounded px-3 py-1.5 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-mono text-red-400">#{f.id}</span>
+                        <span className="ml-2 font-medium truncate">{f.question}</span>
+                        <span className="ml-2 text-red-500 truncate">{f.error?.slice(0, 80)}</span>
+                      </div>
+                      <Button size="sm" variant="outline" className="ml-2 h-5 px-1.5 text-[10px] border-red-200 text-red-600"
+                        onClick={async () => { try { await aiApi.deleteCache(f.id); toast.success(`Đã xóa #${f.id}`); fetchData(); } catch {} }}>
+                        Xóa
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+
         <div className="min-h-[320px] divide-y divide-border/60 sm:min-h-[400px]">
           {paginatedEntries.length === 0 ? (
             <EmptyState
@@ -685,6 +769,28 @@ export default function AiAnalyticsPage() {
                               <button onClick={() => copyToClipboard(entry.generatedSql || '')} className="text-slate-400 hover:text-white hover:bg-slate-700 p-1.5 rounded-md transition-all active:scale-95" title="Copy SQL">
                                 <Copy className="h-4 w-4" />
                               </button>
+                              {entry.type !== 'FAQ' && (
+                                <button
+                                  disabled={testingId === entry.id}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setTestingId(entry.id);
+                                    try {
+                                      const res = await aiApi.testCache(entry.id);
+                                      const d = (res as any).data || res;
+                                      setTestResult(prev => ({ ...prev, [entry.id]: d }));
+                                    } catch {
+                                      setTestResult(prev => ({ ...prev, [entry.id]: { status: 'ERROR', message: 'Lỗi kết nối' } }));
+                                    } finally {
+                                      setTestingId(null);
+                                    }
+                                  }}
+                                  className="text-cyan-400 hover:text-white hover:bg-cyan-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold"
+                                  title="Test SQL"
+                                >
+                                  {testingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Test
+                                </button>
+                              )}
                               <button onClick={() => { setEditingId(entry.id); setEditSql(entry.generatedSql || ''); }} className="text-emerald-400 hover:text-white hover:bg-emerald-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold" title="Sửa SQL">
                                 <Edit3 className="h-4 w-4" /> Dạy lại AI
                               </button>
@@ -730,6 +836,51 @@ export default function AiAnalyticsPage() {
                               ? (entry.answer || '(Chưa có câu trả lời FAQ)')
                               : highlightSql(entry.generatedSql)}
                           </pre>
+                        )}
+
+                        {/* Test Result */}
+                        {testResult[entry.id] && (
+                          <div className={`mt-3 rounded-lg p-3 border text-xs ${
+                            testResult[entry.id].status === 'OK' ? 'bg-emerald-950/50 border-emerald-700 text-emerald-300' :
+                            testResult[entry.id].status === 'ERROR' ? 'bg-red-950/50 border-red-700 text-red-300' :
+                            testResult[entry.id].status === 'EMPTY_RESULT' ? 'bg-amber-950/50 border-amber-700 text-amber-300' :
+                            'bg-slate-800 border-slate-600 text-slate-300'
+                          }`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-bold uppercase px-2 py-0.5 rounded text-[10px] ${
+                                  testResult[entry.id].status === 'OK' ? 'bg-emerald-600 text-white' :
+                                  testResult[entry.id].status === 'ERROR' ? 'bg-red-600 text-white' :
+                                  'bg-amber-600 text-white'
+                                }`}>{testResult[entry.id].status}</span>
+                                <span>{testResult[entry.id].message}</span>
+                                {testResult[entry.id].rowCount > 0 && <span className="text-slate-400">({testResult[entry.id].rowCount} dòng)</span>}
+                              </div>
+                              <button onClick={() => setTestResult(prev => { const n = { ...prev }; delete n[entry.id]; return n; })} className="text-slate-500 hover:text-white">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                            {testResult[entry.id].sampleData?.length > 0 && (
+                              <div className="mt-2 overflow-x-auto">
+                                <table className="w-full text-left text-[10px]">
+                                  <thead><tr className="border-b border-slate-600">
+                                    {Object.keys(testResult[entry.id].sampleData[0]).map((k: string) => (
+                                      <th key={k} className="px-2 py-1 font-bold text-slate-400 uppercase">{k}</th>
+                                    ))}
+                                  </tr></thead>
+                                  <tbody>
+                                    {testResult[entry.id].sampleData.map((row: any, i: number) => (
+                                      <tr key={i} className="border-b border-slate-700/50">
+                                        {Object.values(row).map((v: any, j: number) => (
+                                          <td key={j} className="px-2 py-1 truncate max-w-[120px]">{String(v ?? '')}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
