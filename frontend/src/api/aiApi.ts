@@ -53,6 +53,16 @@ export const aiApi = {
     return axiosClient.delete(`/ai/admin/cache/${id}`);
   },
 
+  // Admin: test chạy thử 1 câu SQL
+  testCache: (id: number) => {
+    return axiosClient.post(`/ai/admin/cache/${id}/test`);
+  },
+
+  // Admin: batch validate tất cả SQL
+  validateAllCache: () => {
+    return axiosClient.post("/ai/admin/cache/validate-all");
+  },
+
   // Admin: xóa cache AI
   clearCache: () => {
     return axiosClient.post("/ai/clear-cache");

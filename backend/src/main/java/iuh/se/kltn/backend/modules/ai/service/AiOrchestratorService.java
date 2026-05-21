@@ -931,6 +931,129 @@ public class AiOrchestratorService {
         reloadVectorCache();
     }
 
+    /**
+     * Test chạy thử 1 câu SQL trong cache.
+     * Dùng LIMIT 5 + timeout 1s để an toàn.
+     */
+    public Map<String, Object> testCacheEntry(Long id) {
+        AiSqlCache cache = cacheRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ID: " + id));
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("id", cache.getId());
+        result.put("question", cache.getQuestion());
+        result.put("type", cache.getType());
+
+        // FAQ entries → không cần test SQL
+        if ("FAQ".equalsIgnoreCase(cache.getType())) {
+            result.put("status", "FAQ");
+            result.put("message", "Entry FAQ — không có SQL để test");
+            result.put("answer", cache.getAnswer());
+            return result;
+        }
+
+        String sql = cache.getGeneratedSql();
+        if (sql == null || sql.isBlank()) {
+            result.put("status", "EMPTY");
+            result.put("message", "SQL rỗng — cần thêm SQL hoặc xóa entry");
+            return result;
+        }
+
+        // Thêm LIMIT 5 nếu chưa có để an toàn
+        String testSql = sql.trim().replaceAll(";\\s*$", "");
+        if (!testSql.toUpperCase().contains("LIMIT")) {
+            testSql += " LIMIT 5";
+        }
+        // Replace placeholder user IDs with 1 (test)
+        testSql = testSql.replace("USER_ID_PLACEHOLDER", "1");
+
+        try {
+            jdbcTemplate.setQueryTimeout(1);
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(testSql);
+            result.put("status", rows.isEmpty() ? "EMPTY_RESULT" : "OK");
+            result.put("rowCount", rows.size());
+            result.put("sampleData", rows.stream().limit(3).toList());
+            result.put("message", rows.isEmpty() ? "SQL hợp lệ nhưng không có dữ liệu" : "✅ SQL chạy thành công, trả về " + rows.size() + " dòng");
+        } catch (Exception e) {
+            result.put("status", "ERROR");
+            result.put("message", e.getMessage());
+            result.put("rowCount", 0);
+        }
+
+        return result;
+    }
+
+    /**
+     * Batch validate: Test tất cả SQL entries trong cache.
+     * Tự động đánh dấu isValid=false cho các entry lỗi.
+     */
+    @Transactional
+    public Map<String, Object> batchValidateCache() {
+        List<AiSqlCache> allEntries = cacheRepository.findAll();
+
+        int totalSql = 0, ok = 0, empty = 0, error = 0, faq = 0;
+        List<Map<String, Object>> failedEntries = new java.util.ArrayList<>();
+
+        for (AiSqlCache cache : allEntries) {
+            if ("FAQ".equalsIgnoreCase(cache.getType())) {
+                faq++;
+                continue;
+            }
+            totalSql++;
+
+            String sql = cache.getGeneratedSql();
+            if (sql == null || sql.isBlank()) {
+                empty++;
+                failedEntries.add(Map.of(
+                        "id", cache.getId(),
+                        "question", cache.getQuestion(),
+                        "status", "EMPTY",
+                        "error", "SQL rỗng"
+                ));
+                cache.setValid(false);
+                continue;
+            }
+
+            String testSql = sql.trim().replaceAll(";\\s*$", "");
+            if (!testSql.toUpperCase().contains("LIMIT")) {
+                testSql += " LIMIT 1";
+            }
+            testSql = testSql.replace("USER_ID_PLACEHOLDER", "1");
+
+            try {
+                jdbcTemplate.setQueryTimeout(1);
+                jdbcTemplate.queryForList(testSql);
+                ok++;
+                if (!cache.isValid()) {
+                    cache.setValid(true); // Fix entries sai trạng thái
+                }
+            } catch (Exception e) {
+                error++;
+                failedEntries.add(Map.of(
+                        "id", cache.getId(),
+                        "question", cache.getQuestion(),
+                        "status", "ERROR",
+                        "error", e.getMessage() != null ? e.getMessage().substring(0, Math.min(e.getMessage().length(), 200)) : "Unknown"
+                ));
+                cache.setValid(false);
+            }
+        }
+
+        cacheRepository.saveAll(allEntries);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("status", "success");
+        result.put("totalEntries", allEntries.size());
+        result.put("faqEntries", faq);
+        result.put("sqlEntries", totalSql);
+        result.put("sqlOk", ok);
+        result.put("sqlEmpty", empty);
+        result.put("sqlError", error);
+        result.put("failedEntries", failedEntries);
+        result.put("message", String.format("Kiểm tra xong: %d SQL OK, %d lỗi, %d rỗng, %d FAQ", ok, error, empty, faq));
+        return result;
+    }
+
     // Load lại toàn bộ Vector Store từ DB đã được filter valid=true
     private void reloadVectorCache() {
         System.out.println("🔄 Đang load lại Vector Store sau khi có thay đổi từ Admin...");
