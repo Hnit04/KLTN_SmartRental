@@ -608,26 +608,58 @@ export default function AiAnalyticsPage() {
           )}
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex flex-col gap-3 border-t border-border/60 bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Hiển thị{' '}
-              <span className="font-semibold tabular-nums text-foreground">{paginatedEntries.length}</span> trên{' '}
-              <span className="font-semibold tabular-nums text-foreground">{filteredEntries.length}</span> mục
-            </p>
-            <div className="flex flex-wrap gap-1">
-              <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
-                Trang trước
-              </Button>
-              <div className="flex min-w-[3rem] items-center justify-center px-3 text-sm font-semibold tabular-nums text-foreground">
-                {currentPage} / {totalPages}
+        {totalPages > 1 && (() => {
+          // Tính page numbers để hiển thị (smart: 1 ... 4 5 [6] 7 8 ... 20)
+          const pages: (number | '...')[] = [];
+          const delta = 2; // Hiện 2 trang mỗi bên trang hiện tại
+          const left = Math.max(2, currentPage - delta);
+          const right = Math.min(totalPages - 1, currentPage + delta);
+
+          pages.push(1);
+          if (left > 2) pages.push('...');
+          for (let i = left; i <= right; i++) pages.push(i);
+          if (right < totalPages - 1) pages.push('...');
+          if (totalPages > 1) pages.push(totalPages);
+
+          return (
+            <div className="flex flex-col gap-3 border-t border-border/60 bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Hiển thị{' '}
+                <span className="font-semibold tabular-nums text-foreground">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredEntries.length)}</span> trên{' '}
+                <span className="font-semibold tabular-nums text-foreground">{filteredEntries.length}</span> mục
+              </p>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="px-2">
+                  «
+                </Button>
+                <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} className="px-2">
+                  ‹
+                </Button>
+                {pages.map((page, i) =>
+                  page === '...' ? (
+                    <span key={`dots-${i}`} className="px-1.5 text-xs text-muted-foreground select-none">…</span>
+                  ) : (
+                    <Button
+                      key={page}
+                      size="sm"
+                      variant={currentPage === page ? "default" : "outline"}
+                      onClick={() => setCurrentPage(page)}
+                      className={`min-w-[2rem] px-2 tabular-nums ${currentPage === page ? 'pointer-events-none' : ''}`}
+                    >
+                      {page}
+                    </Button>
+                  )
+                )}
+                <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} className="px-2">
+                  ›
+                </Button>
+                <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(totalPages)} className="px-2">
+                  »
+                </Button>
               </div>
-              <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
-                Trang sau
-              </Button>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </DashboardPanel>
 
       <ConfirmActionDialog
