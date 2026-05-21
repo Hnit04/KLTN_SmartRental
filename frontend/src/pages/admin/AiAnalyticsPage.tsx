@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Brain, Search, RefreshCw, Trash2, Loader2,
   CheckCircle2, XCircle, MessageSquareText, Code2,
-  TrendingUp, Zap, Shield, Copy, ChevronDown, ChevronUp,
+  TrendingUp, Shield, Copy, ChevronDown, ChevronUp,
   Home, DollarSign, FileText, MapPin, HelpCircle, ReceiptText, Edit3, Save, X,
   Activity, ShieldBan, Clock3, BarChart3
 } from 'lucide-react';
@@ -24,6 +24,8 @@ interface CacheEntry {
   question: string;
   generatedSql: string;
   isValid: boolean;
+  type?: string;   // "SQL" | "FAQ"
+  answer?: string;  // FAQ answer (when type=FAQ)
 }
 
 interface Analytics {
@@ -32,6 +34,8 @@ interface Analytics {
   invalidQueries: number;
   categories: Record<string, number>;
   entries: CacheEntry[];
+  securityFlags?: Array<{ id: number; question: string; sql: string; issues: string[] }>;
+  flaggedCount?: number;
 }
 
 interface ObservabilityData {
@@ -305,32 +309,37 @@ export default function AiAnalyticsPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatKpiCard
-          icon={<MessageSquareText className="h-5 w-5" />}
-          iconClassName="text-violet-600"
-          label="Tổng câu hỏi đã học"
-          value={data.totalQueries}
-          description="Số mục trong kho tri thức"
+          icon={<Activity className="h-5 w-5" />}
+          iconClassName="text-blue-600"
+          label="Tổng truy vấn thực tế"
+          value={obsData?.totalLogs ?? '—'}
+          description="Số lần AI được hỏi gần đây"
         />
         <StatKpiCard
-          icon={<Zap className="h-5 w-5" />}
-          iconClassName="text-emerald-600"
-          label="Trả lời đúng (valid)"
-          value={data.validQueries}
-          description={`${cacheHitRate}% so với tổng truy vấn`}
+          icon={<MessageSquareText className="h-5 w-5" />}
+          iconClassName="text-violet-600"
+          label="Kho tri thức (SQL Cache)"
+          value={data.totalQueries}
+          description={`${data.validQueries} đúng / ${data.invalidQueries} cần sửa`}
         />
         <StatKpiCard
           icon={<Shield className="h-5 w-5" />}
           iconClassName="text-destructive"
-          label="Cần chú ý (invalid)"
-          value={data.invalidQueries}
-          description="SQL không hợp lệ hoặc chưa an toàn"
+          label="Bị chặn bảo mật"
+          value={obsData ? (obsData.sourceDistribution?.['SECURITY_BLOCKED'] ?? 0) : '—'}
+          description="Truy vấn vi phạm quyền hạn"
         />
         <StatKpiCard
           icon={<TrendingUp className="h-5 w-5" />}
-          iconClassName="text-primary"
-          label="Semantic hit (ước lượng)"
-          value={`${cacheHitRate}%`}
-          description="Giảm gọi LLM khi khớp embedding"
+          iconClassName="text-emerald-600"
+          label="Cache hit rate"
+          value={obsData ? (() => {
+            const dist = obsData.sourceDistribution || {};
+            const cacheHits = (dist['DQE_HIT'] || 0) + (dist['SQL_CACHE_HIT'] || 0) + (dist['RESULT_CACHE_HIT'] || 0) + (dist['FAQ_HIT'] || 0);
+            const total = Object.values(dist).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+            return total > 0 ? Math.round((cacheHits / total) * 100) + '%' : '—';
+          })() : `${cacheHitRate}%`}
+          description="% truy vấn không cần gọi LLM"
         />
       </div>
 
@@ -437,27 +446,143 @@ export default function AiAnalyticsPage() {
         </div>
       )}
 
-      {obsData && obsData.blockedQueries.length > 0 && (
+      {obsData && (
         <DashboardPanel title="🚨 Security Blocked Queries" description="Các truy vấn bị SecurityGateService chặn — kiểm tra prompt injection hoặc lạm quyền.">
-          <div className="overflow-hidden">
+          {obsData.blockedQueries.length > 0 ? (
+            <div className="overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-red-50/60">
+                    <th className="px-3 py-2 text-left font-semibold text-red-700">Query</th>
+                    <th className="px-3 py-2 text-left font-semibold text-red-700">Role</th>
+                    <th className="px-3 py-2 text-left font-semibold text-red-700">SQL sinh ra</th>
+                    <th className="px-3 py-2 text-left font-semibold text-red-700">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-red-100">
+                  {obsData.blockedQueries.slice(0, 10).map((bq, i) => (
+                    <tr key={i} className="hover:bg-red-50/40 transition-colors">
+                      <td className="px-3 py-2 max-w-[300px] truncate font-medium" title={bq.query}>{bq.query}</td>
+                      <td className="px-3 py-2"><code className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-mono text-red-700">{bq.role}</code></td>
+                      <td className="px-3 py-2 max-w-[250px] truncate font-mono text-[10px] text-muted-foreground" title={bq.sql}>{bq.sql || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{bq.createdAt ? new Date(bq.createdAt).toLocaleString('vi-VN') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <div className="rounded-full bg-emerald-100 p-3">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              </div>
+              <p className="text-sm font-semibold text-emerald-700">Không có truy vấn nào bị chặn</p>
+              <p className="text-xs text-muted-foreground max-w-md">Tất cả truy vấn AI gần đây đều hợp lệ. Nếu có truy vấn vi phạm quyền hạn (GUEST hỏi hóa đơn, prompt injection...) sẽ hiển thị tại đây.</p>
+            </div>
+          )}
+        </DashboardPanel>
+      )}
+
+      {data.securityFlags && data.securityFlags.length > 0 && (
+        <DashboardPanel
+          title={`⚠️ SQL Cache — Phát hiện ${data.securityFlags.length} mục có vấn đề bảo mật`}
+          description="Auto-scan phát hiện SQL trong kho tri thức có lệnh nguy hiểm, cột nhạy cảm hoặc thiếu LIMIT. Nên xóa hoặc sửa."
+        >
+          <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-red-50/60">
-                  <th className="px-3 py-2 text-left font-semibold text-red-700">Query</th>
-                  <th className="px-3 py-2 text-left font-semibold text-red-700">Role</th>
-                  <th className="px-3 py-2 text-left font-semibold text-red-700">SQL sinh ra</th>
-                  <th className="px-3 py-2 text-left font-semibold text-red-700">Thời gian</th>
+                <tr className="bg-amber-50/60">
+                  <th className="px-3 py-2 text-left font-semibold text-amber-800">ID</th>
+                  <th className="px-3 py-2 text-left font-semibold text-amber-800">Câu hỏi</th>
+                  <th className="px-3 py-2 text-left font-semibold text-amber-800">SQL</th>
+                  <th className="px-3 py-2 text-left font-semibold text-amber-800">Vấn đề</th>
+                  <th className="px-3 py-2 text-center font-semibold text-amber-800">Xóa</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-red-100">
-                {obsData.blockedQueries.slice(0, 10).map((bq, i) => (
-                  <tr key={i} className="hover:bg-red-50/40 transition-colors">
-                    <td className="px-3 py-2 max-w-[300px] truncate font-medium" title={bq.query}>{bq.query}</td>
-                    <td className="px-3 py-2"><code className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-mono text-red-700">{bq.role}</code></td>
-                    <td className="px-3 py-2 max-w-[250px] truncate font-mono text-[10px] text-muted-foreground" title={bq.sql}>{bq.sql || '—'}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{bq.createdAt ? new Date(bq.createdAt).toLocaleString('vi-VN') : '—'}</td>
+              <tbody className="divide-y divide-amber-100">
+                {data.securityFlags.map((flag) => (
+                  <tr key={flag.id} className="hover:bg-amber-50/40 transition-colors">
+                    <td className="px-3 py-2 font-mono text-muted-foreground">#{flag.id}</td>
+                    <td className="px-3 py-2 max-w-[200px] truncate font-medium" title={flag.question}>{flag.question}</td>
+                    <td className="px-3 py-2 max-w-[250px] truncate font-mono text-[10px] text-muted-foreground" title={flag.sql}>{flag.sql}</td>
+                    <td className="px-3 py-2">
+                      {flag.issues.map((issue, i) => (
+                        <span key={i} className={`mr-1 mb-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                          issue.startsWith('DML') || issue.startsWith('NON_SELECT') ? 'bg-red-100 text-red-700'
+                          : issue.startsWith('SENSITIVE') ? 'bg-orange-100 text-orange-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {issue.split(':')[0]}
+                        </span>
+                      ))}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-destructive border-destructive/30 hover:bg-destructive/5"
+                        onClick={async () => {
+                          try { await aiApi.deleteCache(flag.id); toast.success(`Đã xóa #${flag.id}`); fetchData(); }
+                          catch { toast.error('Lỗi xóa'); }
+                        }}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </DashboardPanel>
+      )}
+
+      {obsData && obsData.recentLogs && obsData.recentLogs.length > 0 && (
+        <DashboardPanel title={`📋 Truy vấn gần đây (${obsData.recentLogs.length} mục mới nhất)`} description="Toàn bộ truy vấn AI gần đây — bao gồm DQE, Cache hit, SQL gen và bị chặn.">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="px-3 py-2 text-left font-semibold">Câu hỏi</th>
+                  <th className="px-3 py-2 text-left font-semibold">Role</th>
+                  <th className="px-3 py-2 text-left font-semibold">Intent</th>
+                  <th className="px-3 py-2 text-left font-semibold">Nguồn</th>
+                  <th className="px-3 py-2 text-right font-semibold">Latency</th>
+                  <th className="px-3 py-2 text-left font-semibold">Thời gian</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {obsData.recentLogs.map((log: any) => {
+                  const sourceColor: Record<string, string> = {
+                    DQE_HIT: 'bg-emerald-100 text-emerald-700',
+                    RESULT_CACHE_HIT: 'bg-sky-100 text-sky-700',
+                    SQL_CACHE_HIT: 'bg-blue-100 text-blue-700',
+                    SQL_GENERATED: 'bg-amber-100 text-amber-700',
+                    SECURITY_BLOCKED: 'bg-red-100 text-red-700',
+                    FAQ_HIT: 'bg-teal-100 text-teal-700',
+                    LOCATION_GPS: 'bg-violet-100 text-violet-700',
+                    LOCATION_LANDMARK: 'bg-purple-100 text-purple-700',
+                  };
+                  const cls = sourceColor[log.source] || 'bg-gray-100 text-gray-700';
+                  return (
+                    <tr key={log.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-3 py-2 max-w-[280px] truncate font-medium" title={log.query}>{log.query}</td>
+                      <td className="px-3 py-2">
+                        <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">{log.role}</code>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground font-mono text-[10px]">{log.intent || '—'}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${cls}`}>
+                          {log.source || '—'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <span className={`font-semibold ${(log.latencyMs ?? 0) > 2000 ? 'text-red-600' : (log.latencyMs ?? 0) > 500 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {log.latencyMs != null ? `${log.latencyMs}ms` : '—'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -528,13 +653,18 @@ export default function AiAnalyticsPage() {
                         {!entry.isValid && (
                           <StatusBadge label="Cần dạy lại" tone="danger" className="text-[10px] uppercase font-bold" />
                         )}
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${entry.type === 'FAQ' ? 'bg-teal-100 text-teal-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                          {entry.type === 'FAQ' ? 'FAQ' : 'SQL'}
+                        </span>
                       </div>
                       <p className="text-sm font-semibold text-gray-900 leading-snug">
                          "{entry.question}"
                       </p>
                       {!isExpanded && (
                         <p className="text-xs text-gray-400 mt-1.5 truncate font-mono opacity-80">
-                          {(entry.generatedSql || '').slice(0, 100)}...
+                          {entry.type === 'FAQ'
+                            ? (entry.answer || '(Chưa có câu trả lời)').slice(0, 100) + '...'
+                            : (entry.generatedSql || '(Chưa có SQL)').slice(0, 100) + '...'}
                         </p>
                       )}
                     </div>
@@ -572,7 +702,7 @@ export default function AiAnalyticsPage() {
                         <div className="flex items-center gap-2 mb-3 border-b border-slate-700/50 pb-2 pr-40">
                           <Code2 className="h-4 w-4 text-indigo-400" />
                           <span className="text-xs font-semibold text-indigo-300 tracking-wider uppercase">
-                            {isEditing ? 'Sửa Truy vấn SQL' : 'Generated Query'}
+                            {isEditing ? 'Sửa Truy vấn SQL' : entry.type === 'FAQ' ? 'FAQ Answer' : 'Generated Query'}
                           </span>
                         </div>
                         
@@ -596,7 +726,9 @@ export default function AiAnalyticsPage() {
                           </div>
                         ) : (
                           <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-all leading-relaxed">
-                            {highlightSql(entry.generatedSql)}
+                            {entry.type === 'FAQ'
+                              ? (entry.answer || '(Chưa có câu trả lời FAQ)')
+                              : highlightSql(entry.generatedSql)}
                           </pre>
                         )}
                       </div>

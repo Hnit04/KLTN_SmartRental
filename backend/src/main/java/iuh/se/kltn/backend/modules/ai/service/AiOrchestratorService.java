@@ -807,20 +807,63 @@ public class AiOrchestratorService {
         categories.put("Hoá đơn/Doanh thu", billQueries);
         categories.put("Địa điểm", locationQueries);
         categories.put("Khác",
-                totalQueries - roomQueries - priceQueries - contractQueries - billQueries - locationQueries);
+                Math.max(0, totalQueries - roomQueries - priceQueries - contractQueries - billQueries - locationQueries));
         result.put("categories", categories);
 
-        // Cache entries
+        // Cache entries + Security scan
         List<Map<String, Object>> entries = new java.util.ArrayList<>();
+        List<Map<String, Object>> securityFlags = new java.util.ArrayList<>();
+        
         for (AiSqlCache c : allCaches) {
             Map<String, Object> entry = new java.util.LinkedHashMap<>();
             entry.put("id", c.getId());
             entry.put("question", c.getQuestion());
             entry.put("generatedSql", c.getGeneratedSql());
             entry.put("isValid", c.isValid());
+            entry.put("type", c.getType());
+            entry.put("answer", c.getAnswer());
             entries.add(entry);
+            
+            // 🛡️ Auto-scan SQL trong cache cho các vấn đề bảo mật
+            String sql = c.getGeneratedSql();
+            if (sql != null && !sql.isBlank()) {
+                String upperSql = sql.toUpperCase();
+                List<String> issues = new java.util.ArrayList<>();
+                
+                // Check 1: Chỉ SELECT/WITH
+                if (!upperSql.trim().startsWith("SELECT") && !upperSql.trim().startsWith("WITH")) {
+                    issues.add("NON_SELECT: SQL không bắt đầu bằng SELECT/WITH");
+                }
+                // Check 2: DML/DDL
+                if (upperSql.matches(".*\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE)\\b.*")) {
+                    issues.add("DML_DDL: Chứa lệnh nguy hiểm");
+                }
+                // Check 3: Sensitive columns
+                String[] sensitiveColumns = {"PASSWORD", "VERIFICATION_CODE", "WALLET_ADDRESS", "BLOCKCHAIN_PRIVATE", "REFRESH_TOKEN"};
+                for (String col : sensitiveColumns) {
+                    if (upperSql.contains(col)) {
+                        issues.add("SENSITIVE_COL: Chứa cột nhạy cảm " + col);
+                        break;
+                    }
+                }
+                // Check 4: Thiếu LIMIT
+                if (!upperSql.contains("LIMIT")) {
+                    issues.add("NO_LIMIT: Thiếu LIMIT (có thể dump data)");
+                }
+                
+                if (!issues.isEmpty()) {
+                    Map<String, Object> flag = new java.util.LinkedHashMap<>();
+                    flag.put("id", c.getId());
+                    flag.put("question", c.getQuestion());
+                    flag.put("sql", sql);
+                    flag.put("issues", issues);
+                    securityFlags.add(flag);
+                }
+            }
         }
         result.put("entries", entries);
+        result.put("securityFlags", securityFlags);
+        result.put("flaggedCount", securityFlags.size());
 
         return result;
     }
