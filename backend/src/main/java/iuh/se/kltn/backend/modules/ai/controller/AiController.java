@@ -201,7 +201,7 @@ public class AiController {
     // Admin: Observability — AI pipeline logs with responseSource distribution
     @GetMapping("/admin/observability")
     public ResponseEntity<?> getAiObservability(
-            @RequestParam(defaultValue = "50") int limit) {
+            @RequestParam(defaultValue = "200") int limit) {
         try {
             List<iuh.se.kltn.backend.modules.ai.entity.AiActionLog> logs =
                     aiActionLogRepository.findAllByOrderByCreatedAtDesc(
@@ -260,7 +260,7 @@ public class AiController {
                     "blockedQueries", blockedQueries,
                     "avgLatencyBySource", avgLatencyBySource,
                     "recentLogs", recentLogs,
-                    "totalLogs", logs.size()
+                    "totalLogs", aiActionLogRepository.count()
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("status", "error", "message", e.getMessage()));
