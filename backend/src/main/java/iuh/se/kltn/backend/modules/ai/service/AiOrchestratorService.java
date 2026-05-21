@@ -260,18 +260,56 @@ public class AiOrchestratorService {
         // 🛡️ BẢO VỆ GUEST: Chặn các từ khóa nhạy cảm ngay từ đầu bằng Regex để chính
         // xác tuyệt đối
         if (role.equalsIgnoreCase("GUEST")) {
-            // Regex kiểm tra các từ khóa nhạy cảm — MỞ RỘNG để chặn mọi biến thể
-            String sensitivePattern = ".*(hóa đơn|hoá đơn|bill|hợp đồng|contract|lịch hẹn|appointment"
-                    + "|doanh thu|revenue|của tôi|của mình|nợ|thanh toán|trễ|quá hạn|phí"
-                    + "|đóng tiền|chưa đóng|tiền phòng|tiền thuê|tiền cọc|đặt cọc|cọc"
-                    + "|thành viên|member|người thuê|khách thuê|tenant"
-                    + "|chủ trọ|chủ nhà|landlord|người dùng|user"
+            // Regex kiểm tra các từ khóa nhạy cảm — PHIÊN BẢN TOÀN DIỆN
+            // Phân nhóm rõ ràng để dễ bảo trì
+            String sensitivePattern = ".*("
+                    // === NHÓM 1: Tài chính & Thanh toán ===
+                    + "hóa đơn|hoá đơn|bill|invoice|payment"
+                    + "|nợ|thanh toán|trả tiền|chưa trả|đóng tiền|chưa đóng"
+                    + "|tiền phòng|tiền thuê|tiền cọc|đặt cọc|cọc"
+                    + "|doanh thu|revenue|phí|quá hạn|trễ hạn|trễ"
+                    + "|quyết toán|settlement|khấu trừ|deduction|kiểm kê"
+                    // === NHÓM 2: Hợp đồng & Pháp lý ===
+                    + "|hợp đồng|contract|gia hạn|chấm dứt|terminate"
+                    + "|lịch hẹn|appointment|booking"
+                    // === NHÓM 3: Tra cứu Người (chống dò theo tên) ===
+                    + "|của khách|của người|của ai|của bạn"
+                    + "|khách có|khách nào|khách tên|khách ở"
+                    + "|người tên|người ở phòng|người nào thuê|người thuê|người đang"
+                    + "|có tên là|có tên|tên là"
+                    + "|ai thuê|ai ở|ai đang|ai sống|ai mướn"
+                    + "|thành viên|member|tenant|khách thuê"
+                    // === NHÓM 4: Tra cứu Phòng → Người (reverse lookup) ===
+                    + "|phòng của|phòng.*ai ở|phòng.*ai thuê|phòng.*người tên|phòng.*người thuê|phòng.*người nào"
+                    + "|ở phòng nào|thuê phòng nào|mướn phòng nào"
+                    + "|phòng nào.*đã thuê|phòng nào.*ai.*thuê|phòng nào.*ở|phòng nào.*người"
+                    // === NHÓM 5: Chủ trọ & Quản lý ===
+                    + "|chủ trọ|chủ nhà|chủ khu|landlord"
+                    + "|người dùng|user|admin"
+                    // === NHÓM 6: Thông tin Cá nhân & Liên hệ ===
+                    + "|số điện thoại|sđt|sdt|phone"
+                    + "|email|e-mail|zalo|facebook"
+                    + "|liên hệ|liên lạc|contact"
                     + "|hồ sơ|tài khoản|profile|account"
-                    + "|mật khẩu|password|ví|wallet|blockchain"
-                    + "|lịch sử|history|giao dịch|transaction"
-                    + "|kiểm kê|quyết toán|settlement|khấu trừ|deduction"
-                    + "|thông báo|notification|báo cáo|report"
-                    + "|id\\s*(?:là|=)\\s*\\d+|landlord_id|tenant_id).*";
+                    + "|mật khẩu|password|ví|wallet"
+                    + "|cá nhân|riêng tư|private|bí mật|secret"
+                    // === NHÓM 7: Sở hữu cá nhân ===
+                    + "|của tôi|của mình|của em|của anh|của chị"
+                    + "|phòng tôi|phòng mình"
+                    // === NHÓM 8: Blockchain & Bảo mật ===
+                    + "|blockchain|on-chain|onchain|smart contract"
+                    + "|giao dịch|transaction|ví tiền"
+                    // === NHÓM 9: Lịch sử & Thống kê ===
+                    + "|lịch sử|history|thống kê|statistic"
+                    + "|thông báo|notification"
+                    + "|báo cáo|report|xuất dữ liệu|export"
+                    // === NHÓM 10: Trích xuất dữ liệu hàng loạt (chỉ chặn khi kết hợp nhạy cảm) ===
+                    + "|danh sách.*(khách|người|thuê|hợp đồng|bill|nợ|thanh toán)"
+                    + "|liệt kê.*(khách|người|thuê|hợp đồng|bill|nợ|thanh toán|thành viên|user)"
+                    + "|show.*all|dump"
+                    // === NHÓM 11: Tra cứu theo ID ===
+                    + "|id\\s*(?:là|=|:)\\s*\\d+|landlord_id|tenant_id|user_id|contract_id"
+                    + ").*";
             if (normalizedQuestion.matches(sensitivePattern)) {
                 System.out.println("🛡️ [SECURITY GUEST] Chặn truy vấn nhạy cảm: " + question);
                 return "Dạ, vì lý do bảo mật, các thông tin cá nhân như hóa đơn, hợp đồng và lịch hẹn chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng các tính năng này nhé!";
