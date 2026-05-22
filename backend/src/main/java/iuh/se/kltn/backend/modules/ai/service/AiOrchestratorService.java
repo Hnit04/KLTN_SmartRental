@@ -10,9 +10,13 @@ import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.entity.AiActionLog;
+import iuh.se.kltn.backend.modules.ai.entity.AiUnrecognizedQuery;
+import iuh.se.kltn.backend.modules.ai.dto.AiRawResult;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
 import iuh.se.kltn.backend.modules.ai.repository.AiActionLogRepository;
+import iuh.se.kltn.backend.modules.ai.repository.AiUnrecognizedQueryRepository;
 import iuh.se.kltn.backend.modules.ai.dto.IntentExtractionResult;
+import iuh.se.kltn.backend.modules.ai.dto.RuleIntentResult;
 import iuh.se.kltn.backend.modules.ai.service.handler.DynamicQueryEngine;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
@@ -24,9 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 @Service
@@ -60,6 +66,21 @@ public class AiOrchestratorService {
     private DataPresenterAi dataPresenterAi;
 
     @Autowired
+    private RuleIntentRouter ruleIntentRouter;
+
+    @Autowired
+    private RuleEntityExtractor ruleEntityExtractor;
+
+    @Autowired
+    private TemplateResponseService templateResponseService;
+
+    @Autowired
+    private PresenterDataSanitizer presenterDataSanitizer;
+
+    @Autowired(required = false)
+    private AiUnrecognizedQueryRepository aiUnrecognizedQueryRepository;
+
+    @Autowired
     private EmbeddingModel embeddingModel;
 
     @Autowired
@@ -73,6 +94,9 @@ public class AiOrchestratorService {
 
     @Value("${ai.sql-cache.startup.reindex:true}")
     private boolean sqlCacheStartupReindex;
+
+    @Value("${ai.llm.mode:FULL}")
+    private String aiLlmMode;
 
     /**
      * Tự động chạy khi Spring Boot khởi động.
@@ -448,180 +472,199 @@ public class AiOrchestratorService {
                     "⚠️ [HEURISTIC] Fallback to intent pipeline because geocode miss for: " + heuristicLocation);
         }
 
-        try {
-            System.out.println("🤖 [HYBRID AI] Calling Intent Extractor...");
-            String rawJson = intentExtractorAi.extractIntent(question, role);
-            // Cắt bỏ markdown wrapper nếu LLM tự ý bọc
-            rawJson = rawJson.replace("```json", "").replace("```", "").trim();
-            System.out.println("🤖 [HYBRID AI] Raw JSON: " + rawJson);
+        String llmMode = resolveLlmMode();
+        boolean templateOnlyMode = "TEMPLATE_ONLY".equals(llmMode);
+        boolean presenterOnlyMode = "PRESENTER_ONLY".equals(llmMode);
+        boolean fullLlmMode = "FULL".equals(llmMode);
 
-            // Parse JSON thủ công bằng Jackson (tin cậy hơn POJO mapping)
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+        IntentExtractionResult extraction = null;
+        String intentSource = "UNKNOWN";
+        Optional<RuleIntentResult> ruleResult = ruleIntentRouter.classify(question, role);
+        if (ruleResult.isPresent() && ruleResult.get().matchScore() >= ruleIntentRouter.getAcceptThreshold()) {
+            RuleIntentResult matchedRule = ruleResult.get();
+            Map<String, Object> ruleParams = new HashMap<>(ruleEntityExtractor.extract(question, matchedRule.intent()));
+            extraction = new IntentExtractionResult(matchedRule.intent(), matchedRule.matchScore(), ruleParams);
+            predictedIntent = matchedRule.intent().name();
+            confidence = matchedRule.matchScore();
+            intentSource = matchedRule.source();
+            System.out.println("[HYBRID AI] Rule intent matched: " + predictedIntent + " (Score: " + confidence + ")");
+        }
 
-            String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
-            confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
-            predictedIntent = intentStr;
-
-            // Parse params thành Map
-            Map<String, Object> extractedParams = new java.util.HashMap<>();
-            if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
-                jsonNode.get("params").fields().forEachRemaining(entry -> {
-                    com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
-                    if (val.isNumber())
-                        extractedParams.put(entry.getKey(), val.numberValue());
-                    else if (val.isBoolean())
-                        extractedParams.put(entry.getKey(), val.booleanValue());
-                    else
-                        extractedParams.put(entry.getKey(), val.asText());
-                });
-            }
-
-            // Chuyển đổi String intent thành Enum an toàn
-            iuh.se.kltn.backend.modules.ai.enums.SystemIntent systemIntent;
+        if (extraction == null && fullLlmMode) {
             try {
-                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.valueOf(intentStr);
-            } catch (IllegalArgumentException e) {
-                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.UNKNOWN;
+                System.out.println("[HYBRID AI] Calling intent extractor LLM...");
+                String rawJson = intentExtractorAi.extractIntent(question, role);
+                rawJson = rawJson.replace("```json", "").replace("```", "").trim();
+
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+
+                String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
+                confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
+                predictedIntent = intentStr;
+
+                Map<String, Object> extractedParams = new HashMap<>();
+                if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
+                    jsonNode.get("params").fields().forEachRemaining(entry -> {
+                        com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
+                        if (val.isNumber()) {
+                            extractedParams.put(entry.getKey(), val.numberValue());
+                        } else if (val.isBoolean()) {
+                            extractedParams.put(entry.getKey(), val.booleanValue());
+                        } else {
+                            extractedParams.put(entry.getKey(), val.asText());
+                        }
+                    });
+                }
+
+                iuh.se.kltn.backend.modules.ai.enums.SystemIntent systemIntent;
+                try {
+                    systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.valueOf(intentStr);
+                } catch (IllegalArgumentException e) {
+                    systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.UNKNOWN;
+                }
+
+                extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
+                intentSource = "LLM";
+                System.out.println("[HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
+            } catch (Exception e) {
+                fallbackUsed = true;
+                System.err.println("[HYBRID AI] Intent extractor failed: " + e.getMessage() + ". Fallback to SQL cache/SQL generation.");
+            }
+        }
+
+        if (extraction != null && confidence != null && confidence >= 0.7) {
+            if (isPolicyIntent(extraction.getIntent())) {
+                String policyAnswer = resolvePolicyAnswer(question, extraction.getIntent());
+                if (policyAnswer != null) {
+                    success = true;
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "POLICY_FAQ", null, null, null, null);
+                    return sanitizeUserFacingText(policyAnswer);
+                }
             }
 
-            IntentExtractionResult extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
-            System.out.println("🤖 [HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
-
-            if (confidence != null && confidence >= 0.7) {
-                if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
-                    System.out.println("✅ [HYBRID AI] Intent match LOCATION_SEARCH! Bypassing LLM generation...");
-                    success = true;
-                    String locationName = extraction.getParams().containsKey("location")
-                            ? extraction.getParams().get("location").toString()
-                            : null;
-                    Double radius = 3.0;
-                    if (extraction.getParams().containsKey("radius")) {
-                        try {
-                            radius = Double.parseDouble(extraction.getParams().get("radius").toString());
-                        } catch (Exception e) {
-                        }
-                    }
-                    Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
-                    Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
-                    boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
-                    boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
-                    if (useCurrentLocation) {
-                        if (hasValidCoordinates(userLatitude, userLongitude)) {
-                            System.out.println("[LOCATION FLOW] selectedFlow=INTENT_CURRENT_POSITION");
-                            return handleLocationSearchByCoordinatesFlow(
-                                    userLatitude,
-                                    userLongitude,
-                                    radius,
-                                    maxPrice,
-                                    requiredOccupants,
-                                    requirePetFriendly,
-                                    question,
-                                    role,
-                                    userId,
-                                    predictedIntent,
-                                    confidence,
-                                    startTime);
-                        }
-                        System.out.println("[LOCATION FLOW] selectedFlow=INTENT_GPS_REQUIRED");
-                        return buildUserLocationRequiredMessage();
-                    }
-                    System.out.println("[LOCATION FLOW] selectedFlow=INTENT_LANDMARK, location='" + locationName + "'");
-                    return handleLocationSearchFlow(
-                            locationName,
-                            radius,
-                            maxPrice,
-                            requiredOccupants,
-                            requirePetFriendly,
-                            question,
-                            role,
-                            userId,
-                            predictedIntent,
-                            confidence,
-                            startTime,
-                            false);
-
-                } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
-                    // 🛡️ ROLE GUARD: GUEST chỉ được phép SEARCH_ROOM
-                    if (role.equalsIgnoreCase("GUEST") && extraction.getIntent() != iuh.se.kltn.backend.modules.ai.enums.SystemIntent.SEARCH_ROOM) {
-                        System.err.println("🚨 [SECURITY] GUEST attempted restricted intent: " + extraction.getIntent());
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
-                        return "Dạ, vì lý do bảo mật, thông tin này chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng tính năng này nhé!";
-                    }
-                    // 🛡️ TENANT không được xem intent của LANDLORD
-                    if (role.equalsIgnoreCase("TENANT")) {
-                        iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent = extraction.getIntent();
-                        if (intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_REVENUE
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_DEBTORS
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_OCCUPANCY
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_RISK) {
-                            System.err.println("🚨 [SECURITY] TENANT attempted LANDLORD intent: " + intent);
-                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
-                            return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
-                        }
-                    }
-                    System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
-
-                    // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params + Question fingerprint
-                    String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role, question);
-                    Cache resultCache = cacheManager.getCache("aiQueryResults");
-                    if (resultCache != null) {
-                        Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
-                        if (cachedResult != null) {
-                            System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
-                            success = true;
-                            // 🛡️ Enhanced logging with responseSource
-                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "RESULT_CACHE_HIT", null, null, null, null);
-                            return sanitizeUserFacingResponse(cachedResult.get());
-                        }
-                    }
-
-                    List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
-                    String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
+            if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
+                success = true;
+                String locationName = extraction.getParams().containsKey("location")
+                        ? extraction.getParams().get("location").toString()
+                        : null;
+                Double radius = 3.0;
+                if (extraction.getParams().containsKey("radius")) {
                     try {
-                        Object response = sanitizeUserFacingResponse(
-                                dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
-                        );
-                        // 💾 Ghi cache kết quả
-                        if (resultCache != null) {
-                            resultCache.put(cacheKey, response);
-                            System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
-                        }
-                        success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
-                        return response;
-                    } catch (Exception llmEx) {
-                        System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: "
-                                + llmEx.getMessage());
-                        success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
-                        // Trả về dữ liệu thô nhưng format dễ đọc hơn
-                        if (results.isEmpty()) {
-                            return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
-                        }
-                        StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
-                        for (int i = 0; i < results.size(); i++) {
-                            Map<String, Object> row = results.get(i);
-                            sb.append("\n--- ").append(i + 1).append(" ---\n");
-                            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                                if (entry.getValue() != null) {
-                                    sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue())
-                                            .append("\n");
-                                }
-                            }
-                        }
-                        return sanitizeUserFacingText(sb.toString());
+                        radius = Double.parseDouble(extraction.getParams().get("radius").toString());
+                    } catch (Exception ignored) {
                     }
                 }
-            } else {
-                fallbackUsed = true;
-                System.out.println("⚠️ [HYBRID AI] Intent not fully supported or Confidence too low (" + confidence
-                        + "). Fallback to SqlGeneratorAi.");
+                Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
+                Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
+                boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
+                boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
+                if (useCurrentLocation) {
+                    if (hasValidCoordinates(userLatitude, userLongitude)) {
+                        return handleLocationSearchByCoordinatesFlow(
+                                userLatitude,
+                                userLongitude,
+                                radius,
+                                maxPrice,
+                                requiredOccupants,
+                                requirePetFriendly,
+                                question,
+                                role,
+                                userId,
+                                predictedIntent,
+                                confidence,
+                                startTime);
+                    }
+                    return buildUserLocationRequiredMessage();
+                }
+                return handleLocationSearchFlow(
+                        locationName,
+                        radius,
+                        maxPrice,
+                        requiredOccupants,
+                        requirePetFriendly,
+                        question,
+                        role,
+                        userId,
+                        predictedIntent,
+                        confidence,
+                        startTime,
+                        false);
             }
-        } catch (Exception e) {
+
+            if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
+                if (role.equalsIgnoreCase("GUEST") && extraction.getIntent() != iuh.se.kltn.backend.modules.ai.enums.SystemIntent.SEARCH_ROOM) {
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                    return "Da, vi ly do bao mat, thong tin nay chi danh cho nguoi dung da dang nhap. Ban vui long dang nhap de su dung tinh nang nay nhe!";
+                }
+                if (role.equalsIgnoreCase("TENANT")) {
+                    iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent = extraction.getIntent();
+                    if (intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_REVENUE
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_DEBTORS
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_OCCUPANCY
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_RISK) {
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                        return "Da, thong tin nay thuoc ve noi bo quan ly, em khong the tiet lo.";
+                    }
+                }
+
+                String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role, question);
+                Cache resultCache = cacheManager.getCache("aiQueryResults");
+                if (resultCache != null) {
+                    Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
+                    if (cachedResult != null) {
+                        success = true;
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "RESULT_CACHE_HIT", null, null, null, null);
+                        return sanitizeUserFacingResponse(cachedResult.get());
+                    }
+                }
+
+                List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
+                Object response = buildStructuredResponse(
+                        question,
+                        role,
+                        predictedIntent,
+                        intentSource,
+                        results,
+                        templateOnlyMode,
+                        presenterOnlyMode
+                );
+                if (resultCache != null) {
+                    resultCache.put(cacheKey, response);
+                }
+                success = true;
+                saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
+                return response;
+            }
+        } else {
             fallbackUsed = true;
-            System.err.println(
-                    "❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
+            if (extraction != null) {
+                System.out.println("[HYBRID AI] Intent confidence low (" + confidence + "). Fallback to SQL cache/SQL generation.");
+                saveUnrecognizedQuery(
+                        userId,
+                        question,
+                        normalizedQuestion,
+                        predictedIntent,
+                        confidence,
+                        intentSource,
+                        llmMode,
+                        extraction.getParams(),
+                        "LOW_CONFIDENCE"
+                );
+            } else {
+                System.out.println("[HYBRID AI] No intent match from rule/LLM. Fallback to SQL cache/SQL generation.");
+                saveUnrecognizedQuery(
+                        userId,
+                        question,
+                        normalizedQuestion,
+                        predictedIntent,
+                        confidence,
+                        intentSource,
+                        llmMode,
+                        null,
+                        "NO_INTENT_MATCH"
+                );
+            }
         }
 
         // Fallback tracking variables
@@ -657,15 +700,23 @@ public class AiOrchestratorService {
         }
 
         if (sqlToExecute == null || sqlToExecute.isBlank()) {
-            System.out.println("🤖 [SQL GENERATION] Cache không phù hợp, gọi Gemini sinh SQL...");
+            if (!fullLlmMode) {
+                saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                        "SQL_CACHE_MISS_LLM_DISABLED", null, null, null, null);
+                saveUnrecognizedQuery(userId, question, normalizedQuestion, predictedIntent, confidence, intentSource, llmMode, null, "SQL_CACHE_MISS_LLM_DISABLED");
+                return "Da, em chua du du lieu de xu ly cau hoi nay o che do hien tai. "
+                        + "Ban vui long dien dat ro hon hoac thu lai khi bat che do FULL.";
+            }
+
+            System.out.println("[SQL GENERATION] Cache miss, calling LLM for SQL generation...");
             try {
                 sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, schemaContext, roleRules);
                 fallbackResponseSource = "SQL_GENERATED";
             } catch (Exception llmEx) {
-                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
+                System.err.println("[SQL GENERATION] LLM call failed: " + llmEx.getMessage());
                 saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
                         "LLM_SQL_GENERATION_ERROR", null, null, null, null);
-                return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
+                return "Da, may chu AI hien tai dang qua tai. Vui long thu lai sau it phut.";
             }
         }
 
@@ -711,37 +762,20 @@ public class AiOrchestratorService {
                 System.out.println("💾 Đã lưu tri thức SQL mới vào DB và nạp lên Vector Store!");
             }
 
-            String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
-            System.out.println("Dữ liệu thô: " + rawDataStr);
+            Object response = buildStructuredResponse(
+                    question,
+                    role,
+                    predictedIntent,
+                    fallbackResponseSource != null ? fallbackResponseSource : "SQL_FALLBACK",
+                    results,
+                    templateOnlyMode,
+                    presenterOnlyMode
+            );
 
-            // ✅ Log success cho fallback SQL pipeline
             saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, true,
                     fallbackResponseSource, finalSql, results.size(), fallbackCacheScore, null);
 
-            try {
-                return sanitizeUserFacingResponse(
-                        dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
-                );
-            } catch (Exception llmEx) {
-                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ (Hết Token/Timeout): " + llmEx.getMessage());
-                if (results.isEmpty()) {
-                    return "Dạ hiện AI đang quá tải, nhưng hệ thống ghi nhận không có dữ liệu nào khớp với yêu cầu của bạn ạ.";
-                }
-
-                StringBuilder fallbackResponse = new StringBuilder(
-                        "Dạ hiện AI đang quá tải (Hóa đơn Token), em xin trích xuất kết quả từ hệ thống cho bạn nhé:\n\n");
-                for (Map<String, Object> row : results) {
-                    Object roomId = row.getOrDefault("room_id", row.get("id"));
-                    if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
-                        String firstImg = extractFirstImage(row.get("images"));
-                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n",
-                                roomId, row.get("name"), normalizePriceForCard(row.get("price")), firstImg));
-                    } else {
-                        fallbackResponse.append("- ").append(row.toString()).append("\n");
-                    }
-                }
-                return sanitizeUserFacingText(fallbackResponse.toString());
-            }
+            return response;
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
@@ -756,6 +790,107 @@ public class AiOrchestratorService {
     // Admin: Thống kê AI NLP
     public String sanitizeForUserFacing(String text) {
         return sanitizeUserFacingText(text);
+    }
+
+    private String resolveLlmMode() {
+        if (aiLlmMode == null || aiLlmMode.isBlank()) {
+            return "FULL";
+        }
+        String normalized = aiLlmMode.trim().toUpperCase(Locale.ROOT);
+        if ("TEMPLATE_ONLY".equals(normalized) || "PRESENTER_ONLY".equals(normalized) || "FULL".equals(normalized)) {
+            return normalized;
+        }
+        return "FULL";
+    }
+
+    private boolean isPolicyIntent(iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent) {
+        return intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.DEPOSIT_POLICY
+                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.PAYMENT_GUIDE
+                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.CONTRACT_POLICY;
+    }
+
+    private String resolvePolicyAnswer(String question, iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent) {
+        String faqAnswer = searchFaq(question);
+        if (faqAnswer != null && !faqAnswer.isBlank()) {
+            return faqAnswer;
+        }
+
+        return switch (intent) {
+            case DEPOSIT_POLICY ->
+                    "Dạ, chính sách tiền cọc có thể khác nhau theo từng phòng/khu trọ. Bạn vui lòng xem mục chính sách hoặc liên hệ chủ trọ để được xác nhận điều kiện hoàn cọc và khấu trừ.";
+            case PAYMENT_GUIDE ->
+                    "Dạ, bạn có thể thanh toán theo hướng dẫn trong hóa đơn hoặc mục thanh toán. Nếu cần, mình có thể hỗ trợ kiểm tra trạng thái thanh toán hiện tại của bạn.";
+            case CONTRACT_POLICY ->
+                    "Dạ, điều khoản hợp đồng phụ thuộc từng giao dịch cụ thể. Bạn vui lòng xem bản hợp đồng hoặc liên hệ chủ trọ để được giải thích chi tiết từng điều khoản.";
+            default -> null;
+        };
+    }
+
+    private Object buildStructuredResponse(
+            String question,
+            String role,
+            String intent,
+            String intentSource,
+            List<Map<String, Object>> results,
+            boolean templateOnlyMode,
+            boolean presenterOnlyMode
+    ) {
+        List<Map<String, Object>> safeResults = presenterDataSanitizer.sanitize(intent, role, results);
+        AiRawResult rawResult = AiRawResult.builder()
+                .intent(intent)
+                .intentSource(intentSource)
+                .userRole(role)
+                .rows(safeResults)
+                .totalCount(safeResults == null ? 0 : safeResults.size())
+                .build();
+
+        if (templateOnlyMode) {
+            return sanitizeUserFacingText(templateResponseService.format(rawResult));
+        }
+
+        String rawDataStr = safeResults == null || safeResults.isEmpty()
+                ? "Khong tim thay du lieu phu hop."
+                : safeResults.toString();
+        try {
+            return sanitizeUserFacingResponse(dataPresenterAi.generateNaturalResponse(question, rawDataStr, role));
+        } catch (Exception llmEx) {
+            String modeLabel = presenterOnlyMode ? "PRESENTER_ONLY" : "FULL";
+            System.err.println("[PRESENTER] LLM formatting failed in mode " + modeLabel + ": " + llmEx.getMessage());
+            return sanitizeUserFacingText(templateResponseService.format(rawResult));
+        }
+    }
+
+    private void saveUnrecognizedQuery(
+            Long userId,
+            String question,
+            String normalizedQuestion,
+            String predictedIntent,
+            Double matchScore,
+            String intentSource,
+            String llmMode,
+            Map<String, Object> entities,
+            String reason
+    ) {
+        if (aiUnrecognizedQueryRepository == null || question == null || question.isBlank()) {
+            return;
+        }
+        try {
+            AiUnrecognizedQuery record = AiUnrecognizedQuery.builder()
+                    .userId(userId != null && userId > 0 ? userId : null)
+                    .question(question)
+                    .normalizedQuestion(normalizedQuestion)
+                    .predictedIntent(predictedIntent)
+                    .matchScore(matchScore)
+                    .intentSource(intentSource)
+                    .llmMode(llmMode)
+                    .entitiesJson(entities == null ? null : entities.toString())
+                    .reason(reason)
+                    .status("PENDING")
+                    .build();
+            aiUnrecognizedQueryRepository.save(record);
+        } catch (Exception e) {
+            System.err.println("[AI FEEDBACK] Failed to save unrecognized query: " + e.getMessage());
+        }
     }
 
     private Object sanitizeUserFacingResponse(Object response) {

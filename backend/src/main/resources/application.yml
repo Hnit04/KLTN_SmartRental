@@ -85,6 +85,11 @@ gemini:
     temperature: ${GEMINI_CHAT_TEMPERATURE:0.7}
     timeout-seconds: ${GEMINI_CHAT_TIMEOUT_SECONDS:120}
 ai:
+  # FULL: use Gemini for intent/sql/presenter
+  # PRESENTER_ONLY: no Gemini for intent/sql, only presenter when structured data is available
+  # TEMPLATE_ONLY: fully disable Gemini and use rule + template response only
+  llm:
+    mode: ${AI_LLM_MODE:FULL}
   rag:
     embedding:
       # all-minilm-l6-v2 | onnx-custom | onnx-multilingual
