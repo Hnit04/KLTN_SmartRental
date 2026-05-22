@@ -332,6 +332,21 @@ export default function ContractDetailPage() {
     return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, [id, activeTab, fetchContractData]);
 
+  // ── Auto-poll khi Smart Contract đang deploy (chưa có address) ──
+  useEffect(() => {
+    if (!contract) return;
+    // Chỉ poll nếu: đã ký blockchain + chưa có smartContractAddress
+    const needsPoll = contract.signMethod === 'BLOCKCHAIN' && !contract.smartContractAddress;
+    if (!needsPoll) return;
+
+    console.log("⏳ [Auto-poll] Smart Contract đang deploy, poll mỗi 10s...");
+    const interval = setInterval(() => {
+      fetchContractData(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [contract?.signMethod, contract?.smartContractAddress, fetchContractData]);
+
   // ── Fetch Withdrawable Balance from Smart Contract
   useEffect(() => {
     if (!contract?.smartContractAddress || !window.ethereum) return;
@@ -641,7 +656,7 @@ export default function ContractDetailPage() {
 
   const handleConfirmWeb3Deposit = async () => {
     if (!contract?.smartContractAddress) {
-      toast.info("Smart Contract đang được triển khai. Hệ thống sẽ tự động cập nhật trong 30–60 giây, vui lòng thử lại sau.");
+      toast.info("Smart Contract đang được triển khai trên Blockchain. Trang sẽ tự động cập nhật khi hoàn tất, bạn không cần tải lại trang.");
       return;
     }
     if (!window.ethereum) {
