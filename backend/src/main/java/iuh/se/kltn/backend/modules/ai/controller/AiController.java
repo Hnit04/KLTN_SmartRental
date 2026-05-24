@@ -2,6 +2,7 @@ package iuh.se.kltn.backend.modules.ai.controller;
 
 import iuh.se.kltn.backend.modules.ai.dto.request.*;
 import iuh.se.kltn.backend.modules.ai.service.AiOrchestratorService;
+import iuh.se.kltn.backend.modules.ai.service.AiContextValidator;
 import iuh.se.kltn.backend.modules.ai.service.SmartRentalAi;
 import iuh.se.kltn.backend.modules.ai.service.RagKnowledgeService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -80,6 +81,9 @@ public class AiController {
     private String aiLlmMode;
 
 
+    @Autowired
+    private AiContextValidator aiContextValidator;
+
     @PostMapping("/chat")
     public ResponseEntity<?> chatWithAi(
             @Valid @RequestBody AiChatRequest request,
@@ -90,12 +94,16 @@ public class AiController {
         
         String roleStr = "GUEST (Khách vãng lai chưa đăng nhập)";
         String userName = "Khách hàng";
+        Long userId = -1L;
         
         if (currentUser != null) {
             String roleRaw = currentUser.getAuthorities().iterator().next().getAuthority();
             roleStr = roleRaw.replace("ROLE_", ""); // TENANT hoặc LANDLORD hoặc ADMIN
             userName = currentUser.getUsername(); // Hoặc fullname
+            userId = currentUser.getId();
         }
+
+        AiPageContext validatedContext = aiContextValidator.validateAndResolve(request.getPageContext(), roleStr, userId);
 
         // B1: Thử tìm trong kho tri thức tĩnh (FAQ Cache) trước
         // NHƯNG: Bỏ qua FAQ cho câu hỏi phân tích phòng (dài, chứa dữ liệu phòng cụ thể)
@@ -133,9 +141,15 @@ public class AiController {
             ));
         }
 
+        String contextStr = "";
+        if (validatedContext != null) {
+            contextStr = String.format("Loại trang: %s, Loại đối tượng: %s, ID: %d", 
+                validatedContext.getPageType(), validatedContext.getEntityType(), validatedContext.getEntityId());
+        }
+
         // B2: Nếu không thấy, gọi mô hình LLM
         try {
-            String response = smartRentalAi.chat(sessionId, roleStr, userName, message);
+            String response = smartRentalAi.chat(sessionId, roleStr, userName, message, contextStr);
             String safeResponse = aiOrchestratorService.sanitizeForUserFacing(response);
             
             return ResponseEntity.ok(Map.of(
@@ -178,13 +192,16 @@ public class AiController {
 
         System.out.println("👤 Khách đang tra cứu: ID=" + userId + ", Role=" + role);
 
+        AiPageContext validatedContext = aiContextValidator.validateAndResolve(request.getPageContext(), role, userId);
+
         try {
             Object result = aiOrchestratorService.processDataQuery(
                     question,
                     role,
                     userId,
                     request.getLatitude(),
-                    request.getLongitude()
+                    request.getLongitude(),
+                    validatedContext
             );
             boolean verifiable = true;
             if (result instanceof String textResult) {

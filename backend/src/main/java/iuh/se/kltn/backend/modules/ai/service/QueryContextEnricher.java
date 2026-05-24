@@ -44,6 +44,19 @@ public class QueryContextEnricher {
             Double lat,
             Double lng
     ) {
+        return enrich(question, intent, params, userId, role, lat, lng, null);
+    }
+
+    public EnrichedQuery enrich(
+            String question,
+            SystemIntent intent,
+            Map<String, Object> params,
+            Long userId,
+            String role,
+            Double lat,
+            Double lng,
+            iuh.se.kltn.backend.modules.ai.dto.request.AiPageContext validatedContext
+    ) {
         SystemIntent safeIntent = intent == null ? SystemIntent.UNKNOWN : intent;
         Map<String, Object> enrichedParams = params == null ? new HashMap<>() : new HashMap<>(params);
         List<String> assumptions = new ArrayList<>();
@@ -51,13 +64,31 @@ public class QueryContextEnricher {
         boolean hasGps = hasValidCoordinates(lat, lng);
 
         if (isDeicticReferenceWithoutContext(normalizedQuestion)) {
-            return clarification(
-                    safeIntent,
-                    enrichedParams,
-                    "Bạn muốn nói đến phòng, hóa đơn hay hợp đồng nào?",
-                    assumptions,
-                    "DEICTIC_REFERENCE_WITHOUT_CONTEXT"
-            );
+            if (validatedContext != null && validatedContext.getEntityId() != null) {
+                String entityType = validatedContext.getEntityType();
+                Long entityId = validatedContext.getEntityId();
+                if ("ROOM".equals(entityType)) {
+                    enrichedParams.put("roomId", entityId);
+                    assumptions.add("Sử dụng phòng ID=" + entityId + " từ ngữ cảnh trang.");
+                } else if ("PROPERTY".equals(entityType)) {
+                    enrichedParams.put("propertyId", entityId);
+                    assumptions.add("Sử dụng khu trọ ID=" + entityId + " từ ngữ cảnh trang.");
+                } else if ("CONTRACT".equals(entityType)) {
+                    enrichedParams.put("contractId", entityId);
+                    assumptions.add("Sử dụng hợp đồng ID=" + entityId + " từ ngữ cảnh trang.");
+                } else if ("BILL".equals(entityType)) {
+                    enrichedParams.put("billId", entityId);
+                    assumptions.add("Sử dụng hóa đơn ID=" + entityId + " từ ngữ cảnh trang.");
+                }
+            } else {
+                return clarification(
+                        safeIntent,
+                        enrichedParams,
+                        "Bạn muốn nói đến phòng, khu trọ, hóa đơn hay hợp đồng nào?",
+                        assumptions,
+                        "DEICTIC_REFERENCE_WITHOUT_CONTEXT"
+                );
+            }
         }
 
         if (isAmbiguousLandlordBillQuestion(normalizedQuestion, role)) {

@@ -19,4 +19,6 @@ public class AiDataQueryRequest {
 
     @JsonAlias({"lng", "longitude"})
     private Double longitude;
+
+    private AiPageContext pageContext;
 }

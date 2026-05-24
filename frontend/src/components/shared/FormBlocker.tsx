@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
 
@@ -23,11 +23,12 @@ export default function FormBlocker({
   const navigate = useNavigate();
   const [showDialog, setShowDialog] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const isAllowedToLeave = useRef(false);
 
   // 1. Chặn F5 / đóng tab / reload trình duyệt
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
+      if (isDirty && !isAllowedToLeave.current) {
         e.preventDefault();
         e.returnValue = message;
         return message;
@@ -46,7 +47,7 @@ export default function FormBlocker({
     window.history.pushState({ formBlocker: true }, '');
 
     const handlePopState = (e: PopStateEvent) => {
-      if (isDirty) {
+      if (isDirty && !isAllowedToLeave.current) {
         // Đẩy lại entry để giữ nguyên URL
         window.history.pushState({ formBlocker: true }, '');
         setPendingPath('__back__');
@@ -63,7 +64,7 @@ export default function FormBlocker({
         // Đây là entry sentinel của mình, cho qua
         return originalPushState(state, title, url);
       }
-      if (isDirty && url) {
+      if (isDirty && !isAllowedToLeave.current && url) {
         const targetPath = typeof url === 'string' ? url : url.toString();
         // Chỉ chặn nếu đổi sang path khác
         if (targetPath !== location.pathname) {
@@ -83,14 +84,19 @@ export default function FormBlocker({
 
   // Xử lý khi user xác nhận rời trang
   const handleConfirmLeave = useCallback(() => {
+    isAllowedToLeave.current = true;
     setShowDialog(false);
-    if (pendingPath === '__back__') {
-      // User bấm Back: lùi 2 bước (1 sentinel + 1 trang thật)
-      window.history.go(-2);
-    } else if (pendingPath) {
-      navigate(pendingPath);
-    }
-    setPendingPath(null);
+    
+    // Set timeout to allow React to update state (setShowDialog) before navigation
+    setTimeout(() => {
+      if (pendingPath === '__back__') {
+        // User bấm Back: lùi 2 bước (1 sentinel + 1 trang thật)
+        window.history.go(-2);
+      } else if (pendingPath) {
+        navigate(pendingPath);
+      }
+      setPendingPath(null);
+    }, 0);
   }, [pendingPath, navigate]);
 
   const handleCancelLeave = useCallback(() => {

@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { cn } from "@/utils/cn";
 import { useMobileLayer } from "@/context/MobileLayerContext";
 import { toast } from "sonner";
+import { buildAiPageContext } from "../../utils/aiPageContext";
 
 type Message = {
   id: string;
@@ -605,7 +606,8 @@ export default function AiChatBot() {
             }
           }
           if (!skipBackendQuery) {
-            const dataRes = await aiApi.queryData(userMsg, queryLocation);
+            const pageContext = buildAiPageContext(window.location.pathname);
+            const dataRes = await aiApi.queryData(userMsg, queryLocation, pageContext);
             replyText = dataRes.data;
             sourceLabel = dataRes.verifiable
               ? "Đã đối soát từ dữ liệu hệ thống"
@@ -618,7 +620,8 @@ export default function AiChatBot() {
       } else {
         // Chat thông thường (hỏi linh tinh, hỏi luật, phân tích phòng)
         try {
-          const chatRes = await aiApi.chat(userMsg, "web-session");
+          const pageContext = buildAiPageContext(window.location.pathname);
+          const chatRes = await aiApi.chat(userMsg, "web-session", pageContext);
           replyText = chatRes.reply;
         } catch (error: any) {
           replyText = error.response?.data?.message || "Xin lỗi, mình đang gặp sự cố kết nối. Vui lòng thử lại sau.";
