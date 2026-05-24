@@ -37,6 +37,7 @@ typechain-types/
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 backend/uploads/
+backend/models/**/*.onnx
 *.class
 *.jar
 *.war
