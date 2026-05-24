@@ -1,4 +1,5 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { propertyApi } from '@/api/propertyApi';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -24,9 +25,7 @@ type SortType = 'newest' | 'score_asc' | 'score_desc';
 
 export default function AdminApprovalPage() {
   const [activeTab, setActiveTab] = useState<TabType>('properties');
-  const [pendingProperties, setPendingProperties] = useState<Property[]>([]);
-  const [pendingRooms, setPendingRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortType>('newest');
 
@@ -41,33 +40,29 @@ export default function AdminApprovalPage() {
   // Quick View Modal state
   const [detailModalTarget, setDetailModalTarget] = useState<{ type: 'property' | 'room'; data: any } | null>(null);
 
-  useEffect(() => {
-    fetchData();
+  const { data: pendingProperties = [], isLoading: loadingProperties } = useQuery({
+    queryKey: ['pendingProperties'],
+    queryFn: async () => {
+      const res = await propertyApi.getPendingProperties();
+      return (res as any).data || res;
+    },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+    enabled: activeTab === 'properties'
+  });
 
-    // Auto-refresh every 3 seconds for real-time updates
-    const intervalId = setInterval(() => {
-      fetchData(true);
-    }, 3000);
+  const { data: pendingRooms = [], isLoading: loadingRooms } = useQuery({
+    queryKey: ['pendingRooms'],
+    queryFn: async () => {
+      const res = await propertyApi.getPendingRooms();
+      return (res as any).data || res;
+    },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+    enabled: activeTab === 'rooms'
+  });
 
-    return () => clearInterval(intervalId);
-  }, [activeTab]);
-
-  const fetchData = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      if (activeTab === 'properties') {
-        const res = await propertyApi.getPendingProperties();
-        setPendingProperties((res as any).data || res);
-      } else {
-        const res = await propertyApi.getPendingRooms();
-        setPendingRooms((res as any).data || res);
-      }
-    } catch (error) {
-      if (!silent) toast.error('Không thể tải danh sách chờ duyệt');
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+  const loading = activeTab === 'properties' ? loadingProperties : loadingRooms;
 
   // Sort helper
   const sortItems = <T extends { safetyScore?: number | null; id?: number }>(items: T[]): T[] => {
@@ -91,7 +86,8 @@ export default function AdminApprovalPage() {
         toast.success('Đã duyệt phòng thành công!');
       }
       setApproveTarget(null);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pendingProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingRooms'] });
     } catch (error) {
       toast.error('Duyệt thất bại');
     } finally {
@@ -121,7 +117,8 @@ export default function AdminApprovalPage() {
         toast.success('Đã từ chối phòng');
       }
       setRejectTarget(null);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pendingProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingRooms'] });
     } catch (error) {
       toast.error('Thao tác thất bại');
     } finally {

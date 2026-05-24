@@ -128,12 +128,12 @@
     @apply rounded-2xl border border-border/80 bg-card shadow-sm shadow-black/[0.03];
   }
 
-  /* Khá»‘i ná»™i dung chĂ­nh â€” gá»n, cÄƒn max-width thá»‘ng nháº¥t */
+  /* Khối nội dung chính - gọn, căn max-width thống nhất */
   .app-panel {
     @apply mx-auto w-full max-w-3xl;
   }
 
-  /* Ná»n phá»¥ trong card (thĂ´ng tin cá»‘ Ä‘á»‹nh, báº£ngâ€¦) */
+  /* Nền phụ trong card (thông tin cố định, bảng...) */
   .muted-surface {
     @apply rounded-xl border border-border/60 bg-muted/30;
   }
@@ -142,17 +142,17 @@
     @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
   }
 
-  /* Báº£ng / danh sĂ¡ch trong khung SaaS */
+  /* Bảng / danh sách trong khung SaaS */
   .data-shell {
     @apply overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm shadow-black/[0.03];
   }
 
-  /* LiĂªn káº¿t trong ná»™i dung prose */
+  /* Liên kết trong nội dung prose */
   .link-subtle {
     @apply font-medium text-primary underline-offset-4 transition-colors hover:text-primary/80 hover:underline;
   }
 
-  /* Native select â€” Ä‘á»“ng bá»™ vá»›i Input */
+  /* Native select - đồng bộ với Input */
   .select-native {
     @apply flex h-11 w-full cursor-pointer appearance-none rounded-lg border border-input bg-background py-2 pl-9 pr-8 text-sm font-medium text-foreground shadow-xs transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
@@ -189,7 +189,7 @@
   }
 }
 
-/* â”€â”€â”€ CUSTOM KEYFRAMES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ────────────────────────────────────────── CUSTOM KEYFRAMES ────────────────────────────────────────── */
 @keyframes bell-shake {
   0%, 100% { transform: rotate(0deg); }
   15%       { transform: rotate(15deg); }
@@ -200,11 +200,11 @@
   90%       { transform: rotate(-3deg); }
 }
 
-/* áº¨n scrollbar nhÆ°ng váº«n scroll Ä‘Æ°á»£c */
+/* Ẩn scrollbar nhưng vẫn scroll được */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Panel thĂ´ng bĂ¡o â€” thanh cuá»™n máº£nh, khĂ´ng chiáº¿m diá»‡n tĂ­ch quĂ¡ lá»›n */
+/* Panel thông báo — thanh cuộn mảnh, không chiếm diện tích quá lớn */
 .notif-panel-scroll {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -225,7 +225,7 @@
   background-color: rgb(120 113 108 / 0.55);
 }
 
-/* Skeleton â€” chuyá»ƒn Ä‘á»™ng nháº¹ (tĂ´n trá»ng prefers-reduced-motion) */
+/* Skeleton - chuyển động nhẹ (tôn trọng prefers-reduced-motion) */
 @keyframes sr-shimmer {
   0% {
     background-position: 200% 0;
@@ -248,7 +248,7 @@
   }
 }
 
-/* â”€â”€â”€ GLOBAL INTERACTIVE TRANSITIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- GLOBAL INTERACTIVE TRANSITIONS ----------------------------- */
 @media (prefers-reduced-motion: no-preference) {
   a, button, [role="button"], input, select, textarea {
     transition-property: color, background-color, border-color, box-shadow, opacity, transform;
@@ -257,7 +257,7 @@
   }
 }
 
-/* â”€â”€â”€ UTILITY CLASSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- UTILITY CLASSES -------------------------------------------- */
 /* Card / element lift effect */
 .hover-lift {
   transition: transform var(--motion-hover) var(--ease-out), box-shadow var(--motion-hover) var(--ease-out);
@@ -297,7 +297,7 @@
   border: 1px solid hsl(var(--border) / 0.5);
 }
 
-/* Focus ring â€” consistent across system */
+/* Focus ring - consistent across system */
 .focus-ring {
   outline: none;
 }
@@ -305,7 +305,7 @@
   box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.5);
 }
 
-/* â”€â”€â”€ ADDITIONAL KEYFRAMES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- ADDITIONAL KEYFRAMES --------------------------------------- */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -344,7 +344,7 @@
 .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
 
-/* â”€â”€â”€ GLOBAL SCROLLBAR POLISH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- GLOBAL SCROLLBAR POLISH ------------------------------------ */
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
@@ -364,7 +364,7 @@
   background-color: hsl(var(--muted-foreground) / 0.35);
 }
 
-/* â”€â”€â”€ DARK MODE TRANSITION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- DARK MODE TRANSITION --------------------------------------- */
 html.transitioning-theme,
 html.transitioning-theme *,
 html.transitioning-theme *::before,
@@ -372,7 +372,7 @@ html.transitioning-theme *::after {
   transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, box-shadow 300ms ease !important;
 }
 
-/* â”€â”€â”€ GLOBAL PAGE-LEVEL POLISH (cascades to ALL pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* --- GLOBAL PAGE-LEVEL POLISH (cascades to ALL pages) ----------- */
 
 /* Section cards: subtle hover shadow lift */
 .section-card {

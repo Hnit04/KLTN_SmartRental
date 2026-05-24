@@ -310,6 +310,33 @@ public class RuleBasedModerationScorer {
             int roomLikeCount = Math.max(0, sceneResult.getRoomLikeCount());
             int suspiciousCount = Math.max(0, sceneResult.getSuspiciousCount());
             int unknownCount = Math.max(0, sceneResult.getUnknownCount());
+            List<ImageSceneClassificationResult.ImageScenePrediction> scenePredictions =
+                    sceneResult.getPredictions() == null ? List.of() : sceneResult.getPredictions();
+            if (classifiedCount == 0 && !scenePredictions.isEmpty()) {
+                classifiedCount = scenePredictions.size();
+            }
+            if ((roomLikeCount + suspiciousCount + unknownCount) == 0 && !scenePredictions.isEmpty()) {
+                for (ImageSceneClassificationResult.ImageScenePrediction prediction : scenePredictions) {
+                    if (prediction == null || prediction.getLabel() == null) {
+                        unknownCount++;
+                        continue;
+                    }
+                    String label = prediction.getLabel().trim().toUpperCase(Locale.ROOT);
+                    if ("UNKNOWN".equals(label)) {
+                        unknownCount++;
+                    }
+                    if ("ROOM_INTERIOR".equals(label)
+                            || "BATHROOM".equals(label)
+                            || "KITCHEN".equals(label)
+                            || "EXTERIOR".equals(label)
+                            || "CORRIDOR".equals(label)) {
+                        roomLikeCount++;
+                    }
+                    if ("DOCUMENT".equals(label) || "OTHER".equals(label)) {
+                        suspiciousCount++;
+                    }
+                }
+            }
             int knownCount = Math.max(0, classifiedCount - unknownCount);
             double threshold = resolveRoomLikeThreshold();
 
@@ -323,6 +350,7 @@ public class RuleBasedModerationScorer {
                     sceneRatios[0] = roomLikeRatio;
                     if (roomLikeRatio >= threshold) {
                         score += 2;
+                        reasons.add("Scene classifier: da so anh la phong tro/noi that.");
                         reasons.add("Đa số ảnh có ngữ cảnh phòng trọ/nội thất. ✓");
                     } else if (roomLikeRatio < 0.30) {
                         score -= 2;
@@ -336,6 +364,7 @@ public class RuleBasedModerationScorer {
                 sceneRatios[1] = suspiciousRatio;
                 if (knownCount > 0 && (suspiciousCount >= 2 || suspiciousRatio >= 0.50)) {
                     score -= 2;
+                    reasons.add("NEEDS_REVIEW: Scene classifier: ti le document/other cao.");
                     reasons.add("⚠️ Phát hiện nhiều ảnh tài liệu/không phải phòng, cần Admin xem lại.");
                 }
 

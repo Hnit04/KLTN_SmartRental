@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, MapPin, Frown, Filter, ChevronDown, ArrowUpDown, X, List, Map as MapIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
@@ -17,17 +18,35 @@ export default function PropertiesPage() {
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [isLoading, setIsLoading] = useState(true);
   
-  // Filter States
-  const [searchInput, setSearchInput] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCity, setSelectedCity] = useState("Tất cả");
-  const [maxPrice, setMaxPrice] = useState(20000000); // 20 TRIỆU
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
-  const [isAvailableOnly, setIsAvailableOnly] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Filter States initialized from URL
+  const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "Tất cả");
+  const [maxPrice, setMaxPrice] = useState(Number(searchParams.get("maxPrice")) || 20000000);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>(searchParams.get("amenities") ? searchParams.get("amenities")!.split(",") : []);
+  const [showAdvanceFilters, setShowAdvanceFilters] = useState(searchParams.get("advance") === "true");
+  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">(
+    (searchParams.get("sort") as any) || "default"
+  );
+  const [isAvailableOnly, setIsAvailableOnly] = useState(searchParams.get("available") !== "false");
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+
+  // Sync to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("q", searchTerm);
+    if (selectedCity !== "Tất cả") params.set("city", selectedCity);
+    if (maxPrice !== 20000000) params.set("maxPrice", maxPrice.toString());
+    if (selectedAmenities.length > 0) params.set("amenities", selectedAmenities.join(","));
+    if (showAdvanceFilters) params.set("advance", "true");
+    if (sortBy !== "default") params.set("sort", sortBy);
+    if (!isAvailableOnly) params.set("available", "false");
+    
+    setSearchParams(params, { replace: true });
+  }, [searchTerm, selectedCity, maxPrice, selectedAmenities, showAdvanceFilters, sortBy, isAvailableOnly, setSearchParams]);
 
   const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
 

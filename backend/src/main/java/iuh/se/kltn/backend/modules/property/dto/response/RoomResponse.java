@@ -30,6 +30,7 @@ public class RoomResponse {
     private Double elecPrice;
     private Long propertyId;
     private Double waterPrice;
+
     private Double internetPrice;
     private String defaultTerms;
     private Double matchScore; // Thêm điểm phù hợp AI
@@ -38,4 +39,5 @@ public class RoomResponse {
     private String moderationReason;
     private String description;
     private String availableFromDate; // Thêm ngày dự kiến trống
+    private Long version;
 }

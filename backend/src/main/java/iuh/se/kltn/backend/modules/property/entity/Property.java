@@ -59,6 +59,9 @@ public class Property {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    @Version
+    private Long version;
+
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
     private List<Room> rooms;
 }

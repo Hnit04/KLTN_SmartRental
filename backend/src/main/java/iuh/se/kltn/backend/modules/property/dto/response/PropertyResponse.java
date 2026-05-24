@@ -50,4 +50,6 @@ public class PropertyResponse {
 
     private Integer safetyScore;
     private String moderationReason;
+    
+    private Long version;
 }

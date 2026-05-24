@@ -77,7 +77,8 @@ export default function PropertiesManagePage() {
     elecPrice: '', waterPrice: '', internetPrice: '', description: '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
-    images: [] as string[] 
+    images: [] as string[],
+    version: undefined as number | undefined
   };
 
   const { formData, setFormData, clearDraft } = useAutoSaveForm(
@@ -148,7 +149,8 @@ export default function PropertiesManagePage() {
       internetPrice: property.internetPrice?.toString() || '', description: property.description || '',
       latitude: property.latitude ?? undefined,
       longitude: property.longitude ?? undefined,
-      images: property.images || []
+      images: property.images || [],
+      version: property.version
     });
     setSelectedFiles([]);
     setPreviewUrls([]);
@@ -365,7 +367,8 @@ export default function PropertiesManagePage() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         elecPrice: Number(formData.elecPrice) || 0, waterPrice: Number(formData.waterPrice) || 0, internetPrice: Number(formData.internetPrice) || 0,
-        images: finalImagesList 
+        images: finalImagesList,
+        version: editingId ? formData.version : undefined
       };
 
       if (editingId) {
@@ -380,8 +383,25 @@ export default function PropertiesManagePage() {
       setShowModal(false);
       fetchProperties(); 
     } catch (error: any) {
-      const errData = error.response?.data;
-      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+      const errResp = error.response;
+      const errData = errResp?.data;
+
+      if (errResp?.status === 409 && errData?.code === 'CONFLICT_RESOURCE_VERSION') {
+        setIsSubmitting(false);
+        toast.error('Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.', {
+          action: {
+            label: 'Tải lại',
+            onClick: () => { 
+              fetchProperties(); 
+              setShowModal(false); 
+            }
+          },
+          duration: 8000
+        });
+        return;
+      }
+
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED' || errData?.code === 'VIP_LIMIT_EXCEEDED') {
         setShowModal(false);
         setVipLimit({
           isOpen: true,

@@ -170,6 +170,7 @@ export interface Property {
   status?: "PENDING" | "APPROVED" | "REJECTED" | "HIDDEN";
   safetyScore?: number;
   moderationReason?: string;
+  version?: number;
 }
 
 export type RoomStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE" | "RESERVED" | "HIDDEN";
@@ -208,6 +209,7 @@ export interface Room {
   safetyScore?: number;
   moderationReason?: string;
   availableFromDate?: string;
+  version?: number;
 }
 
 // ==========================================

@@ -31,5 +31,6 @@ public class RoomRequest {
     private List<String> panoramaImages;
     private String defaultTerms;
     private String description;
+    private Long version;
 
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature, AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import { StepIndicator } from "@/components/ui/StepIndicator";
 import { ContractMethodSelector } from "@/features/contract/components/method-selector";
 import { trackEvent } from "@/utils/analytics";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
+import FormBlocker from "@/components/shared/FormBlocker";
 
 const WIZARD_STEPS = [
   { title: "Thông tin & thời hạn" },
@@ -35,16 +36,16 @@ export default function CreateContractPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
 
-  const INITIAL_DATA = {
+  const INITIAL_DATA = useMemo(() => ({
     startDate: new Date().toISOString().split('T')[0], 
     duration: 6, 
     tenantEmail: "", 
     landlordRules: "",
     tenantRequests: "",
     signMethod: "TRADITIONAL" as ContractSignMethod,
-  };
+  }), []);
 
-  const { formData, setFormData, clearDraft } = useAutoSaveForm(
+  const { formData, setFormData, clearDraft, isDirty } = useAutoSaveForm(
     `draft_contract_create_${roomId}`,
     INITIAL_DATA
   );
@@ -210,6 +211,7 @@ export default function CreateContractPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background py-6 md:py-10 animate-fade-in-up">
+      <FormBlocker isDirty={isDirty} />
       <div className="page-shell app-panel">
         {existingContract && user?.role === 'TENANT' && (
           <div className="mb-5 rounded-2xl border border-orange-200/90 bg-orange-50/90 p-4 shadow-sm sm:p-5">

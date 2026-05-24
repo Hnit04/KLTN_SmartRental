@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { 
-  Plus, Edit, ArrowLeft, Loader2, 
-  Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
+  Plus, Edit, ArrowLeft, Loader2,
+  Sparkles, X, FileText, FileSignature, CheckSquare, ScrollText,
   AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users,
-  Wrench, CheckCircle, ChevronRight, ChevronLeft, Building
+  Wrench, CheckCircle, ChevronRight, ChevronLeft, Building, Lock, Clock
 } from 'lucide-react';
 import type { RoomType } from '@/types/index';
 import { propertyApi } from '@/api/propertyApi';
@@ -21,9 +21,13 @@ import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
 import { StatusSummaryStrip, AttentionBanner } from '@/components/detail';
 import type { SummaryStripItem } from '@/components/detail';
+import { formatDate } from '@/utils/format';
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import FormBlocker from '@/components/shared/FormBlocker';
 import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { useUploadQueue } from '@/hooks/useUploadQueue';
+import UploadQueueUI from '@/components/shared/UploadQueueUI';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -90,7 +94,6 @@ const RULE_CATEGORIES: { label: string; color: string; rules: { text: string; to
 
 export default function PropertyManageDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { user } = useAuth();
   
   const [property, setProperty] = useState<Property | null>(null);
@@ -144,24 +147,28 @@ export default function PropertyManageDetailPage() {
     customAmenitiesInput: '', 
     images: [] as string[],
     panoramaImages: [] as string[],
-    defaultTerms: ''
+    defaultTerms: '',
+    version: undefined as number | undefined
   };
 
-  const { formData, setFormData, clearDraft } = useAutoSaveForm(
+  const { formData, setFormData, clearDraft, isDirty } = useAutoSaveForm(
     `draft_room_form_${id}${editingId ? `_edit_${editingId}` : ''}`, 
     INITIAL_ROOM_DATA,
     showModal
   );
 
-  // --- STATE UPLOAD ẢNH ---
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // --- UPLOAD QUEUE (ảnh thường: có nén, ảnh 360: không nén) ---
+  const imageQueue = useUploadQueue({ compress: true });
+  const panoQueue = useUploadQueue({ compress: false });
 
-  // --- STATE UPLOAD ẢNH 360 ---
-  const [panoSelectedFiles, setPanoSelectedFiles] = useState<File[]>([]);
-  const [panoPreviewUrls, setPanoPreviewUrls] = useState<string[]>([]);
-  const panoFileInputRef = useRef<HTMLInputElement>(null);
+  // Sync success URLs vào formData để AutoSave lưu lại URL ảnh đã tải lên
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, images: imageQueue.successUrls }));
+  }, [imageQueue.successUrls, setFormData]);
+
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, panoramaImages: panoQueue.successUrls }));
+  }, [panoQueue.successUrls, setFormData]);
 
   // --- STATE CHO EXCEL IMPORT ---
   const excelInputRef = useRef<HTMLInputElement>(null);
@@ -461,10 +468,8 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     }
     setEditingId(null);
     // Lưu ý: Không reset formData ở đây để useAutoSaveForm có thể khôi phục draft khi showModal = true
-    setSelectedFiles([]); 
-    setPreviewUrls([]);
-    setPanoSelectedFiles([]);
-    setPanoPreviewUrls([]);
+    imageQueue.resetQueue();
+    panoQueue.resetQueue();
     setPriceSuggestion(null);
     setAppliedSuggestion(null);
     setRoomStep(1);
@@ -513,13 +518,12 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       customAmenitiesInput: customAmenities.join(', '), 
       images: [],
       panoramaImages: [],
-      defaultTerms: room.defaultTerms || '' 
+      defaultTerms: room.defaultTerms || '',
+      version: undefined
     });
 
-    setSelectedFiles([]); 
-    setPreviewUrls([]);
-    setPanoSelectedFiles([]);
-    setPanoPreviewUrls([]);
+    imageQueue.resetQueue();
+    panoQueue.resetQueue();
     setRoomStep(1);
     setShowModal(true);
     
@@ -532,19 +536,18 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const cacheKey = `draft_room_form_${id}_edit_${room.id}_${user?.id || 'guest'}`;
     const cached = localStorage.getItem(cacheKey);
 
-    if (cached) {
-      setFormData(JSON.parse(cached));
-      toast.info('Đã khôi phục bản nháp chỉnh sửa phòng dở.', { duration: 4000 });
-      setSelectedFiles([]); 
-      
-      let parsedImages = [];
-      try { parsedImages = room.images ? (typeof room.images === 'string' ? JSON.parse(room.images) : room.images) : []; } catch(e){}
-      setPreviewUrls(parsedImages);
+    // Reset queue trước
+    imageQueue.resetQueue();
+    panoQueue.resetQueue();
 
-      let parsedPano = [];
-      try { parsedPano = room.panoramaImages ? (typeof room.panoramaImages === 'string' ? JSON.parse(room.panoramaImages) : room.panoramaImages) : []; } catch(e){}
-      setPanoSelectedFiles([]);
-      setPanoPreviewUrls(parsedPano);
+    if (cached) {
+      const draft = JSON.parse(cached);
+      setFormData(draft);
+      toast.info('Đã khôi phục bản nháp chỉnh sửa phòng dở.', { duration: 4000 });
+
+      // Đưa URL đã lưu trong draft vào queue dạng "success"
+      if (draft.images?.length > 0) imageQueue.addExistingUrls(draft.images);
+      if (draft.panoramaImages?.length > 0) panoQueue.addExistingUrls(draft.panoramaImages);
 
       setRoomStep(1);
       setShowModal(true);
@@ -562,6 +565,12 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       }
     });
 
+    // Load ảnh hiện tại từ server vào queue
+    const existingImages = room.images || [];
+    const existingPano = room.panoramaImages || [];
+    if (existingImages.length > 0) imageQueue.addExistingUrls(existingImages);
+    if (existingPano.length > 0) panoQueue.addExistingUrls(existingPano);
+
     setFormData({
       name: room.name, 
       price: room.price.toString(), 
@@ -573,14 +582,11 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       maxOccupants: room.maxOccupants?.toString() || '',
       amenities: standardAmenities,
       customAmenitiesInput: customAmenities.join(', '), 
-      images: room.images || [],
-      panoramaImages: room.panoramaImages || [],
-      defaultTerms: room.defaultTerms || '' 
+      images: existingImages,
+      panoramaImages: existingPano,
+      defaultTerms: room.defaultTerms || '',
+      version: room.version
     });
-    setSelectedFiles([]); 
-    setPreviewUrls([]);
-    setPanoSelectedFiles([]);
-    setPanoPreviewUrls([]);
     setPriceSuggestion(null);
     setAppliedSuggestion(null);
     setRoomStep(1);
@@ -646,53 +652,29 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     }));
   };
 
-  // --- XỬ LÝ ẢNH ---
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files).filter(file => file.size <= 5 * 1024 * 1024);
-      setSelectedFiles(prev => [...prev, ...filesArray]);
-      setPreviewUrls(prev => [...prev, ...filesArray.map(f => URL.createObjectURL(f))]);
+  // --- XỬ LÝ ẢNH (thông qua UploadQueue) ---
+  // Ảnh thường: filter 5MB, nén tự động bởi hook
+  const handleAddImages = (files: File[]) => {
+    const valid = files.filter(f => f.size <= 5 * 1024 * 1024);
+    if (valid.length < files.length) {
+      toast.warning(`${files.length - valid.length} ảnh quá lớn (>5MB) đã bị bỏ qua.`);
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (valid.length > 0) imageQueue.addFiles(valid);
   };
 
-  const removeSelectedFile = (idx: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const removeOldImage = (idx: number) => {
-    setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
-  };
-
-  // --- XỬ LÝ ẢNH 360 ---
-  const handlePanoImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const totalCurrent = formData.panoramaImages.length + panoSelectedFiles.length;
-      const remaining = 5 - totalCurrent;
-      if (remaining <= 0) {
-        toast.warning('Tối đa 5 ảnh 360 độ mỗi phòng!');
-        return;
-      }
-      const filesArray = Array.from(e.target.files)
-        .filter(file => file.size <= 10 * 1024 * 1024)
-        .slice(0, remaining);
-      if (filesArray.length < Array.from(e.target.files).length) {
-        toast.warning('Một số ảnh quá lớn (>10MB) hoặc vượt giới hạn đã bị bỏ qua.');
-      }
-      setPanoSelectedFiles(prev => [...prev, ...filesArray]);
-      setPanoPreviewUrls(prev => [...prev, ...filesArray.map(f => URL.createObjectURL(f))]);
+  // Ảnh 360: filter 10MB, giới hạn tổng 5
+  const handleAddPanoImages = (files: File[]) => {
+    const totalCurrent = panoQueue.items.length;
+    const remaining = 5 - totalCurrent;
+    if (remaining <= 0) {
+      toast.warning('Tối đa 5 ảnh 360 độ mỗi phòng!');
+      return;
     }
-    if (panoFileInputRef.current) panoFileInputRef.current.value = '';
-  };
-
-  const removePanoSelectedFile = (idx: number) => {
-    setPanoSelectedFiles(prev => prev.filter((_, i) => i !== idx));
-    setPanoPreviewUrls(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const removeOldPanoImage = (idx: number) => {
-    setFormData(prev => ({ ...prev, panoramaImages: prev.panoramaImages.filter((_, i) => i !== idx) }));
+    const valid = files.filter(f => f.size <= 10 * 1024 * 1024).slice(0, remaining);
+    if (valid.length < files.length) {
+      toast.warning('Một số ảnh quá lớn (>10MB) hoặc vượt giới hạn đã bị bỏ qua.');
+    }
+    if (valid.length > 0) panoQueue.addFiles(valid);
   };
 
   // --- TÍCH HỢP AI TẠO MÔ TẢ ---
@@ -740,22 +722,10 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     try {
       setIsSubmitting(true);
-      
-      // Upload ảnh thường
-      let newUrls: string[] = [];
-      if (selectedFiles.length > 0) {
-        toast.info("Đang tải ảnh lên...");
-        const uploadRes = await propertyApi.uploadImages(selectedFiles);
-        newUrls = (uploadRes as { data?: string[] }).data || uploadRes as unknown as string[];
-      }
 
-      // Upload ảnh 360
-      let newPanoUrls: string[] = [];
-      if (panoSelectedFiles.length > 0) {
-        toast.info("Đang tải ảnh 360° lên...");
-        const panoUploadRes = await propertyApi.uploadImages(panoSelectedFiles);
-        newPanoUrls = (panoUploadRes as { data?: string[] }).data || panoUploadRes as unknown as string[];
-      }
+      // Lấy toàn bộ URL ảnh success từ queue (bao gồm ảnh cũ + ảnh mới đã upload xong)
+      const allImageUrls = imageQueue.successUrls;
+      const allPanoUrls = panoQueue.successUrls;
 
       const parsedCustomAmenities = formData.customAmenitiesInput
         .split(',')
@@ -774,9 +744,10 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         maxOccupants: formData.maxOccupants ? Number(formData.maxOccupants) : null,
         description: formData.description,
         amenities: finalAmenities,
-        images: [...formData.images, ...newUrls],
-        panoramaImages: [...formData.panoramaImages, ...newPanoUrls],
-        defaultTerms: formData.defaultTerms 
+        images: allImageUrls,
+        panoramaImages: allPanoUrls,
+        defaultTerms: formData.defaultTerms,
+        version: editingId ? formData.version : undefined
       };
 
       if (editingId) {
@@ -787,11 +758,33 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         toast.success('Thêm phòng mới thành công! Admin sẽ kiểm duyệt trước khi hiển thị công khai.');
       }
       
+      clearDraft();
+      imageQueue.clearQueue();
+      panoQueue.clearQueue();
+
       setShowModal(false);
       fetchData(); 
     } catch (error: unknown) {
-      const errData = (error as { response?: { data?: { type?: string; limitType?: string; currentTier?: string; currentCount?: number; maxAllowed?: number; message?: string } } })?.response?.data;
-      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+      const customError = error as { response?: { status?: number; data?: { code?: string; type?: string; limitType?: string; currentTier?: string; currentCount?: number; maxAllowed?: number; message?: string } } };
+      const errResp = customError.response;
+      const errData = errResp?.data;
+
+      if (errResp?.status === 409 && errData?.code === 'CONFLICT_RESOURCE_VERSION') {
+        setIsSubmitting(false);
+        toast.error('Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.', {
+          action: {
+            label: 'Tải lại',
+            onClick: () => { 
+              fetchData(); 
+              setShowModal(false); 
+            }
+          },
+          duration: 8000
+        });
+        return;
+      }
+
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED' || errData?.code === 'VIP_LIMIT_EXCEEDED') {
         setShowModal(false);
         setVipLimit({
           isOpen: true,
@@ -810,23 +803,28 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   const propertyOps = useMemo(() => {
-    const vacant = rooms.filter((r) => r.status === 'AVAILABLE').length;
-    const rented = rooms.filter((r) => r.status === 'RENTED').length;
-    const maintenance = rooms.filter((r) => r.status === 'MAINTENANCE').length;
-    const reserved = rooms.filter((r) => r.status === 'RESERVED').length;
-    const vacantRevenue = rooms
+    // Chỉ tính phòng đã được duyệt vào thống kê hoạt động
+    const approvedRooms = rooms.filter((r) => r.approvalStatus === 'APPROVED');
+    const vacant = approvedRooms.filter((r) => r.status === 'AVAILABLE').length;
+    const rented = approvedRooms.filter((r) => r.status === 'RENTED').length;
+    const maintenance = approvedRooms.filter((r) => r.status === 'MAINTENANCE').length;
+    const reserved = approvedRooms.filter((r) => r.status === 'RESERVED').length;
+    const vacantRevenue = approvedRooms
       .filter((r) => r.status === 'AVAILABLE')
       .reduce((sum, r) => sum + Number(r.price || 0), 0);
-    const rentedYield = rooms
+    const rentedYield = approvedRooms
       .filter((r) => r.status === 'RENTED')
       .reduce((sum, r) => sum + Number(r.price || 0), 0);
     const pendingApproval = rooms.filter((r) => r.approvalStatus === 'PENDING').length;
+    const rejected = rooms.filter((r) => r.approvalStatus === 'REJECTED').length;
 
     const summary: SummaryStripItem[] = [
       { id: 'rooms', label: 'Tổng phòng', value: rooms.length, subline: 'Trong khu trọ này' },
-      { id: 'vacant', label: 'Đang trống', value: vacant, tone: vacant > 0 ? 'warning' : 'muted', subline: 'Có thể nhận khách' },
+      { id: 'vacant', label: 'Đang trống', value: vacant, tone: vacant > 0 ? 'warning' : 'muted', subline: 'Đã duyệt, có thể nhận khách' },
       { id: 'rented', label: 'Đang cho thuê', value: rented, tone: rented > 0 ? 'success' : 'muted', subline: 'Đang sinh doanh thu' },
       { id: 'maint', label: 'Bảo trì', value: maintenance, tone: maintenance > 0 ? 'warning' : 'muted', subline: 'Không nhận xem phòng' },
+      ...(pendingApproval > 0 ? [{ id: 'pending', label: 'Chờ duyệt', value: pendingApproval, tone: 'warning' as const, subline: 'Chưa hiển thị công khai' }] : []),
+      ...(rejected > 0 ? [{ id: 'rejected', label: 'Bị từ chối', value: rejected, tone: 'danger' as const, subline: 'Cần chỉnh sửa & gửi lại' }] : []),
       {
         id: 'vac-rev',
         label: 'Tiềm năng thu (trống)',
@@ -873,6 +871,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
 
   return (
     <>
+      <FormBlocker isDirty={showModal && isDirty} />
     <div className="min-w-0 space-y-6 overflow-x-hidden pb-8">
       <Link
         to="/landlord/properties"
@@ -969,15 +968,15 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                   room.status === 'RESERVED' ? 'bg-amber-500 text-white' : 
                   'bg-muted/400 text-white'
                 }`}>
-                  {room.status === 'AVAILABLE' && '🟢 Trống'}
-                  {room.status === 'RENTED' && room.availableFromDate && `Sắp trống (${new Date(room.availableFromDate).toLocaleDateString('vi-VN')})`}
-                  {room.status === 'RENTED' && !room.availableFromDate && '🔵 Đã thuê'}
+                  {room.status === 'AVAILABLE' && <><CheckCircle className="h-3.5 w-3.5" /> Trống</>}
+                  {room.status === 'RENTED' && room.availableFromDate && <><Clock className="h-3.5 w-3.5" /> Sắp trống ({formatDate(room.availableFromDate)})</>}
+                  {room.status === 'RENTED' && !room.availableFromDate && <><Users className="h-3.5 w-3.5" /> Đã thuê</>}
                   {room.status === 'MAINTENANCE' && (
                     <>
                       <Wrench className="h-3.5 w-3.5" /> Đang bảo trì
                     </>
                   )}
-                  {room.status === 'RESERVED' && '🟠 Giữ chỗ'}
+                  {room.status === 'RESERVED' && <><Lock className="h-3.5 w-3.5" /> Giữ chỗ</>}
                   {room.status === 'HIDDEN' && 'Ẩn'}
                 </span>
 
@@ -998,12 +997,12 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Thông tin phòng */}
               <div className="p-4 flex-1 flex flex-col">
-                {(room.status === 'REJECTED' || room.approvalStatus === 'REJECTED') && (room as any).moderationReason && (
+                {room.approvalStatus === 'REJECTED' && (room as Room & { moderationReason?: string }).moderationReason && (
                   <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div>
                       <p className="font-semibold">Lý do từ chối:</p>
-                      <p className="line-clamp-2">{(room as any).moderationReason}</p>
+                      <p className="line-clamp-2">{(room as Room & { moderationReason?: string }).moderationReason}</p>
                     </div>
                   </div>
                 )}
@@ -1153,7 +1152,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b flex flex-col bg-muted/40 flex-shrink-0 relative">
-              <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Đóng"><X className="h-5 w-5" /></button>
               <h2 className="text-xl font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật phòng' : 'Thêm phòng mới'}</h2>
               
               {/* Stepper Header */}
@@ -1236,7 +1235,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                               <p className="text-xs font-bold text-purple-900 flex items-center gap-1">
                                 <Sparkles className="h-3 w-3" /> AI Đề xuất
                               </p>
-                              <button onClick={() => setPriceSuggestion(null)} className="text-gray-400 hover:text-gray-600"><X className="h-3 w-3" /></button>
+                              <button type="button" onClick={() => setPriceSuggestion(null)} className="text-gray-400 hover:text-gray-600" aria-label="Đóng gợi ý"><X className="h-3 w-3" /></button>
                             </div>
                             <p className="text-sm font-black text-purple-700 mb-1">{priceSuggestion.suggestion} <span className="text-[10px] font-normal text-gray-400">VND/tháng</span></p>
                             <p className="text-[10px] text-gray-600 mb-3 leading-relaxed bg-purple-50 p-2 rounded-md italic">"{priceSuggestion.reason}"</p>
@@ -1491,81 +1490,36 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                 {/* STEP 4: HÌNH ẢNH */}
                 {roomStep === 4 && (
                   <div className="space-y-6 animate-in slide-in-from-right-4">
-                    {/* Upload Ảnh */}
+                    {/* Upload Ảnh thường — dùng UploadQueueUI */}
                     <div className="border-t pt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">📷 Hình ảnh Phòng</label>
-                      <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-muted/40 hover:bg-gray-100 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer">
-                        <ImagePlus className="h-6 w-6 text-gray-400 mb-1" />
-                        <span className="text-sm font-medium text-gray-600">Chọn ảnh phòng</span>
-                        <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
-                      </div>
-
-                      {(formData.images.length > 0 || previewUrls.length > 0) && (
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 mt-4">
-                          {formData.images.map((url, idx) => (
-                            <div key={`old-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border">
-                              <img src={url} alt={`old-${idx}`} className="w-full h-full object-cover" />
-                              <button type="button" onClick={() => removeOldImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                            </div>
-                          ))}
-                          {previewUrls.map((url, idx) => (
-                            <div key={`new-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-primary border-dashed">
-                              <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover opacity-80" />
-                              <button type="button" onClick={() => removeSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <UploadQueueUI
+                        items={imageQueue.items}
+                        onAddFiles={handleAddImages}
+                        onRemove={imageQueue.removeItem}
+                        onRetry={imageQueue.retryItem}
+                        label="📷 Hình ảnh Phòng"
+                      />
                     </div>
 
-                    {/* Upload Ảnh 360 */}
+                    {/* Upload Ảnh 360 — dùng UploadQueueUI */}
                     <div className="border-t pt-4 mt-2">
-                      <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
-                        🌐 Ảnh 360° (Virtual Tour)
-                      </label>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Tải lên ảnh panorama 360 độ để khách thuê có thể xem phòng 3D trực tuyến. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB.
-                      </p>
-
-                      <div 
-                        onClick={() => panoFileInputRef.current?.click()} 
-                        className="border-2 border-dashed border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer group"
-                      >
-                        <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                          <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10" strokeDasharray="4 2"/>
-                            <path d="M12 2a10 10 0 0 1 0 20M12 2a10 10 0 0 0 0 20M2 12h20"/>
-                          </svg>
-                        </div>
-                        <span className="text-sm font-semibold text-cyan-700">Chọn ảnh 360°</span>
-                        <span className="text-[11px] text-cyan-600/70 mt-0.5">Chụp bằng Google Street View, Panorama trên điện thoại...</span>
-                        <input type="file" multiple accept="image/*" ref={panoFileInputRef} onChange={handlePanoImageChange} className="hidden" />
+                      <div className="mb-2">
+                        <label className="block text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                          🌐 Ảnh 360° (Virtual Tour)
+                        </label>
+                        <p className="text-xs text-gray-500">
+                          Tải lên ảnh panorama 360 độ để khách thuê có thể xem phòng 3D trực tuyến. Tối đa 5 ảnh, mỗi ảnh ≤ 10MB. Ảnh 360° không bị nén.
+                        </p>
                       </div>
+                      <UploadQueueUI
+                        items={panoQueue.items}
+                        onAddFiles={handleAddPanoImages}
+                        onRemove={panoQueue.removeItem}
+                        onRetry={panoQueue.retryItem}
+                        label="Ảnh 360°"
+                      />
 
-                      {(formData.panoramaImages.length > 0 || panoPreviewUrls.length > 0) && (
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
-                          {formData.panoramaImages.map((url, idx) => (
-                            <div key={`pano-old-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border border-cyan-200 bg-cyan-50">
-                              <img src={url} alt={`pano-${idx}`} className="w-full h-full object-cover" />
-                              <div className="absolute top-1 left-1">
-                                <span className="text-[9px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">360°</span>
-                              </div>
-                              <button type="button" onClick={() => removeOldPanoImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                            </div>
-                          ))}
-                          {panoPreviewUrls.map((url, idx) => (
-                            <div key={`pano-new-${idx}`} className="relative group aspect-video rounded-lg overflow-hidden border-2 border-dashed border-cyan-400 bg-cyan-50/50">
-                              <img src={url} alt={`pano-preview-${idx}`} className="w-full h-full object-cover opacity-80" />
-                              <div className="absolute top-1 left-1">
-                                <span className="text-[9px] font-bold bg-cyan-500 text-white px-1.5 py-0.5 rounded">Mới</span>
-                              </div>
-                              <button type="button" onClick={() => removePanoSelectedFile(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {formData.panoramaImages.length === 0 && panoPreviewUrls.length === 0 && (
+                      {panoQueue.items.length === 0 && (
                         <p className="text-[11px] text-cyan-600 mt-2 flex items-start gap-1 bg-cyan-50 p-2.5 rounded-md border border-cyan-100">
                           <span className="flex-shrink-0">💡</span>
                           <span><strong>Mẹo:</strong> Mở ứng dụng Camera → chế độ Panorama → quay tròn 360°. Hoặc dùng app Google Street View để chụp ảnh cầu 360 chuyên nghiệp.</span>
@@ -1594,9 +1548,22 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                   Tiếp tục <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               ) : (
-                <Button type="submit" form="room-form" disabled={isSubmitting} className="min-w-[140px] bg-green-600 hover:bg-green-700">
+                <Button
+                  type="submit"
+                  form="room-form"
+                  disabled={isSubmitting || !imageQueue.canSubmit || !panoQueue.canSubmit}
+                  className="min-w-[140px] bg-green-600 hover:bg-green-700"
+                  title={
+                    imageQueue.isUploading || panoQueue.isUploading
+                      ? 'Đang tải ảnh lên, vui lòng chờ...'
+                      : imageQueue.hasError || panoQueue.hasError
+                        ? 'Có ảnh lỗi. Vui lòng Thử lại hoặc Xóa trước khi lưu.'
+                        : undefined
+                  }
+                >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {isSubmitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Hoàn tất & Tạo')}
+                  {(imageQueue.isUploading || panoQueue.isUploading) && !isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isSubmitting ? 'Đang lưu...' : (imageQueue.isUploading || panoQueue.isUploading) ? 'Đang tải ảnh...' : (editingId ? 'Lưu thay đổi' : 'Hoàn tất & Tạo')}
                 </Button>
               )}
             </div>
@@ -1722,7 +1689,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                   <h3 className="text-lg font-bold text-gray-900">Xem trước danh sách nhập ({excelRooms.length} phòng)</h3>
                   <p className="text-xs text-gray-500 italic">Vui lòng kiểm tra kỹ thông tin trước khi xác nhận lưu vào hệ thống.</p>
                </div>
-               <button onClick={() => setShowExcelPreview(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+               <button type="button" onClick={() => setShowExcelPreview(false)} className="text-gray-400 hover:text-gray-600" aria-label="Đóng"><X className="h-5 w-5" /></button>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 bg-gray-50/30">
@@ -1823,7 +1790,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                  <Sparkles className="h-5 w-5 text-purple-600" />
                  Bản nháp từ Copilot
                </h3>
-               <button onClick={() => setAiContentPreview(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="h-5 w-5" /></button>
+               <button type="button" onClick={() => setAiContentPreview(null)} className="text-gray-400 hover:text-gray-600 p-1" aria-label="Đóng"><X className="h-5 w-5" /></button>
             </div>
             
             <div className="p-6 bg-muted/40 flex-1 overflow-y-auto max-h-[60vh]">

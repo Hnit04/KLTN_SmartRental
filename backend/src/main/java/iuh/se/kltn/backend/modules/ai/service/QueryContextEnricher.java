@@ -25,6 +25,7 @@ public class QueryContextEnricher {
     private static final String SORT_PRICE_ASC = "PRICE_ASC";
     private static final String SORT_NEAREST_THEN_PRICE = "NEAREST_THEN_PRICE";
     private static final String SORT_PRICE_ASC_WITH_DISTANCE = "PRICE_ASC_WITH_DISTANCE";
+    private static final Pattern STANDALONE_CHEAP_WORD_PATTERN = Pattern.compile("\\bre\\b");
 
     private final UserRepository userRepository;
     private final AiRuntimeProperties aiRuntimeProperties;
@@ -345,14 +346,21 @@ public class QueryContextEnricher {
     }
 
     private boolean isCheapCue(String normalizedQuestion) {
-        return containsAny(
+        if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
+            return false;
+        }
+        if (containsAny(
                 normalizedQuestion,
                 "gia re",
-                "re",
+                "re nhat",
+                "phong re",
                 "gia mem",
                 "sinh vien",
                 "tiet kiem"
-        );
+        )) {
+            return true;
+        }
+        return STANDALONE_CHEAP_WORD_PATTERN.matcher(normalizedQuestion).find();
     }
 
     private boolean isDeicticReferenceWithoutContext(String normalizedQuestion) {

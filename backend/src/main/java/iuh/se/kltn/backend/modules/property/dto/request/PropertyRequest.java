@@ -34,4 +34,6 @@ public class PropertyRequest {
     private Double internetPrice;
 
     private List<String> images;
+    
+    private Long version;
 }

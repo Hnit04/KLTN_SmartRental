@@ -43,12 +43,12 @@ public class RoomService {
     private NotificationService notificationService;
 
     /**
-     * Láº¥y chi tiáº¿t phĂ²ng theo ID
+     * Láº¥y chi tiáº¿t phòng theo ID
      */
     @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long id) {
         Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng vá»›i ID: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + id));
 
         return mapToRoomResponse(room);
     }
@@ -59,7 +59,7 @@ public class RoomService {
     public RoomResponse mapToRoomResponse(Room r) {
         RoomResponse res = modelMapper.map(r, RoomResponse.class);
 
-        // Convert chuá»—i JSON trong DB thĂ nh List Java
+        // Convert chuỗi JSON trong DB thĂ nh List Java
         res.setImages(JsonUtil.convertJsonToList(r.getImages()));
         res.setAmenities(JsonUtil.convertJsonToList(r.getAmenities()));
         res.setPanoramaImages(JsonUtil.convertJsonToList(r.getPanoramaImages()));
@@ -87,7 +87,7 @@ public class RoomService {
         res.setModerationReason(r.getModerationReason());
 
         if (r.getStatus() == RoomStatus.RENTED) {
-            // đŸ›¡ï¸ DĂ¹ng query lá»c startDate <= today Ä‘á»ƒ trĂ¡nh láº¥y nháº§m Pre-booking
+            // đŸ›¡ï¸ DĂ¹ng query lá»c startDate <= today để tránh lấy nhầm Pre-booking
             iuh.se.kltn.backend.modules.contract.entity.Contract currentContract = contractRepository.findCurrentActiveContractByRoomId(r.getId(), java.time.LocalDate.now()).orElse(null);
             if (currentContract != null && currentContract.getEndDate() != null) {
                 long daysToExpiry = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), currentContract.getEndDate());
@@ -102,7 +102,7 @@ public class RoomService {
     }
 
     private String buildRoomContentCheck(RoomRequest request) {
-        return String.format("TĂªn/Sá»‘ phĂ²ng: %s\nGiĂ¡ phĂ²ng: %s\nDiá»‡n tĂ­ch: %s\nLoáº¡i phĂ²ng: %s\nTiá»‡n Ă­ch: %s\nMĂ´ táº£/Ná»™i quy: %s",
+        return String.format("Tên/Số phòng: %s\nGiá phòng: %s\nDiện tích: %s\nLoại phòng: %s\nTiện ích: %s\nMô tả/Nội quy: %s",
                 request.getName(), request.getPrice(), request.getArea(), request.getType(),
                 request.getAmenities(), request.getDefaultTerms());
     }
@@ -110,9 +110,16 @@ public class RoomService {
     @Transactional
     public RoomResponse updateRoom(Long id, RoomRequest request) {
         Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng vá»›i ID: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + id));
 
-        // KIá»‚M DUYá»†T Ná»˜I DUNG - Gá»™p áº£nh thÆ°á»ng + áº£nh 360 Ä‘á»ƒ AI kiá»ƒm duyá»‡t toĂ n bá»™
+        if (request.getVersion() == null) {
+            throw new iuh.se.kltn.backend.common.exception.ResourceVersionConflictException("Dữ liệu cập nhật thiếu thông tin version. Vui lòng tải lại trang.");
+        }
+        if (!request.getVersion().equals(room.getVersion())) {
+            throw new iuh.se.kltn.backend.common.exception.ResourceVersionConflictException("Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.");
+        }
+
+        // KIá»‚M DUYá»†T NỘI DUNG - Gộp ảnh thÆ°á»ng + ảnh 360 Ä‘á»ƒ AI kiá»ƒm duyệt toĂ n bá»™
         java.util.List<String> allImages = new java.util.ArrayList<>();
         if (request.getImages() != null) allImages.addAll(request.getImages());
         if (request.getPanoramaImages() != null) allImages.addAll(request.getPanoramaImages());
@@ -141,7 +148,7 @@ public class RoomService {
         room.setPrice(request.getPrice());
         room.setArea(request.getArea());
         room.setDescription(request.getDescription());
-        room.setApprovalStatus(aiStatus); // Duyá»‡t láº¡i khi sá»­a
+        room.setApprovalStatus(aiStatus); // Duyệt lại khi sửa
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
 
@@ -160,7 +167,7 @@ public class RoomService {
             room.setDefaultTerms(request.getDefaultTerms());
         }
 
-        // Map maxOccupants náº¿u cĂ³
+        // Map maxOccupants náº¿u có
         if (request.getMaxOccupants() != null) {
             room.setMaxOccupants(request.getMaxOccupants());
         }
@@ -182,7 +189,7 @@ public class RoomService {
         return stats;
     }
 
-    // === ADMIN Duyá»‡t phĂ²ng ===
+    // === ADMIN Duyệt phòng ===
     @Transactional(readOnly = true)
     public List<RoomResponse> getPendingRooms() {
         return roomRepository.findByApprovalStatus(PropertyStatus.PENDING).stream()
@@ -193,52 +200,52 @@ public class RoomService {
     @Transactional
     public void updateApprovalStatus(Long roomId, PropertyStatus status, String rejectionReason) {
         Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng vá»›i ID: " + roomId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
         room.setApprovalStatus(status);
 
-        // LÆ°u lĂ½ do tá»« chá»‘i náº¿u cĂ³
+        // LÆ°u lĂ½ do từ chối náº¿u có
         if (status == PropertyStatus.REJECTED && rejectionReason != null && !rejectionReason.isBlank()) {
-            room.setModerationReason("Admin tá»« chá»‘i: " + rejectionReason);
+            room.setModerationReason("Admin từ chối: " + rejectionReason);
         }
 
         roomRepository.save(room);
 
-        // Gá»­i thĂ´ng bĂ¡o cho chá»§ trá»
+        // Gá»­i thông báo cho chủ trá»
         try {
             User landlord = room.getProperty().getLandlord();
-            String roomLabel = "PhĂ²ng \"" + room.getName() + "\" (Khu trá» " + room.getProperty().getName() + ")";
+            String roomLabel = "Phòng \"" + room.getName() + "\" (Khu trá» " + room.getProperty().getName() + ")";
             
             if (status == PropertyStatus.APPROVED) {
                 notificationService.createNotification(
                         landlord,
-                        "PhĂ²ng Ä‘Ă£ Ä‘Æ°á»£c duyá»‡t âœ…",
-                        roomLabel + " Ä‘Ă£ Ä‘Æ°á»£c Admin duyá»‡t vĂ  hiá»ƒn thá»‹ cĂ´ng khai.",
+                        "Phòng đã được duyệt âœ…",
+                        roomLabel + " đã được Admin duyệt vĂ  hiển thị công khai.",
                         NotificationType.ROOM_APPROVED,
                         room.getId()
                 );
             } else if (status == PropertyStatus.REJECTED) {
-                String msg = roomLabel + " Ä‘Ă£ bá»‹ Admin tá»« chá»‘i.";
+                String msg = roomLabel + " đã bị Admin từ chối.";
                 if (rejectionReason != null && !rejectionReason.isBlank()) {
-                    msg += "\nLĂ½ do: " + rejectionReason;
+                    msg += "\nLý do: " + rejectionReason;
                 }
                 notificationService.createNotification(
                         landlord,
-                        "PhĂ²ng bá»‹ tá»« chá»‘i âŒ",
+                        "Phòng bị từ chối âŒ",
                         msg,
                         NotificationType.ROOM_REJECTED,
                         room.getId()
                 );
             }
         } catch (Exception e) {
-            System.err.println("â ï¸ Lá»—i gá»­i notification phĂ²ng: " + e.getMessage());
+            System.err.println("â ï¸ Lỗi gửi notification phòng: " + e.getMessage());
         }
     }
     @Transactional(readOnly = true)
     public List<UserProfileResponse> getTenantsByRoomId(Long roomId) {
         roomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng vá»›i ID: " + roomId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
 
-        // Láº¥y danh sĂ¡ch tá»« há»£p Ä‘á»“ng (Cáº§n inject ContractRepository)
+        // Láº¥y danh sĂ¡ch tá»« hợp đồng (Cáº§n inject ContractRepository)
         List<User> tenants = roomRepository.findTenantsByRoomId(roomId);
 
         // Map sang DTO Ä‘á»ƒ tráº£ vá»
@@ -247,34 +254,34 @@ public class RoomService {
                 .collect(Collectors.toList());
     }
     /**
-     * Cáº­p nháº­t tráº¡ng thĂ¡i phĂ²ng (chá»‰ dĂ¹ng Ä‘á»ƒ áº©n phĂ²ng)
+     * Cáº­p nháº­t trạng thái phòng (chá»‰ dĂ¹ng Ä‘á»ƒ ẩn phòng)
      */
     @Transactional
     public RoomResponse updateRoomStatus(Long roomId, RoomStatus newStatus, Long landlordId) {
         Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng vá»›i ID: " + roomId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
 
         // Kiá»ƒm tra quyá»n
         if (!room.getProperty().getLandlord().getId().equals(landlordId)) {
-            throw new RuntimeException("Báº¡n khĂ´ng cĂ³ quyá»n thay Ä‘á»•i tráº¡ng thĂ¡i phĂ²ng nĂ y.");
+            throw new RuntimeException("Bạn không có quyá»n thay đổi trạng thái phòng nĂ y.");
         }
 
-        // Kiá»ƒm tra Ä‘iá»u kiá»‡n kinh doanh trÆ°á»›c khi áº©n
+        // Kiá»ƒm tra Ä‘iá»u kiá»‡n kinh doanh trước khi ẩn
         if (newStatus == RoomStatus.HIDDEN) {
             if (room.getStatus() == RoomStatus.RENTED) {
-                throw new RuntimeException("KhĂ´ng thá»ƒ áº©n phĂ²ng Ä‘ang cho thuĂª. Vui lĂ²ng káº¿t thĂºc há»£p Ä‘á»“ng trÆ°á»›c.");
+                throw new RuntimeException("Không thể ẩn phòng đang cho thuê. Vui lòng kết thúc hợp đồng trước.");
             }
             if (room.getStatus() == RoomStatus.RESERVED) {
-                throw new RuntimeException("KhĂ´ng thá»ƒ áº©n phĂ²ng Ä‘ang giá»¯ chá»— / Ä‘Ă£ cá»c. Vui lĂ²ng há»§y giá»¯ chá»— trÆ°á»›c.");
+                throw new RuntimeException("Không thể ẩn phòng đang giữ chỗ / đã cá»c. Vui lòng hủy giữ chỗ trước.");
             }
         }
 
         // Cáº­p nháº­t chá»‰ trÆ°á»ng status (trĂ¡nh lá»—i Data truncated)
         roomRepository.updateRoomStatus(roomId, newStatus);
 
-        // Láº¥y láº¡i entity Ä‘á»ƒ tráº£ vá» Ä‘áº§y Ä‘á»§ thĂ´ng tin
+        // Láº¥y lại entity Ä‘á»ƒ tráº£ vá» Ä‘áº§y Ä‘á»§ thông tin
         Room updatedRoom = roomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y phĂ²ng sau khi cáº­p nháº­t"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng sau khi cập nhật"));
 
         return mapToRoomResponse(updatedRoom);
     }

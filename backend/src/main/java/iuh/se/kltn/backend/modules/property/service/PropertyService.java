@@ -73,7 +73,7 @@ public class PropertyService {
     @Autowired
     private BillRepository billRepository;
 
-    // 1. API Má»I: Láº¥y táº¥t cáº£ danh sĂ¡ch nhĂ  trá» (Public) - CHá»ˆ Láº¤Y "APPROVED"
+    // 1. API Má»I: Láº¥y táº¥t cáº£ danh sĂ¡ch nhĂ  trá» (Public) - CHá»ˆ LẤY "APPROVED"
     private static final double FALLBACK_SYSTEM_AVERAGE_RATING = 4.2;
     private static final double DISTANCE_MAX_KM = 20.0;
     private static final double RATING_PRIOR_COUNT = 12.0;
@@ -295,13 +295,13 @@ public class PropertyService {
     ) {}
 
     private String buildPropertyContentCheck(PropertyRequest request) {
-        return String.format("TĂªn khu trá»: %s\nÄá»‹a chá»‰: %s, %s, %s\nMĂ´ táº£: %s\nGiĂ¡ Ä‘iá»‡n: %s\nGiĂ¡ nÆ°á»›c: %s\nInternet: %s",
+        return String.format("TĂªn khu trá»: %s\nÄá»‹a chá»‰: %s, %s, %s\nMĂ´ táº£: %s\nGiá điện: %s\nGiá nước: %s\nInternet: %s",
                 request.getName(), request.getAddress(), request.getDistrict(), request.getCity(),
                 request.getDescription(), request.getElecPrice(), request.getWaterPrice(), request.getInternetPrice());
     }
 
     private String buildRoomContentCheck(RoomRequest request) {
-        return String.format("TĂªn/Sá»‘ phĂ²ng: %s\nGiĂ¡ phĂ²ng: %s\nDiá»‡n tĂ­ch: %s\nLoáº¡i phĂ²ng: %s\nTiá»‡n Ă­ch: %s\nMĂ´ táº£/Ná»™i quy: %s",
+        return String.format("Tên/Số phòng: %s\nGiá phòng: %s\nDiện tích: %s\nLoại phòng: %s\nTiện ích: %s\nMô tả/Nội quy: %s",
                 request.getName(), request.getPrice(), request.getArea(), request.getType(),
                 request.getAmenities(), request.getDefaultTerms());
     }
@@ -310,10 +310,10 @@ public class PropertyService {
     @Transactional
     public PropertyResponse createProperty(Long landlordId, PropertyRequest request) {
         User user = userRepository.findById(landlordId)
-                .orElseThrow(() -> new RuntimeException("User khĂ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
         if (user.getRole() != Role.LANDLORD) {
-            throw new RuntimeException("Chá»‰ chá»§ trá» má»›i Ä‘Æ°á»£c Ä‘Äƒng bĂ i!");
+            throw new RuntimeException("Chá»‰ chủ trá» mới được đăng bĂ i!");
         }
 
         // KIá»‚M TRA GIá»I Háº N VIP
@@ -322,7 +322,7 @@ public class PropertyService {
             vipSubscriptionService.checkPropertyImageLimit(landlordId, request.getImages().size());
         }
 
-        // KIá»‚M DUYá»†T Ná»˜I DUNG (AI Moderation) - Chá»‰ Ä‘á»ƒ gá»£i Ă½ cho Admin
+        // KIá»‚M DUYá»†T NỘI DUNG (AI Moderation) - Chá»‰ Ä‘á»ƒ gá»£i Ă½ cho Admin
         ModerationResult modResult = moderationService
                 .checkContent(
                         "Khu tro",
@@ -353,23 +353,23 @@ public class PropertyService {
 
         Property saved = propertyRepository.save(property);
 
-        // ThĂ´ng bĂ¡o cho Admin cĂ³ tin Ä‘Äƒng má»›i
+        // Thông báo cho Admin có tin đăng mới
         List<User> admins = userRepository.findAllByRole(Role.ADMIN);
         for (User admin : admins) {
-            notificationService.createNotification(admin, "YĂªu cáº§u duyá»‡t khu trá» má»›i đŸ ", "Chá»§ trá» " + user.getFullName() + " vá»«a Ä‘Äƒng khu trá» má»›i: " + saved.getName(), NotificationType.PROPERTY_APPROVED, saved.getId());
+            notificationService.createNotification(admin, "Yêu cầu duyệt khu trá» mới đŸ ", "Chá»§ trá» " + user.getFullName() + " vừa đăng khu trá» mới: " + saved.getName(), NotificationType.PROPERTY_APPROVED, saved.getId());
         }
 
         return mapToPropertyResponse(saved);
     }
 
-    // THĂM PHĂ’NG VĂ€O KHU TRá»Œ
+    // THĂM PHĂ’NG VÀO KHU TRá»Œ
     @Transactional
     public RoomResponse addRoom(Long landlordId, Long propertyId, RoomRequest request) {
         Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new RuntimeException("Khu trá» khĂ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new RuntimeException("Khu trá» không tồn tại"));
 
         if (!property.getLandlord().getId().equals(landlordId)) {
-            throw new RuntimeException("Báº¡n khĂ´ng pháº£i chá»§ khu trá» nĂ y!");
+            throw new RuntimeException("Bạn không phải chủ khu trá» nĂ y!");
         }
 
         // KIá»‚M TRA GIá»I Háº N VIP
@@ -378,7 +378,7 @@ public class PropertyService {
             vipSubscriptionService.checkRoomImageLimit(landlordId, request.getImages().size());
         }
 
-        // KIá»‚M DUYá»†T Ná»˜I DUNG PHĂ’NG - Gá»™p áº£nh thÆ°á»ng + áº£nh 360 Ä‘á»ƒ AI kiá»ƒm duyá»‡t toĂ n bá»™
+        // KIá»‚M DUYá»†T NỘI DUNG PHĂ’NG - Gộp ảnh thÆ°á»ng + ảnh 360 Ä‘á»ƒ AI kiá»ƒm duyệt toĂ n bá»™
         List<String> allImages = new java.util.ArrayList<>();
         if (request.getImages() != null) allImages.addAll(request.getImages());
         if (request.getPanoramaImages() != null) allImages.addAll(request.getPanoramaImages());
@@ -415,23 +415,23 @@ public class PropertyService {
         room.setSafetyScore(modResult.getScore());
         room.setModerationReason(modResult.getReason());
 
-        // Map maxOccupants náº¿u cĂ³
+        // Map maxOccupants náº¿u có
         if (request.getMaxOccupants() != null) {
             room.setMaxOccupants(request.getMaxOccupants());
         }
 
         Room savedRoom = roomRepository.save(room);
 
-        // ThĂ´ng bĂ¡o cho Admin cĂ³ phĂ²ng má»›i cáº§n duyá»‡t
+        // Thông báo cho Admin có phòng mới cần duyệt
         List<User> admins = userRepository.findAllByRole(Role.ADMIN);
         for (User admin : admins) {
-            notificationService.createNotification(admin, "YĂªu cáº§u duyá»‡t phĂ²ng má»›i đŸª", "Chá»§ trá» " + property.getLandlord().getFullName() + " vá»«a thĂªm phĂ²ng má»›i: " + savedRoom.getName() + " táº¡i " + property.getName(), NotificationType.PROPERTY_APPROVED, property.getId());
+            notificationService.createNotification(admin, "Yêu cầu duyệt phòng mới đŸª", "Chá»§ trá» " + property.getLandlord().getFullName() + " vừa thĂªm phòng mới: " + savedRoom.getName() + " tại " + property.getName(), NotificationType.PROPERTY_APPROVED, property.getId());
         }
 
         return mapToRoomResponse(savedRoom);
     }
 
-    // Láº¤Y DANH SĂCH NHĂ€ Cá»¦A CHU TRO
+    // LẤY DANH SĂCH NHÀ CỦA CHỦ TRỌ
     @Transactional(readOnly = true)
     public List<PropertyResponse> getMyProperties(Long landlordId) {
         return propertyRepository.findByLandlordIdOrderByCreatedAtDesc(landlordId).stream()
@@ -439,7 +439,7 @@ public class PropertyService {
                 .collect(Collectors.toList());
     }
 
-    // Láº¤Y DANH SĂCH NHĂ€ Cá»¦A CHU TRO (DĂ™NG CHO PUBLIC)
+    // LẤY DANH SĂCH NHÀ CỦA CHỦ TRỌ (DÙNG CHO PUBLIC)
     @Transactional(readOnly = true)
     public List<PropertyResponse> getPropertiesByUsername(String username) {
         return propertyRepository.findByLandlordUsername(username).stream()
@@ -447,11 +447,11 @@ public class PropertyService {
                 .collect(Collectors.toList());
     }
 
-    // Láº¤Y DANH SĂCH PHĂ’NG Cá»¦A 1 KHU TRá»Œ
+    // LẤY DANH SĂCH PHĂ’NG CỦA 1 KHU TRá»Œ
     @Transactional(readOnly = true)
     public List<RoomResponse> getRoomsByProperty(Long propertyId, Long currentUserId) {
         Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new RuntimeException("Khu trá» khĂ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new RuntimeException("Khu trá» không tồn tại"));
 
         if (currentUserId != null && property.getLandlord().getId().equals(currentUserId)) {
             return roomRepository.findByPropertyId(propertyId).stream()
@@ -552,17 +552,24 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public PropertyResponse getPropertyById(Long id) {
         Property property = propertyRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("KhĂ´ng tĂ¬m tháº¥y khu trá» vá»›i ID: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khu trá» với ID: " + id));
         return mapToPropertyResponse(property);
     }
 
     @Transactional
     public PropertyResponse updateProperty(Long landlordId, Long propertyId, PropertyRequest request) {
         Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new RuntimeException("Khu trá» khĂ´ng tá»“n táº¡i vá»›i ID: " + propertyId));
+                .orElseThrow(() -> new RuntimeException("Khu trọ không tồn tại với ID: " + propertyId));
 
         if (!property.getLandlord().getId().equals(landlordId)) {
-            throw new RuntimeException("Báº¡n khĂ´ng cĂ³ quyá»n chá»‰nh sá»­a khu trá» nĂ y!");
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa khu trọ nĂ y!");
+        }
+
+        if (request.getVersion() == null) {
+            throw new iuh.se.kltn.backend.common.exception.ResourceVersionConflictException("Dữ liệu cập nhật thiếu thông tin version. Vui lòng tải lại trang.");
+        }
+        if (!request.getVersion().equals(property.getVersion())) {
+            throw new iuh.se.kltn.backend.common.exception.ResourceVersionConflictException("Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.");
         }
 
         ModerationResult modResult = moderationService
@@ -607,7 +614,7 @@ public class PropertyService {
         return mapToPropertyResponse(saved);
     }
 
-    // === ADMIN Duyá»‡t tin ===
+    // === ADMIN Duyệt tin ===
     @Transactional(readOnly = true)
     public List<PropertyResponse> getPropertiesByStatus(PropertyStatus status) {
         return propertyRepository.findByStatus(status).stream()
@@ -618,42 +625,42 @@ public class PropertyService {
     @Transactional
     public void updateStatus(Long propertyId, PropertyStatus status, String rejectionReason) {
         Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new RuntimeException("Khu trá» khĂ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new RuntimeException("Khu trá» không tồn tại"));
         property.setStatus(status);
 
-        // LÆ°u lĂ½ do tá»« chá»‘i náº¿u cĂ³
+        // LÆ°u lĂ½ do từ chối náº¿u có
         if (status == PropertyStatus.REJECTED && rejectionReason != null && !rejectionReason.isBlank()) {
-            property.setModerationReason("Admin tá»« chá»‘i: " + rejectionReason);
+            property.setModerationReason("Admin từ chối: " + rejectionReason);
         }
 
         propertyRepository.save(property);
 
-        // Gá»­i thĂ´ng bĂ¡o cho chá»§ trá»
+        // Gá»­i thông báo cho chủ trá»
         try {
             User landlord = property.getLandlord();
             if (status == PropertyStatus.APPROVED) {
                 notificationService.createNotification(
                         landlord,
-                        "Khu trá» Ä‘Ă£ Ä‘Æ°á»£c duyá»‡t âœ…",
-                        "Khu trá» \"" + property.getName() + "\" cá»§a báº¡n Ä‘Ă£ Ä‘Æ°á»£c Admin duyá»‡t vĂ  hiá»ƒn thá»‹ cĂ´ng khai.",
+                        "Khu trá» đã được duyệt âœ…",
+                        "Khu trá» \"" + property.getName() + "\" của bạn đã được Admin duyệt vĂ  hiển thị công khai.",
                         NotificationType.PROPERTY_APPROVED,
                         property.getId()
                 );
             } else if (status == PropertyStatus.REJECTED) {
-                String msg = "Khu trá» \"" + property.getName() + "\" cá»§a báº¡n Ä‘Ă£ bá»‹ Admin tá»« chá»‘i.";
+                String msg = "Khu trá» \"" + property.getName() + "\" của bạn đã bị Admin từ chối.";
                 if (rejectionReason != null && !rejectionReason.isBlank()) {
-                    msg += "\nLĂ½ do: " + rejectionReason;
+                    msg += "\nLý do: " + rejectionReason;
                 }
                 notificationService.createNotification(
                         landlord,
-                        "Khu trá» bá»‹ tá»« chá»‘i âŒ",
+                        "Khu trá» bị từ chối âŒ",
                         msg,
                         NotificationType.PROPERTY_REJECTED,
                         property.getId()
                 );
             }
         } catch (Exception e) {
-            System.err.println("â ï¸ Lá»—i gá»­i notification: " + e.getMessage());
+            System.err.println("â ï¸ Lỗi gửi notification: " + e.getMessage());
         }
     }
 
@@ -675,10 +682,10 @@ public class PropertyService {
     }
     public PropertyResponse updatePropertyStatus(Long landlordId, Long propertyId, PropertyStatus newStatus) {
         Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new RuntimeException("Khu trá» khĂ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new RuntimeException("Khu trá» không tồn tại"));
 
         if (!property.getLandlord().getId().equals(landlordId)) {
-            throw new RuntimeException("Báº¡n khĂ´ng cĂ³ quyá»n thá»±c hiá»‡n thao tĂ¡c nĂ y!");
+            throw new RuntimeException("Bạn không có quyá»n thực hiện thao tác nĂ y!");
         }
         if(newStatus== PropertyStatus.HIDDEN){
             List<Room> rooms = roomRepository.findByPropertyId(propertyId);
@@ -688,7 +695,7 @@ public class PropertyService {
             );
 
             if (hasActiveRooms) {
-                throw new RuntimeException("KhĂ´ng thá»ƒ áº©n khu trá» vĂ¬ hiá»‡n táº¡i cĂ³ phĂ²ng Ä‘ang Ä‘Æ°á»£c thuĂª hoáº·c Ä‘Ă£ Ä‘Æ°á»£c Ä‘áº·t cá»c.");
+                throw new RuntimeException("Không thể ẩn khu trá» vì hiện tại có phòng đang được thuê hoặc đã được Ä‘áº·t cá»c.");
             }
         }
         property.setStatus(newStatus);

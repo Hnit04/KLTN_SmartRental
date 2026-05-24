@@ -25,19 +25,19 @@ ai:
 
     templates:
       query-data:
-        unsupported: "Da, he thong chua du du lieu de xu ly cau hoi nay o che do hien tai. Ban vui long dien dat ro hon hoac bat mode FULL."
+        unsupported: "Dạ, hệ thống chưa đủ dữ liệu để xử lý câu hỏi này ở chế độ hiện tại. Bạn vui lòng diễn đạt rõ hơn hoặc bật mode FULL."
       reminder:
-        due-soon: "Chao {tenantName}, phong {roomName} sap den han thanh toan. Tong so tien ky nay la {amount}, han cuoi {deadline}. Nho ban thanh toan dung han giup minh."
-        overdue: "Chao {tenantName}, phong {roomName} hien dang qua han/chua thanh toan. Tong so tien can thanh toan la {amount}, han {deadline}. Ban vui long thanh toan som de tranh phat sinh phi phat."
+        due-soon: "Chào {tenantName}, phòng {roomName} sắp đến hạn thanh toán. Tổng số tiền kỳ này là {amount}, hạn cuối {deadline}. Nhờ bạn thanh toán đúng hạn giúp mình."
+        overdue: "Chào {tenantName}, phòng {roomName} hiện đang quá hạn/chưa thanh toán. Tổng số tiền cần thanh toán là {amount}, hạn {deadline}. Bạn vui lòng thanh toán sớm để tránh phát sinh phí phạt."
       anomaly:
-        header: "Bao cao bat thuong dien nuoc thang {month}/{year}"
-        recommendation: "De xuat: Kiem tra thiet bi cong suat lon, ra soat ro ri, va lien he khach thue de xac minh nhu cau su dung thuc te."
+        header: "Báo cáo bất thường điện nước tháng {month}/{year}"
+        recommendation: "Đề xuất: Kiểm tra thiết bị công suất lớn, rà soát rò rỉ, và liên hệ khách thuê để xác minh nhu cầu sử dụng thực tế."
         summary:
-          - "Kiem tra phong co dau hieu tang dot bien >35% ngay trong ky tiep theo."
-          - "Dat nguong canh bao cho phong vuot >2.0x dien hoac >1.5x nuoc so voi trung binh."
-          - "Uu tien xu ly truong hop vuot nguong cao de giam rui ro chay no/ngap nuoc."
+          - "Kiểm tra phòng có dấu hiệu tăng đột biến >35% ngay trong kỳ tiếp theo."
+          - "Đặt ngưỡng cảnh báo cho phòng vượt >2.0x điện hoặc >1.5x nước so với trung bình."
+          - "Ưu tiên xử lý trường hợp vượt ngưỡng cao để giảm rủi ro cháy nổ/ngập nước."
       room-description:
-        base: "Phong tro co thong tin noi bat: {prompt}. Khong gian duoc toi uu cho nhu cau o lau dai, phu hop sinh hoat hang ngay. Muc gia va tien ich duoc can doi de dam bao chi phi hop ly."
+        base: "Phòng trọ có thông tin nổi bật: {prompt}. Không gian được tối ưu cho nhu cầu ở lâu dài, phù hợp sinh hoạt hằng ngày. Mức giá và tiện ích được cân đối để đảm bảo chi phí hợp lý."
 
     price-suggestion:
       base-per-m2: 105000

@@ -102,7 +102,7 @@ public class OnnxImageSceneClassifier implements ImageSceneClassifier, Disposabl
                     .requestedCount(safeUrls.size())
                     .classifiedCount(0)
                     .needsReview(true)
-                    .reasons(List.of(ex.getMessage()))
+                    .reasons(List.of("NEEDS_REVIEW: " + ex.getMessage()))
                     .build();
         }
 

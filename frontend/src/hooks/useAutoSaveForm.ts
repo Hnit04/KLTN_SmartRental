@@ -66,8 +66,8 @@ export function useAutoSaveForm<T>(
   useEffect(() => {
     if (!enabled) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const isDirty = JSON.stringify(formData) !== JSON.stringify(initialData);
-      if (isDirty) {
+      const isFormDirty = JSON.stringify(formData) !== JSON.stringify(initialData);
+      if (isFormDirty) {
         e.preventDefault();
         e.returnValue = ''; // Required for Chrome to show the prompt
       }
@@ -89,5 +89,7 @@ export function useAutoSaveForm<T>(
     clearDraft();
   };
 
-  return { formData, setFormData, clearDraft, resetForm, hasRestoredDraft };
+  const isDirty = JSON.stringify(formData) !== JSON.stringify(initialData);
+
+  return { formData, setFormData, clearDraft, resetForm, hasRestoredDraft, isDirty };
 }

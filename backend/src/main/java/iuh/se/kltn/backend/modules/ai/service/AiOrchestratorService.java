@@ -885,7 +885,7 @@ public class AiOrchestratorService {
             unsupported = aiRuntimeProperties.getTemplates().getQueryData().getUnsupported();
         }
         if (unsupported == null || unsupported.isBlank()) {
-            unsupported = "Da, he thong chua du du lieu de xu ly cau hoi nay o che do hien tai.";
+            unsupported = "Dạ, hệ thống chưa đủ dữ liệu để xử lý câu hỏi này ở chế độ hiện tại.";
         }
         return unsupported;
     }
@@ -941,9 +941,13 @@ public class AiOrchestratorService {
             boolean templateOnlyMode,
             boolean presenterOnlyMode
     ) {
-        List<Map<String, Object>> safeResults = presenterDataSanitizer.sanitize(intent, role, results);
+        String safeIntent = intent == null ? "UNKNOWN" : intent;
+        List<Map<String, Object>> safeResults = presenterDataSanitizer.sanitize(safeIntent, role, results);
+        if (safeResults == null) {
+            safeResults = List.of();
+        }
         AiRawResult rawResult = AiRawResult.builder()
-                .intent(intent)
+                .intent(safeIntent)
                 .intentSource(intentSource)
                 .userRole(role)
                 .rows(safeResults)
