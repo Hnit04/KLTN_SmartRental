@@ -67,8 +67,8 @@ export function buildAiPageContext(pathname: string): AiPageContext | undefined 
     };
   }
 
-  // /landlord/rooms/:id
-  const landlordRoomMatch = cleanPath.match(/^\/landlord\/rooms\/(\d+)$/);
+  // /landlord/properties/:propertyId/rooms/:roomId
+  const landlordRoomMatch = cleanPath.match(/^\/landlord\/properties\/\d+\/rooms\/(\d+)$/);
   if (landlordRoomMatch) {
     return {
       path: cleanPath,
@@ -76,6 +76,20 @@ export function buildAiPageContext(pathname: string): AiPageContext | undefined 
       entityType: "ROOM",
       entityId: parseInt(landlordRoomMatch[1], 10)
     };
+  }
+
+  // /tenant/contracts/create?roomId=...
+  if (cleanPath === '/tenant/contracts/create') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('roomId');
+    if (roomId) {
+      return {
+        path: cleanPath,
+        pageType: "TENANT_CONTRACT_CREATE",
+        entityType: "ROOM",
+        entityId: parseInt(roomId, 10)
+      };
+    }
   }
 
   return undefined;
