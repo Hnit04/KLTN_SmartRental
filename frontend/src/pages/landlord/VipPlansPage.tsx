@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { vipApi } from '@/api/vipApi';
 import { useAuth } from '@/context/AuthContext';
 import { Crown, Check, X, Zap, ChevronDown, History, Sparkles, Shield, Star, Image, Home, DoorOpen, Bot } from 'lucide-react';
@@ -7,7 +7,7 @@ import VipPaymentModal from '@/components/subscription/VipPaymentModal';
 import VipBadge from '@/components/shared/VipBadge';
 import { toast } from 'sonner';
 
-const TIERS = ['FREE', 'SILVER', 'GOLD', 'PLATINUM'] as const;
+const TIERS = ['FREE', 'GOLD', 'PLATINUM'] as const;
 type TierName = typeof TIERS[number];
 
 const TIER_CONFIG: Record<TierName, {
@@ -19,14 +19,8 @@ const TIER_CONFIG: Record<TierName, {
     gradient: 'from-gray-50 to-white', border: 'border-gray-200',
     headerBg: 'bg-gray-100', btnClass: 'bg-gray-200 text-gray-500 cursor-default',
   },
-  SILVER: {
-    label: 'Silver', emoji: '🥈',
-    gradient: 'from-slate-50 to-blue-50/30', border: 'border-slate-300',
-    headerBg: 'bg-gradient-to-r from-slate-200 to-blue-100',
-    btnClass: 'bg-slate-700 hover:bg-slate-800 text-white shadow-md',
-  },
   GOLD: {
-    label: 'Gold', emoji: '🥇',
+    label: 'Premium', emoji: '🥇',
     gradient: 'from-amber-50/50 to-orange-50/30', border: 'border-amber-300',
     headerBg: 'bg-gradient-to-r from-amber-200 to-yellow-100',
     btnClass: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-200',
@@ -47,17 +41,16 @@ const BENEFIT_ROWS: { icon: React.ReactNode; label: string; key: string }[] = [
   { icon: <Image className="h-4 w-4" />, label: 'Ảnh / khu trọ', key: 'maxImagesPerProperty' },
   { icon: <Image className="h-4 w-4" />, label: 'Ảnh / phòng', key: 'maxImagesPerRoom' },
   { icon: <span className="text-sm">🌐</span>, label: 'Ảnh 360° / phòng', key: 'maxPanoramaPerRoom' },
-  { icon: <Bot className="h-4 w-4" />, label: 'AI tạo mô tả', key: 'aiDescMonthlyLimit' },
-  { icon: <Zap className="h-4 w-4" />, label: 'Boost tìm kiếm', key: 'searchBoost' },
-  { icon: <Shield className="h-4 w-4" />, label: 'Hỗ trợ ưu tiên', key: 'prioritySupport' },
+  { icon: <Bot className="h-4 w-4" />, label: 'AI tạo mô tả phòng', key: 'aiDescriptionEnabled' },
+  { icon: <Zap className="h-4 w-4" />, label: 'AI gợi ý giá tham khảo', key: 'aiPriceSuggestionEnabled' },
+  { icon: <Star className="h-4 w-4" />, label: 'Báo cáo nâng cao', key: 'advancedDashboardEnabled' },
+  { icon: <Shield className="h-4 w-4" />, label: 'Tự động duyệt khi đạt chuẩn', key: 'autoApproveWhenSafe' },
 ];
 
 function formatValue(key: string, val: any): string {
-  if (key === 'prioritySupport') return val ? '✅' : '❌';
-  if (key === 'searchBoost') return val > 0 ? `+${val} điểm` : '❌';
+  if (typeof val === 'boolean') return val ? '✅' : '❌';
   if (typeof val === 'number' && val === -1) return '♾️ Không giới hạn';
   if (typeof val === 'number' && val === 0) return '❌';
-  if (key === 'aiDescMonthlyLimit') return `${val} lần/tháng`;
   return `${val}`;
 }
 
@@ -161,8 +154,8 @@ export default function VipPlansPage() {
       </div>
 
       {/* PRICING CARDS */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {TIERS.map((tierName, idx) => {
             const config = TIER_CONFIG[tierName];
             const plan = plans.find((p: any) => p.tier === tierName);
@@ -220,7 +213,7 @@ export default function VipPlansPage() {
                 </div>
 
                 {/* CTA */}
-                <div className="px-5 pb-5">
+                <div className="px-5 pb-5 mt-auto">
                   {isCurrent ? (
                     <div className="w-full h-11 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-emerald-700 font-bold text-sm flex items-center justify-center gap-2">
                       <Check className="h-4 w-4" /> Đang sử dụng
@@ -272,7 +265,7 @@ export default function VipPlansPage() {
                   <p className="text-[10px] text-gray-400 font-medium">/ {myPlan.maxProperties === -1 ? '♾️' : myPlan.maxProperties} khu trọ</p>
                 </div>
                 <div className="bg-muted/40 rounded-xl px-4 py-2 text-center">
-                  <p className="text-lg font-bold text-indigo-600">+{myPlan.searchBoost || 0}</p>
+                  <p className="text-lg font-bold text-indigo-600">+{myPlan.searchBoostWeight || 0}</p>
                   <p className="text-[10px] text-gray-400 font-medium">Boost điểm</p>
                 </div>
               </div>

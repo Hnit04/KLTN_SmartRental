@@ -100,14 +100,16 @@ export default function FormBlocker({
 
   return (
     <ConfirmActionDialog
-      isOpen={showDialog}
-      onClose={handleCancelLeave}
+      open={showDialog}
+      onOpenChange={(open) => {
+        if (!open) handleCancelLeave();
+      }}
       onConfirm={handleConfirmLeave}
       title="Xác nhận rời trang"
       description={message}
-      confirmText="Rời đi"
-      cancelText="Ở lại"
-      isDestructive={true}
+      confirmLabel="Rời đi"
+      cancelLabel="Ở lại"
+      tone="danger"
     />
   );
 }

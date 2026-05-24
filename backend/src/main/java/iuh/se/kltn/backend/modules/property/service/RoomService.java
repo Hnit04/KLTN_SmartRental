@@ -42,8 +42,27 @@ public class RoomService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService vipSubscriptionService;
+
+    private boolean shouldAutoApprove(Long landlordId, ModerationResult modResult) {
+        if (landlordId == null) return false;
+        iuh.se.kltn.backend.modules.subscription.enums.VipTier tier = vipSubscriptionService.getCurrentTier(landlordId);
+        if (!tier.isAutoApproveWhenSafe()) return false;
+        if (modResult.getScore() < 90) return false;
+        
+        String reasonStr = modResult.getReason() != null ? modResult.getReason().toLowerCase() : "";
+        boolean hasPolicyViolation = reasonStr.contains("policy") || 
+                                     reasonStr.contains("vi phạm") || 
+                                     reasonStr.contains("số điện thoại") || 
+                                     reasonStr.contains("zalo") ||
+                                     reasonStr.contains("nghi ngờ");
+        
+        return modResult.isSafe() && !hasPolicyViolation;
+    }
+
     /**
-     * Láº¥y chi tiáº¿t phòng theo ID
+     * Lấy chi tiáº¿t phòng theo ID
      */
     @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long id) {
@@ -119,7 +138,7 @@ public class RoomService {
             throw new iuh.se.kltn.backend.common.exception.ResourceVersionConflictException("Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.");
         }
 
-        // KIá»‚M DUYá»†T NỘI DUNG - Gộp ảnh thÆ°á»ng + ảnh 360 Ä‘á»ƒ AI kiá»ƒm duyệt toĂ n bá»™
+        // KIỂM DUYỆT NỘI DUNG - Gộp ảnh thÆ°á»ng + ảnh 360 để AI kiá»ƒm duyệt toàn bộ
         java.util.List<String> allImages = new java.util.ArrayList<>();
         if (request.getImages() != null) allImages.addAll(request.getImages());
         if (request.getPanoramaImages() != null) allImages.addAll(request.getPanoramaImages());
@@ -143,6 +162,13 @@ public class RoomService {
                 );
         
         PropertyStatus aiStatus = PropertyStatus.PENDING;
+        Long landlordId = null;
+        if (room.getProperty() != null && room.getProperty().getLandlord() != null) {
+            landlordId = room.getProperty().getLandlord().getId();
+        }
+        if (shouldAutoApprove(landlordId, modResult)) {
+            aiStatus = PropertyStatus.APPROVED;
+        }
 
         room.setName(request.getName());
         room.setPrice(request.getPrice());
@@ -245,16 +271,16 @@ public class RoomService {
         roomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
 
-        // Láº¥y danh sĂ¡ch tá»« hợp đồng (Cáº§n inject ContractRepository)
+        // Lấy danh sách tá»« hợp đồng (Cáº§n inject ContractRepository)
         List<User> tenants = roomRepository.findTenantsByRoomId(roomId);
 
-        // Map sang DTO Ä‘á»ƒ tráº£ vá»
+        // Map sang DTO để tráº£ vá»
         return tenants.stream()
                 .map(user -> modelMapper.map(user, UserProfileResponse.class))
                 .collect(Collectors.toList());
     }
     /**
-     * Cáº­p nháº­t trạng thái phòng (chá»‰ dĂ¹ng Ä‘á»ƒ ẩn phòng)
+     * Cập nhật trạng thái phòng (chỉ dĂ¹ng để ẩn phòng)
      */
     @Transactional
     public RoomResponse updateRoomStatus(Long roomId, RoomStatus newStatus, Long landlordId) {
@@ -276,10 +302,10 @@ public class RoomService {
             }
         }
 
-        // Cáº­p nháº­t chá»‰ trÆ°á»ng status (trĂ¡nh lá»—i Data truncated)
+        // Cập nhật chỉ trÆ°á»ng status (tránh lỗi Data truncated)
         roomRepository.updateRoomStatus(roomId, newStatus);
 
-        // Láº¥y lại entity Ä‘á»ƒ tráº£ vá» Ä‘áº§y Ä‘á»§ thông tin
+        // Lấy lại entity để tráº£ vá» đầy đủ thông tin
         Room updatedRoom = roomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng sau khi cập nhật"));
 

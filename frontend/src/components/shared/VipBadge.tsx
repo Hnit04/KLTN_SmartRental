@@ -8,7 +8,7 @@ interface VipBadgeProps {
 const TIER_STYLES: Record<string, { emoji: string; label: string; bg: string; text: string; border: string }> = {
   FREE: { emoji: '', label: 'Free', bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' },
   SILVER: { emoji: '🥈', label: 'Silver', bg: 'bg-gradient-to-r from-slate-100 to-blue-50', text: 'text-slate-700', border: 'border-slate-300' },
-  GOLD: { emoji: '🥇', label: 'Gold', bg: 'bg-gradient-to-r from-amber-100 to-yellow-50', text: 'text-amber-800', border: 'border-amber-300' },
+  GOLD: { emoji: '🥇', label: 'Premium', bg: 'bg-gradient-to-r from-amber-100 to-yellow-50', text: 'text-amber-800', border: 'border-amber-300' },
   PLATINUM: { emoji: '💎', label: 'Platinum', bg: 'bg-gradient-to-r from-violet-100 to-purple-50', text: 'text-violet-800', border: 'border-violet-300' },
 };
 
