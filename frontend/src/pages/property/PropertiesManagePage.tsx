@@ -476,6 +476,15 @@ export default function PropertiesManagePage() {
             </div>
 
             <div className="p-5 flex-1 flex flex-col">
+              {(property.status === 'REJECTED' || (property as any).approvalStatus === 'REJECTED') && property.moderationReason && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Lý do từ chối:</p>
+                    <p className="line-clamp-2">{property.moderationReason}</p>
+                  </div>
+                </div>
+              )}
               <h3 className="text-lg font-bold text-gray-900 mb-1 truncate pr-14">{property.name}</h3>
               <div className="flex items-start gap-1.5 text-sm text-gray-500 mb-3 h-10">
                 <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />

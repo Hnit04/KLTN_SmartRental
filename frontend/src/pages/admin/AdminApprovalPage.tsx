@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
 import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';
+import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
 import { toast } from 'sonner';
 import { 
   Loader2, CheckCircle, XCircle, Building, MapPin, ExternalLink, 
@@ -33,6 +34,9 @@ export default function AdminApprovalPage() {
   const [rejectTarget, setRejectTarget] = useState<{ type: 'property' | 'room'; id: number; name: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
+
+  // Approve dialog state
+  const [approveTarget, setApproveTarget] = useState<{ type: 'property' | 'room'; id: number; name: string } | null>(null);
 
   // Quick View Modal state
   const [detailModalTarget, setDetailModalTarget] = useState<{ type: 'property' | 'room'; data: any } | null>(null);
@@ -74,26 +78,19 @@ export default function AdminApprovalPage() {
     });
   };
 
-  // --- PROPERTY ACTIONS ---
-  const handleApproveProperty = async (id: number) => {
+  // --- APPROVE ACTIONS ---
+  const handleConfirmApprove = async () => {
+    if (!approveTarget) return;
     try {
-      setSubmitting(id);
-      await propertyApi.approveProperty(id);
-      toast.success('Đã duyệt khu trọ thành công!');
-      fetchData();
-    } catch (error) {
-      toast.error('Duyệt thất bại');
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  // --- ROOM ACTIONS ---
-  const handleApproveRoom = async (id: number) => {
-    try {
-      setSubmitting(id);
-      await propertyApi.approveRoom(id);
-      toast.success('Đã duyệt phòng thành công!');
+      setSubmitting(approveTarget.id);
+      if (approveTarget.type === 'property') {
+        await propertyApi.approveProperty(approveTarget.id);
+        toast.success('Đã duyệt khu trọ thành công!');
+      } else {
+        await propertyApi.approveRoom(approveTarget.id);
+        toast.success('Đã duyệt phòng thành công!');
+      }
+      setApproveTarget(null);
       fetchData();
     } catch (error) {
       toast.error('Duyệt thất bại');
@@ -110,13 +107,17 @@ export default function AdminApprovalPage() {
 
   const handleConfirmReject = async () => {
     if (!rejectTarget) return;
+    if (!rejectReason.trim()) {
+      toast.warning('Vui lòng nhập lý do từ chối để chủ trọ biết cách khắc phục.');
+      return;
+    }
     setIsRejecting(true);
     try {
       if (rejectTarget.type === 'property') {
-        await propertyApi.rejectProperty(rejectTarget.id, rejectReason || undefined);
+        await propertyApi.rejectProperty(rejectTarget.id, rejectReason.trim());
         toast.success('Đã từ chối khu trọ');
       } else {
-        await propertyApi.rejectRoom(rejectTarget.id, rejectReason || undefined);
+        await propertyApi.rejectRoom(rejectTarget.id, rejectReason.trim());
         toast.success('Đã từ chối phòng');
       }
       setRejectTarget(null);
@@ -297,7 +298,7 @@ export default function AdminApprovalPage() {
   const ActionButtons = ({ id, name, type, item }: { id: number; name: string; type: 'property' | 'room', item: any }) => (
     <div className="flex flex-col gap-2">
       <Button 
-        onClick={() => type === 'property' ? handleApproveProperty(id) : handleApproveRoom(id)}
+        onClick={() => setApproveTarget({ type, id, name })}
         disabled={submitting === id}
         className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
       >
@@ -633,12 +634,8 @@ export default function AdminApprovalPage() {
                 <Button 
                   className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
                   disabled={submitting === detailModalTarget.data.id}
-                  onClick={async () => {
-                    if (detailModalTarget.type === 'property') {
-                      await handleApproveProperty(detailModalTarget.data.id);
-                    } else {
-                      await handleApproveRoom(detailModalTarget.data.id);
-                    }
+                  onClick={() => {
+                    setApproveTarget({ type: detailModalTarget.type, id: detailModalTarget.data.id, name: detailModalTarget.data.name });
                     setDetailModalTarget(null);
                   }}
                 >
@@ -701,6 +698,17 @@ export default function AdminApprovalPage() {
           </div>
         </div>
       )}
+
+      {/* APPROVE DIALOG */}
+      <ConfirmActionDialog
+        open={!!approveTarget}
+        onClose={() => setApproveTarget(null)}
+        onConfirm={handleConfirmApprove}
+        title="Xác nhận duyệt"
+        description={`Bạn có chắc muốn duyệt ${approveTarget?.type === 'property' ? 'khu trọ' : 'phòng'} "${approveTarget?.name}"? Sau khi duyệt, tin đăng sẽ hiển thị công khai trên ứng dụng.`}
+        confirmText="Duyệt ngay"
+        confirmVariant="success"
+      />
     </div>
   );
 }

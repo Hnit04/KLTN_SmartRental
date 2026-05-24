@@ -64,6 +64,7 @@ export default function PropertyCard({ data, userLocation = null }: PropertyCard
           src={thumbnail} 
           alt={data.name} 
           loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition-transform duration-700 will-change-transform group-hover:scale-[1.04]"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-2 pt-6 sm:p-3 sm:pt-8">

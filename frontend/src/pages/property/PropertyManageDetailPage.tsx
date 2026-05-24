@@ -22,6 +22,7 @@ import { vipApi } from '@/api/vipApi';
 import { StatusSummaryStrip, AttentionBanner } from '@/components/detail';
 import type { SummaryStripItem } from '@/components/detail';
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 
 // Danh sách các tiện ích phổ biến
@@ -89,6 +90,8 @@ const RULE_CATEGORIES: { label: string; color: string; rules: { text: string; to
 
 export default function PropertyManageDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [property, setProperty] = useState<Property | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -145,9 +148,9 @@ export default function PropertyManageDetailPage() {
   };
 
   const { formData, setFormData, clearDraft } = useAutoSaveForm(
-    `draft_room_form_${id}`, // Use property id in cache key so drafts are isolated per property
+    `draft_room_form_${id}${editingId ? `_edit_${editingId}` : ''}`, 
     INITIAL_ROOM_DATA,
-    showModal && !editingId
+    showModal
   );
 
   // --- STATE UPLOAD ẢNH ---
@@ -526,6 +529,28 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
   const handleOpenEdit = (room: Room) => { 
     setEditingId(room.id);
     
+    const cacheKey = `draft_room_form_${id}_edit_${room.id}_${user?.id || 'guest'}`;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (cached) {
+      setFormData(JSON.parse(cached));
+      toast.info('Đã khôi phục bản nháp chỉnh sửa phòng dở.', { duration: 4000 });
+      setSelectedFiles([]); 
+      
+      let parsedImages = [];
+      try { parsedImages = room.images ? (typeof room.images === 'string' ? JSON.parse(room.images) : room.images) : []; } catch(e){}
+      setPreviewUrls(parsedImages);
+
+      let parsedPano = [];
+      try { parsedPano = room.panoramaImages ? (typeof room.panoramaImages === 'string' ? JSON.parse(room.panoramaImages) : room.panoramaImages) : []; } catch(e){}
+      setPanoSelectedFiles([]);
+      setPanoPreviewUrls(parsedPano);
+
+      setRoomStep(1);
+      setShowModal(true);
+      return;
+    }
+
     const standardAmenities: string[] = [];
     const customAmenities: string[] = [];
     
@@ -973,6 +998,15 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Thông tin phòng */}
               <div className="p-4 flex-1 flex flex-col">
+                {(room.status === 'REJECTED' || room.approvalStatus === 'REJECTED') && (room as any).moderationReason && (
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Lý do từ chối:</p>
+                      <p className="line-clamp-2">{(room as any).moderationReason}</p>
+                    </div>
+                  </div>
+                )}
                 <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary transition-colors">
                   Phòng {room.name}
                 </h3>

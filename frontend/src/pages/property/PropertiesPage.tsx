@@ -18,6 +18,7 @@ export default function PropertiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter States
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("Tất cả");
   const [maxPrice, setMaxPrice] = useState(20000000); // 20 TRIỆU
@@ -26,16 +27,29 @@ export default function PropertiesPage() {
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "available_desc" | "newest">("default");
   const [isAvailableOnly, setIsAvailableOnly] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
 
   const amenityOptions = ["Máy lạnh", "Gác lửng", "Cho nuôi thú cưng", "Giờ giấc tự do", "Máy giặt"];
 
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (position) => setUserLocation([position.coords.latitude, position.coords.longitude]),
-      () => setUserLocation(null)
+      (position) => {
+        setUserLocation([position.coords.latitude, position.coords.longitude]);
+        setGpsStatus('granted');
+      },
+      () => {
+        setUserLocation(null);
+        setGpsStatus('denied');
+      }
     );
   }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     setPage(0);
@@ -126,8 +140,8 @@ export default function PropertiesPage() {
   ].filter(Boolean).length;
 
   const activeFilters = [
-    searchTerm ? { key: "search", label: `Tu khoa: ${searchTerm}`, onClear: () => setSearchTerm("") } : null,
-    selectedCity !== "Tất cả" ? { key: "city", label: `Khu vuc: ${selectedCity}`, onClear: () => setSelectedCity("Tất cả") } : null,
+    searchTerm ? { key: "search", label: `Từ khóa: ${searchTerm}`, onClear: () => { setSearchInput(""); setSearchTerm(""); } } : null,
+    selectedCity !== "Tất cả" ? { key: "city", label: `Khu vực: ${selectedCity}`, onClear: () => setSelectedCity("Tất cả") } : null,
     maxPrice < 20000000
       ? {
           key: "price",
@@ -145,6 +159,7 @@ export default function PropertiesPage() {
   const resetFilters = () => {
     setMaxPrice(20000000);
     setSelectedAmenities([]);
+    setSearchInput("");
     setSearchTerm("");
     setSelectedCity("Tất cả");
     setSortBy("default");
@@ -176,8 +191,8 @@ export default function PropertiesPage() {
                 <Input 
                   placeholder="Khu vực, đường..." 
                   className="h-9 border-border bg-muted/40 pl-8 text-xs sm:h-10 sm:pl-9 sm:text-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
 
@@ -323,6 +338,15 @@ export default function PropertiesPage() {
 
       {/* --- MAIN CONTENT --- */}
       <div className="page-shell py-5 sm:py-8">
+        {gpsStatus === 'denied' && (
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span>
+              Bạn chưa cấp quyền vị trí. <strong>Bật quyền định vị (GPS)</strong> trong cài đặt trình duyệt để xem các phòng trọ gần bạn nhất.
+            </span>
+          </div>
+        )}
+
         <h2 className="mb-4 flex flex-col gap-2 border-b border-border pb-2 text-base font-bold text-foreground sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xl">
             <div className="min-w-0">
               <span className="leading-tight">Khám phá khu trọ</span>
