@@ -111,11 +111,14 @@ public class AiController {
         String lowerMessage = message.toLowerCase();
         boolean isRoomAnalysis = (lowerMessage.contains("phân tích") || lowerMessage.contains("ưu điểm") 
                 || lowerMessage.contains("nhược điểm") || lowerMessage.contains("đánh giá") 
-                || lowerMessage.contains("lời khuyên") || lowerMessage.contains("tư vấn"))
+                || lowerMessage.contains("lời khuyên") || lowerMessage.contains("tư vấn")
+                || lowerMessage.contains("chi tiết phòng"))
                 && (lowerMessage.contains("diện tích") || lowerMessage.contains("giá thuê") 
                 || lowerMessage.contains("tiện nghi") || lowerMessage.contains("m²")
                 || lowerMessage.contains("khu trọ") || lowerMessage.contains("giá dịch vụ")
-                || lowerMessage.contains("khoảng giá") || lowerMessage.contains("tổng số phòng"));
+                || lowerMessage.contains("khoảng giá") || lowerMessage.contains("tổng số phòng")
+                || lowerMessage.contains("phòng này") || lowerMessage.contains("phòng trọ này")
+                || lowerMessage.contains("căn phòng này"));
         
         if (!isRoomAnalysis) {
             String faqAnswer = aiOrchestratorService.searchFaq(message);
