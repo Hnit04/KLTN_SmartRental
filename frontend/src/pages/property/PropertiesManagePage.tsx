@@ -18,6 +18,7 @@ import type { Property } from '@/types/index';
 import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 
 // Danh sách 63 tỉnh/thành phố Việt Nam
 const VIETNAM_CITIES = [
@@ -372,7 +373,7 @@ export default function PropertiesManagePage() {
         toast.success('Cập nhật khu trọ thành công!');
       } else {
         await propertyApi.createProperty(payload);
-        toast.success('Thêm khu trọ mới thành công!');
+        toast.success('Thêm khu trọ mới thành công! Admin sẽ kiểm duyệt trước khi hiển thị công khai.');
         clearDraft();
       }
       
@@ -625,15 +626,15 @@ export default function PropertiesManagePage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Zap className="h-4 w-4 text-yellow-500" /> Giá điện (đ/kWh)</label>
-                        <input type="number" value={formData.elecPrice} onChange={e => setFormData({...formData, elecPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3500" />
+                        <CurrencyInput value={formData.elecPrice} onChange={val => setFormData({...formData, elecPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3.500" />
                       </div>
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Droplets className="h-4 w-4 text-blue-500" /> Giá nước (đ/m3)</label>
-                        <input type="number" value={formData.waterPrice} onChange={e => setFormData({...formData, waterPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 20000" />
+                        <CurrencyInput value={formData.waterPrice} onChange={val => setFormData({...formData, waterPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 20.000" />
                       </div>
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Wifi className="h-4 w-4 text-gray-500" /> Internet (đ/tháng)</label>
-                        <input type="number" value={formData.internetPrice} onChange={e => setFormData({...formData, internetPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 100000" />
+                        <CurrencyInput value={formData.internetPrice} onChange={val => setFormData({...formData, internetPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 100.000" />
                       </div>
                     </div>
                   </div>

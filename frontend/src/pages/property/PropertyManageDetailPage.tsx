@@ -22,6 +22,7 @@ import { vipApi } from '@/api/vipApi';
 import { StatusSummaryStrip, AttentionBanner } from '@/components/detail';
 import type { SummaryStripItem } from '@/components/detail';
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -758,7 +759,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         toast.success('Cập nhật phòng thành công!');
       } else {
         await propertyApi.createRoom(id!, payload);
-        toast.success('Thêm phòng mới thành công!');
+        toast.success('Thêm phòng mới thành công! Admin sẽ kiểm duyệt trước khi hiển thị công khai.');
       }
       
       setShowModal(false);
@@ -1192,7 +1193,7 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
                             Gợi ý giá AI
                           </button>
                         </label>
-                        <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+                        <CurrencyInput required value={formData.price} onChange={val => setFormData({...formData, price: val})} className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3.000.000" />
                         
                         {/* MODAL GỢI Ý ĐANG CHỌN */}
                         {priceSuggestion && (
