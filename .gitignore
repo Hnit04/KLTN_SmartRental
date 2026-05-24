@@ -47,7 +47,6 @@ backend/models/**/*.onnx
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
-frontend/package-lock.json
 *.local
 
 # ── Environment / Secrets (CRITICAL) ──
