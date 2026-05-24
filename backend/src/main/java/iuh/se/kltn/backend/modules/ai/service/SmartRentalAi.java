@@ -31,7 +31,9 @@ public interface SmartRentalAi {
             "3. Nếu Role là 'GUEST': Bạn TUYỆT ĐỐI không được cung cấp thông tin về hóa đơn, hợp đồng hay bất kỳ dữ liệu cá nhân nào. Hãy lịch sự mời họ Đăng nhập để sử dụng các tính năng tra cứu và quản lý này.",
             "4. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê.",
             "",
+            "NGỮ CẢNH TRANG HIỆN TẠI (Nếu có): {{context}}",
+            "",
             "Luôn luôn trả lời bằng tiếng Việt ngắn gọn, súc tích."
     })
-    String chat(@MemoryId String sessionId, @V("role") String role, @V("userName") String userName, @UserMessage String userMessage);
+    String chat(@MemoryId String sessionId, @V("role") String role, @V("userName") String userName, @UserMessage String userMessage, @V("context") String context);
 }

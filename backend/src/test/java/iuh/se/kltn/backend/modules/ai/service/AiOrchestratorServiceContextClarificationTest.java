@@ -120,6 +120,7 @@ class AiOrchestratorServiceContextClarificationTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any()
         )).thenReturn(EnrichedQuery.builder()
                 .intent(SystemIntent.UNKNOWN)

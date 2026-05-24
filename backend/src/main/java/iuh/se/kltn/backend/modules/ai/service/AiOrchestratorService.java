@@ -282,10 +282,14 @@ public class AiOrchestratorService {
 
     // 1. Thêm 2 tham số role và userId vào hàm
     public Object processDataQuery(String question, String role, Long userId) {
-        return processDataQuery(question, role, userId, null, null);
+        return processDataQuery(question, role, userId, null, null, null);
     }
 
     public Object processDataQuery(String question, String role, Long userId, Double userLatitude, Double userLongitude) {
+        return processDataQuery(question, role, userId, userLatitude, userLongitude, null);
+    }
+
+    public Object processDataQuery(String question, String role, Long userId, Double userLatitude, Double userLongitude, iuh.se.kltn.backend.modules.ai.dto.request.AiPageContext validatedContext) {
         String normalizedQuestion = normalizeText(question);
         boolean currentLocationQuery = isNearCurrentLocationQuery(question, role);
         System.out.println("[LOCATION INPUT] query='" + question + "', isCurrentLocationQuery=" + currentLocationQuery
@@ -554,7 +558,8 @@ public class AiOrchestratorService {
                 userId,
                 role,
                 userLatitude,
-                userLongitude
+                userLongitude,
+                validatedContext
         );
         List<String> contextAssumptions = enrichedQuery.getAssumptions() == null ? List.of() : enrichedQuery.getAssumptions();
 

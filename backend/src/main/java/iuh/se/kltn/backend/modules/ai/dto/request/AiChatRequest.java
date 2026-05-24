@@ -17,4 +17,6 @@ public class AiChatRequest {
     @Size(max = 200, message = "Session ID is too long")
     @JsonAlias({"session", "conversationId"})
     private String sessionId;
+
+    private AiPageContext pageContext;
 }

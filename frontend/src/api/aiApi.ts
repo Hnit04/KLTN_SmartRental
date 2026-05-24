@@ -1,4 +1,5 @@
 import axiosClient from "./axiosClient";
+import type { AiPageContext } from "../utils/aiPageContext";
 
 export interface ChatResponse {
   status: string;
@@ -20,16 +21,17 @@ export interface QueryDataLocationPayload {
 }
 
 export const aiApi = {
-  chat: async (message: string, sessionId?: string): Promise<ChatResponse> => {
-    const response = await axiosClient.post('/ai/chat', { message, sessionId });
+  chat: async (message: string, sessionId?: string, pageContext?: AiPageContext): Promise<ChatResponse> => {
+    const response = await axiosClient.post('/ai/chat', { message, sessionId, pageContext });
     return response.data;
   },
 
   queryData: async (
     question: string,
-    location?: QueryDataLocationPayload | null
+    location?: QueryDataLocationPayload | null,
+    pageContext?: AiPageContext
   ): Promise<QueryDataResponse> => {
-    const payload: { question: string; lat?: number; lng?: number } = { question };
+    const payload: { question: string; lat?: number; lng?: number; pageContext?: AiPageContext } = { question, pageContext };
     if (location) {
       payload.lat = location.lat;
       payload.lng = location.lng;
