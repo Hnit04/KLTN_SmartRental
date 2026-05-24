@@ -25,6 +25,7 @@ public class DynamicQueryEngine {
     public void initHandlers() {
         // --- GUEST / ALL ROLES ---
         handlers.put(SystemIntent.SEARCH_ROOM, this::handleSearchRoom);
+        handlers.put(SystemIntent.VIEW_ROOM_DETAIL, this::handleViewRoomDetail);
 
         // --- TENANT ---
         handlers.put(SystemIntent.VIEW_BILL, this::handleViewBill);
@@ -49,6 +50,30 @@ public class DynamicQueryEngine {
             return handler.handle(intentData, userId, role);
         }
         throw new RuntimeException("No handler found for intent: " + intentData.getIntent());
+    }
+
+    // ========================================================================
+    // VIEW_ROOM_DETAIL: Xem chi tiết 1 phòng cụ thể
+    // ========================================================================
+    private List<Map<String, Object>> handleViewRoomDetail(IntentExtractionResult intentData, Long userId, String role) {
+        Map<String, Object> params = intentData.getParams();
+        Long roomId = null;
+        if (params != null && params.containsKey("roomId")) {
+            roomId = Long.valueOf(params.get("roomId").toString());
+        }
+        
+        if (roomId == null) {
+            throw new IllegalArgumentException("Thiếu roomId để xem chi tiết phòng.");
+        }
+
+        String sql = "SELECT r.id AS room_id, r.name, r.price, r.area, r.type, r.images, " +
+                "r.has_mezzanine, r.has_balcony, r.max_occupants, r.current_occupants, " +
+                "r.amenities, r.default_terms, r.description, r.status, " +
+                "p.name AS property_name, p.address, p.district, p.city, " +
+                "p.elec_price AS elecPrice, p.water_price AS waterPrice, p.internet_price AS internetPrice " +
+                "FROM rooms r JOIN properties p ON r.property_id = p.id WHERE r.id = ?";
+                
+        return jdbcTemplate.queryForList(sql, roomId);
     }
 
     // ========================================================================
@@ -87,6 +112,14 @@ public class DynamicQueryEngine {
         sql.append(" FROM rooms r JOIN properties p ON r.property_id = p.id WHERE r.status = 'AVAILABLE' AND p.status = 'APPROVED'");
 
         if (params != null) {
+            if (params.containsKey("roomId")) {
+                sql.append(" AND r.id = ?");
+                queryParams.add(toInt(params.get("roomId")));
+            }
+            if (params.containsKey("propertyId")) {
+                sql.append(" AND p.id = ?");
+                queryParams.add(toInt(params.get("propertyId")));
+            }
             if (params.containsKey("district")) {
                 sql.append(" AND (p.district LIKE ? OR p.address LIKE ?)");
                 String district = "%" + params.get("district") + "%";
@@ -183,6 +216,10 @@ public class DynamicQueryEngine {
         Map<String, Object> params = intentData.getParams();
 
         if (params != null) {
+            if (params.containsKey("billId")) {
+                sql.append(" AND b.id = ?");
+                queryParams.add(toInt(params.get("billId")));
+            }
             if (params.containsKey("month")) {
                 sql.append(" AND b.month = ?");
                 queryParams.add(toInt(params.get("month")));
@@ -239,9 +276,15 @@ public class DynamicQueryEngine {
         queryParams.add(userId);
         Map<String, Object> params = intentData.getParams();
 
-        if (params != null && params.containsKey("contract_status")) {
-            sql.append(" AND c.status = ?");
-            queryParams.add(params.get("contract_status").toString());
+        if (params != null) {
+            if (params.containsKey("contractId")) {
+                sql.append(" AND c.id = ?");
+                queryParams.add(toInt(params.get("contractId")));
+            }
+            if (params.containsKey("contract_status")) {
+                sql.append(" AND c.status = ?");
+                queryParams.add(params.get("contract_status").toString());
+            }
         }
         sql.append(" ORDER BY c.start_date DESC LIMIT 10");
         return jdbcTemplate.queryForList(sql.toString(), queryParams.toArray());
@@ -358,9 +401,15 @@ public class DynamicQueryEngine {
         queryParams.add(userId);
         Map<String, Object> params = intentData.getParams();
 
-        if (params != null && params.containsKey("property_name")) {
-            sql.append(" AND p.name LIKE ?");
-            queryParams.add("%" + params.get("property_name") + "%");
+        if (params != null) {
+            if (params.containsKey("propertyId")) {
+                sql.append(" AND p.id = ?");
+                queryParams.add(toInt(params.get("propertyId")));
+            }
+            if (params.containsKey("property_name")) {
+                sql.append(" AND p.name LIKE ?");
+                queryParams.add("%" + params.get("property_name") + "%");
+            }
         }
         sql.append(" GROUP BY p.name, r.status ORDER BY p.name, r.status");
         return jdbcTemplate.queryForList(sql.toString(), queryParams.toArray());

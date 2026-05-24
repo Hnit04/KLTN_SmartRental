@@ -116,6 +116,10 @@ public class RuleIntentRouter {
             return Optional.of(RuleIntentResult.of(SystemIntent.SEARCH_ROOM, 0.88));
         }
 
+        if (containsAny(q, "ưu nhược điểm", "ưu điểm", "nhược điểm", "đánh giá", "chi tiết phòng", "thông tin phòng", "tiền điện", "tiền nước", "giá điện", "tính thế nào")) {
+            return Optional.of(RuleIntentResult.of(SystemIntent.VIEW_ROOM_DETAIL, 0.90));
+        }
+
         if (Pattern.compile("(dưới|tầm|khoảng|từ|\\d+)\\s*(triệu|tr|củ|trăm)").matcher(q).find()
                 && !containsAny(q, "hóa đơn", "hoá đơn", "nợ", "doanh thu")) {
             return Optional.of(RuleIntentResult.of(SystemIntent.SEARCH_ROOM, 0.85));
