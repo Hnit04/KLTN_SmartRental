@@ -1,4 +1,5 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { propertyApi } from '@/api/propertyApi';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -7,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
 import { Button } from '@/components/ui/Button';
 import StatusBadge from '@/components/shared/StatusBadge';
+import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
 import { toast } from 'sonner';
 import { 
   Loader2, CheckCircle, XCircle, Building, MapPin, ExternalLink, 
@@ -23,9 +25,7 @@ type SortType = 'newest' | 'score_asc' | 'score_desc';
 
 export default function AdminApprovalPage() {
   const [activeTab, setActiveTab] = useState<TabType>('properties');
-  const [pendingProperties, setPendingProperties] = useState<Property[]>([]);
-  const [pendingRooms, setPendingRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortType>('newest');
 
@@ -34,29 +34,35 @@ export default function AdminApprovalPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
 
+  // Approve dialog state
+  const [approveTarget, setApproveTarget] = useState<{ type: 'property' | 'room'; id: number; name: string } | null>(null);
+
   // Quick View Modal state
   const [detailModalTarget, setDetailModalTarget] = useState<{ type: 'property' | 'room'; data: any } | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+  const { data: pendingProperties = [], isLoading: loadingProperties } = useQuery({
+    queryKey: ['pendingProperties'],
+    queryFn: async () => {
+      const res = await propertyApi.getPendingProperties();
+      return (res as any).data || res;
+    },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+    enabled: activeTab === 'properties'
+  });
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'properties') {
-        const res = await propertyApi.getPendingProperties();
-        setPendingProperties((res as any).data || res);
-      } else {
-        const res = await propertyApi.getPendingRooms();
-        setPendingRooms((res as any).data || res);
-      }
-    } catch (error) {
-      toast.error('Không thể tải danh sách chờ duyệt');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: pendingRooms = [], isLoading: loadingRooms } = useQuery({
+    queryKey: ['pendingRooms'],
+    queryFn: async () => {
+      const res = await propertyApi.getPendingRooms();
+      return (res as any).data || res;
+    },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+    enabled: activeTab === 'rooms'
+  });
+
+  const loading = activeTab === 'properties' ? loadingProperties : loadingRooms;
 
   // Sort helper
   const sortItems = <T extends { safetyScore?: number | null; id?: number }>(items: T[]): T[] => {
@@ -67,27 +73,21 @@ export default function AdminApprovalPage() {
     });
   };
 
-  // --- PROPERTY ACTIONS ---
-  const handleApproveProperty = async (id: number) => {
+  // --- APPROVE ACTIONS ---
+  const handleConfirmApprove = async () => {
+    if (!approveTarget) return;
     try {
-      setSubmitting(id);
-      await propertyApi.approveProperty(id);
-      toast.success('Đã duyệt khu trọ thành công!');
-      fetchData();
-    } catch (error) {
-      toast.error('Duyệt thất bại');
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  // --- ROOM ACTIONS ---
-  const handleApproveRoom = async (id: number) => {
-    try {
-      setSubmitting(id);
-      await propertyApi.approveRoom(id);
-      toast.success('Đã duyệt phòng thành công!');
-      fetchData();
+      setSubmitting(approveTarget.id);
+      if (approveTarget.type === 'property') {
+        await propertyApi.approveProperty(approveTarget.id);
+        toast.success('Đã duyệt khu trọ thành công!');
+      } else {
+        await propertyApi.approveRoom(approveTarget.id);
+        toast.success('Đã duyệt phòng thành công!');
+      }
+      setApproveTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['pendingProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingRooms'] });
     } catch (error) {
       toast.error('Duyệt thất bại');
     } finally {
@@ -103,17 +103,22 @@ export default function AdminApprovalPage() {
 
   const handleConfirmReject = async () => {
     if (!rejectTarget) return;
+    if (!rejectReason.trim()) {
+      toast.warning('Vui lòng nhập lý do từ chối để chủ trọ biết cách khắc phục.');
+      return;
+    }
     setIsRejecting(true);
     try {
       if (rejectTarget.type === 'property') {
-        await propertyApi.rejectProperty(rejectTarget.id, rejectReason || undefined);
+        await propertyApi.rejectProperty(rejectTarget.id, rejectReason.trim());
         toast.success('Đã từ chối khu trọ');
       } else {
-        await propertyApi.rejectRoom(rejectTarget.id, rejectReason || undefined);
+        await propertyApi.rejectRoom(rejectTarget.id, rejectReason.trim());
         toast.success('Đã từ chối phòng');
       }
       setRejectTarget(null);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pendingProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingRooms'] });
     } catch (error) {
       toast.error('Thao tác thất bại');
     } finally {
@@ -124,6 +129,72 @@ export default function AdminApprovalPage() {
   // --- AI SCORE BADGE ---
   const AiScoreBadge = ({ score, reason }: { score?: number | null; reason?: string | null }) => {
     const s = score || 0;
+
+    // Parse reason string into structured parts
+    const parseReason = (raw: string) => {
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      const scoreParts: string[] = [];
+      const ruleNotes: string[] = [];
+      let aiNote = '';
+
+      // Dictionary to fix legacy non-diacritic strings already stored in the DB
+      const fixLegacyString = (text: string) => {
+        const dictionary: Record<string, string> = {
+          'Mot so anh co do phan giai qua thap.': 'Một số ảnh có độ phân giải quá thấp.',
+          'Mot so anh qua toi/sang hoac co dau hieu mo.': 'Một số ảnh quá tối/sáng hoặc có dấu hiệu mờ.',
+          'NEEDS_REVIEW: Khong co anh de phan loai scene.': '⚠️ Không có ảnh để phân loại cảnh.',
+          'NEEDS_REVIEW: Khong du du lieu phan loai anh phong tro.': '⚠️ Không đủ dữ liệu phân loại ảnh phòng trọ.',
+          'NEEDS_REVIEW: Scene classifier phat hien nhan DOCUMENT/OTHER.': '⚠️ Phát hiện ảnh tài liệu/không liên quan đến phòng trọ.',
+          'NEEDS_REVIEW: Scene classifier: anh co ty le phong tro thap, can Admin xem lai.': '⚠️ Ảnh có tỷ lệ phòng trọ thấp, cần Admin xem lại.',
+          'NEEDS_REVIEW: Scene classifier: phat hien nhieu anh DOCUMENT/OTHER, can Admin review.': '⚠️ Phát hiện nhiều ảnh tài liệu/không phải phòng, cần Admin xem lại.',
+          'Scene classifier: da so anh co ngu canh phong tro/noi that.': 'Đa số ảnh có ngữ cảnh phòng trọ/nội thất. ✓',
+          'Khong co anh phong hop le.': 'Không có ảnh phòng hợp lệ.',
+          'So luong anh phong qua it de xac thuc.': 'Số lượng ảnh phòng quá ít để xác thực.',
+          'Gia thue bat thuong so voi mat bang thi truong.': 'Giá thuê bất thường so với mặt bằng thị trường.',
+          'Dien tich bat thuong cho phong tro.': 'Diện tích bất thường cho phòng trọ.',
+          'So nguoi toi da khong hop ly.': 'Số người tối đa không hợp lý.',
+          'Gia/m2 bat thuong.': 'Giá/m² bất thường.',
+          'Mat do nguoi o qua cao so voi dien tich.': 'Mật độ người ở quá cao so với diện tích.',
+          'RISK_CAP: Tỷ lệ ảnh phòng quá thấp (<25%).': '🚫 Tỷ lệ ảnh phòng quá thấp (dưới 25%).',
+          'RISK_CAP: Đa số ảnh không hợp lệ/đáng ngờ (>=75%).': '🚫 Đa số ảnh không hợp lệ hoặc đáng ngờ.',
+          'RISK_CAP: Tỷ lệ ảnh không hợp lệ/đáng ngờ cao (>=50%).': '🚫 Tỷ lệ ảnh không hợp lệ/đáng ngờ cao.',
+          'RISK_CAP: Tỷ lệ ảnh phòng thấp (<40%).': '🚫 Tỷ lệ ảnh phòng thấp (dưới 40%).',
+          'RISK_CAP: Dữ liệu giá/diện tích/sức chứa vô lý.': '🚫 Dữ liệu giá/diện tích/sức chứa vô lý.',
+        };
+        return dictionary[text] || text;
+      };
+
+      for (const line of lines) {
+        if (line.startsWith('[RULE]')) {
+          const content = line.replace('[RULE]', '').trim();
+          const parts = content.split(' - ');
+          scoreParts.push(parts[0]); // e.g. "SafetyScore=55/100, RiskLevel=HIGH_RISK"
+          
+          const notesMatch = line.match(/Rule notes:\s*(.+)$/);
+          if (notesMatch) {
+            notesMatch[1].split(' | ').forEach(note => {
+              const trimmed = note.trim();
+              if (trimmed) ruleNotes.push(fixLegacyString(trimmed));
+            });
+          }
+        } else if (line.startsWith('- contentScore') || line.startsWith('- imageScore') || line.startsWith('- completenessScore') || line.startsWith('- policyScore')) {
+          scoreParts.push(line.replace('- ', '').trim());
+        } else if (line.startsWith('- Rule notes:')) {
+          line.replace('- Rule notes:', '').split(' | ').forEach(note => {
+            const trimmed = note.trim();
+            if (trimmed) ruleNotes.push(fixLegacyString(trimmed));
+          });
+        } else if (line.startsWith('[AI NOTE]')) {
+          aiNote = line.replace('[AI NOTE] ', '').trim();
+        }
+      }
+
+      const scoreBreakdown = scoreParts.join(', ');
+      return { scoreBreakdown, ruleNotes, aiNote };
+    };
+
+    const parsed = reason ? parseReason(reason) : null;
+
     return (
       <div className={`mt-4 rounded-lg border p-3 ${
         s < 50 ? 'border-red-200 bg-red-50/90' : 'border-border/60 bg-muted/30'
@@ -157,9 +228,63 @@ export default function AdminApprovalPage() {
             Phân tích tự động từ AI
           </span>
         </div>
-        {reason && (
-          <div className="mt-2 rounded border border-border/60 bg-card p-2 text-xs text-foreground/90">
-            <span className="font-semibold text-foreground">Lý do chấm điểm:</span> {reason}
+        {parsed && (
+          <div className="mt-2 space-y-2">
+            {/* Score breakdown */}
+            {parsed.scoreBreakdown && (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground font-mono">
+                {parsed.scoreBreakdown.split(',').map((part, i) => {
+                  const trimmed = part.trim();
+                  const match = trimmed.match(/(\w+)=(\d+)\/(\d+)/);
+                  if (!match) return <span key={i}>{trimmed}</span>;
+                  const [, label, val, max] = match;
+                  const ratio = parseInt(val) / parseInt(max);
+                  const labelMap: Record<string, string> = {
+                    'SafetyScore': '🏆 Tổng',
+                    'contentScore': '📝 Nội dung',
+                    'imageScore': '🖼️ Hình ảnh',
+                    'completenessScore': '📋 Đầy đủ',
+                    'policyScore': '📜 Chính sách',
+                  };
+                  return (
+                    <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      ratio >= 0.8 ? 'bg-emerald-50 text-emerald-700' : 
+                      ratio >= 0.5 ? 'bg-amber-50 text-amber-700' : 
+                      'bg-red-50 text-red-700'
+                    }`}>
+                      {labelMap[label] || label}: {val}/{max}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {/* Rule notes as list */}
+            {parsed.ruleNotes.length > 0 && (
+              <div className="rounded border border-border/60 bg-card p-2">
+                <p className="text-[11px] font-semibold text-foreground mb-1">Chi tiết đánh giá:</p>
+                <ul className="space-y-0.5">
+                  {parsed.ruleNotes.map((note, i) => (
+                    <li key={i} className={`text-[11px] leading-relaxed flex items-start gap-1.5 ${
+                      note.startsWith('⚠️') ? 'text-amber-700 font-medium' : 
+                      note.startsWith('🚫') ? 'text-red-700 font-medium' : 
+                      note.includes('✓') ? 'text-emerald-700' :
+                      'text-foreground/80'
+                    }`}>
+                      {!note.startsWith('⚠️') && !note.startsWith('🚫') && !note.includes('✓') && (
+                        <span className="shrink-0 mt-0.5">•</span>
+                      )}
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* AI Note */}
+            {parsed.aiNote && (
+              <p className="text-[10px] italic text-muted-foreground">
+                💡 {parsed.aiNote}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -170,7 +295,7 @@ export default function AdminApprovalPage() {
   const ActionButtons = ({ id, name, type, item }: { id: number; name: string; type: 'property' | 'room', item: any }) => (
     <div className="flex flex-col gap-2">
       <Button 
-        onClick={() => type === 'property' ? handleApproveProperty(id) : handleApproveRoom(id)}
+        onClick={() => setApproveTarget({ type, id, name })}
         disabled={submitting === id}
         className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
       >
@@ -506,12 +631,8 @@ export default function AdminApprovalPage() {
                 <Button 
                   className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
                   disabled={submitting === detailModalTarget.data.id}
-                  onClick={async () => {
-                    if (detailModalTarget.type === 'property') {
-                      await handleApproveProperty(detailModalTarget.data.id);
-                    } else {
-                      await handleApproveRoom(detailModalTarget.data.id);
-                    }
+                  onClick={() => {
+                    setApproveTarget({ type: detailModalTarget.type, id: detailModalTarget.data.id, name: detailModalTarget.data.name });
                     setDetailModalTarget(null);
                   }}
                 >
@@ -574,6 +695,17 @@ export default function AdminApprovalPage() {
           </div>
         </div>
       )}
+
+      {/* APPROVE DIALOG */}
+      <ConfirmActionDialog
+        open={!!approveTarget}
+        onClose={() => setApproveTarget(null)}
+        onConfirm={handleConfirmApprove}
+        title="Xác nhận duyệt"
+        description={`Bạn có chắc muốn duyệt ${approveTarget?.type === 'property' ? 'khu trọ' : 'phòng'} "${approveTarget?.name}"? Sau khi duyệt, tin đăng sẽ hiển thị công khai trên ứng dụng.`}
+        confirmText="Duyệt ngay"
+        confirmVariant="success"
+      />
     </div>
   );
 }

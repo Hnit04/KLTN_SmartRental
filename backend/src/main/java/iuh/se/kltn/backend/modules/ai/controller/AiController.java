@@ -8,6 +8,7 @@ import dev.langchain4j.model.chat.ChatLanguageModel;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -72,6 +73,9 @@ public class AiController {
     @Autowired
     private RagKnowledgeService ragKnowledgeService;
 
+    @Value("${ai.llm.mode:FULL}")
+    private String aiLlmMode;
+
 
     @PostMapping("/chat")
     public ResponseEntity<?> chatWithAi(
@@ -115,6 +119,15 @@ public class AiController {
             }
         } else {
             System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Bỏ qua FAQ Cache, chuyển thẳng cho SmartRentalAi.");
+        }
+
+        if (!"FULL".equals(resolveLlmMode())) {
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "sessionId", sessionId,
+                    "reply", "Da, che do chat AI dang tam tat theo cau hinh hien tai. Ban vui long dung tra cuu du lieu hoac FAQ.",
+                    "source", "LLM_DISABLED_MODE"
+            ));
         }
 
         // B2: Nếu không thấy, gọi mô hình LLM
@@ -423,7 +436,7 @@ public class AiController {
 
             if (dueBills.isEmpty()) {
                 String emptyMessage = "OVERDUE".equals(normalizedScope)
-                        ? "Khong co phong nao dang no hoac qua han thanh toan."
+                        ? "Không có phòng nào đang nợ hoặc quá hạn thanh toán."
                         : "Khong co hoa don nao sap den han trong khoang thoi gian da chon.";
                 return ResponseEntity.ok(Map.of(
                         "status", "success",
@@ -450,21 +463,38 @@ public class AiController {
                 billDataList.add(map);
             }
 
-            String billsJson = objectMapper.writeValueAsString(billDataList);
-            String aiResultString = draftReminderAi.generateReminders(billsJson);
-            aiResultString = aiResultString.replace("```json", "").replace("```", "").trim();
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> draftedReminders = objectMapper.readValue(aiResultString, List.class);
+            List<Map<String, Object>> draftedReminders;
+            if ("FULL".equals(resolveLlmMode())) {
+                try {
+                    String billsJson = objectMapper.writeValueAsString(billDataList);
+                    String aiResultString = draftReminderAi.generateReminders(billsJson);
+                    aiResultString = aiResultString.replace("```json", "").replace("```", "").trim();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> aiDrafts = objectMapper.readValue(aiResultString, List.class);
+                    draftedReminders = aiDrafts;
+                } catch (Exception ex) {
+                    System.err.println("[AI REMINDER WARN] fallback to template: " + ex.getMessage());
+                    draftedReminders = buildTemplateReminderDrafts(billDataList, normalizedScope);
+                }
+            } else {
+                draftedReminders = buildTemplateReminderDrafts(billDataList, normalizedScope);
+            }
 
             for (Map<String, Object> draft : draftedReminders) {
-                Long billId = Long.valueOf(draft.get("billId").toString());
+                Object billIdObj = draft.get("billId");
+                if (billIdObj == null) {
+                    continue;
+                }
+                Long billId = Long.valueOf(billIdObj.toString());
                 Map<String, Object> matchedBill = billDataList.stream()
                         .filter(b -> Long.valueOf(b.get("billId").toString()).equals(billId))
                         .findFirst().orElse(null);
                 if (matchedBill != null) {
                     draft.put("tenantId", matchedBill.get("tenantId"));
                     draft.put("roomName", matchedBill.get("roomName"));
+                    if (!draft.containsKey("draftedMessage") || draft.get("draftedMessage") == null) {
+                        draft.put("draftedMessage", buildTemplateReminderMessage(matchedBill, normalizedScope));
+                    }
                 }
             }
 
@@ -489,17 +519,15 @@ public class AiController {
         try {
             Long landlordId = currentUser.getId();
             List<Bill> allBills = billRepository.findAllByContract_Room_Property_Landlord_IdOrderByYearDescMonthDesc(landlordId);
-            
+
             if (allBills.isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "success", "report", "Chưa có dữ liệu hóa đơn để phân tích."));
+                return ResponseEntity.ok(Map.of("status", "success", "report", "Chua co du lieu hoa don de phan tich."));
             }
 
-            // Lấy thông tin tháng/năm mới nhất có trong DB
             Bill theLatest = allBills.get(0);
             int latestYear = theLatest.getYear();
             int latestMonth = theLatest.getMonth();
 
-            // Tính toán mức tiêu thụ trung bình của toàn bộ khu trọ trong tháng mới nhất (để tìm Outlier)
             List<Bill> latestMonthBills = allBills.stream()
                     .filter(b -> b.getYear() == latestYear && b.getMonth() == latestMonth)
                     .collect(Collectors.toList());
@@ -523,10 +551,9 @@ public class AiController {
             double avgElec = countElec > 0 ? totalElec / countElec : 0;
             double avgWater = countWater > 0 ? totalWater / countWater : 0;
 
-            // Group bills by Room ID để so sánh với tháng trước (Time-series)
             Map<Long, List<Bill>> billsByRoom = allBills.stream()
                     .collect(Collectors.groupingBy(b -> b.getContract().getRoom().getId()));
-            
+
             List<Map<String, Object>> anomalies = new ArrayList<>();
 
             for (Map.Entry<Long, List<Bill>> entry : billsByRoom.entrySet()) {
@@ -534,8 +561,10 @@ public class AiController {
                 Bill latestBill = roomBills.stream()
                         .filter(b -> b.getYear() == latestYear && b.getMonth() == latestMonth)
                         .findFirst().orElse(null);
-                
-                if (latestBill == null) continue;
+
+                if (latestBill == null) {
+                    continue;
+                }
 
                 int currElec = (latestBill.getNewElecIndex() != null && latestBill.getOldElecIndex() != null) ? (latestBill.getNewElecIndex() - latestBill.getOldElecIndex()) : 0;
                 int currWater = (latestBill.getNewWaterIndex() != null && latestBill.getOldWaterIndex() != null) ? (latestBill.getNewWaterIndex() - latestBill.getOldWaterIndex()) : 0;
@@ -546,60 +575,63 @@ public class AiController {
                 anomalyData.put("avgElecSystem", Math.round(avgElec));
                 anomalyData.put("avgWaterSystem", Math.round(avgWater));
 
-                // 1. So sánh với CHÍNH NÓ tháng trước (Time-series)
                 if (roomBills.size() >= 2) {
-                    // Tìm bill của tháng ngay trước đó (ví dụ: month-1 hoặc year-1 month 12)
-                    // Ở đây lấy đơn giản là index 1 vì đã sort Desc, nhưng có thể bị lệch nếu thiếu tháng.
-                    // Tuy nhiên với nghiệp vụ trọ thường bill ra hàng tháng nên index 1 là tin cậy.
-                    Bill prevBill = roomBills.get(1); 
+                    Bill prevBill = roomBills.get(1);
                     int prevElec = (prevBill.getNewElecIndex() != null && prevBill.getOldElecIndex() != null) ? (prevBill.getNewElecIndex() - prevBill.getOldElecIndex()) : 0;
                     int prevWater = (prevBill.getNewWaterIndex() != null && prevBill.getOldWaterIndex() != null) ? (prevBill.getNewWaterIndex() - prevBill.getOldWaterIndex()) : 0;
 
                     if (prevElec > 0 && currElec >= prevElec * 1.35) {
-                        anomalyData.put("electricityTimeAnomaly", String.format("Tăng %d%% so với tháng trước (Từ %d lên %d kWh)", ((currElec - prevElec) * 100 / prevElec), prevElec, currElec));
+                        anomalyData.put("electricityTimeAnomaly", String.format("Tang %d%% so voi thang truoc (tu %d len %d kWh)", ((currElec - prevElec) * 100 / prevElec), prevElec, currElec));
                         isAnomaly = true;
                     }
                     if (prevWater > 0 && currWater >= prevWater * 1.35) {
-                        anomalyData.put("waterTimeAnomaly", String.format("Tăng %d%% so với tháng trước (Từ %d lên %d m3)", ((currWater - prevWater) * 100 / prevWater), prevWater, currWater));
+                        anomalyData.put("waterTimeAnomaly", String.format("Tang %d%% so voi thang truoc (tu %d len %d m3)", ((currWater - prevWater) * 100 / prevWater), prevWater, currWater));
                         isAnomaly = true;
                     }
                 }
 
-                // 2. So sánh với MẶT BẰNG CHUNG tòa nhà (Cross-sectional Outlier)
-                // Ngưỡng: Điện 2.0x Avg, Nước 1.5x Avg
                 if (avgElec > 0 && currElec >= avgElec * 2.0) {
-                    anomalyData.put("electricityOutlier", String.format("Vượt 200%% mức trung bình tòa nhà (%d so với trung bình %d kWh)", currElec, (int)avgElec));
+                    anomalyData.put("electricityOutlier", String.format("Vuot 200%% muc trung binh toa nha (%d so voi trung binh %d kWh)", currElec, (int) avgElec));
                     isAnomaly = true;
                 }
                 if (avgWater > 0 && currWater >= avgWater * 1.5) {
-                    anomalyData.put("waterOutlier", String.format("Vượt 150%% mức trung bình tòa nhà (%d so với trung bình %d m3)", currWater, (int)avgWater));
+                    anomalyData.put("waterOutlier", String.format("Vuot 150%% muc trung binh toa nha (%d so voi trung binh %d m3)", currWater, (int) avgWater));
                     isAnomaly = true;
                 }
-                
+
                 if (isAnomaly) {
                     anomalies.add(anomalyData);
                 }
             }
 
             if (anomalies.isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "success", "report", "✅ Hệ thống không phát hiện dấu hiệu bất thường nào. Lượng tiêu thụ điện nước của các phòng đều nằm trong ngưỡng ổn định so với tháng trước và mặt bằng chung của tòa nhà."));
+                return ResponseEntity.ok(Map.of("status", "success", "report", "He thong khong phat hien dau hieu bat thuong nao trong ky gan nhat."));
             }
 
-            String anomaliesJson = objectMapper.writeValueAsString(anomalies);
-            String report = anomalyAi.generateAnomalyReport(anomaliesJson);
-            
-            // Clean markdown blocks
-            report = report.replace("```markdown", "").replace("```", "").trim();
+            String report;
+            if ("FULL".equals(resolveLlmMode())) {
+                try {
+                    String anomaliesJson = objectMapper.writeValueAsString(anomalies);
+                    report = anomalyAi.generateAnomalyReport(anomaliesJson);
+                    report = report.replace("```markdown", "").replace("```", "").trim();
+                } catch (Exception ex) {
+                    System.err.println("[AI ANOMALY WARN] fallback to template: " + ex.getMessage());
+                    report = buildTemplateAnomalyReport(anomalies, latestMonth, latestYear);
+                }
+            } else {
+                report = buildTemplateAnomalyReport(anomalies, latestMonth, latestYear);
+            }
 
             return ResponseEntity.ok(Map.of("status", "success", "report", report));
-        } catch(Throwable t) {
-            System.err.println("❌ [AI ANOMALY ERROR] " + t.getMessage());
+        } catch (Throwable t) {
+            System.err.println("[AI ANOMALY ERROR] " + t.getMessage());
             return ResponseEntity.status(503).body(Map.of(
-                "status", "error", 
-                "message", "Dịch vụ AI phân tích đang bận (503). Vui lòng thử lại sau giây lát."
+                    "status", "error",
+                    "message", "Dich vu phan tich dang ban. Vui long thu lai sau giay lat."
             ));
         }
     }
+
 
     @PostMapping("/actions/send-reminders")
     public ResponseEntity<?> sendReminders(@Valid @RequestBody @NotEmpty List<AiReminderApprovalRequest> approvedReminders,
@@ -679,24 +711,25 @@ public class AiController {
     public ResponseEntity<?> generateRoomDescription(@Valid @RequestBody AiRoomDescriptionRequest request) {
         String prompt = request.getPrompt();
         if (prompt == null || prompt.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Vui lòng cung cấp thông tin phòng"));
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Vui long cung cap thong tin phong"));
+        }
+
+        if (!"FULL".equals(resolveLlmMode())) {
+            return ResponseEntity.ok(Map.of("description", buildTemplateRoomDescription(prompt)));
         }
 
         try {
             String aiPrompt = String.format(
                 "Bạn là chuyên gia viết nội dung cho website cho thuê phòng trọ. " +
                 "Hãy viết một đoạn mô tả phòng trọ hấp dẫn, ngắn gọn (3-5 câu), bằng tiếng Việt, " +
-                "dựa trên thông tin sau. Chỉ trả về nội dung mô tả, KHÔNG thêm tiêu đề hay giải thích gì khác.\n\n" +
-                "Thông tin phòng: %s", prompt);
+                "dua tren thong tin sau. Chi tra ve noi dung mo ta, KHONG them tieu de hay giai thich gi khac.\n\n" +
+                "Thong tin phong: %s", prompt);
 
             String description = geminiChatModel.generate(aiPrompt);
             return ResponseEntity.ok(Map.of("description", description));
         } catch (Throwable t) {
-            System.err.println("Lỗi AI generate description: " + t.getMessage());
-            return ResponseEntity.status(503).body(Map.of(
-                "status", "error", 
-                "message", "Dịch vụ AI đang bận. Không thể tạo mô tả lúc này. Vui lòng thử lại sau."
-            ));
+            System.err.println("AI description fallback template: " + t.getMessage());
+            return ResponseEntity.ok(Map.of("description", buildTemplateRoomDescription(prompt)));
         }
     }
 
@@ -712,51 +745,197 @@ public class AiController {
         String type = request.getType();
         List<String> amenities = request.getAmenities();
 
-        String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Không có";
-        
-        // Tạo câu hỏi chuẩn hóa để tìm trong Cache
+        String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Khong co";
         String standardizedQuestion = String.format("PRICE_SUGGEST:%s:%s:%s:%.0f", city, district, type, area);
         String rawQueryForLog = String.format("Gợi ý giá phòng %s, diện tích %.1f m2 tại Quận %s, %s.", type, area, district, city);
 
-        // 1. KIỂM TRA CACHE TRƯỚC (Để tiết kiệm Token)
         String cachedResponse = aiOrchestratorService.searchFaq(standardizedQuestion);
         if (cachedResponse != null) {
             try {
-                System.out.println("⚡ [PRICE CACHE HIT] Reusing suggestion for: " + standardizedQuestion);
                 saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 1.0, false, startTime, true);
                 return ResponseEntity.ok(objectMapper.readValue(cachedResponse, Map.class));
             } catch (Exception e) {
-                System.err.println("Lỗi parse cache: " + e.getMessage());
+                System.err.println("Price cache parse error: " + e.getMessage());
             }
         }
 
+        Map<String, Object> templateSuggestion = buildDeterministicPriceSuggestion(district, city, area, type, amenities);
+        if (!"FULL".equals(resolveLlmMode())) {
+            try {
+                aiOrchestratorService.addFaq(standardizedQuestion, objectMapper.writeValueAsString(templateSuggestion));
+            } catch (Exception ignored) {
+            }
+            saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 1.0, false, startTime, true);
+            return ResponseEntity.ok(templateSuggestion);
+        }
+
         try {
-            // 2. NẾU KHÔNG CÓ TRONG CACHE -> GỌI GEMINI
             String aiPrompt = String.format(
                 "Gợi ý KHOẢNG GIÁ thuê (VND) phòng %s, %.1f m2 tại Q.%s, %s. Tiện ích: %s.\n" +
-                "Trả về JSON: {\"suggestion\": \"Khoảng giá\", \"reason\": \"Lý do ngắn gọn\"}. Chỉ trả về JSON.",
+                "Tra ve JSON: {\"suggestion\": \"Khoang gia\", \"reason\": \"Ly do ngan gon\"}. Chi tra ve JSON.",
                 type, area, district, city, amenitiesStr
             );
 
             String response = geminiChatModel.generate(aiPrompt);
             response = response.replace("```json", "").replace("```", "").trim();
-            
-            // 3. LƯU VÀO CACHE FAQ (Dùng làm tri thức cho lần sau)
-            aiOrchestratorService.addFaq(standardizedQuestion, response);
-
-            // 4. LƯU LOG
+            Map<String, Object> parsed = objectMapper.readValue(response, Map.class);
+            if (!parsed.containsKey("suggestion")) {
+                parsed.putAll(templateSuggestion);
+            }
+            aiOrchestratorService.addFaq(standardizedQuestion, objectMapper.writeValueAsString(parsed));
             saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 1.0, false, startTime, true);
-
-            return ResponseEntity.ok(objectMapper.readValue(response, Map.class));
+            return ResponseEntity.ok(parsed);
         } catch (Throwable t) {
-            System.err.println("❌ [AI PRICE SUGGEST ERROR] " + t.getMessage());
-            saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 0.0, true, startTime, false);
-
-            return ResponseEntity.status(503).body(Map.of(
-                "status", "error", 
-                "message", "Dịch vụ AI đang bận. Không thể đưa ra gợi ý lúc này."
-            ));
+            System.err.println("AI price suggest fallback deterministic: " + t.getMessage());
+            saveActionLog(userIdFrom(currentUser), roleFrom(currentUser), rawQueryForLog, "SUGGEST_PRICE", 0.6, true, startTime, true);
+            return ResponseEntity.ok(templateSuggestion);
         }
+    }
+
+
+    private List<Map<String, Object>> buildTemplateReminderDrafts(List<Map<String, Object>> billDataList, String scope) {
+        List<Map<String, Object>> drafts = new ArrayList<>();
+        for (Map<String, Object> bill : billDataList) {
+            Map<String, Object> draft = new HashMap<>();
+            draft.put("billId", bill.get("billId"));
+            draft.put("roomId", bill.get("roomId"));
+            draft.put("tenantName", bill.get("tenantName"));
+            draft.put("draftedMessage", buildTemplateReminderMessage(bill, scope));
+            drafts.add(draft);
+        }
+        return drafts;
+    }
+
+    private String buildTemplateReminderMessage(Map<String, Object> bill, String scope) {
+        String tenantName = String.valueOf(bill.getOrDefault("tenantName", "ban"));
+        String roomName = String.valueOf(bill.getOrDefault("roomName", "phong"));
+        long amount = parseLongValue(bill.get("totalAmount"));
+        String deadline = String.valueOf(bill.getOrDefault("deadline", ""));
+        String amountText = formatCurrencyVnd(amount);
+
+        if ("DUE_SOON".equalsIgnoreCase(scope)) {
+            return String.format(
+                    "Chào %s, phòng %s sắp đến hạn thanh toán. Tổng số tiền kỳ này là %s, hạn cuối %s. Nhớ bạn sắp xếp thanh toán đúng hạn giúp mình nhé.",
+                    tenantName, roomName, amountText, deadline
+            );
+        }
+
+        return String.format(
+                "Chào %s, phòng %s hiện đang quá hạn/chưa thanh toán. Tổng số tiền cần thanh toán là %s, hạn %s. Bạn vui lòng thanh toán sớm để tránh phát sinh phí phạt.",
+                tenantName, roomName, amountText, deadline
+        );
+    }
+
+    private String buildTemplateAnomalyReport(List<Map<String, Object>> anomalies, int latestMonth, int latestYear) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Bao cao bat thuong dien nuoc thang ").append(latestMonth).append("/").append(latestYear).append("\n\n");
+        sb.append("Tổng số phòng cảnh báo: ").append(anomalies.size()).append("\n\n");
+
+        int idx = 1;
+        for (Map<String, Object> anomaly : anomalies) {
+            if (idx > 10) {
+                sb.append("... và ").append(anomalies.size() - 10).append(" phòng cảnh báo khác.\n");
+                break;
+            }
+            sb.append(idx).append(". Phong: ").append(String.valueOf(anomaly.getOrDefault("roomName", "N/A"))).append("\n");
+            if (anomaly.get("electricityTimeAnomaly") != null) {
+                sb.append("- Dien (time-series): ").append(anomaly.get("electricityTimeAnomaly")).append("\n");
+            }
+            if (anomaly.get("waterTimeAnomaly") != null) {
+                sb.append("- Nuoc (time-series): ").append(anomaly.get("waterTimeAnomaly")).append("\n");
+            }
+            if (anomaly.get("electricityOutlier") != null) {
+                sb.append("- Dien (outlier): ").append(anomaly.get("electricityOutlier")).append("\n");
+            }
+            if (anomaly.get("waterOutlier") != null) {
+                sb.append("- Nuoc (outlier): ").append(anomaly.get("waterOutlier")).append("\n");
+            }
+            sb.append("- De xuat: Kiem tra thiet bi cong suat lon, ra soat ro ri, va lien he khach thue de xac minh nhu cau su dung thuc te.\n\n");
+            idx++;
+        }
+
+        sb.append("Khuyen nghi chung:\n");
+        sb.append("- Kiểm tra phòng có dấu hiệu tăng đột biến >35% ngay trong kỳ tiếp theo.\n");
+        sb.append("- Đặt ngưỡng cảnh báo cho phòng vượt >2.0x điện hoặc >1.5x nước so với trung bình.\n");
+        sb.append("- Uu tien xu ly truong hop vuot nguong cao de giam rui ro chay no/ngap nuoc.\n");
+        return sb.toString();
+    }
+
+    private String buildTemplateRoomDescription(String prompt) {
+        String clean = prompt == null ? "" : prompt.replaceAll("\\s+", " ").trim();
+        if (clean.length() > 240) {
+            clean = clean.substring(0, 240) + "...";
+        }
+        return "Phong tro co thong tin noi bat: " + clean + ". "
+                + "Khong gian duoc toi uu cho nhu cau o lau dai, phu hop sinh hoat hang ngay. "
+                + "Muc gia va tien ich duoc can doi de dam bao chi phi hop ly. "
+                + "Bạn nên liên hệ xem phòng thực tế để chốt lựa chọn phù hợp nhất.";
+    }
+
+    private Map<String, Object> buildDeterministicPriceSuggestion(String district, String city, Double area, String type, List<String> amenities) {
+        double safeArea = area == null || area <= 0 ? 20.0 : area;
+        String typeNormalized = type == null ? "" : type.trim().toUpperCase();
+
+        double typeMultiplier;
+        if (typeNormalized.contains("STUDIO")) {
+            typeMultiplier = 1.12;
+        } else if (typeNormalized.contains("ONE_BEDROOM") || typeNormalized.contains("1")) {
+            typeMultiplier = 1.08;
+        } else if (typeNormalized.contains("TWO_BEDROOM") || typeNormalized.contains("2")) {
+            typeMultiplier = 1.18;
+        } else if (typeNormalized.contains("SHARED") || typeNormalized.contains("GHEP")) {
+            typeMultiplier = 0.82;
+        } else if (typeNormalized.contains("MEZZANINE") || typeNormalized.contains("GAC")) {
+            typeMultiplier = 1.10;
+        } else {
+            typeMultiplier = 1.0;
+        }
+
+        String districtNorm = district == null ? "" : district.toLowerCase();
+        double districtMultiplier = 1.0;
+        if (districtNorm.contains("quan 1") || districtNorm.contains("quan 3") || districtNorm.contains("binh thanh") || districtNorm.contains("phu nhuan")) {
+            districtMultiplier = 1.15;
+        } else if (districtNorm.contains("quan 7") || districtNorm.contains("quan 2") || districtNorm.contains("thu duc")) {
+            districtMultiplier = 1.10;
+        } else if (districtNorm.contains("quan 12") || districtNorm.contains("binh tan") || districtNorm.contains("hoc mon") || districtNorm.contains("cu chi")) {
+            districtMultiplier = 0.92;
+        }
+
+        int amenityCount = amenities == null ? 0 : amenities.size();
+        double amenityBonus = Math.min(amenityCount, 4) * 150000.0;
+
+        double basePerM2 = 110000.0;
+        double estimated = (safeArea * basePerM2 * typeMultiplier * districtMultiplier) + amenityBonus;
+        long minPrice = Math.round(estimated * 0.9);
+        long maxPrice = Math.round(estimated * 1.1);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("suggestion", formatCurrencyVnd(minPrice) + " - " + formatCurrencyVnd(maxPrice) + "/thang");
+        result.put("reason", "Uoc tinh theo dien tich, loai phong, khu vuc " + district + ", " + city + " va so tien ich khai bao.");
+        result.put("minPrice", minPrice);
+        result.put("maxPrice", maxPrice);
+        result.put("currency", "VND");
+        result.put("source", "RULE_BASED");
+        return result;
+    }
+
+    private long parseLongValue(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null) {
+            return 0L;
+        }
+        try {
+            return Math.round(Double.parseDouble(value.toString()));
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
+    private String formatCurrencyVnd(long amount) {
+        java.text.NumberFormat nf = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+        return nf.format(amount) + "d";
     }
 
     private void saveActionLog(Long userId, String userRole, String query, String intent, double score, boolean isError, long startTime, boolean isSuccess) {
@@ -894,5 +1073,16 @@ public class AiController {
             }
         }
         return true;
+    }
+
+    private String resolveLlmMode() {
+        if (aiLlmMode == null || aiLlmMode.isBlank()) {
+            return "FULL";
+        }
+        String normalized = aiLlmMode.trim().toUpperCase();
+        if ("FULL".equals(normalized) || "PRESENTER_ONLY".equals(normalized) || "TEMPLATE_ONLY".equals(normalized)) {
+            return normalized;
+        }
+        return "FULL";
     }
 }

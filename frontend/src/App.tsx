@@ -61,6 +61,7 @@ import { FavoritesProvider } from "./context/FavoritesContext";
 import CompareBar from "./components/property/CompareBar";
 import CompareRoomsModal from "./components/property/CompareRoomsModal";
 import PageLoader from "./components/shared/PageLoader";
+import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 // 1. ProtectedRoute (yêu cầu đăng nhập)
 const ProtectedRoute = () => {
@@ -249,11 +250,13 @@ function AppRoutesAndChrome() {
 
 function App() {
   return (
-    <FavoritesProvider>
-      <CompareProvider>
-        <AppRoutesAndChrome />
-      </CompareProvider>
-    </FavoritesProvider>
+    <ErrorBoundary>
+      <FavoritesProvider>
+        <CompareProvider>
+          <AppRoutesAndChrome />
+        </CompareProvider>
+      </FavoritesProvider>
+    </ErrorBoundary>
   );
 }
 

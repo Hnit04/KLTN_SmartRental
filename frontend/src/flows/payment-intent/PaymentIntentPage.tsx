@@ -121,6 +121,32 @@ export default function PaymentIntentPage() {
     setStatusUpdatedAt(new Date().toISOString());
   }, [contractId, method]);
 
+  // Polling for status update when in 'confirmed' state
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout;
+
+    if (status === "confirmed") {
+      // Bắt đầu polling mỗi 5 giây
+      intervalId = setInterval(() => {
+        refreshSyncedState();
+      }, 5000);
+
+      // Timeout sau 3 phút (180000 ms) nếu vẫn chưa thành công
+      timeoutId = setTimeout(() => {
+        clearInterval(intervalId);
+        setStatus("failed");
+        setNote("Đã hết thời gian chờ đồng bộ (3 phút). Vui lòng kiểm tra lại sau hoặc liên hệ hỗ trợ.");
+        setStatusUpdatedAt(new Date().toISOString());
+      }, 180000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [status, refreshSyncedState]);
+
   const handleStartPayment = useCallback(async () => {
     if (!contract) return;
 

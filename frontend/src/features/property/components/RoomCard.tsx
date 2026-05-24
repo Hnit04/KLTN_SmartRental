@@ -98,6 +98,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
               src={images[currImgIndex]} 
               alt={data.name} 
               loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover transition-transform duration-700 will-change-transform group-hover:scale-105"
             />
           ) : (
@@ -297,7 +298,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
           >
 
             <div className="h-56 bg-gray-100 relative shrink-0">
-              {coverImage && <img src={coverImage} className="w-full h-full object-cover" alt="" />}
+              {coverImage && <img src={coverImage} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="" />}
               <button
                 onClick={() => setIsDetailOpen(false)}
                 className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"

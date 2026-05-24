@@ -44,6 +44,9 @@ public class AiConfig {
     @Value("${gemini.chat.timeout-seconds:120}")
     private long geminiChatTimeoutSeconds;
 
+    @Value("${ai.llm.mode:FULL}")
+    private String aiLlmMode;
+
     @Value("${ai.rag.embedding.model:all-minilm-l6-v2}")
     private String ragEmbeddingModel;
 
@@ -64,6 +67,16 @@ public class AiConfig {
 
     @Bean
     public ChatLanguageModel geminiChatModel() {
+        String llmMode = aiLlmMode == null ? "FULL" : aiLlmMode.trim().toUpperCase(Locale.ROOT);
+        if ("TEMPLATE_ONLY".equals(llmMode)) {
+            System.out.println("[AI MODEL ROUTING] LLM disabled because ai.llm.mode=TEMPLATE_ONLY");
+            return new DisabledChatLanguageModel();
+        }
+        if (isBlank(apiKey)) {
+            System.out.println("[AI MODEL ROUTING] LLM disabled because GEMINI_API_KEY is missing");
+            return new DisabledChatLanguageModel();
+        }
+
         List<String> modelChain = buildChatModelChain();
         List<FallbackChatLanguageModel.ModelDelegate> delegates = new ArrayList<>(modelChain.size());
         for (String modelName : modelChain) {
@@ -111,7 +124,7 @@ public class AiConfig {
                 poolingMode = PoolingMode.valueOf(ragOnnxPoolingMode.trim().toUpperCase(Locale.ROOT));
             } catch (Exception e) {
                 throw new IllegalStateException(
-                        "ai.rag.embedding.onnx.pooling-mode khong hop le. Gia tri hop le: CLS, MEAN",
+                        "ai.rag.embedding.onnx.pooling-mode không hợp lệ. Giá trị hợp lệ: CLS, MEAN",
                         e
                 );
             }

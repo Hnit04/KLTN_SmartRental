@@ -8,11 +8,18 @@ import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
+import iuh.se.kltn.backend.modules.ai.config.AiRuntimeProperties;
 import iuh.se.kltn.backend.modules.ai.entity.AiSqlCache;
 import iuh.se.kltn.backend.modules.ai.entity.AiActionLog;
+import iuh.se.kltn.backend.modules.ai.entity.AiUnrecognizedQuery;
+import iuh.se.kltn.backend.modules.ai.dto.AiRawResult;
+import iuh.se.kltn.backend.modules.ai.dto.EnrichedQuery;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
 import iuh.se.kltn.backend.modules.ai.repository.AiActionLogRepository;
+import iuh.se.kltn.backend.modules.ai.repository.AiUnrecognizedQueryRepository;
 import iuh.se.kltn.backend.modules.ai.dto.IntentExtractionResult;
+import iuh.se.kltn.backend.modules.ai.dto.RuleIntentResult;
+import iuh.se.kltn.backend.modules.ai.enums.SystemIntent;
 import iuh.se.kltn.backend.modules.ai.service.handler.DynamicQueryEngine;
 import iuh.se.kltn.backend.modules.property.repository.PropertyRepository;
 import jakarta.annotation.PostConstruct;
@@ -24,9 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 @Service
@@ -60,6 +70,24 @@ public class AiOrchestratorService {
     private DataPresenterAi dataPresenterAi;
 
     @Autowired
+    private RuleIntentRouter ruleIntentRouter;
+
+    @Autowired
+    private RuleEntityExtractor ruleEntityExtractor;
+
+    @Autowired
+    private QueryContextEnricher queryContextEnricher;
+
+    @Autowired
+    private TemplateResponseService templateResponseService;
+
+    @Autowired
+    private PresenterDataSanitizer presenterDataSanitizer;
+
+    @Autowired(required = false)
+    private AiUnrecognizedQueryRepository aiUnrecognizedQueryRepository;
+
+    @Autowired
     private EmbeddingModel embeddingModel;
 
     @Autowired
@@ -71,8 +99,14 @@ public class AiOrchestratorService {
     @Autowired
     private PropertyRepository propertyRepository;
 
+    @Autowired
+    private AiRuntimeProperties aiRuntimeProperties;
+
     @Value("${ai.sql-cache.startup.reindex:true}")
     private boolean sqlCacheStartupReindex;
+
+    @Value("${ai.llm.mode:FULL}")
+    private String aiLlmMode;
 
     /**
      * Tự động chạy khi Spring Boot khởi động.
@@ -395,6 +429,7 @@ public class AiOrchestratorService {
                 System.out.println("[LOCATION FLOW] selectedFlow=COORDINATE_CURRENT_POSITION");
                 Double radius = extractRadiusKm(question);
                 Long maxPrice = extractMaxPriceVnd(question);
+                boolean cheapMode = shouldUseCheapMode(question, maxPrice);
                 Integer requiredOccupants = extractRequiredOccupantsFromQuestion(question);
                 boolean requirePetFriendly = extractRequirePetFriendly(question);
                 String currentLocationResponse = handleLocationSearchByCoordinatesFlow(
@@ -402,6 +437,7 @@ public class AiOrchestratorService {
                         userLongitude,
                         radius,
                         maxPrice,
+                        cheapMode,
                         requiredOccupants,
                         requirePetFriendly,
                         question,
@@ -426,12 +462,14 @@ public class AiOrchestratorService {
             System.out.println("[LOCATION FLOW] selectedFlow=LANDMARK_HEURISTIC, heuristicLocation='" + heuristicLocation + "'");
             Double heuristicRadius = extractRadiusKm(question);
             Long heuristicMaxPrice = extractMaxPriceVnd(question);
+            boolean heuristicCheapMode = shouldUseCheapMode(question, heuristicMaxPrice);
             Integer heuristicRequiredOccupants = extractRequiredOccupantsFromQuestion(question);
             boolean heuristicRequirePetFriendly = extractRequirePetFriendly(question);
             String heuristicResponse = handleLocationSearchFlow(
                     heuristicLocation,
                     heuristicRadius,
                     heuristicMaxPrice,
+                    heuristicCheapMode,
                     heuristicRequiredOccupants,
                     heuristicRequirePetFriendly,
                     question,
@@ -448,180 +486,264 @@ public class AiOrchestratorService {
                     "⚠️ [HEURISTIC] Fallback to intent pipeline because geocode miss for: " + heuristicLocation);
         }
 
-        try {
-            System.out.println("🤖 [HYBRID AI] Calling Intent Extractor...");
-            String rawJson = intentExtractorAi.extractIntent(question, role);
-            // Cắt bỏ markdown wrapper nếu LLM tự ý bọc
-            rawJson = rawJson.replace("```json", "").replace("```", "").trim();
-            System.out.println("🤖 [HYBRID AI] Raw JSON: " + rawJson);
+        String llmMode = resolveLlmMode();
+        boolean templateOnlyMode = "TEMPLATE_ONLY".equals(llmMode);
+        boolean presenterOnlyMode = "PRESENTER_ONLY".equals(llmMode);
+        boolean fullLlmMode = "FULL".equals(llmMode);
 
-            // Parse JSON thủ công bằng Jackson (tin cậy hơn POJO mapping)
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+        IntentExtractionResult extraction = null;
+        String intentSource = "UNKNOWN";
+        Optional<RuleIntentResult> ruleResult = ruleIntentRouter.classify(question, role);
+        if (ruleResult.isPresent() && ruleResult.get().matchScore() >= ruleIntentRouter.getAcceptThreshold()) {
+            RuleIntentResult matchedRule = ruleResult.get();
+            Map<String, Object> ruleParams = new HashMap<>(ruleEntityExtractor.extract(question, matchedRule.intent()));
+            extraction = new IntentExtractionResult(matchedRule.intent(), matchedRule.matchScore(), ruleParams);
+            predictedIntent = matchedRule.intent().name();
+            confidence = matchedRule.matchScore();
+            intentSource = matchedRule.source();
+            System.out.println("[HYBRID AI] Rule intent matched: " + predictedIntent + " (Score: " + confidence + ")");
+        }
 
-            String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
-            confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
-            predictedIntent = intentStr;
-
-            // Parse params thành Map
-            Map<String, Object> extractedParams = new java.util.HashMap<>();
-            if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
-                jsonNode.get("params").fields().forEachRemaining(entry -> {
-                    com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
-                    if (val.isNumber())
-                        extractedParams.put(entry.getKey(), val.numberValue());
-                    else if (val.isBoolean())
-                        extractedParams.put(entry.getKey(), val.booleanValue());
-                    else
-                        extractedParams.put(entry.getKey(), val.asText());
-                });
-            }
-
-            // Chuyển đổi String intent thành Enum an toàn
-            iuh.se.kltn.backend.modules.ai.enums.SystemIntent systemIntent;
+        if (extraction == null && fullLlmMode) {
             try {
-                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.valueOf(intentStr);
-            } catch (IllegalArgumentException e) {
-                systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.UNKNOWN;
+                System.out.println("[HYBRID AI] Calling intent extractor LLM...");
+                String rawJson = intentExtractorAi.extractIntent(question, role);
+                rawJson = rawJson.replace("```json", "").replace("```", "").trim();
+
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+
+                String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
+                confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
+                predictedIntent = intentStr;
+
+                Map<String, Object> extractedParams = new HashMap<>();
+                if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
+                    jsonNode.get("params").fields().forEachRemaining(entry -> {
+                        com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
+                        if (val.isNumber()) {
+                            extractedParams.put(entry.getKey(), val.numberValue());
+                        } else if (val.isBoolean()) {
+                            extractedParams.put(entry.getKey(), val.booleanValue());
+                        } else {
+                            extractedParams.put(entry.getKey(), val.asText());
+                        }
+                    });
+                }
+
+                iuh.se.kltn.backend.modules.ai.enums.SystemIntent systemIntent;
+                try {
+                    systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.valueOf(intentStr);
+                } catch (IllegalArgumentException e) {
+                    systemIntent = iuh.se.kltn.backend.modules.ai.enums.SystemIntent.UNKNOWN;
+                }
+
+                extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
+                intentSource = "LLM";
+                System.out.println("[HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
+            } catch (Exception e) {
+                fallbackUsed = true;
+                System.err.println("[HYBRID AI] Intent extractor failed: " + e.getMessage() + ". Fallback to SQL cache/SQL generation.");
+            }
+        }
+
+        EnrichedQuery enrichedQuery = queryContextEnricher.enrich(
+                question,
+                extraction != null ? extraction.getIntent() : SystemIntent.UNKNOWN,
+                extraction != null ? extraction.getParams() : null,
+                userId,
+                role,
+                userLatitude,
+                userLongitude
+        );
+        List<String> contextAssumptions = enrichedQuery.getAssumptions() == null ? List.of() : enrichedQuery.getAssumptions();
+
+        if (enrichedQuery.isShouldAskClarification()) {
+            success = true;
+            saveActionLog(
+                    userId,
+                    role,
+                    question,
+                    extraction == null ? "UNKNOWN" : extraction.getIntent().name(),
+                    confidence,
+                    false,
+                    startTime,
+                    true,
+                    "CONTEXT_CLARIFICATION_REQUIRED",
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            saveUnrecognizedQuery(
+                    userId,
+                    question,
+                    normalizedQuestion,
+                    extraction == null ? "UNKNOWN" : extraction.getIntent().name(),
+                    confidence,
+                    intentSource,
+                    llmMode,
+                    enrichedQuery.getParams(),
+                    "CONTEXT_CLARIFICATION_REQUIRED"
+            );
+            return sanitizeUserFacingText(enrichedQuery.getClarificationMessage());
+        }
+
+        if (extraction != null) {
+            if (enrichedQuery.getIntent() != null) {
+                extraction.setIntent(enrichedQuery.getIntent());
+            }
+            extraction.setParams(enrichedQuery.getParams() == null ? new HashMap<>() : new HashMap<>(enrichedQuery.getParams()));
+            predictedIntent = extraction.getIntent().name();
+            if (!contextAssumptions.isEmpty()) {
+                System.out.println("[CONTEXT ENRICHMENT] assumptions=" + contextAssumptions);
+            }
+        }
+
+        if (extraction != null && confidence != null && confidence >= 0.7) {
+            if (isPolicyIntent(extraction.getIntent())) {
+                String policyAnswer = resolvePolicyAnswer(question, extraction.getIntent());
+                if (policyAnswer != null) {
+                    success = true;
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "POLICY_FAQ", null, null, null, null);
+                    return sanitizeUserFacingText(policyAnswer);
+                }
             }
 
-            IntentExtractionResult extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
-            System.out.println("🤖 [HYBRID AI] Extracted Intent: " + predictedIntent + " (Score: " + confidence + ")");
-
-            if (confidence != null && confidence >= 0.7) {
-                if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
-                    System.out.println("✅ [HYBRID AI] Intent match LOCATION_SEARCH! Bypassing LLM generation...");
-                    success = true;
-                    String locationName = extraction.getParams().containsKey("location")
-                            ? extraction.getParams().get("location").toString()
-                            : null;
-                    Double radius = 3.0;
-                    if (extraction.getParams().containsKey("radius")) {
-                        try {
-                            radius = Double.parseDouble(extraction.getParams().get("radius").toString());
-                        } catch (Exception e) {
-                        }
-                    }
-                    Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
-                    Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
-                    boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
-                    boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
-                    if (useCurrentLocation) {
-                        if (hasValidCoordinates(userLatitude, userLongitude)) {
-                            System.out.println("[LOCATION FLOW] selectedFlow=INTENT_CURRENT_POSITION");
-                            return handleLocationSearchByCoordinatesFlow(
-                                    userLatitude,
-                                    userLongitude,
-                                    radius,
-                                    maxPrice,
-                                    requiredOccupants,
-                                    requirePetFriendly,
-                                    question,
-                                    role,
-                                    userId,
-                                    predictedIntent,
-                                    confidence,
-                                    startTime);
-                        }
-                        System.out.println("[LOCATION FLOW] selectedFlow=INTENT_GPS_REQUIRED");
-                        return buildUserLocationRequiredMessage();
-                    }
-                    System.out.println("[LOCATION FLOW] selectedFlow=INTENT_LANDMARK, location='" + locationName + "'");
-                    return handleLocationSearchFlow(
-                            locationName,
-                            radius,
-                            maxPrice,
-                            requiredOccupants,
-                            requirePetFriendly,
-                            question,
-                            role,
-                            userId,
-                            predictedIntent,
-                            confidence,
-                            startTime,
-                            false);
-
-                } else if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
-                    // 🛡️ ROLE GUARD: GUEST chỉ được phép SEARCH_ROOM
-                    if (role.equalsIgnoreCase("GUEST") && extraction.getIntent() != iuh.se.kltn.backend.modules.ai.enums.SystemIntent.SEARCH_ROOM) {
-                        System.err.println("🚨 [SECURITY] GUEST attempted restricted intent: " + extraction.getIntent());
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
-                        return "Dạ, vì lý do bảo mật, thông tin này chỉ dành cho người dùng đã đăng nhập. Bạn vui lòng Đăng nhập để sử dụng tính năng này nhé!";
-                    }
-                    // 🛡️ TENANT không được xem intent của LANDLORD
-                    if (role.equalsIgnoreCase("TENANT")) {
-                        iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent = extraction.getIntent();
-                        if (intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_REVENUE
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_DEBTORS
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_OCCUPANCY
-                                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_RISK) {
-                            System.err.println("🚨 [SECURITY] TENANT attempted LANDLORD intent: " + intent);
-                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
-                            return "Dạ, thông tin này thuộc về nội bộ ban quản lý, em không thể tiết lộ ạ.";
-                        }
-                    }
-                    System.out.println("✅ [HYBRID AI] Intent match! Routing to DynamicQueryEngine...");
-
-                    // 💾 RESULT CACHE: Kiểm tra cache theo Intent + Params + Question fingerprint
-                    String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role, question);
-                    Cache resultCache = cacheManager.getCache("aiQueryResults");
-                    if (resultCache != null) {
-                        Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
-                        if (cachedResult != null) {
-                            System.out.println("⚡ [RESULT CACHE HIT] Key: " + cacheKey);
-                            success = true;
-                            // 🛡️ Enhanced logging with responseSource
-                            saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "RESULT_CACHE_HIT", null, null, null, null);
-                            return sanitizeUserFacingResponse(cachedResult.get());
-                        }
-                    }
-
-                    List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
-                    String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu phù hợp." : results.toString();
+            if (extraction.getIntent() == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.LOCATION_SEARCH) {
+                success = true;
+                String locationName = extraction.getParams().containsKey("location")
+                        ? extraction.getParams().get("location").toString()
+                        : null;
+                Double radius = 3.0;
+                if (extraction.getParams().containsKey("radius")) {
                     try {
-                        Object response = sanitizeUserFacingResponse(
-                                dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
-                        );
-                        // 💾 Ghi cache kết quả
-                        if (resultCache != null) {
-                            resultCache.put(cacheKey, response);
-                            System.out.println("💾 [RESULT CACHE STORED] Key: " + cacheKey);
-                        }
-                        success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
-                        return response;
-                    } catch (Exception llmEx) {
-                        System.err.println("⚠️ [HYBRID AI] LLM formatting failed, returning formatted fallback: "
-                                + llmEx.getMessage());
-                        success = true;
-                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
-                        // Trả về dữ liệu thô nhưng format dễ đọc hơn
-                        if (results.isEmpty()) {
-                            return "Dạ, hiện không tìm thấy dữ liệu phù hợp với yêu cầu của bạn.";
-                        }
-                        StringBuilder sb = new StringBuilder("Dạ, đây là kết quả tra cứu:\n");
-                        for (int i = 0; i < results.size(); i++) {
-                            Map<String, Object> row = results.get(i);
-                            sb.append("\n--- ").append(i + 1).append(" ---\n");
-                            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                                if (entry.getValue() != null) {
-                                    sb.append("• ").append(entry.getKey()).append(": ").append(entry.getValue())
-                                            .append("\n");
-                                }
-                            }
-                        }
-                        return sanitizeUserFacingText(sb.toString());
+                        radius = Double.parseDouble(extraction.getParams().get("radius").toString());
+                    } catch (Exception ignored) {
                     }
                 }
-            } else {
-                fallbackUsed = true;
-                System.out.println("⚠️ [HYBRID AI] Intent not fully supported or Confidence too low (" + confidence
-                        + "). Fallback to SqlGeneratorAi.");
+                Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
+                boolean cheapMode = shouldUseCheapMode(question, maxPrice);
+                Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
+                boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
+                boolean useCurrentLocation = isCurrentLocationCue(locationName) || isNearCurrentLocationQuery(question, role);
+                if (useCurrentLocation) {
+                    if (hasValidCoordinates(userLatitude, userLongitude)) {
+                        return handleLocationSearchByCoordinatesFlow(
+                                userLatitude,
+                                userLongitude,
+                                radius,
+                                maxPrice,
+                                cheapMode,
+                                requiredOccupants,
+                                requirePetFriendly,
+                                question,
+                                role,
+                                userId,
+                                predictedIntent,
+                                confidence,
+                                startTime);
+                    }
+                    return buildUserLocationRequiredMessage();
+                }
+                return handleLocationSearchFlow(
+                        locationName,
+                        radius,
+                        maxPrice,
+                        cheapMode,
+                        requiredOccupants,
+                        requirePetFriendly,
+                        question,
+                        role,
+                        userId,
+                        predictedIntent,
+                        confidence,
+                        startTime,
+                        false);
             }
-        } catch (Exception e) {
+
+            if (dynamicQueryEngine.canHandle(extraction.getIntent())) {
+                if (role.equalsIgnoreCase("GUEST") && extraction.getIntent() != iuh.se.kltn.backend.modules.ai.enums.SystemIntent.SEARCH_ROOM) {
+                    saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                    return "Da, vi ly do bao mat, thong tin nay chi danh cho nguoi dung da dang nhap. Ban vui long dang nhap de su dung tinh nang nay nhe!";
+                }
+                if (role.equalsIgnoreCase("TENANT")) {
+                    iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent = extraction.getIntent();
+                    if (intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_REVENUE
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_DEBTORS
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_OCCUPANCY
+                            || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.VIEW_RISK) {
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, false, "SECURITY_BLOCKED", null, null, null, null);
+                        return "Dạ, thông tin này thuộc về nội bộ quản lý, em không thể tiết lộ.";
+                    }
+                }
+
+                String cacheKey = buildCacheKey(predictedIntent, extraction.getParams(), userId, role, question);
+                Cache resultCache = cacheManager.getCache("aiQueryResults");
+                if (resultCache != null) {
+                    Cache.ValueWrapper cachedResult = resultCache.get(cacheKey);
+                    if (cachedResult != null) {
+                        success = true;
+                        saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "RESULT_CACHE_HIT", null, null, null, null);
+                        return sanitizeUserFacingResponse(cachedResult.get());
+                    }
+                }
+
+                List<Map<String, Object>> results = dynamicQueryEngine.execute(extraction, userId, role);
+                Object response = buildStructuredResponse(
+                        question,
+                        role,
+                        predictedIntent,
+                        intentSource,
+                        results,
+                        templateOnlyMode,
+                        presenterOnlyMode
+                );
+                response = appendAssumptionsIfNeeded(response, contextAssumptions);
+                if (resultCache != null) {
+                    resultCache.put(cacheKey, response);
+                }
+                success = true;
+                saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "DQE_HIT", null, results.size(), null, null);
+                return response;
+            }
+        } else {
             fallbackUsed = true;
-            System.err.println(
-                    "❌ [HYBRID AI] Intent Extractor failed: " + e.getMessage() + ". Fallback to SqlGeneratorAi.");
+            if (extraction != null) {
+                System.out.println("[HYBRID AI] Intent confidence low (" + confidence + "). Fallback to SQL cache/SQL generation.");
+                saveUnrecognizedQuery(
+                        userId,
+                        question,
+                        normalizedQuestion,
+                        predictedIntent,
+                        confidence,
+                        intentSource,
+                        llmMode,
+                        extraction.getParams(),
+                        "LOW_CONFIDENCE"
+                );
+            } else {
+                System.out.println("[HYBRID AI] No intent match from rule/LLM. Fallback to SQL cache/SQL generation.");
+                saveUnrecognizedQuery(
+                        userId,
+                        question,
+                        normalizedQuestion,
+                        predictedIntent,
+                        confidence,
+                        intentSource,
+                        llmMode,
+                        null,
+                        "NO_INTENT_MATCH"
+                );
+            }
+        }
+
+        if (!fullLlmMode) {
+            String source = "SQL_FALLBACK_DISABLED_" + llmMode;
+            saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                    source, null, null, null, null);
+            saveUnrecognizedQuery(userId, question, normalizedQuestion, predictedIntent, confidence, intentSource, llmMode, null, source);
+            return sanitizeUserFacingText(resolveQueryDataUnsupportedMessage());
         }
 
         // Fallback tracking variables
@@ -657,15 +779,22 @@ public class AiOrchestratorService {
         }
 
         if (sqlToExecute == null || sqlToExecute.isBlank()) {
-            System.out.println("🤖 [SQL GENERATION] Cache không phù hợp, gọi Gemini sinh SQL...");
+            if (!isSqlGeneratorEnabled()) {
+                saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
+                        "SQL_GENERATOR_DISABLED", null, null, null, null);
+                saveUnrecognizedQuery(userId, question, normalizedQuestion, predictedIntent, confidence, intentSource, llmMode, null, "SQL_GENERATOR_DISABLED");
+                return sanitizeUserFacingText(resolveQueryDataUnsupportedMessage());
+            }
+
+            System.out.println("[SQL GENERATION] Cache miss, calling LLM for SQL generation...");
             try {
                 sqlToExecute = sqlGeneratorAi.generateSql(question, role, userId, schemaContext, roleRules);
                 fallbackResponseSource = "SQL_GENERATED";
             } catch (Exception llmEx) {
-                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ sinh SQL (Hết Token/Timeout): " + llmEx.getMessage());
+                System.err.println("[SQL GENERATION] LLM call failed: " + llmEx.getMessage());
                 saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, false,
                         "LLM_SQL_GENERATION_ERROR", null, null, null, null);
-                return "Dạ, máy chủ AI hiện tại đang quá tải. Quý khách vui lòng thử lại sau ít phút hoặc tra cứu thủ công qua Menu ứng dụng nhé!";
+                return "Da, may chu AI hien tai dang qua tai. Vui long thu lai sau it phut.";
             }
         }
 
@@ -711,37 +840,20 @@ public class AiOrchestratorService {
                 System.out.println("💾 Đã lưu tri thức SQL mới vào DB và nạp lên Vector Store!");
             }
 
-            String rawDataStr = results.isEmpty() ? "Không tìm thấy dữ liệu." : results.toString();
-            System.out.println("Dữ liệu thô: " + rawDataStr);
+            Object response = buildStructuredResponse(
+                    question,
+                    role,
+                    predictedIntent,
+                    fallbackResponseSource != null ? fallbackResponseSource : "SQL_FALLBACK",
+                    results,
+                    templateOnlyMode,
+                    presenterOnlyMode
+            );
 
-            // ✅ Log success cho fallback SQL pipeline
             saveActionLog(userId, role, question, predictedIntent, confidence, true, startTime, true,
                     fallbackResponseSource, finalSql, results.size(), fallbackCacheScore, null);
 
-            try {
-                return sanitizeUserFacingResponse(
-                        dataPresenterAi.generateNaturalResponse(question, rawDataStr, role)
-                );
-            } catch (Exception llmEx) {
-                System.err.println("⚠️ Lỗi gọi mô hình ngôn ngữ (Hết Token/Timeout): " + llmEx.getMessage());
-                if (results.isEmpty()) {
-                    return "Dạ hiện AI đang quá tải, nhưng hệ thống ghi nhận không có dữ liệu nào khớp với yêu cầu của bạn ạ.";
-                }
-
-                StringBuilder fallbackResponse = new StringBuilder(
-                        "Dạ hiện AI đang quá tải (Hóa đơn Token), em xin trích xuất kết quả từ hệ thống cho bạn nhé:\n\n");
-                for (Map<String, Object> row : results) {
-                    Object roomId = row.getOrDefault("room_id", row.get("id"));
-                    if (roomId != null && row.containsKey("name") && row.containsKey("price")) {
-                        String firstImg = extractFirstImage(row.get("images"));
-                        fallbackResponse.append(String.format("[ROOM_CARD: %s | %s | %s | %s]\n",
-                                roomId, row.get("name"), normalizePriceForCard(row.get("price")), firstImg));
-                    } else {
-                        fallbackResponse.append("- ").append(row.toString()).append("\n");
-                    }
-                }
-                return sanitizeUserFacingText(fallbackResponse.toString());
-            }
+            return response;
 
         } catch (Exception e) {
             System.err.println("❌ Lỗi thực thi SQL: " + e.getMessage());
@@ -758,11 +870,162 @@ public class AiOrchestratorService {
         return sanitizeUserFacingText(text);
     }
 
+    private boolean isSqlGeneratorEnabled() {
+        if (aiRuntimeProperties == null || aiRuntimeProperties.getSqlGenerator() == null) {
+            return false;
+        }
+        return aiRuntimeProperties.getSqlGenerator().isEnabled();
+    }
+
+    private String resolveQueryDataUnsupportedMessage() {
+        String unsupported = null;
+        if (aiRuntimeProperties != null
+                && aiRuntimeProperties.getTemplates() != null
+                && aiRuntimeProperties.getTemplates().getQueryData() != null) {
+            unsupported = aiRuntimeProperties.getTemplates().getQueryData().getUnsupported();
+        }
+        if (unsupported == null || unsupported.isBlank()) {
+            unsupported = "Dạ, hệ thống chưa đủ dữ liệu để xử lý câu hỏi này ở chế độ hiện tại.";
+        }
+        return unsupported;
+    }
+
+    private String resolveLlmMode() {
+        String mode = aiLlmMode;
+        AiRuntimeProperties.FeaturePolicy queryDataPolicy = aiRuntimeProperties.getFeatures().getQueryData();
+        if (queryDataPolicy != null && queryDataPolicy.getMode() != null && !queryDataPolicy.getMode().isBlank()) {
+            mode = queryDataPolicy.getMode();
+        }
+        if (queryDataPolicy != null && !queryDataPolicy.isLlmEnabled()) {
+            return "TEMPLATE_ONLY";
+        }
+        if (mode == null || mode.isBlank()) {
+            return "FULL";
+        }
+        String normalized = mode.trim().toUpperCase(Locale.ROOT);
+        if ("TEMPLATE_ONLY".equals(normalized) || "PRESENTER_ONLY".equals(normalized) || "FULL".equals(normalized)) {
+            return normalized;
+        }
+        return "FULL";
+    }
+
+    private boolean isPolicyIntent(iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent) {
+        return intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.DEPOSIT_POLICY
+                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.PAYMENT_GUIDE
+                || intent == iuh.se.kltn.backend.modules.ai.enums.SystemIntent.CONTRACT_POLICY;
+    }
+
+    private String resolvePolicyAnswer(String question, iuh.se.kltn.backend.modules.ai.enums.SystemIntent intent) {
+        String faqAnswer = searchFaq(question);
+        if (faqAnswer != null && !faqAnswer.isBlank()) {
+            return faqAnswer;
+        }
+
+        return switch (intent) {
+            case DEPOSIT_POLICY ->
+                    "Dạ, chính sách tiền cọc có thể khác nhau theo từng phòng/khu trọ. Bạn vui lòng xem mục chính sách hoặc liên hệ chủ trọ để được xác nhận điều kiện hoàn cọc và khấu trừ.";
+            case PAYMENT_GUIDE ->
+                    "Dạ, bạn có thể thanh toán theo hướng dẫn trong hóa đơn hoặc mục thanh toán. Nếu cần, mình có thể hỗ trợ kiểm tra trạng thái thanh toán hiện tại của bạn.";
+            case CONTRACT_POLICY ->
+                    "Dạ, điều khoản hợp đồng phụ thuộc từng giao dịch cụ thể. Bạn vui lòng xem bản hợp đồng hoặc liên hệ chủ trọ để được giải thích chi tiết từng điều khoản.";
+            default -> null;
+        };
+    }
+
+    private Object buildStructuredResponse(
+            String question,
+            String role,
+            String intent,
+            String intentSource,
+            List<Map<String, Object>> results,
+            boolean templateOnlyMode,
+            boolean presenterOnlyMode
+    ) {
+        String safeIntent = intent == null ? "UNKNOWN" : intent;
+        List<Map<String, Object>> safeResults = presenterDataSanitizer.sanitize(safeIntent, role, results);
+        if (safeResults == null) {
+            safeResults = List.of();
+        }
+        AiRawResult rawResult = AiRawResult.builder()
+                .intent(safeIntent)
+                .intentSource(intentSource)
+                .userRole(role)
+                .rows(safeResults)
+                .totalCount(safeResults == null ? 0 : safeResults.size())
+                .build();
+
+        if (templateOnlyMode) {
+            return sanitizeUserFacingText(templateResponseService.format(rawResult));
+        }
+
+        String rawDataStr = safeResults == null || safeResults.isEmpty()
+                ? "Khong tim thay du lieu phu hop."
+                : safeResults.toString();
+        try {
+            return sanitizeUserFacingResponse(dataPresenterAi.generateNaturalResponse(question, rawDataStr, role));
+        } catch (Exception llmEx) {
+            String modeLabel = presenterOnlyMode ? "PRESENTER_ONLY" : "FULL";
+            System.err.println("[PRESENTER] LLM formatting failed in mode " + modeLabel + ": " + llmEx.getMessage());
+            return sanitizeUserFacingText(templateResponseService.format(rawResult));
+        }
+    }
+
+    private void saveUnrecognizedQuery(
+            Long userId,
+            String question,
+            String normalizedQuestion,
+            String predictedIntent,
+            Double matchScore,
+            String intentSource,
+            String llmMode,
+            Map<String, Object> entities,
+            String reason
+    ) {
+        if (aiUnrecognizedQueryRepository == null || question == null || question.isBlank()) {
+            return;
+        }
+        try {
+            AiUnrecognizedQuery record = AiUnrecognizedQuery.builder()
+                    .userId(userId != null && userId > 0 ? userId : null)
+                    .question(question)
+                    .normalizedQuestion(normalizedQuestion)
+                    .predictedIntent(predictedIntent)
+                    .matchScore(matchScore)
+                    .intentSource(intentSource)
+                    .llmMode(llmMode)
+                    .entitiesJson(entities == null ? null : entities.toString())
+                    .reason(reason)
+                    .status("PENDING")
+                    .build();
+            aiUnrecognizedQueryRepository.save(record);
+        } catch (Exception e) {
+            System.err.println("[AI FEEDBACK] Failed to save unrecognized query: " + e.getMessage());
+        }
+    }
+
     private Object sanitizeUserFacingResponse(Object response) {
         if (response instanceof String text) {
             return sanitizeUserFacingText(text);
         }
         return response;
+    }
+
+    private Object appendAssumptionsIfNeeded(Object response, List<String> assumptions) {
+        if (!(response instanceof String text) || assumptions == null || assumptions.isEmpty()) {
+            return response;
+        }
+        List<String> uniqueAssumptions = assumptions.stream()
+                .filter(item -> item != null && !item.isBlank())
+                .distinct()
+                .toList();
+        if (uniqueAssumptions.isEmpty()) {
+            return response;
+        }
+        String prefix = String.join(" ", uniqueAssumptions).trim();
+        if (prefix.isBlank()) {
+            return response;
+        }
+        return sanitizeUserFacingText(prefix + "\n" + text);
     }
 
     private String sanitizeUserFacingText(String text) {
@@ -1192,28 +1455,71 @@ public class AiOrchestratorService {
             return null;
         }
         String normalized = normalizeForHeuristic(question);
+        return extractExplicitMaxPriceVnd(normalized);
+    }
 
-        java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[] {
+    private Long extractExplicitMaxPriceVnd(String normalized) {
+        if (normalized == null || normalized.isBlank()) {
+            return null;
+        }
+
+        java.util.regex.Matcher compactTrMatcher = java.util.regex.Pattern
+                .compile("\\b(\\d+)\\s*tr\\s*(\\d{1,2})\\b")
+                .matcher(normalized);
+        if (compactTrMatcher.find()) {
+            double base = Double.parseDouble(compactTrMatcher.group(1));
+            String decimalDigits = compactTrMatcher.group(2);
+            double decimalPart = Double.parseDouble(decimalDigits) / Math.pow(10, decimalDigits.length());
+            return convertToVnd(base + decimalPart, "tr");
+        }
+
+        java.util.regex.Matcher rangeMatcher = java.util.regex.Pattern
+                .compile(
+                        "(?:tu|from)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?\\s*(?:den|toi|to|-)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?")
+                .matcher(normalized);
+        if (rangeMatcher.find()) {
+            double upperValue = Double.parseDouble(rangeMatcher.group(3).replace(",", "."));
+            String upperUnit = rangeMatcher.group(4);
+            String lowerUnit = rangeMatcher.group(2);
+            return convertToVnd(upperValue, upperUnit != null ? upperUnit : lowerUnit);
+        }
+
+        java.util.regex.Pattern[] explicitPatterns = new java.util.regex.Pattern[] {
                 java.util.regex.Pattern.compile(
                         "(?:duoi|toi da|khong qua|nho hon|under|<=)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)?"),
                 java.util.regex.Pattern.compile(
-                        "(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\s*(?:tro xuong|do lai|hoac thap hon|or less)")
+                        "(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\s*(?:tro xuong|do lai|hoac thap hon|or less)"),
+                java.util.regex.Pattern.compile(
+                        "(?:tam|khoang|around|about)\\s*(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)"),
+                java.util.regex.Pattern.compile(
+                        "\\b(\\d+(?:[\\.,]\\d+)?)\\s*(trieu|tr|cu|k|nghin)\\b")
         };
 
-        for (java.util.regex.Pattern pattern : patterns) {
+        for (java.util.regex.Pattern pattern : explicitPatterns) {
             java.util.regex.Matcher matcher = pattern.matcher(normalized);
             if (matcher.find()) {
                 double value = Double.parseDouble(matcher.group(1).replace(",", "."));
                 String unit = matcher.groupCount() >= 2 ? matcher.group(2) : null;
-                return convertToVnd(value, unit);
+                Long parsed = convertToVnd(value, unit);
+                if (parsed != null && parsed > 0) {
+                    return parsed;
+                }
             }
         }
-
-        // "giá rẻ" không có ngưỡng cụ thể -> mặc định <= 3 triệu.
-        if (normalized.contains("gia re") || normalized.contains(" re ")) {
-            return 3_000_000L;
-        }
         return null;
+    }
+
+    private boolean shouldUseCheapMode(String question, Long maxPrice) {
+        return (maxPrice == null || maxPrice <= 0) && hasCheapCue(question);
+    }
+
+    private boolean hasCheapCue(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeForHeuristic(question);
+        return containsAny(normalized, "gia re", "gia mem", "tiet kiem", "sinh vien")
+                || normalized.matches(".*\\bre\\b.*");
     }
 
     private Long convertToVnd(double value, String unit) {
@@ -1579,13 +1885,14 @@ public class AiOrchestratorService {
     }
 
     private String buildUserLocationRequiredMessage() {
-        return "Da, de tim phong 'gan day' chinh xac, ban vui long bat quyen vi tri tren trinh duyet roi thu lai nhe. "
+        return "Dạ, để tìm phòng 'gần đây' chính xác, bạn vui lòng bật quyền vị trí trên trình duyệt rồi thử lại nhé. "
                 + "Hoac ban co the nhap moc cu the, vi du: 'gan Dai hoc Cong nghiep'.";
     }
 
     private String handleLocationSearchFlow(String locationName,
             Double radius,
             Long maxPrice,
+            boolean cheapMode,
             Integer requiredOccupants,
             boolean requirePetFriendly,
             String question,
@@ -1598,7 +1905,8 @@ public class AiOrchestratorService {
         Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
         System.out.println(
                 "📍 [LOCATION FLOW] location='" + locationName + "', radius=" + safeRadius + "km, maxPrice=" + maxPrice
-                        + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
+                        + ", cheapMode=" + cheapMode + ", requiredOccupants=" + requiredOccupants
+                        + ", requirePetFriendly=" + requirePetFriendly);
 
         if (locationName == null || locationName.trim().isEmpty()) {
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_LANDMARK", null, null, null, "NONE");
@@ -1630,6 +1938,7 @@ public class AiOrchestratorService {
                 (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
                 (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
                 requirePetFriendly);
+        results = maybeApplyCheapNearbyRanking(results, cheapMode, maxPrice, "LANDMARK");
         if (results.isEmpty()) {
             if (requirePetFriendly) {
                 List<Map<String, Object>> relaxedResults = propertyRepository.findNearbyRoomsAdvanced(
@@ -1653,6 +1962,10 @@ public class AiOrchestratorService {
         }
 
         StringBuilder responseStr = new StringBuilder();
+        if (cheapMode) {
+            responseStr.append("Minh dang hieu 'gia re' la nhom phong co gia thap trong khu vuc ban tim. ")
+                    .append("Ban co the nhap ngan sach cu the nhu 'duoi 3 trieu' de loc chinh xac hon.\n\n");
+        }
         responseStr.append("Dạ, mình tìm được ").append(results.size())
                 .append(" phòng trống gần '").append(geoResult.displayName)
                 .append("' (trong bán kính ").append(safeRadius.intValue()).append("km):\n\n");
@@ -1683,6 +1996,7 @@ public class AiOrchestratorService {
             Double longitude,
             Double radius,
             Long maxPrice,
+            boolean cheapMode,
             Integer requiredOccupants,
             boolean requirePetFriendly,
             String question,
@@ -1698,7 +2012,8 @@ public class AiOrchestratorService {
         Double safeRadius = (radius == null || radius <= 0) ? 3.0 : radius;
         System.out.println(
                 "[LOCATION FLOW] using current user coordinates, radius=" + safeRadius + "km, maxPrice=" + maxPrice
-                        + ", requiredOccupants=" + requiredOccupants + ", requirePetFriendly=" + requirePetFriendly);
+                        + ", cheapMode=" + cheapMode + ", requiredOccupants=" + requiredOccupants
+                        + ", requirePetFriendly=" + requirePetFriendly);
 
         List<Map<String, Object>> results = propertyRepository.findNearbyRoomsAdvanced(
                 latitude,
@@ -1707,6 +2022,7 @@ public class AiOrchestratorService {
                 (maxPrice != null && maxPrice > 0) ? maxPrice : Long.MAX_VALUE,
                 (requiredOccupants != null && requiredOccupants > 0) ? requiredOccupants : 0,
                 requirePetFriendly);
+        results = maybeApplyCheapNearbyRanking(results, cheapMode, maxPrice, "GPS");
 
         if (results.isEmpty()) {
             if (requirePetFriendly) {
@@ -1726,13 +2042,17 @@ public class AiOrchestratorService {
                 }
             }
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, 0, null, "GPS");
-            return "Hien tai khong tim thay phong trong nao trong ban kinh " + safeRadius.intValue()
+            return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue()
                     + "km gan vi tri hien tai cua ban.";
         }
 
         StringBuilder responseStr = new StringBuilder();
+        if (cheapMode) {
+            responseStr.append("Minh dang hieu 'gia re' la nhom phong co gia thap trong khu vuc gan ban. ")
+                    .append("Ban co the nhap ngan sach cu the nhu 'duoi 3 trieu' de loc chinh xac hon.\n\n");
+        }
         responseStr.append("Da, minh tim duoc ").append(results.size())
-                .append(" phong trong gan vi tri hien tai cua ban (trong ban kinh ")
+                .append(" phòng trống gần vị trí hiện tại của bạn (trong bán kính ")
                 .append(safeRadius.intValue()).append("km):\n\n");
 
         int limit = Math.min(results.size(), 5);
@@ -1755,6 +2075,198 @@ public class AiOrchestratorService {
 
         saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, results.size(), null, "GPS");
         return responseStr.toString();
+    }
+
+    private List<Map<String, Object>> maybeApplyCheapNearbyRanking(
+            List<Map<String, Object>> results,
+            boolean cheapMode,
+            Long explicitMaxPrice,
+            String locationScope) {
+        if (!cheapMode || results == null || results.size() <= 1) {
+            return results;
+        }
+
+        AiRuntimeProperties.Search searchConfig = aiRuntimeProperties != null ? aiRuntimeProperties.getSearch() : null;
+        double configuredPriceWeight = searchConfig != null ? searchConfig.getCheapPriceWeight() : 0.60;
+        double configuredDistanceWeight = searchConfig != null ? searchConfig.getCheapDistanceWeight() : 0.40;
+        double configuredPercentile = searchConfig != null ? searchConfig.getCheapPercentile() : 30.0;
+        int configuredMinSamples = searchConfig != null ? searchConfig.getCheapMinSamples() : 5;
+        double configuredPercentileBoost = searchConfig != null ? searchConfig.getCheapPercentileBoost() : 0.10;
+
+        double priceWeight = sanitizeWeight(configuredPriceWeight, 0.60);
+        double distanceWeight = sanitizeWeight(configuredDistanceWeight, 0.40);
+        double weightTotal = priceWeight + distanceWeight;
+        if (weightTotal <= 0) {
+            priceWeight = 0.60;
+            distanceWeight = 0.40;
+        } else {
+            priceWeight = priceWeight / weightTotal;
+            distanceWeight = distanceWeight / weightTotal;
+        }
+        double cheapPercentile = Math.max(0d, Math.min(100d, configuredPercentile));
+        int cheapMinSamples = configuredMinSamples > 1 ? configuredMinSamples : 5;
+        double percentileBoost = sanitizeWeight(configuredPercentileBoost, 0.10);
+
+        List<Map<String, Object>> ranked = new ArrayList<>(results);
+        List<Double> prices = new ArrayList<>();
+        List<Double> distances = new ArrayList<>();
+        for (Map<String, Object> row : ranked) {
+            double price = parseNumericValue(row.get("price"), Double.NaN);
+            double distance = parseNumericValue(row.get("distance_km"), Double.NaN);
+            if (!Double.isNaN(price)) {
+                prices.add(price);
+            }
+            if (!Double.isNaN(distance)) {
+                distances.add(distance);
+            }
+        }
+
+        if (prices.isEmpty() || distances.isEmpty()) {
+            return ranked;
+        }
+
+        double minPrice = prices.stream().min(Double::compareTo).orElse(0d);
+        double maxPrice = prices.stream().max(Double::compareTo).orElse(minPrice);
+        double minDistance = distances.stream().min(Double::compareTo).orElse(0d);
+        double maxDistance = distances.stream().max(Double::compareTo).orElse(minDistance);
+        Double cheapThreshold = ranked.size() >= cheapMinSamples ? calculatePercentile(prices, cheapPercentile) : null;
+        final double effectivePriceWeight = priceWeight;
+        final double effectiveDistanceWeight = distanceWeight;
+        final double effectivePercentileBoost = percentileBoost;
+        System.out.println("[CHEAP MODE] scope=" + locationScope
+                + ", hardMaxPrice=" + (explicitMaxPrice != null ? explicitMaxPrice : "NONE")
+                + ", sampleSize=" + ranked.size()
+                + ", percentile=" + cheapPercentile
+                + ", threshold=" + (cheapThreshold == null ? "N/A" : Math.round(cheapThreshold))
+                + ", weights(price=" + roundDouble(effectivePriceWeight) + ",distance=" + roundDouble(effectiveDistanceWeight) + ")"
+                + ", minSamples=" + cheapMinSamples);
+
+        ranked.sort((left, right) -> {
+            double rightScore = calculateCheapNearbyScore(
+                    right,
+                    minPrice,
+                    maxPrice,
+                    minDistance,
+                    maxDistance,
+                    cheapThreshold,
+                    effectivePriceWeight,
+                    effectiveDistanceWeight,
+                    effectivePercentileBoost);
+            double leftScore = calculateCheapNearbyScore(
+                    left,
+                    minPrice,
+                    maxPrice,
+                    minDistance,
+                    maxDistance,
+                    cheapThreshold,
+                    effectivePriceWeight,
+                    effectiveDistanceWeight,
+                    effectivePercentileBoost);
+            int scoreCompare = Double.compare(rightScore, leftScore);
+            if (scoreCompare != 0) {
+                return scoreCompare;
+            }
+            double leftDistance = parseNumericValue(left.get("distance_km"), Double.MAX_VALUE);
+            double rightDistance = parseNumericValue(right.get("distance_km"), Double.MAX_VALUE);
+            int distanceCompare = Double.compare(leftDistance, rightDistance);
+            if (distanceCompare != 0) {
+                return distanceCompare;
+            }
+            double leftPrice = parseNumericValue(left.get("price"), Double.MAX_VALUE);
+            double rightPrice = parseNumericValue(right.get("price"), Double.MAX_VALUE);
+            return Double.compare(leftPrice, rightPrice);
+        });
+
+        return ranked;
+    }
+
+    private double calculateCheapNearbyScore(
+            Map<String, Object> room,
+            double minPrice,
+            double maxPrice,
+            double minDistance,
+            double maxDistance,
+            Double cheapThreshold,
+            double priceWeight,
+            double distanceWeight,
+            double percentileBoost) {
+        double price = parseNumericValue(room.get("price"), maxPrice);
+        double distance = parseNumericValue(room.get("distance_km"), maxDistance);
+        double priceScore = inverseNormalize(price, minPrice, maxPrice);
+        double distanceScore = inverseNormalize(distance, minDistance, maxDistance);
+        double finalScore = (priceWeight * priceScore) + (distanceWeight * distanceScore);
+        if (cheapThreshold != null && price <= cheapThreshold) {
+            finalScore += percentileBoost;
+        }
+        return finalScore;
+    }
+
+    private double sanitizeWeight(double value, double fallback) {
+        if (Double.isNaN(value) || Double.isInfinite(value) || value < 0) {
+            return fallback;
+        }
+        return value;
+    }
+
+    private String roundDouble(double value) {
+        return java.math.BigDecimal.valueOf(value)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros()
+                .toPlainString();
+    }
+
+    private double inverseNormalize(double value, double min, double max) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0.0;
+        }
+        if (max <= min) {
+            return 1.0;
+        }
+        double normalized = (value - min) / (max - min);
+        normalized = Math.max(0.0, Math.min(1.0, normalized));
+        return 1.0 - normalized;
+    }
+
+    private double parseNumericValue(Object rawValue, double defaultValue) {
+        if (rawValue == null) {
+            return defaultValue;
+        }
+        if (rawValue instanceof Number number) {
+            double value = number.doubleValue();
+            return (Double.isNaN(value) || Double.isInfinite(value)) ? defaultValue : value;
+        }
+        String normalized = rawValue.toString().trim();
+        if (normalized.isEmpty()) {
+            return defaultValue;
+        }
+        normalized = normalized.replace(",", ".");
+        try {
+            return Double.parseDouble(normalized);
+        } catch (Exception ignored) {
+            return defaultValue;
+        }
+    }
+
+    private double calculatePercentile(List<Double> values, double percentile) {
+        if (values == null || values.isEmpty()) {
+            return 0d;
+        }
+        List<Double> sorted = new ArrayList<>(values);
+        sorted.sort(Double::compareTo);
+        if (sorted.size() == 1) {
+            return sorted.get(0);
+        }
+        double safePercentile = Math.max(0d, Math.min(100d, percentile));
+        double index = (safePercentile / 100d) * (sorted.size() - 1);
+        int lowerIndex = (int) Math.floor(index);
+        int upperIndex = (int) Math.ceil(index);
+        if (lowerIndex == upperIndex) {
+            return sorted.get(lowerIndex);
+        }
+        double lowerValue = sorted.get(lowerIndex);
+        double upperValue = sorted.get(upperIndex);
+        double weight = index - lowerIndex;
+        return lowerValue + (upperValue - lowerValue) * weight;
     }
 
     private String extractFirstImage(Object imagesObj) {

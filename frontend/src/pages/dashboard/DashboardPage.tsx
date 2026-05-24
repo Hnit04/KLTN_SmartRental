@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   TrendingUp, Users, Home as HomeIcon, AlertCircle,
   Wallet, ArrowUpRight, ArrowDownRight, Clock
@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { billApi } from '@/api/billApi';
 import { roomApi } from '@/api/roomApi';
 import { contractApi } from '@/api/contractApi';
+import { formatCurrency } from '@/utils/format';
 
 
 export default function DashboardPage() {
@@ -130,10 +131,6 @@ export default function DashboardPage() {
     return () => window.removeEventListener('app:refresh-data', handleRefresh);
   }, []);
 
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('vi-VN') + 'đ';
-  };
-
   const isPositiveChange = percentageChange >= 0;
 
   return (
@@ -225,8 +222,8 @@ export default function DashboardPage() {
             </span>
           }
         >
-          <div className="h-[300px] w-full px-4 pb-5 pt-2 sm:px-6">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="min-h-[300px] w-full px-4 pb-5 pt-2 sm:px-6">
+            <ResponsiveContainer width="100%" height={300} minWidth={1} minHeight={1}>
               <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />

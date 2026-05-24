@@ -6,6 +6,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, Tooltip, Legend 
 } from "recharts";
+import { formatCurrency } from "@/utils/format";
 
 const COLORS = ["#6366f1", "#f43f5e", "#10b981", "#f59e0b"]; // Indigo, Rose, Emerald, Amber
 const COLOR_LABELS = ["Tím", "Hồng", "Xanh lá", "Vàng"];
@@ -84,7 +85,7 @@ export default function CompareRoomsModal() {
       label: "Giá thuê",
       render: (room: typeof compareList[0]) => (
         <span className={`font-bold text-sm ${bestCell(room.price, minPriceVal) ? 'text-emerald-600' : 'text-gray-800'}`}>
-          {room.price?.toLocaleString('vi-VN')}đ
+          {formatCurrency(room.price)}
           {bestCell(room.price, minPriceVal) && <Trophy className="inline h-3.5 w-3.5 ml-1 text-amber-500" />}
         </span>
       ),
@@ -138,7 +139,7 @@ export default function CompareRoomsModal() {
       label: "Tiền điện",
       render: (room: typeof compareList[0]) => (
         <span className="text-sm text-gray-700">
-          {room.elecPrice !== undefined && room.elecPrice !== null ? `${room.elecPrice.toLocaleString()}đ/kWh` : '—'}
+          {room.elecPrice !== undefined && room.elecPrice !== null ? `${formatCurrency(room.elecPrice)}/kWh` : '—'}
         </span>
       ),
     },
@@ -150,7 +151,7 @@ export default function CompareRoomsModal() {
           {room.waterPrice === 0 
             ? <span className="text-emerald-600 font-semibold">Miễn phí</span> 
             : room.waterPrice !== undefined && room.waterPrice !== null
-              ? `${room.waterPrice.toLocaleString()}đ/m³` 
+              ? `${formatCurrency(room.waterPrice)}/m³` 
               : '—'}
         </span>
       ),
@@ -163,7 +164,7 @@ export default function CompareRoomsModal() {
           {room.internetPrice === 0 
             ? <span className="text-emerald-600 font-semibold">Miễn phí</span> 
             : room.internetPrice !== undefined && room.internetPrice !== null
-              ? `${room.internetPrice.toLocaleString()}đ/tháng` 
+              ? `${formatCurrency(room.internetPrice)}/tháng` 
               : '—'}
         </span>
       ),
@@ -189,8 +190,10 @@ export default function CompareRoomsModal() {
             </div>
           </div>
           <button 
+            type="button"
             className="p-2 hover:bg-gray-100 text-gray-400 hover:text-gray-600 rounded-xl transition"
             onClick={closeCompareModal}
+            aria-label="Đóng so sánh"
           >
             <X className="h-5 w-5" />
           </button>
@@ -225,8 +228,10 @@ export default function CompareRoomsModal() {
                         </div>
                         {/* Remove btn */}
                         <button 
+                          type="button"
                           className="absolute top-2 right-2 p-1 bg-black/40 hover:bg-red-500 text-white rounded-full transition opacity-0 group-hover:opacity-100"
                           onClick={() => removeFromCompare(room.id)}
+                          aria-label="Xóa khỏi so sánh"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -236,7 +241,7 @@ export default function CompareRoomsModal() {
                         <p className="font-bold text-sm text-gray-900 truncate">Phòng {room.name}</p>
                         <p className="text-xs text-gray-500 truncate mt-0.5">{room.propertyName || room.address || '—'}</p>
                         <p className="font-bold text-sm mt-1.5" style={{ color: COLORS[i % COLORS.length] }}>
-                          {room.price?.toLocaleString('vi-VN')}đ<span className="text-xs font-normal text-gray-400">/tháng</span>
+                          {formatCurrency(room.price)}<span className="text-xs font-normal text-gray-400">/tháng</span>
                         </p>
                       </div>
                     </div>

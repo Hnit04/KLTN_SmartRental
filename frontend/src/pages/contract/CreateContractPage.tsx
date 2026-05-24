@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Calendar, Clock, CreditCard, ShieldCheck, User, Mail, Info, Eye, X, FileSignature, AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,8 @@ import type { ContractSignMethod, CreateContractPayload } from "@/types";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import { ContractMethodSelector } from "@/features/contract/components/method-selector";
 import { trackEvent } from "@/utils/analytics";
+import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
+import FormBlocker from "@/components/shared/FormBlocker";
 
 const WIZARD_STEPS = [
   { title: "Thông tin & thời hạn" },
@@ -34,14 +36,19 @@ export default function CreateContractPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
 
-  const [formData, setFormData] = useState({
+  const INITIAL_DATA = useMemo(() => ({
     startDate: new Date().toISOString().split('T')[0], 
     duration: 6, 
     tenantEmail: "", 
     landlordRules: "",
     tenantRequests: "",
     signMethod: "TRADITIONAL" as ContractSignMethod,
-  });
+  }), []);
+
+  const { formData, setFormData, clearDraft, isDirty } = useAutoSaveForm(
+    `draft_contract_create_${roomId}`,
+    INITIAL_DATA
+  );
 
   const TENANT_SUGGESTED_TERMS = [
     "Yêu cầu dọn vệ sinh phòng trước khi bàn giao.",
@@ -108,12 +115,15 @@ export default function CreateContractPage() {
                 }
             }
 
-            setFormData(prev => ({
-                ...prev,
-                startDate: initialStartDate,
-                landlordRules: defaultText,
-                tenantRequests: ""
-            }));
+            setFormData(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(INITIAL_DATA)) return prev;
+                return {
+                    ...prev,
+                    startDate: initialStartDate,
+                    landlordRules: defaultText,
+                    tenantRequests: ""
+                };
+            });
 
         } catch (error) {
             toast.error("Lỗi tải thông tin phòng");
@@ -182,6 +192,7 @@ export default function CreateContractPage() {
 
       const res = await contractApi.createContract(payload as any);
       
+      clearDraft();
       toast.success(user?.role === 'LANDLORD' ? "Đã tạo hợp đồng nháp thành công!" : "Đã gửi yêu cầu thuê thành công!");
       
       const newContractId = (res as any).data?.id || (res as any).id;
@@ -200,6 +211,7 @@ export default function CreateContractPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background py-6 md:py-10 animate-fade-in-up">
+      <FormBlocker isDirty={isDirty} />
       <div className="page-shell app-panel">
         {existingContract && user?.role === 'TENANT' && (
           <div className="mb-5 rounded-2xl border border-orange-200/90 bg-orange-50/90 p-4 shadow-sm sm:p-5">

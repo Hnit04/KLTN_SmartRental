@@ -58,4 +58,7 @@ public class Room {
 
     @Column(columnDefinition = "TEXT")
     private String moderationReason;
+
+    @Version
+    private Long version;
 }

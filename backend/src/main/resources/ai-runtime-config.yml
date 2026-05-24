@@ -1,0 +1,134 @@
+ai:
+  runtime:
+    features:
+      chat:
+        llm-enabled: true
+        fallback: FAQ_ONLY
+      query-data:
+        llm-enabled: true
+        mode: ${AI_LLM_MODE:PRESENTER_ONLY}
+      generate-room-description:
+        llm-enabled: false
+        fallback: TEMPLATE
+      suggest-room-price:
+        llm-enabled: false
+        fallback: DETERMINISTIC
+      anomaly-report:
+        llm-enabled: false
+        fallback: TEMPLATE
+      reminder-draft:
+        llm-enabled: false
+        fallback: TEMPLATE
+      moderation:
+        llm-enabled: false
+        fallback: RULE
+
+    templates:
+      query-data:
+        unsupported: "Dạ, hệ thống chưa đủ dữ liệu để xử lý câu hỏi này ở chế độ hiện tại. Bạn vui lòng diễn đạt rõ hơn hoặc bật mode FULL."
+      reminder:
+        due-soon: "Chào {tenantName}, phòng {roomName} sắp đến hạn thanh toán. Tổng số tiền kỳ này là {amount}, hạn cuối {deadline}. Nhờ bạn thanh toán đúng hạn giúp mình."
+        overdue: "Chào {tenantName}, phòng {roomName} hiện đang quá hạn/chưa thanh toán. Tổng số tiền cần thanh toán là {amount}, hạn {deadline}. Bạn vui lòng thanh toán sớm để tránh phát sinh phí phạt."
+      anomaly:
+        header: "Báo cáo bất thường điện nước tháng {month}/{year}"
+        recommendation: "Đề xuất: Kiểm tra thiết bị công suất lớn, rà soát rò rỉ, và liên hệ khách thuê để xác minh nhu cầu sử dụng thực tế."
+        summary:
+          - "Kiểm tra phòng có dấu hiệu tăng đột biến >35% ngay trong kỳ tiếp theo."
+          - "Đặt ngưỡng cảnh báo cho phòng vượt >2.0x điện hoặc >1.5x nước so với trung bình."
+          - "Ưu tiên xử lý trường hợp vượt ngưỡng cao để giảm rủi ro cháy nổ/ngập nước."
+      room-description:
+        base: "Phòng trọ có thông tin nổi bật: {prompt}. Không gian được tối ưu cho nhu cầu ở lâu dài, phù hợp sinh hoạt hằng ngày. Mức giá và tiện ích được cân đối để đảm bảo chi phí hợp lý."
+
+    price-suggestion:
+      base-per-m2: 105000
+      range-min-factor: 0.90
+      range-max-factor: 1.10
+      amenity-bonus-per-item: 100000
+      amenity-bonus-cap-items: 3
+      type-multipliers:
+        STUDIO: 1.12
+        ONE_BEDROOM: 1.08
+        TWO_BEDROOM: 1.18
+        SHARED_ROOM: 0.82
+        MEZZANINE_ROOM: 1.10
+        DEFAULT: 1.0
+      district-keyword-multipliers:
+        "quan 1": 1.15
+        "quan 3": 1.15
+        "binh thanh": 1.15
+        "phu nhuan": 1.15
+        "quan 7": 1.10
+        "quan 2": 1.10
+        "thu duc": 1.10
+        "quan 12": 0.92
+        "binh tan": 0.92
+        "hoc mon": 0.92
+        "cu chi": 0.92
+
+    dictionaries:
+      district-aliases:
+        "go vap": "Gò Vấp"
+        "gv": "Gò Vấp"
+        "q1": "Quận 1"
+        "q2": "Quận 2"
+        "q3": "Quận 3"
+        "q7": "Quận 7"
+        "tp thu duc": "Thủ Đức"
+
+    moderation:
+      image-quality:
+        enabled: true
+        min-width: 800
+        min-height: 600
+        max-download-bytes: 3000000
+        timeout-ms: 3000
+        block-private-network: true
+        allowed-hosts:
+          - res.cloudinary.com
+
+      scene-classifier:
+        enabled: true
+        model-path: backend/models/scene-classifier/model.onnx
+        labels-path: backend/models/scene-classifier/labels.txt
+        max-images-to-classify: 6
+        timeout-ms: 3000
+        min-confidence: 0.60
+        input-width: 224
+        input-height: 224
+        room-like-threshold: 0.65
+        suspicious-labels:
+          - DOCUMENT
+          - OTHER
+          - UNKNOWN
+        low-room-like-cap-score: 69
+        high-suspicious-ratio: 0.50
+        high-suspicious-cap-score: 59
+        severe-suspicious-ratio: 0.75
+        severe-suspicious-cap-score: 49
+        max-low-risk-when-needs-review: 79
+        label-mapping:
+          interior: ROOM_INTERIOR
+          exterior: EXTERIOR
+          bathroom: BATHROOM
+          bedroom: ROOM_INTERIOR
+          closets: ROOM_INTERIOR
+          dining_room: ROOM_INTERIOR
+          kitchen: KITCHEN
+          living_room: ROOM_INTERIOR
+          others: OTHER
+          corridor: CORRIDOR
+          hallway: CORRIDOR
+          building_facade: EXTERIOR
+          document: DOCUMENT
+          paper: DOCUMENT
+
+    search:
+      default-radius-km: 3
+      cheap-price-weight: 0.60
+      cheap-distance-weight: 0.40
+      cheap-percentile: 30
+      cheap-min-samples: 8
+      cheap-percentile-boost: 0.15
+
+    sql-generator:
+      enabled: false

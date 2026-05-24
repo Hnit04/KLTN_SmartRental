@@ -1,0 +1,47 @@
+{
+  "architectures": [
+    "ViTForImageClassification"
+  ],
+  "attention_probs_dropout_prob": 0.0,
+  "dtype": "float32",
+  "encoder_stride": 16,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.0,
+  "hidden_size": 768,
+  "id2label": {
+    "0": "Exterior",
+    "1": "Interior",
+    "2": "bathroom",
+    "3": "bedroom",
+    "4": "closets",
+    "5": "dining_room",
+    "6": "kitchen",
+    "7": "living_room",
+    "8": "others"
+  },
+  "image_size": 224,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "label2id": {
+    "Exterior": "0",
+    "Interior": "1",
+    "bathroom": "2",
+    "bedroom": "3",
+    "closets": "4",
+    "dining_room": "5",
+    "kitchen": "6",
+    "living_room": "7",
+    "others": "8"
+  },
+  "layer_norm_eps": 1e-12,
+  "model_type": "vit",
+  "num_attention_heads": 12,
+  "num_channels": 3,
+  "num_hidden_layers": 12,
+  "patch_size": 16,
+  "pooler_act": "tanh",
+  "pooler_output_size": 768,
+  "problem_type": "single_label_classification",
+  "qkv_bias": true,
+  "transformers_version": "4.57.6"
+}

@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import type { Property } from '@/types/index';
 import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 
 // Danh sách 63 tỉnh/thành phố Việt Nam
 const VIETNAM_CITIES = [
@@ -70,13 +72,20 @@ export default function PropertiesManagePage() {
     isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
   }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
   
-  const [formData, setFormData] = useState({
+  const INITIAL_PROPERTY_DATA = {
     name: '', city: '', district: '', address: '',
     elecPrice: '', waterPrice: '', internetPrice: '', description: '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
-    images: [] as string[] 
-  });
+    images: [] as string[],
+    version: undefined as number | undefined
+  };
+
+  const { formData, setFormData, clearDraft } = useAutoSaveForm(
+    'draft_property_form',
+    INITIAL_PROPERTY_DATA,
+    showModal && !editingId
+  );
 
   // --- STATE CHO UPLOAD ẢNH ---
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -122,12 +131,9 @@ export default function PropertiesManagePage() {
     }
 
     setEditingId(null);
-    setFormData({ 
-      name: '', city: '', district: '', address: '', 
-      elecPrice: '', waterPrice: '', internetPrice: '', description: '',
-      latitude: undefined, longitude: undefined,
-      images: [] 
-    });
+    setEditingId(null);
+    // Lưu ý: Không reset form ở đây để useAutoSaveForm có thể khôi phục draft khi showModal = true
+    // setFormData(INITIAL_PROPERTY_DATA);
     setSelectedFiles([]);
     setPreviewUrls([]);
     setPropStep(1);
@@ -143,7 +149,8 @@ export default function PropertiesManagePage() {
       internetPrice: property.internetPrice?.toString() || '', description: property.description || '',
       latitude: property.latitude ?? undefined,
       longitude: property.longitude ?? undefined,
-      images: property.images || []
+      images: property.images || [],
+      version: property.version
     });
     setSelectedFiles([]);
     setPreviewUrls([]);
@@ -360,7 +367,8 @@ export default function PropertiesManagePage() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         elecPrice: Number(formData.elecPrice) || 0, waterPrice: Number(formData.waterPrice) || 0, internetPrice: Number(formData.internetPrice) || 0,
-        images: finalImagesList 
+        images: finalImagesList,
+        version: editingId ? formData.version : undefined
       };
 
       if (editingId) {
@@ -368,14 +376,32 @@ export default function PropertiesManagePage() {
         toast.success('Cập nhật khu trọ thành công!');
       } else {
         await propertyApi.createProperty(payload);
-        toast.success('Thêm khu trọ mới thành công!');
+        toast.success('Thêm khu trọ mới thành công! Admin sẽ kiểm duyệt trước khi hiển thị công khai.');
+        clearDraft();
       }
       
       setShowModal(false);
       fetchProperties(); 
     } catch (error: any) {
-      const errData = error.response?.data;
-      if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
+      const errResp = error.response;
+      const errData = errResp?.data;
+
+      if (errResp?.status === 409 && errData?.code === 'CONFLICT_RESOURCE_VERSION') {
+        setIsSubmitting(false);
+        toast.error('Dữ liệu đã được thay đổi ở nơi khác. Vui lòng tải lại trước khi lưu.', {
+          action: {
+            label: 'Tải lại',
+            onClick: () => { 
+              fetchProperties(); 
+              setShowModal(false); 
+            }
+          },
+          duration: 8000
+        });
+        return;
+      }
+
+      if (errData?.type === 'VIP_LIMIT_EXCEEDED' || errData?.code === 'VIP_LIMIT_EXCEEDED') {
         setShowModal(false);
         setVipLimit({
           isOpen: true,
@@ -470,6 +496,15 @@ export default function PropertiesManagePage() {
             </div>
 
             <div className="p-5 flex-1 flex flex-col">
+              {(property.status === 'REJECTED' || (property as any).approvalStatus === 'REJECTED') && property.moderationReason && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Lý do từ chối:</p>
+                    <p className="line-clamp-2">{property.moderationReason}</p>
+                  </div>
+                </div>
+              )}
               <h3 className="text-lg font-bold text-gray-900 mb-1 truncate pr-14">{property.name}</h3>
               <div className="flex items-start gap-1.5 text-sm text-gray-500 mb-3 h-10">
                 <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -620,15 +655,15 @@ export default function PropertiesManagePage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Zap className="h-4 w-4 text-yellow-500" /> Giá điện (đ/kWh)</label>
-                        <input type="number" value={formData.elecPrice} onChange={e => setFormData({...formData, elecPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3500" />
+                        <CurrencyInput value={formData.elecPrice} onChange={val => setFormData({...formData, elecPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 3.500" />
                       </div>
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Droplets className="h-4 w-4 text-blue-500" /> Giá nước (đ/m3)</label>
-                        <input type="number" value={formData.waterPrice} onChange={e => setFormData({...formData, waterPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 20000" />
+                        <CurrencyInput value={formData.waterPrice} onChange={val => setFormData({...formData, waterPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 20.000" />
                       </div>
                       <div className="bg-white p-4 rounded-lg border">
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"><Wifi className="h-4 w-4 text-gray-500" /> Internet (đ/tháng)</label>
-                        <input type="number" value={formData.internetPrice} onChange={e => setFormData({...formData, internetPrice: e.target.value})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 100000" />
+                        <CurrencyInput value={formData.internetPrice} onChange={val => setFormData({...formData, internetPrice: val})} className="w-full border p-2.5 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="VD: 100.000" />
                       </div>
                     </div>
                   </div>

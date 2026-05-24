@@ -1,0 +1,9 @@
+﻿Exterior
+Interior
+bathroom
+bedroom
+closets
+dining_room
+kitchen
+living_room
+others

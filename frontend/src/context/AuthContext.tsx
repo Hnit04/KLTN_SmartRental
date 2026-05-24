@@ -2,6 +2,22 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // 1. Import từ '../types' thay vì '../types/auth' để lấy đúng định nghĩa User mới
 import type { User, AuthResponse, RegisterRequest } from '../types'; 
 import { authApi } from '../api/authApi';
+import { userApi } from '../api/userApi';
+
+const SENSITIVE_FIELDS: (keyof User)[] = [
+  'cccdFrontUrl', 'cccdBackUrl', 'bankAccountNumber', 
+  'bankAccountHolder', 'bankQrUrl', 'cccdNumber'
+];
+
+const sanitizeUserForStorage = (user: User): User => {
+  const safe = { ...user };
+  SENSITIVE_FIELDS.forEach(f => {
+    if (f in safe) {
+      delete safe[f];
+    }
+  });
+  return safe;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -21,13 +37,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load user từ localStorage khi F5 trang
   useEffect(() => {
-    const initAuth = () => {
+    const initAuth = async () => {
       const storedUser = localStorage.getItem('user');
       const token = localStorage.getItem('accessToken');
       
       if (storedUser && token) {
         try {
+          // Khôi phục tạm user từ localStorage để UI không bị trống
           setUser(JSON.parse(storedUser));
+          
+          // Lấy user đầy đủ từ server để có các trường nhạy cảm (bank, cccd...)
+          try {
+            const fullUser = await userApi.getMe();
+            setUser(fullUser);
+            // Vẫn chỉ lưu sanitize user vào storage
+            localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(fullUser)));
+          } catch (fetchError) {
+            console.error("Không thể fetch thông tin user mới nhất", fetchError);
+          }
         } catch (e) {
           console.error("Lỗi parse user từ storage", e);
           localStorage.removeItem('user');
@@ -70,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatedAt: userData.updatedAt || new Date().toISOString(),
       };
 
-      localStorage.setItem('user', JSON.stringify(safeUser));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(safeUser)));
       setUser(safeUser);
 
     } catch (error) {
@@ -91,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Hàm cập nhật state user (ví dụ sau khi update ví thành công ở ProfilePage)
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
   };
 
   return (
