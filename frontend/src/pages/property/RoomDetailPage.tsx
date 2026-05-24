@@ -213,29 +213,9 @@ export default function RoomDetailPage() {
 
   const handleAskAI = () => {
     if (!room) return;
-    // Parse amenities for the prompt
-    let roomAmenities: string[] = [];
-    try {
-      roomAmenities = room.amenities ? (typeof room.amenities === "string" ? JSON.parse(room.amenities) : room.amenities) : [];
-    } catch { roomAmenities = []; }
-
-    const details = [
-      `Tên phòng: "${room.name}"`,
-      `Khu trọ: "${room.propertyName || ''}"`,
-      `Địa chỉ: ${room.propertyAddress || room.address || ''}`,
-      `Diện tích: ${room.area}m²`,
-      `Giá thuê: ${room.price?.toLocaleString("vi-VN")}đ/tháng`,
-      room.type ? `Loại phòng: ${room.type === 'STUDIO' ? 'Studio' : room.type === 'ONE_BEDROOM' ? '1 Phòng ngủ' : room.type === 'TWO_BEDROOM' ? '2 Phòng ngủ' : room.type === 'SINGLE_ROOM' ? 'Phòng đơn' : room.type === 'SHARED_ROOM' ? 'Phòng ghép' : room.type === 'MEZZANINE_ROOM' ? 'Phòng gác lửng' : room.type}` : '',
-      room.hasMezzanine ? 'Có gác lửng' : '',
-      room.hasBalcony ? 'Có ban công' : '',
-      roomAmenities.length > 0 ? `Tiện nghi: ${roomAmenities.join(', ')}` : '',
-      room.elecPrice ? `Tiền điện: ${room.elecPrice.toLocaleString()}đ/kWh` : '',
-      room.waterPrice ? `Tiền nước: ${room.waterPrice.toLocaleString()}đ/khối` : '',
-      room.internetPrice ? `Internet: ${room.internetPrice.toLocaleString()}đ/tháng` : '',
-      room.description ? `Mô tả: ${room.description.substring(0, 200)}` : '',
-    ].filter(Boolean).join('. ');
-
-    const q = `Hãy phân tích chi tiết ưu điểm và nhược điểm của phòng trọ sau đây, đánh giá mức giá có hợp lý không, và đưa ra lời khuyên cho người thuê:\n${details}`;
+    
+    // Gửi câu lệnh sạch để Backend Context-Aware tự động bóc tách ID và lấy dữ liệu
+    const q = "Đánh giá ưu nhược điểm của phòng này giúp mình nhé!";
     const shortText = `Phân tích phòng "${room.name}" tại "${room.propertyName || 'khu trọ này'}" giúp mình nhé! 🏠`;
     window.dispatchEvent(new CustomEvent("openAiChat", { detail: { question: q, autoSend: true, displayText: shortText } }));
   };

@@ -109,13 +109,23 @@ public class AiController {
         // NHƯNG: Bỏ qua FAQ cho câu hỏi phân tích phòng (dài, chứa dữ liệu phòng cụ thể)
         // vì FAQ vector search dễ bị false-positive với câu hỏi dài/phức tạp.
         String lowerMessage = message.toLowerCase();
-        boolean isRoomAnalysis = (lowerMessage.contains("phân tích") || lowerMessage.contains("ưu điểm") 
+        
+        // Nhận diện ý định phân tích/đánh giá chung
+        boolean hasAnalysisIntent = lowerMessage.contains("phân tích") || lowerMessage.contains("ưu điểm") 
                 || lowerMessage.contains("nhược điểm") || lowerMessage.contains("đánh giá") 
-                || lowerMessage.contains("lời khuyên") || lowerMessage.contains("tư vấn"))
-                && (lowerMessage.contains("diện tích") || lowerMessage.contains("giá thuê") 
-                || lowerMessage.contains("tiện nghi") || lowerMessage.contains("m²")
-                || lowerMessage.contains("khu trọ") || lowerMessage.contains("giá dịch vụ")
-                || lowerMessage.contains("khoảng giá") || lowerMessage.contains("tổng số phòng"));
+                || lowerMessage.contains("lời khuyên") || lowerMessage.contains("tư vấn")
+                || lowerMessage.contains("chi tiết phòng");
+                
+        // Kiểm tra xem người dùng có đang ở trang chi tiết phòng không
+        boolean isOnRoomPage = validatedContext != null && "ROOM".equals(validatedContext.getEntityType());
+        
+        // Nếu đang ở trang phòng VÀ có ý định phân tích -> Chắc chắn là phân tích phòng
+        boolean isRoomAnalysis = hasAnalysisIntent && (isOnRoomPage || lowerMessage.contains("diện tích") 
+                || lowerMessage.contains("giá thuê") || lowerMessage.contains("tiện nghi") 
+                || lowerMessage.contains("m²") || lowerMessage.contains("khu trọ") 
+                || lowerMessage.contains("giá dịch vụ") || lowerMessage.contains("khoảng giá") 
+                || lowerMessage.contains("tổng số phòng") || lowerMessage.contains("phòng này") 
+                || lowerMessage.contains("phòng trọ này") || lowerMessage.contains("căn phòng này"));
         
         if (!isRoomAnalysis) {
             String faqAnswer = aiOrchestratorService.searchFaq(message);
@@ -129,7 +139,28 @@ public class AiController {
                 ));
             }
         } else {
-            System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Bỏ qua FAQ Cache, chuyển thẳng cho SmartRentalAi.");
+            System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Chuyển hướng sang truy vấn dữ liệu động.");
+            try {
+                Object result = aiOrchestratorService.processDataQuery(
+                        message,
+                        roleStr,
+                        userId,
+                        null,
+                        null,
+                        validatedContext
+                );
+                if (result instanceof String textResult) {
+                    String safeResponse = aiOrchestratorService.sanitizeForUserFacing(textResult);
+                    return ResponseEntity.ok(Map.of(
+                            "status", "success",
+                            "sessionId", sessionId,
+                            "reply", safeResponse,
+                            "source", "SYSTEM_DB"
+                    ));
+                }
+            } catch (Exception e) {
+                System.err.println("❌ [AI DATA ERROR] Lỗi khi xử lý phân tích phòng: " + e.getMessage());
+            }
         }
 
         if (!"FULL".equals(resolveLlmMode())) {

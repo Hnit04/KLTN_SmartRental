@@ -33,7 +33,8 @@ public class AiContextValidator {
 
     private static final List<String> VALID_PAGE_TYPES = Arrays.asList(
             "ROOM_DETAIL", "PROPERTY_DETAIL", "TENANT_CONTRACT_DETAIL",
-            "TENANT_BILL_DETAIL", "LANDLORD_PROPERTY_DETAIL", "LANDLORD_ROOM_DETAIL"
+            "TENANT_BILL_DETAIL", "LANDLORD_PROPERTY_DETAIL", "LANDLORD_ROOM_DETAIL",
+            "TENANT_CONTRACT_CREATE"
     );
 
     private static final List<String> VALID_ENTITY_TYPES = Arrays.asList(

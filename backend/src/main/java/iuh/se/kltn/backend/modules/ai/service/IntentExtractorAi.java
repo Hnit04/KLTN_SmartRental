@@ -18,6 +18,8 @@ public interface IntentExtractorAi {
             "SEARCH_ROOM: Tìm phòng trọ, lọc phòng, so sánh giá phòng, phòng trống.",
             "  params: district (String), city (String), min_price (Number), max_price (Number), room_type (String: STUDIO/ONE_BEDROOM/TWO_BEDROOM/SINGLE_ROOM/SHARED_ROOM/MEZZANINE_ROOM), has_mezzanine (Boolean), has_balcony (Boolean), occupants (Integer, số người ở, VD: 'cho 2 người'→2, '1 mình'→1, 'ở ghép 3 người'→3), pet_friendly (Boolean, VD: 'cho nuôi thú cưng'→true, 'nuôi chó/mèo'→true, 'không nuôi pet'→false).",
             "  MẸO: Nếu user nói 'tầm 3 củ' → max_price=3500000, min_price=2500000. Nếu nói 'dưới 3 triệu' → max_price=3000000. Nếu nói 'rẻ' → max_price=3000000.",
+            "VIEW_ROOM_DETAIL: Đánh giá, xem chi tiết, phân tích ưu nhược điểm của một phòng cụ thể.",
+            "  params: room_id (Integer).",
             "LOCATION_SEARCH: Tìm phòng trọ dựa trên một vị trí cụ thể, tên địa danh, trường học, bệnh viện, tòa nhà.",
             "  params: location (String, Tên địa điểm, VD: 'Đại học RMIT', 'Landmark 81', bắt buộc), radius (Number, bán kính tìm kiếm bằng km, VD 'gần đây'=3.0, 'rất gần'=1.0, 'trong bán kính 5km'=5.0. Mặc định nếu không rõ là 3.0), max_price (Number, ngân sách tối đa theo VNĐ nếu user có nói rõ mức giá, VD: 'dưới 5 triệu' => 5000000), occupants (Integer, nếu user nói rõ số người ở, VD: 'cho 2 người'→2), pet_friendly (Boolean, nếu user muốn nuôi thú cưng, VD: 'nuôi chó'→true).",
 
