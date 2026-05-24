@@ -21,6 +21,7 @@ import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
 import { StatusSummaryStrip, AttentionBanner } from '@/components/detail';
 import type { SummaryStripItem } from '@/components/detail';
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 // Danh sách các tiện ích phổ biến
 const COMMON_AMENITIES = [
@@ -126,7 +127,7 @@ export default function PropertyManageDetailPage() {
     isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
   }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
 
-  const [formData, setFormData] = useState({
+  const INITIAL_ROOM_DATA = {
     name: '', 
     price: '', 
     area: '', 
@@ -140,7 +141,13 @@ export default function PropertyManageDetailPage() {
     images: [] as string[],
     panoramaImages: [] as string[],
     defaultTerms: ''
-  });
+  };
+
+  const { formData, setFormData, clearDraft } = useAutoSaveForm(
+    `draft_room_form_${id}`, // Use property id in cache key so drafts are isolated per property
+    INITIAL_ROOM_DATA,
+    showModal && !editingId
+  );
 
   // --- STATE UPLOAD ẢNH ---
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -448,17 +455,8 @@ const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       console.error("Lỗi khi kiểm tra gói VIP:", error);
       // Tiếp tục mở modal nếu có lỗi mạng
     }
-
     setEditingId(null);
-    setFormData({ 
-      name: '', price: '', area: '', description: '', 
-      type: 'STUDIO' as RoomType,
-      hasMezzanine: false, hasBalcony: false,
-      maxOccupants: '',
-      amenities: [], customAmenitiesInput: '', images: [],
-      panoramaImages: [],
-      defaultTerms: '' 
-    });
+    // Lưu ý: Không reset formData ở đây để useAutoSaveForm có thể khôi phục draft khi showModal = true
     setSelectedFiles([]); 
     setPreviewUrls([]);
     setPanoSelectedFiles([]);

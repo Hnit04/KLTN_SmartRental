@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import type { Property } from '@/types/index';
 import UpgradePromptModal from '@/components/subscription/UpgradePromptModal';
 import { vipApi } from '@/api/vipApi';
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 // Danh sách 63 tỉnh/thành phố Việt Nam
 const VIETNAM_CITIES = [
@@ -70,13 +71,19 @@ export default function PropertiesManagePage() {
     isOpen: boolean; limitType: string; currentTier: string; currentCount: number; maxAllowed: number; message: string;
   }>({ isOpen: false, limitType: '', currentTier: '', currentCount: 0, maxAllowed: 0, message: '' });
   
-  const [formData, setFormData] = useState({
+  const INITIAL_PROPERTY_DATA = {
     name: '', city: '', district: '', address: '',
     elecPrice: '', waterPrice: '', internetPrice: '', description: '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     images: [] as string[] 
-  });
+  };
+
+  const { formData, setFormData, clearDraft } = useAutoSaveForm(
+    'draft_property_form',
+    INITIAL_PROPERTY_DATA,
+    showModal && !editingId
+  );
 
   // --- STATE CHO UPLOAD ẢNH ---
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -122,12 +129,9 @@ export default function PropertiesManagePage() {
     }
 
     setEditingId(null);
-    setFormData({ 
-      name: '', city: '', district: '', address: '', 
-      elecPrice: '', waterPrice: '', internetPrice: '', description: '',
-      latitude: undefined, longitude: undefined,
-      images: [] 
-    });
+    setEditingId(null);
+    // Lưu ý: Không reset form ở đây để useAutoSaveForm có thể khôi phục draft khi showModal = true
+    // setFormData(INITIAL_PROPERTY_DATA);
     setSelectedFiles([]);
     setPreviewUrls([]);
     setPropStep(1);
@@ -369,6 +373,7 @@ export default function PropertiesManagePage() {
       } else {
         await propertyApi.createProperty(payload);
         toast.success('Thêm khu trọ mới thành công!');
+        clearDraft();
       }
       
       setShowModal(false);
