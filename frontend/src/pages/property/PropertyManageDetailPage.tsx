@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { 
-  MapPin, Plus, Edit, ArrowLeft, Loader2, 
+  Plus, Edit, ArrowLeft, Loader2, 
   Sparkles, ImagePlus, X, FileText, FileSignature, CheckSquare, ScrollText,
-  Trash2, AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users,
+  AlertTriangle, Layers, Copy, ShieldCheck, ShieldAlert, Users,
   Wrench, CheckCircle, ChevronRight, ChevronLeft, Building
 } from 'lucide-react';
 import type { RoomType } from '@/types/index';
@@ -41,7 +41,7 @@ const ROOM_TYPE_LABELS: Record<RoomType, string> = {
 };
 
 // ✅ DANH SÁCH GỢI Ý ĐIỀU KHOẢN DÀNH CHO CHỦ TRỌ
-const RULE_CATEGORIES = [
+const RULE_CATEGORIES: { label: string; color: string; rules: { text: string; toggle?: string }[] }[] = [
   {
     label: '🐾 Thú cưng',
     color: 'amber',
@@ -154,10 +154,9 @@ export default function PropertyManageDetailPage() {
 
   // --- STATE CHO EXCEL IMPORT ---
   const excelInputRef = useRef<HTMLInputElement>(null);
-  const excelImagesInputRef = useRef<HTMLInputElement>(null);
   const [showExcelPreview, setShowExcelPreview] = useState(false);
-  const [excelRooms, setExcelRooms] = useState<any[]>([]);
-  const [excelImageFiles, setExcelImageFiles] = useState<Map<string, File>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [excelRooms, setExcelRooms] = useState<Record<string, any>[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importTotal, setImportTotal] = useState(0);
@@ -170,6 +169,7 @@ export default function PropertyManageDetailPage() {
 
   useEffect(() => {
     if (id) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchData = async () => {
@@ -179,9 +179,9 @@ export default function PropertyManageDetailPage() {
         propertyApi.getDetail(id!),
         propertyApi.getRooms(id!)
       ]);
-      setProperty((propRes as any).data || propRes);
-      setRooms((roomsRes as any).data || roomsRes);
-    } catch (error) {
+      setProperty((propRes as { data?: Property }).data || propRes as unknown as Property);
+      setRooms((roomsRes as { data?: Room[] }).data || roomsRes as unknown as Room[]);
+    } catch {
       toast.error('Không thể tải dữ liệu phòng');
     } finally {
       setLoading(false);
@@ -231,8 +231,9 @@ export default function PropertyManageDetailPage() {
         toast.success(`Đã hoàn thành bảo trì phòng "${roomName}"! Phòng đã sẵn sàng cho thuê.`);
       }
       fetchData();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Không thể cập nhật trạng thái bảo trì');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Không thể cập nhật trạng thái bảo trì');
     } finally {
       setIsMaintenanceLoading(false);
       setMaintenanceRoomId(null);
@@ -240,9 +241,22 @@ export default function PropertyManageDetailPage() {
     }
   };
 
-  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const lowerName = file.name.toLowerCase();
+  const isExcelFile =
+    lowerName.endsWith(".xlsx") ||
+    lowerName.endsWith(".xls") ||
+    lowerName.endsWith(".csv") ||
+    file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    file.type === "application/vnd.ms-excel" ||
+    file.type === "text/csv";
+  if (!isExcelFile) {
+    toast.error("Vui lòng chọn file Excel hợp lệ (.xlsx, .xls, .csv).");
+    e.target.value = "";
+    return;
+  }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -251,40 +265,49 @@ export default function PropertyManageDetailPage() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         
-        const parsedRooms = data.map((row: any) => {
-          const roomName = row['Tên phòng']?.toString() || '';
-          const normalImgNames = row['Ảnh thường'] ? String(row['Ảnh thường']).split(',').map(s => s.trim()) : [];
-          const panoImgName = row['Ảnh 360'] ? String(row['Ảnh 360']).trim() : '';
+        const parsedRooms = data.map((row) => {
+          const roomName = (row['Tên phòng'] || row['name'])?.toString() || '';
+          
+          const rawImages = row['Ảnh thường'] || row['images'];
+          const normalImgUrls = rawImages 
+            ? String(rawImages).split(/[,|]/).map(s => s.trim()).filter(s => s.startsWith('http')) 
+            : [];
+          
+          const rawPano = row['Ảnh 360'] || row['panoramaImages'];
+          const panoImgUrls = rawPano 
+            ? String(rawPano).split(/[,|]/).map(s => s.trim()).filter(s => s.startsWith('http')) 
+            : [];
 
-          // Tìm file khớp
-          const matchedNormalFiles = normalImgNames.map(name => excelImageFiles.get(name)).filter(f => !!f) as File[];
-          const matchedPanoFile = excelImageFiles.get(panoImgName);
+          const hasMezzanineVal = row['Có gác lửng'] !== undefined ? row['Có gác lửng'] : row['hasMezzanine'];
+          const hasBalconyVal = row['Có ban công'] !== undefined ? row['Có ban công'] : row['hasBalcony'];
+          const rawAmenities = row['Tiện ích'] || row['amenities'];
 
           return {
             name: roomName,
-            price: Number(row['Giá thuê (VNĐ)']) || 0,
-            area: Number(row['Diện tích (m2)']) || 0,
-            type: row['Loại phòng'] || 'STUDIO',
-            maxOccupants: row['Sức chứa tối đa'] ? Number(row['Sức chứa tối đa']) : null,
-            hasMezzanine: row['Có gác lửng'] == 1 || row['Có gác lửng'] == '1' || String(row['Có gác lửng']).toLowerCase() === 'có',
-            hasBalcony: row['Có ban công'] == 1 || row['Có ban công'] == '1' || String(row['Có ban công']).toLowerCase() === 'có',
-            amenities: row['Tiện ích'] ? String(row['Tiện ích']).split(',').map(s => s.trim()) : [],
-            normalImgFiles: matchedNormalFiles,
-            panoImgFile: matchedPanoFile,
+            price: Number(row['Giá thuê (VNĐ)'] || row['price']) || 0,
+            area: Number(row['Diện tích (m2)'] || row['area']) || 0,
+            type: row['Loại phòng'] || row['type'] || 'STUDIO',
+            maxOccupants: (row['Sức chứa tối đa'] || row['maxOccupants']) ? Number(row['Sức chứa tối đa'] || row['maxOccupants']) : null,
+            hasMezzanine: hasMezzanineVal == 1 || hasMezzanineVal == '1' || String(hasMezzanineVal).toLowerCase() === 'có' || String(hasMezzanineVal).toLowerCase() === 'true',
+            hasBalcony: hasBalconyVal == 1 || hasBalconyVal == '1' || String(hasBalconyVal).toLowerCase() === 'có' || String(hasBalconyVal).toLowerCase() === 'true',
+            amenities: rawAmenities ? String(rawAmenities).split(/[,|]/).map(s => s.trim()).filter(s => s) : [],
+            normalImgUrls,
+            panoImgUrls,
             imageStatus: {
-              normalCount: matchedNormalFiles.length,
-              normalTotal: normalImgNames.length,
-              hasPano: !!matchedPanoFile,
-              needsPano: !!panoImgName
+              normalCount: normalImgUrls.length,
+              normalTotal: normalImgUrls.length,
+              hasPano: panoImgUrls.length > 0,
+              needsPano: !!rawPano
             }
           };
         });
 
         setExcelRooms(parsedRooms);
         setShowExcelPreview(true);
-      } catch (err) {
+      } catch {
         toast.error('Lỗi đọc file Excel. Vui lòng kiểm tra lại định dạng!');
       }
     };
@@ -292,29 +315,20 @@ export default function PropertyManageDetailPage() {
     if (excelInputRef.current) excelInputRef.current.value = '';
   };
 
-  const handleImageBatchSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    
-    const fileMap = new Map<string, File>();
-    for (let i = 0; i < files.length; i++) {
-      fileMap.set(files[i].name, files[i]);
-    }
-    setExcelImageFiles(fileMap);
-    toast.success(`Đã ghi nhớ ${files.length} ảnh. Bây giờ hãy chọn file Excel!`);
-    excelInputRef.current?.click();
-  };
+
+
+
 
   const executeExcelImport = async () => {
     try {
       const res = await vipApi.getMyPlan();
-      const plan = (res as any).data || res;
+      const plan = (res as { data?: { maxRoomsPerProperty: number; tier: string } }).data || res as unknown as { maxRoomsPerProperty: number; tier: string };
       if (plan.maxRoomsPerProperty !== -1 && rooms.length + excelRooms.length > plan.maxRoomsPerProperty) {
         toast.error(`Gói ${plan.tier} chỉ cho phép tối đa ${plan.maxRoomsPerProperty} phòng. Bạn đang tải lên quá giới hạn!`);
         return;
       }
-    } catch (e) {
-      console.error("Lỗi lấy thông tin VIP", e);
+    } catch (vipErr) {
+      console.error("Lỗi lấy thông tin VIP", vipErr);
     }
 
     setIsImporting(true);
@@ -323,7 +337,7 @@ export default function PropertyManageDetailPage() {
     setImportErrors([]);
 
     let successCount = 0;
-    let errList = [];
+    const errList: {name: string; reason: string}[] = [];
 
     for (let i = 0; i < excelRooms.length; i++) {
       const room = excelRooms[i];
@@ -334,19 +348,8 @@ export default function PropertyManageDetailPage() {
       }
 
       try {
-        // Tải ảnh lên trước
-        let uploadedNormalUrls: string[] = [];
-        let uploadedPanoUrls: string[] = [];
-
-        if (room.normalImgFiles.length > 0) {
-          const res = await propertyApi.uploadImages(room.normalImgFiles);
-          uploadedNormalUrls = (res as any).data || res;
-        }
-
-        if (room.panoImgFile) {
-          const res = await propertyApi.uploadImages([room.panoImgFile]);
-          uploadedPanoUrls = (res as any).data || res;
-        }
+        const uploadedNormalUrls: string[] = room.normalImgUrls || [];
+        const uploadedPanoUrls: string[] = room.panoImgUrls || [];
 
         await propertyApi.createRoom(id!, {
           name: room.name,
@@ -364,8 +367,8 @@ export default function PropertyManageDetailPage() {
         });
         successCount++;
         await new Promise(r => setTimeout(r, 800)); // Delay để AI không bị quá tải
-      } catch (err: any) {
-        const errData = err?.response?.data;
+      } catch (err: unknown) {
+        const errData = (err as { response?: { data?: { message?: string; type?: string } } })?.response?.data;
         errList.push({ name: room.name, reason: errData?.message || 'Lỗi không xác định' });
         
         if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
@@ -403,8 +406,8 @@ export default function PropertyManageDetailPage() {
         type: formData.type,
         amenities: [...formData.amenities, ...formData.customAmenitiesInput.split(',').map(s => s.trim()).filter(s => s)]
       });
-      setPriceSuggestion((res as any).data || res);
-    } catch (err) {
+      setPriceSuggestion((res as { data?: { suggestion: string; reason: string } }).data || res as unknown as { suggestion: string; reason: string });
+    } catch {
       toast.error('Không thể lấy gợi ý giá lúc này');
     } finally {
       setIsSuggestingPrice(false);
@@ -427,7 +430,7 @@ export default function PropertyManageDetailPage() {
   const handleOpenCreate = async () => {
     try {
       const res = await vipApi.getMyPlan();
-      const plan = (res as any).data || res;
+      const plan = (res as { data?: { maxRoomsPerProperty: number; tier: string } }).data || res as unknown as { maxRoomsPerProperty: number; tier: string };
       
       // Kiểm tra giới hạn phòng
       if (plan.maxRoomsPerProperty !== -1 && rooms.length >= plan.maxRoomsPerProperty) {
@@ -467,7 +470,7 @@ export default function PropertyManageDetailPage() {
   };
 
   // --- NHÂN BẢN PHÒNG ---
-  const handleDuplicate = async (room: any) => {
+  const handleDuplicate = async (room: Room) => {
     if (!room) {
       toast.error('Không tìm thấy dữ liệu phòng để sao chép');
       return;
@@ -480,7 +483,7 @@ export default function PropertyManageDetailPage() {
       rawAmenities = Array.isArray(room.amenities) 
         ? room.amenities 
         : JSON.parse(room.amenities || '[]');
-    } catch (e) {
+    } catch {
       rawAmenities = [];
     }
 
@@ -521,7 +524,7 @@ export default function PropertyManageDetailPage() {
     toast.info('Đã sao chép thông tin! Vui lòng nhập Số phòng mới.');
   };
 
-  const handleOpenEdit = (room: any) => { 
+  const handleOpenEdit = (room: Room) => { 
     setEditingId(room.id);
     
     const standardAmenities: string[] = [];
@@ -685,10 +688,10 @@ export default function PropertyManageDetailPage() {
       const keywords = `Tên phòng hoặc số phòng: ${formData.name}. Diện tích: ${formData.area}m2. Giá thuê: ${formData.price} VND/tháng. \nTiện ích có sẵn: ${allAmenities}.\nYêu cầu viết: ${tonePrompt}`;
       
       const res = await propertyApi.generateRoomDescription(keywords);
-      const generatedText = (res as any).data?.description || res; 
+      const generatedText = (res as { data?: { description?: string } }).data?.description || (res as unknown as { description?: string })?.description || ''; 
       
       setAiContentPreview(generatedText); // Bật preview modal
-    } catch (error) {
+    } catch {
       toast.error('Lỗi khi gọi AI. Tính năng đang bảo trì.');
     } finally {
       setIsGeneratingAI(false);
@@ -719,7 +722,7 @@ export default function PropertyManageDetailPage() {
       if (selectedFiles.length > 0) {
         toast.info("Đang tải ảnh lên...");
         const uploadRes = await propertyApi.uploadImages(selectedFiles);
-        newUrls = (uploadRes as any).data || uploadRes;
+        newUrls = (uploadRes as { data?: string[] }).data || uploadRes as unknown as string[];
       }
 
       // Upload ảnh 360
@@ -727,7 +730,7 @@ export default function PropertyManageDetailPage() {
       if (panoSelectedFiles.length > 0) {
         toast.info("Đang tải ảnh 360° lên...");
         const panoUploadRes = await propertyApi.uploadImages(panoSelectedFiles);
-        newPanoUrls = (panoUploadRes as any).data || panoUploadRes;
+        newPanoUrls = (panoUploadRes as { data?: string[] }).data || panoUploadRes as unknown as string[];
       }
 
       const parsedCustomAmenities = formData.customAmenitiesInput
@@ -762,17 +765,17 @@ export default function PropertyManageDetailPage() {
       
       setShowModal(false);
       fetchData(); 
-    } catch (error: any) {
-      const errData = error?.response?.data;
+    } catch (error: unknown) {
+      const errData = (error as { response?: { data?: { type?: string; limitType?: string; currentTier?: string; currentCount?: number; maxAllowed?: number; message?: string } } })?.response?.data;
       if (errData?.type === 'VIP_LIMIT_EXCEEDED') {
         setShowModal(false);
         setVipLimit({
           isOpen: true,
-          limitType: errData.limitType,
-          currentTier: errData.currentTier,
-          currentCount: errData.currentCount,
-          maxAllowed: errData.maxAllowed,
-          message: errData.message,
+          limitType: errData.limitType || '',
+          currentTier: errData.currentTier || '',
+          currentCount: errData.currentCount || 0,
+          maxAllowed: errData.maxAllowed || 0,
+          message: errData.message || '',
         });
       } else {
         toast.error(errData?.message || (editingId ? 'Cập nhật thất bại' : 'Thêm mới thất bại'));
@@ -859,14 +862,22 @@ export default function PropertyManageDetailPage() {
         description={property.address}
         actions={
           <div className="flex gap-2 flex-col md:flex-row w-full md:w-auto">
-            <input type="file" accept=".xlsx, .xls" ref={excelInputRef} onChange={handleExcelImport} className="hidden" />
-            <input type="file" multiple ref={excelImagesInputRef} onChange={handleImageBatchSelect} className="hidden" />
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+              ref={excelInputRef}
+              onClick={(e) => {
+                (e.currentTarget as HTMLInputElement).value = "";
+              }}
+              onChange={handleExcelImport}
+              className="hidden"
+            />
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => excelImagesInputRef.current?.click()} 
+              onClick={() => excelInputRef.current?.click()} 
               className="min-h-11 w-full md:w-auto shrink-0 gap-2 border-primary text-primary hover:bg-primary/10"
-              title="Chọn ảnh trước, sau đó chọn file Excel để tự động khớp ảnh"
+              title="Chọn file Excel để nhập phòng hàng loạt"
             >
               <ScrollText className="h-4 w-4" /> Nhập từ Excel
             </Button>
@@ -990,19 +1001,19 @@ export default function PropertyManageDetailPage() {
                 </div>
 
                 {/* AI Safety Score */}
-                {(room as any).safetyScore != null && (
+                {(room as Room & { safetyScore?: number }).safetyScore != null && (
                   <div className="mb-3 flex items-center gap-2 text-xs">
-                    {(room as any).safetyScore >= 80 ? (
+                    {(room as Room & { safetyScore?: number }).safetyScore! >= 80 ? (
                       <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
-                        <ShieldCheck className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                        <ShieldCheck className="h-3 w-3" /> AI: {(room as Room & { safetyScore?: number }).safetyScore}/100
                       </span>
-                    ) : (room as any).safetyScore >= 50 ? (
+                    ) : (room as Room & { safetyScore?: number }).safetyScore! >= 50 ? (
                       <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
-                        <AlertTriangle className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                        <AlertTriangle className="h-3 w-3" /> AI: {(room as Room & { safetyScore?: number }).safetyScore}/100
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
-                        <ShieldAlert className="h-3 w-3" /> AI: {(room as any).safetyScore}/100
+                        <ShieldAlert className="h-3 w-3" /> AI: {(room as Room & { safetyScore?: number }).safetyScore}/100
                       </span>
                     )}
                   </div>
@@ -1330,7 +1341,7 @@ export default function PropertyManageDetailPage() {
                         <span className="text-xs text-purple-800 font-medium">Giọng văn:</span>
                         <select 
                           value={aiTone} 
-                          onChange={e => setAiTone(e.target.value as any)}
+                          onChange={e => setAiTone(e.target.value as 'SEO' | 'GENZ' | 'PRO')}
                           className="text-xs border border-purple-200 rounded px-2 py-1 bg-white outline-none text-purple-900 focus:ring-1 focus:ring-purple-400"
                         >
                           <option value="SEO">🔥 Tiêu chuẩn (Chuẩn SEO)</option>
@@ -1586,7 +1597,7 @@ export default function PropertyManageDetailPage() {
                     setDeleteRoomConfirm(null);
                     fetchData();
                   })
-                  .catch((error: any) => {
+                  .catch(() => {
                     toast.error('Không thể xóa phòng đang có hợp đồng hoặc lỗi hệ thống.');
                   })
                   .finally(() => setIsDeleting(false));
@@ -1698,7 +1709,7 @@ export default function PropertyManageDetailPage() {
                     <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                       <p className="font-bold mb-1">Có lỗi khi tải lên một số phòng:</p>
                       <ul className="list-disc pl-5 text-sm">
-                        {importErrors.map((err: any, idx: number) => (
+                        {importErrors.map((err, idx) => (
                           <li key={idx}>Phòng <strong>{err.name}</strong>: {err.reason}</li>
                         ))}
                       </ul>
@@ -1716,7 +1727,7 @@ export default function PropertyManageDetailPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {excelRooms.map((room: any, idx: number) => {
+                        {excelRooms.map((room, idx) => {
                           const isInvalid = !room.name || !room.price || !room.area;
                           return (
                             <tr key={idx} className={isInvalid ? 'bg-red-50' : 'hover:bg-gray-50'}>

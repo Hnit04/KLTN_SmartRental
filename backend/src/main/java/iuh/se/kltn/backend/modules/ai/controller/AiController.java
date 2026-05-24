@@ -436,7 +436,7 @@ public class AiController {
 
             if (dueBills.isEmpty()) {
                 String emptyMessage = "OVERDUE".equals(normalizedScope)
-                        ? "Khong co phong nao dang no hoac qua han thanh toan."
+                        ? "Không có phòng nào đang nợ hoặc quá hạn thanh toán."
                         : "Khong co hoa don nao sap den han trong khoang thoi gian da chon.";
                 return ResponseEntity.ok(Map.of(
                         "status", "success",
@@ -720,8 +720,8 @@ public class AiController {
 
         try {
             String aiPrompt = String.format(
-                "Ban la chuyen gia viet noi dung cho website cho thue phong tro. " +
-                "Hay viet mot doan mo ta phong tro hap dan, ngan gon (3-5 cau), bang tieng Viet, " +
+                "Bạn là chuyên gia viết nội dung cho website cho thuê phòng trọ. " +
+                "Hãy viết một đoạn mô tả phòng trọ hấp dẫn, ngắn gọn (3-5 câu), bằng tiếng Việt, " +
                 "dua tren thong tin sau. Chi tra ve noi dung mo ta, KHONG them tieu de hay giai thich gi khac.\n\n" +
                 "Thong tin phong: %s", prompt);
 
@@ -747,7 +747,7 @@ public class AiController {
 
         String amenitiesStr = (amenities != null && !amenities.isEmpty()) ? String.join(", ", amenities) : "Khong co";
         String standardizedQuestion = String.format("PRICE_SUGGEST:%s:%s:%s:%.0f", city, district, type, area);
-        String rawQueryForLog = String.format("Goi y gia phong %s, dien tich %.1f m2 tai Quan %s, %s.", type, area, district, city);
+        String rawQueryForLog = String.format("Gợi ý giá phòng %s, diện tích %.1f m2 tại Quận %s, %s.", type, area, district, city);
 
         String cachedResponse = aiOrchestratorService.searchFaq(standardizedQuestion);
         if (cachedResponse != null) {
@@ -771,7 +771,7 @@ public class AiController {
 
         try {
             String aiPrompt = String.format(
-                "Goi y KHOANG GIA thue (VND) phong %s, %.1f m2 tai Q.%s, %s. Tien ich: %s.\n" +
+                "Gợi ý KHOẢNG GIÁ thuê (VND) phòng %s, %.1f m2 tại Q.%s, %s. Tiện ích: %s.\n" +
                 "Tra ve JSON: {\"suggestion\": \"Khoang gia\", \"reason\": \"Ly do ngan gon\"}. Chi tra ve JSON.",
                 type, area, district, city, amenitiesStr
             );
@@ -815,13 +815,13 @@ public class AiController {
 
         if ("DUE_SOON".equalsIgnoreCase(scope)) {
             return String.format(
-                    "Chao %s, phong %s sap den han thanh toan. Tong so tien ky nay la %s, han cuoi %s. Nho ban sap xep thanh toan dung han giup minh nhe.",
+                    "Chào %s, phòng %s sắp đến hạn thanh toán. Tổng số tiền kỳ này là %s, hạn cuối %s. Nhớ bạn sắp xếp thanh toán đúng hạn giúp mình nhé.",
                     tenantName, roomName, amountText, deadline
             );
         }
 
         return String.format(
-                "Chao %s, phong %s hien dang qua han/chua thanh toan. Tong so tien can thanh toan la %s, han %s. Ban vui long thanh toan som de tranh phat sinh phi phat.",
+                "Chào %s, phòng %s hiện đang quá hạn/chưa thanh toán. Tổng số tiền cần thanh toán là %s, hạn %s. Bạn vui lòng thanh toán sớm để tránh phát sinh phí phạt.",
                 tenantName, roomName, amountText, deadline
         );
     }
@@ -829,12 +829,12 @@ public class AiController {
     private String buildTemplateAnomalyReport(List<Map<String, Object>> anomalies, int latestMonth, int latestYear) {
         StringBuilder sb = new StringBuilder();
         sb.append("Bao cao bat thuong dien nuoc thang ").append(latestMonth).append("/").append(latestYear).append("\n\n");
-        sb.append("Tong so phong canh bao: ").append(anomalies.size()).append("\n\n");
+        sb.append("Tổng số phòng cảnh báo: ").append(anomalies.size()).append("\n\n");
 
         int idx = 1;
         for (Map<String, Object> anomaly : anomalies) {
             if (idx > 10) {
-                sb.append("... va ").append(anomalies.size() - 10).append(" phong canh bao khac.\n");
+                sb.append("... và ").append(anomalies.size() - 10).append(" phòng cảnh báo khác.\n");
                 break;
             }
             sb.append(idx).append(". Phong: ").append(String.valueOf(anomaly.getOrDefault("roomName", "N/A"))).append("\n");
@@ -855,8 +855,8 @@ public class AiController {
         }
 
         sb.append("Khuyen nghi chung:\n");
-        sb.append("- Kiem tra phong co dau hieu tang dot bien >35% ngay trong ky tiep theo.\n");
-        sb.append("- Dat nguong canh bao cho phong vuot >2.0x dien hoac >1.5x nuoc so voi trung binh.\n");
+        sb.append("- Kiểm tra phòng có dấu hiệu tăng đột biến >35% ngay trong kỳ tiếp theo.\n");
+        sb.append("- Đặt ngưỡng cảnh báo cho phòng vượt >2.0x điện hoặc >1.5x nước so với trung bình.\n");
         sb.append("- Uu tien xu ly truong hop vuot nguong cao de giam rui ro chay no/ngap nuoc.\n");
         return sb.toString();
     }
@@ -869,7 +869,7 @@ public class AiController {
         return "Phong tro co thong tin noi bat: " + clean + ". "
                 + "Khong gian duoc toi uu cho nhu cau o lau dai, phu hop sinh hoat hang ngay. "
                 + "Muc gia va tien ich duoc can doi de dam bao chi phi hop ly. "
-                + "Ban nen lien he xem phong thuc te de chot lua chon phu hop nhat.";
+                + "Bạn nên liên hệ xem phòng thực tế để chốt lựa chọn phù hợp nhất.";
     }
 
     private Map<String, Object> buildDeterministicPriceSuggestion(String district, String city, Double area, String type, List<String> amenities) {

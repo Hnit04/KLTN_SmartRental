@@ -61,6 +61,19 @@ frontend/.env
 frontend/.env.*
 !frontend/.env.example
 
+# ── Python / AI Scripts ──
+backend/.venv*/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# ── Archives ──
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
 # ── Logs ──
 *.log
 logs/

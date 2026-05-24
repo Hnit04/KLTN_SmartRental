@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "status", "error",
-                        "message", "Du lieu khong hop le: " + message
+                        "message", "Dữ liệu không hợp lệ: " + message
                 ));
     }
 

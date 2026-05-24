@@ -83,7 +83,7 @@ public class RoomController {
         try {
             newStatus = RoomStatus.valueOf(statusStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Trang thai khong hop le. Gia tri hop le: AVAILABLE, HIDDEN");
+            return ResponseEntity.badRequest().body("Trạng thái không hợp lệ. Giá trị hợp lệ: AVAILABLE, HIDDEN");
         }
 
         RoomResponse response = roomService.updateRoomStatus(id, newStatus, currentUser.getId());

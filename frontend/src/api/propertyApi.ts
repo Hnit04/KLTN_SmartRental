@@ -1,6 +1,7 @@
 import axiosClient from "./axiosClient";
 import type { Property, Room } from "@/types/index";
 
+
 export interface PaginatedResponse<T> {
   content: T[];
   totalPages: number;

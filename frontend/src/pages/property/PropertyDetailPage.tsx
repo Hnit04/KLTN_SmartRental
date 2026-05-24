@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
-  MapPin, ArrowLeft, Zap, Droplets, Wifi, ShieldCheck,
-  User, Phone, MessageSquare, CalendarClock, X, Loader2, Star, Bot,
-  ChevronLeft, ChevronRight, ZoomIn, SlidersHorizontal, Home
+  MapPin, Zap, Droplets, Wifi, ShieldCheck,
+  User, Phone, MessageSquare, Bot, CalendarClock, X, Loader2, Star,
+  ChevronLeft, ChevronRight, SlidersHorizontal, Home
 } from "lucide-react";
 import { propertyApi } from "@/api/propertyApi";
 import { tenantPreferenceApi } from "@/api/tenantPreferenceApi";
@@ -88,7 +88,7 @@ function parseRoomAmenities(room: Room): string[] {
         return parsed.map((item) => normalizeText(String(item))).filter(Boolean);
       }
     } catch {
-      return room.amenities
+      return (room.amenities as unknown as string)
         .split(/[;,|]/)
         .map(normalizeText)
         .filter(Boolean);
@@ -170,7 +170,6 @@ function computeRoomPreferenceScore(room: Room, preference: TenantPreference | n
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
   const [property, setProperty] = useState<Property | null>(null);
@@ -180,7 +179,6 @@ export default function PropertyDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // --- STATE LIGHTBOX ---
-  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // --- STATE FILTER PHÒNG ---
@@ -217,10 +215,10 @@ export default function PropertyDetailPage() {
           preferencePromise
         ]);
 
-        const propertyData = propRes.data as any;
+        const propertyData = propRes.data as unknown as Property;
         setProperty(propertyData);
-        setRooms(roomRes.data as any);
-        setTenantPreference((prefRes as any)?.data ?? null);
+        setRooms(roomRes.data as unknown as Room[]);
+        setTenantPreference((prefRes as { data?: TenantPreference })?.data ?? null);
 
         // ✅ GỌI THẲNG API LẤY REVIEW THEO PROPERTY ID (KHU TRỌ)
         try {
@@ -228,10 +226,10 @@ export default function PropertyDetailPage() {
           const reviewRes = await reviewApi.getReviewsByProperty(id);
 
           // Bóc tách nhiều lớp bọc của Spring Boot & Axios
-          let finalReviewData = (reviewRes as any)?.data !== undefined ? (reviewRes as any).data : reviewRes;
+          let finalReviewData = (reviewRes as { data?: unknown })?.data !== undefined ? (reviewRes as { data?: unknown }).data : reviewRes;
 
-          if (finalReviewData?.data) finalReviewData = finalReviewData.data;
-          if (finalReviewData?.content) finalReviewData = finalReviewData.content;
+          if ((finalReviewData as { data?: unknown })?.data) finalReviewData = (finalReviewData as { data?: unknown }).data;
+          if ((finalReviewData as { content?: unknown })?.content) finalReviewData = (finalReviewData as { content?: unknown }).content;
 
           if (Array.isArray(finalReviewData)) {
             setReviews(finalReviewData);
@@ -243,7 +241,7 @@ export default function PropertyDetailPage() {
           setReviews([]);
         }
 
-      } catch (error) {
+      } catch {
         toast.error("Không thể tải thông tin khu trọ.");
       } finally {
         setIsLoading(false);
@@ -357,8 +355,9 @@ export default function PropertyDetailPage() {
 
       toast.success("Đặt lịch thành công! Vui lòng chờ chủ nhà duyệt.");
       setIsBookingModalOpen(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Có lỗi xảy ra khi đặt lịch.");
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || "Có lỗi xảy ra khi đặt lịch.");
     } finally {
       setIsSubmitting(false);
     }
@@ -479,7 +478,6 @@ export default function PropertyDetailPage() {
                     src={images[lightboxIndex] || images[0]}
                     alt="Ảnh khu trọ"
                     className="w-full h-full object-cover bg-black/5 cursor-pointer transition-transform duration-500"
-                    onClick={() => setLightboxOpen(true)}
                   />
 
                   {/* Controls */}
@@ -496,7 +494,7 @@ export default function PropertyDetailPage() {
                     <ChevronRight className="h-5 w-5 text-gray-700" />
                   </button>
 
-                  <div className="absolute bottom-4 right-4 bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg backdrop-blur-md cursor-pointer" onClick={() => setLightboxOpen(true)}>
+                  <div className="absolute bottom-4 right-4 bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg backdrop-blur-md">
                     {lightboxIndex + 1} / {images.length}
                   </div>
                 </div>
@@ -515,8 +513,7 @@ export default function PropertyDetailPage() {
                     ))}
                     {images.length > 5 && (
                       <div
-                        className="relative w-24 h-16 rounded-xl overflow-hidden cursor-pointer shrink-0 border-2 border-transparent bg-black"
-                        onClick={() => setLightboxOpen(true)}
+                        className="relative w-24 h-16 rounded-xl overflow-hidden shrink-0 border-2 border-transparent bg-black"
                       >
                         <img src={images[4]} className="w-full h-full object-cover opacity-40" alt="" />
                         <div className="absolute inset-0 flex items-center justify-center text-white font-semibold text-sm">
@@ -758,7 +755,7 @@ export default function PropertyDetailPage() {
                   <select
                     className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
                     value={roomSortBy}
-                    onChange={e => setRoomSortBy(e.target.value as any)}
+                    onChange={e => setRoomSortBy(e.target.value as "default" | "price_asc" | "price_desc" | "area_asc")}
                   >
                     <option value="default">Mặc định</option>
                     <option value="price_asc">Giá: Thấp → Cao</option>
@@ -980,7 +977,7 @@ export default function PropertyDetailPage() {
   );
 }
 
-      const ServiceItem = ({icon, label, value, unit}: any) => (
+      const ServiceItem = ({ icon, label, value, unit }: { icon: React.ReactNode; label: string; value?: number; unit: string }) => (
       <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-gray-200 hover:shadow-md sm:min-w-[140px] sm:flex-none">
         <div className="p-2.5 bg-muted/40 rounded-full">{icon}</div>
         <div>

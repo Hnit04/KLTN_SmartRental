@@ -1,18 +1,22 @@
 package iuh.se.kltn.backend.modules.ai.service;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.Content;
 import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import iuh.se.kltn.backend.modules.ai.config.AiRuntimeProperties;
 import iuh.se.kltn.backend.modules.ai.dto.ModerationResult;
+import iuh.se.kltn.backend.modules.ai.dto.ModerationScoreDetail;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 public class ModerationService {
@@ -21,59 +25,127 @@ public class ModerationService {
     private ChatLanguageModel geminiChatModel;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private RuleBasedModerationScorer ruleBasedModerationScorer;
 
-    /**
-     * Kiểm tra nội dung văn bản có an toàn không và chấm điểm an toàn (0-100).
-     * 
-     * @param type "Khu trọ" hoặc "Phòng trọ"
-     * @param text Nội dung cần kiểm tra
-     * @param imageUrls Danh sách URL ảnh (nếu có)
-     * @return ModerationResult chứa kết quả kiểm tra và điểm số
-     */
+    @Autowired(required = false)
+    private AiRuntimeProperties aiRuntimeProperties;
+
+    @Value("${ai.llm.mode:FULL}")
+    private String aiLlmMode;
+
     public ModerationResult checkContent(String type, String text, List<String> imageUrls) {
-        if (text == null || text.trim().isEmpty()) {
-            return new ModerationResult(true, 100, "Nội dung trống");
+        return checkContent(type, text, imageUrls, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    public ModerationResult checkContent(
+            String type,
+            String text,
+            List<String> imageUrls,
+            List<String> panoramaImageUrls,
+            Double price,
+            Float area,
+            String address,
+            String district,
+            String city,
+            List<String> amenities,
+            String roomType,
+            Integer maxOccupants,
+            Double elecPrice,
+            Double waterPrice,
+            Double internetPrice
+    ) {
+        String safeType = type == null || type.isBlank() ? "Phòng trọ" : type;
+        String safeText = text == null ? "" : text;
+
+        ModerationScoreDetail detail = ruleBasedModerationScorer.score(
+                safeType,
+                safeText,
+                imageUrls,
+                panoramaImageUrls,
+                price,
+                area,
+                address,
+                district,
+                city,
+                amenities,
+                roomType,
+                maxOccupants,
+                elecPrice,
+                waterPrice,
+                internetPrice
+        );
+
+        boolean isSafe = ruleBasedModerationScorer.isSafe(detail);
+        String ruleReason = buildRuleReason(detail);
+
+        boolean llmEnabled = isModerationLlmEnabled();
+        String aiNote = null;
+        if (llmEnabled) {
+            aiNote = generateAiModerationNote(safeType, safeText, imageUrls, detail);
         }
 
-        String tieuChiDiemCao = type.equals("Khu trọ") 
-                ? "- Mô tả rõ ràng về toàn nhà, tiện ích chung, địa chỉ. LƯU Ý: ĐÂY LÀ KHU TRỌ NÊN KHÔNG BẮT BUỘC CÓ GIÁ THUÊ PHÒNG (Tuyệt đối không trừ điểm nếu thiếu thông tin giá thuê phòng)." 
-                : "- Mô tả rõ ràng về phòng, diện tích, giá thuê cụ thể. "
-                + "LƯU Ý QUAN TRỌNG: "
-                + "(1) Chi phí phụ (điện, nước, internet) được quản lý ở cấp KHU TRỌ chứ KHÔNG PHẢI ở phòng → TUYỆT ĐỐI KHÔNG trừ điểm nếu phòng thiếu thông tin chi phí phụ. "
-                + "(2) Quy trình liên hệ/xem phòng do HỆ THỐNG APP xử lý (đặt lịch hẹn online) → KHÔNG trừ điểm nếu thiếu thông tin liên hệ hay quy trình xem phòng.";
+        if (aiNote != null && !aiNote.isBlank()) {
+            detail.setSource("RULE_GEMINI");
+        } else {
+            detail.setSource("RULE");
+        }
 
-        String prompt = String.format(
-                "Bạn là chuyên gia kiểm duyệt nội dung cho mạng xã hội bất động sản. " +
-                        "Nhiệm vụ: Đánh giá xem nội dung sau có hữu ích cho người tìm phòng trọ hay không. " +
-                        "Các trường hợp tính điểm thấp (score < 50, isSafe = false):\n" +
-                        "1. Nội dung bậy bạ, rác (ví dụ: 'asdasd', '123123', gõ phím vô nghĩa).\n" +
-                        "2. Nội dung không liên quan đến thuê phòng (ví dụ: quảng cáo game, tin tức chính trị).\n" +
-                        "3. Chửi thề, xúc phạm, lừa đảo, số điện thoại ảo.\n\n" +
-                        "Các trường hợp điểm cao (score >= 80, isSafe = true):\n" +
-                        "%s\n\n" +
-                        "Yêu cầu trả về JSON duy nhất: {\"isSafe\": boolean, \"score\": int, \"reason\": \"string\"}. " +
-                        "Chỉ trả về JSON. Không giải thích thêm. Ở mục reason, hãy ghi rõ nếu phát hiện lỗi từ chữ hoặc từ ảnh.\n\n" +
-                        "Loại bài đăng: %s\n" +
-                        "Nội dung cần kiểm duyệt: \"%s\"",
-                tieuChiDiemCao, type, text);
+        String finalReason = composeFinalReason(ruleReason, aiNote, llmEnabled);
+        return new ModerationResult(isSafe, detail.getTotalScore(), finalReason);
+    }
 
+    public ModerationResult checkContent(String text) {
+        return checkContent("Phòng trọ", text, null);
+    }
+
+    public ModerationResult checkContent(String type, String text) {
+        return checkContent(type, text, null);
+    }
+
+    public boolean isSafe(String text) {
+        return checkContent(text).isSafe();
+    }
+
+    private boolean isModerationLlmEnabled() {
+        String normalizedMode = aiLlmMode == null ? "FULL" : aiLlmMode.trim().toUpperCase(Locale.ROOT);
+        if ("TEMPLATE_ONLY".equals(normalizedMode)) {
+            return false;
+        }
+        if (aiRuntimeProperties == null || aiRuntimeProperties.getFeatures() == null
+                || aiRuntimeProperties.getFeatures().getModeration() == null) {
+            return false;
+        }
+        return aiRuntimeProperties.getFeatures().getModeration().isLlmEnabled();
+    }
+
+    private String generateAiModerationNote(String type, String text, List<String> imageUrls, ModerationScoreDetail detail) {
         try {
-            System.out.println("--- AI MODERATION DEBUG ---");
-            System.out.println("PROMPT: " + prompt);
-            
+            String prompt = "Bạn là trợ lý kiểm duyệt. Hãy viết tối đa 3 nhận xét ngắn để hỗ trợ Admin xem lại bài đăng. "
+                    + "Không được thay đổi điểm. Không được kết luận thay Admin. "
+                    + "Chỉ trả về văn bản ngắn, không dùng JSON.\n\n"
+                    + "Loại bài đăng: " + type + "\n"
+                    + "SafetyScore(rule): " + detail.getTotalScore() + "/100\n"
+                    + "RiskLevel(rule): " + detail.getRiskLevel() + "\n"
+                    + "Rule reasons: " + String.join("; ", detail.getRuleReasons()) + "\n"
+                    + "Nội dung: " + text;
+
             UserMessage userMessage;
             if (imageUrls != null && !imageUrls.isEmpty()) {
-                System.out.println("CHECKING " + imageUrls.size() + " IMAGES...");
-                List<dev.langchain4j.data.message.Content> contents = new ArrayList<>();
+                List<Content> contents = new ArrayList<>();
                 contents.add(TextContent.from(prompt));
+                int added = 0;
                 for (String url : imageUrls) {
-                    // Giới hạn số lượng ảnh
-                    if (contents.size() > 4) break; 
+                    if (url == null || url.isBlank()) {
+                        continue;
+                    }
+                    if (added >= 3) {
+                        break;
+                    }
                     try {
                         contents.add(ImageContent.from(url));
-                    } catch (Exception e) {
-                        System.err.println("Invalid image URL: " + url);
+                        added++;
+                    } catch (Exception ignored) {
+                        // Skip invalid image URL for AI note.
                     }
                 }
                 userMessage = UserMessage.from(contents);
@@ -82,45 +154,43 @@ public class ModerationService {
             }
 
             Response<AiMessage> aiResponse = geminiChatModel.generate(userMessage);
-            String response = aiResponse.content().text();
-            
-            System.out.println("RESPONSE: " + response);
-            System.out.println("---------------------------");
-
-            // Tìm block JSON trong trường hợp AI trả về text thừa
-            int start = response.indexOf("{");
-            int end = response.lastIndexOf("}");
-
-            if (start != -1 && end != -1 && end > start) {
-                String potentialJson = response.substring(start, end + 1);
-                return objectMapper.readValue(potentialJson, ModerationResult.class);
+            if (aiResponse == null || aiResponse.content() == null || aiResponse.content().text() == null) {
+                return null;
             }
-
-            // Fallback: xóa backticks nếu không tìm thấy {} hợp lệ
-            String cleaned = response.replaceAll("```json|```", "").trim();
-            return objectMapper.readValue(cleaned, ModerationResult.class);
-        } catch (Exception e) {
-            System.err.println("Lỗi gọi Moderation AI: " + e.getMessage());
-            // Dự phòng nếu AI lỗi
-            return new ModerationResult(true, 50, "Không thể phân tích bằng AI, cần Admin kiểm tra lại");
+            String note = aiResponse.content().text().trim();
+            if (note.startsWith("```") && note.endsWith("```")) {
+                note = note.replace("```", "").trim();
+            }
+            return note.isBlank() ? null : note;
+        } catch (Exception ex) {
+            System.err.println("[MODERATION] Gemini note không khả dụng: " + ex.getMessage());
+            return null;
         }
     }
 
-    /**
-     * Hàm Overload cũ (không truyền type -> Gán mặc định là Phòng trọ)
-     */
-    public ModerationResult checkContent(String text) {
-        return checkContent("Phòng trọ", text, null);
-    }
-    
-    public ModerationResult checkContent(String type, String text) {
-        return checkContent(type, text, null);
+    private String buildRuleReason(ModerationScoreDetail detail) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[RULE] SafetyScore=")
+                .append(detail.getTotalScore()).append("/100, ")
+                .append("contentScore=").append(detail.getContentScore()).append("/25, ")
+                .append("imageScore=").append(detail.getImageScore()).append("/25, ")
+                .append("completenessScore=").append(detail.getCompletenessScore()).append("/30, ")
+                .append("policyScore=").append(detail.getPolicyScore()).append("/20");
+
+        if (detail.getRuleReasons() != null && !detail.getRuleReasons().isEmpty()) {
+            sb.append(" - Rule notes: ");
+            sb.append(String.join(" | ", detail.getRuleReasons()));
+        }
+        return sb.toString();
     }
 
-    /**
-     * Hàm cũ để tương thích ngược (nếu cần)
-     */
-    public boolean isSafe(String text) {
-        return checkContent(text).isSafe();
+    private String composeFinalReason(String ruleReason, String aiNote, boolean llmEnabled) {
+        if (aiNote != null && !aiNote.isBlank()) {
+            return ruleReason + "\n[AI NOTE] " + aiNote;
+        }
+        if (llmEnabled) {
+            return ruleReason + "\n[AI NOTE] Gemini không khả dụng, sử dụng kết quả RULE.";
+        }
+        return ruleReason + "\n[AI NOTE] Gemini đang tắt, sử dụng kết quả RULE.";
     }
 }

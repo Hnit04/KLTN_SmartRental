@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: smart-rental
+  config:
+    import: "optional:classpath:ai-runtime-config.yml"
   datasource:
     # URL kết nối MariaDB, lưu ý port 3307
 

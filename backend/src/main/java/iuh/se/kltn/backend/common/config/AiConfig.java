@@ -124,7 +124,7 @@ public class AiConfig {
                 poolingMode = PoolingMode.valueOf(ragOnnxPoolingMode.trim().toUpperCase(Locale.ROOT));
             } catch (Exception e) {
                 throw new IllegalStateException(
-                        "ai.rag.embedding.onnx.pooling-mode khong hop le. Gia tri hop le: CLS, MEAN",
+                        "ai.rag.embedding.onnx.pooling-mode không hợp lệ. Giá trị hợp lệ: CLS, MEAN",
                         e
                 );
             }

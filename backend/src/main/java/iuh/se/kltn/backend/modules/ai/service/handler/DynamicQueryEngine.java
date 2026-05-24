@@ -52,21 +52,39 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // GUEST: Tim phong tro cong khai
-    // Chi hien thi phong AVAILABLE thuoc khu tro da APPROVED.
+    // GUEST: Tìm phòng trọ công khai
+    // Chỉ hiển thị phòng AVAILABLE thuộc khu trọ đã APPROVED.
     // ========================================================================
     private List<Map<String, Object>> handleSearchRoom(IntentExtractionResult intentData, Long userId, String role) {
+        Map<String, Object> params = intentData.getParams();
+        List<Object> queryParams = new ArrayList<>();
+
+        Double lat = null;
+        Double lng = null;
+        if (params != null) {
+            lat = toNullableDouble(firstPresent(params, "lat", "latitude"));
+            lng = toNullableDouble(firstPresent(params, "lng", "longitude"));
+        }
+
+        boolean hasGeoContext = hasValidCoordinates(lat, lng);
+        String distanceExpr = "(6371 * ACOS(LEAST(1.0, COS(RADIANS(?)) * COS(RADIANS(p.latitude)) * COS(RADIANS(p.longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(p.latitude)))))";
+
         StringBuilder sql = new StringBuilder(
                 "SELECT r.id AS room_id, r.name, r.price, r.area, r.type, r.images, " +
                 "r.has_mezzanine, r.has_balcony, r.max_occupants, r.current_occupants, " +
                 "r.amenities, r.default_terms, r.description, " +
                 "p.name AS property_name, p.address, p.district, " +
-                "p.elec_price AS elecPrice, p.water_price AS waterPrice, p.internet_price AS internetPrice " +
-                "FROM rooms r JOIN properties p ON r.property_id = p.id " +
-                "WHERE r.status = 'AVAILABLE' AND p.status = 'APPROVED'"
+                "p.elec_price AS elecPrice, p.water_price AS waterPrice, p.internet_price AS internetPrice"
         );
-        List<Object> queryParams = new ArrayList<>();
-        Map<String, Object> params = intentData.getParams();
+
+        if (hasGeoContext) {
+            sql.append(", ").append(distanceExpr).append(" AS distance_km");
+            queryParams.add(lat);
+            queryParams.add(lng);
+            queryParams.add(lat);
+        }
+
+        sql.append(" FROM rooms r JOIN properties p ON r.property_id = p.id WHERE r.status = 'AVAILABLE' AND p.status = 'APPROVED'");
 
         if (params != null) {
             if (params.containsKey("district")) {
@@ -97,7 +115,7 @@ public class DynamicQueryEngine {
             if (params.containsKey("has_balcony") && Boolean.TRUE.equals(toBoolean(params.get("has_balcony")))) {
                 sql.append(" AND r.has_balcony = TRUE");
             }
-            // So nguoi o: loc phong co max_occupants >= so nguoi yeu cau
+            // Số người ở: lọc phòng có max_occupants >= số người yêu cầu
             Object occupantsParam = firstPresent(params, "occupants", "required_occupants", "people", "persons", "max_occupants");
             if (occupantsParam != null) {
                 int occupants = toInt(occupantsParam);
@@ -116,15 +134,38 @@ public class DynamicQueryEngine {
                         ") AND LOWER(COALESCE(r.default_terms,'')) NOT LIKE '%khong cho nuoi thu cung%'" +
                         " AND LOWER(COALESCE(r.description,'')) NOT LIKE '%khong cho nuoi thu cung%'");
             }
+
+            if (hasGeoContext) {
+                sql.append(" AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL");
+                Double radiusKm = toNullableDouble(firstPresent(params, "radiusKm", "radius_km", "radius"));
+                if (radiusKm != null && radiusKm > 0) {
+                    sql.append(" AND ").append(distanceExpr).append(" <= ?");
+                    queryParams.add(lat);
+                    queryParams.add(lng);
+                    queryParams.add(lat);
+                    queryParams.add(radiusKm);
+                }
+            }
         }
-        sql.append(" ORDER BY r.price ASC LIMIT 10");
+
+        String sortMode = params == null || !params.containsKey("sort")
+                ? null
+                : String.valueOf(params.get("sort"));
+        if (hasGeoContext && "PRICE_ASC_WITH_DISTANCE".equalsIgnoreCase(sortMode)) {
+            sql.append(" ORDER BY r.price ASC, distance_km ASC");
+        } else if (hasGeoContext && "NEAREST_THEN_PRICE".equalsIgnoreCase(sortMode)) {
+            sql.append(" ORDER BY distance_km ASC, r.price ASC");
+        } else {
+            sql.append(" ORDER BY r.price ASC");
+        }
+        sql.append(" LIMIT 10");
         return jdbcTemplate.queryForList(sql.toString(), queryParams.toArray());
     }
 
     // ========================================================================
-    // TENANT: Xem hoa don cua chinh minh
-    // bills KHONG co tenant_id -> BAT BUOC JOIN qua contracts.
-    // Hien thi thong tin phong kem theo de khach biet hoa don thuoc phong nao.
+    // TENANT: Xem hóa đơn của chính mình
+    // bills KHÔNG có tenant_id -> BẮT BUỘC JOIN qua contracts.
+    // Hiển thị thông tin phòng kèm theo để khách biết hóa đơn thuộc phòng nào.
     // ========================================================================
     private List<Map<String, Object>> handleViewBill(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -160,9 +201,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem no chua dong
-    // No = hoa don co status UNPAID hoac LATE.
-    // Day la tinh nang canh bao nen hien thi them deadline va tien phat.
+    // TENANT: Xem nợ chưa đóng
+    // Nợ = hóa đơn có status UNPAID hoặc LATE.
+    // Đây là tính năng cảnh báo nên hiển thị thêm deadline và tiền phạt.
     // ========================================================================
     private List<Map<String, Object>> handleViewDebt(IntentExtractionResult intentData, Long userId, String role) {
         String sql =
@@ -178,10 +219,10 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem hop dong
-    // Hien thi gia thue thuc te (actual_price), tien coc, ngay het han,
-    // trang thai ky. Neu khach hoi "hop dong con bao lau" thi
-    // PostgreSQL date subtraction se tra ve so ngay con lai rat truc quan.
+    // TENANT: Xem hợp đồng
+    // Hiển thị giá thuê thực tế (actual_price), tiền cọc, ngày hết hạn,
+    // trạng thái ký. Nếu khách hỏi "hợp đồng còn bao lâu" thì
+    // PostgreSQL date subtraction sẽ trả về số ngày còn lại rất trực quan.
     // ========================================================================
     private List<Map<String, Object>> handleViewContract(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -207,9 +248,9 @@ public class DynamicQueryEngine {
     }
 
     // ========================================================================
-    // TENANT: Xem lich hen xem phong
-    // Lich hen co tenant_id truc tiep. Kem thong tin phong
-    // va meeting_link de khach co the tham gia ngay.
+    // TENANT: Xem lịch hẹn xem phòng
+    // Lịch hẹn có tenant_id trực tiếp. Kèm thông tin phòng
+    // và meeting_link để khách có thể tham gia ngay.
     // ========================================================================
     private List<Map<String, Object>> handleViewAppointment(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -244,9 +285,9 @@ public class DynamicQueryEngine {
 
     // ========================================================================
     // LANDLORD: Xem doanh thu
-    // SONG CON: Doanh thu = CHI tinh hoa don da PAID.
-    // Tuyet doi khong duoc cong gop hoa don UNPAID/LATE/PENDING vao.
-    // JOIN chuoi: bills -> contracts -> rooms -> properties (loc landlord_id).
+    // SỐNG CÒN: Doanh thu = CHỈ tính hóa đơn đã PAID.
+    // Tuyệt đối không được cộng gộp hóa đơn UNPAID/LATE/PENDING vào.
+    // JOIN chuỗi: bills -> contracts -> rooms -> properties (lọc landlord_id).
     // ========================================================================
     private List<Map<String, Object>> handleViewRevenue(IntentExtractionResult intentData, Long userId, String role) {
         StringBuilder sql = new StringBuilder(
@@ -302,7 +343,7 @@ public class DynamicQueryEngine {
 
     // ========================================================================
     // LANDLORD: Xem ty le lap day phong
-    // Dem so phong theo tung trang thai (AVAILABLE, RENTED, MAINTENANCE,
+    // Đếm số phòng theo từng trạng thái (AVAILABLE, RENTED, MAINTENANCE,
     // RESERVED) de chu biet tong quan "suc khoe" tai san.
     // Co the loc theo ten khu tro cu the neu chu co nhieu khu.
     // ========================================================================
@@ -360,6 +401,20 @@ public class DynamicQueryEngine {
         try { return Double.parseDouble(obj.toString()); } catch (Exception e) { return 0; }
     }
 
+    private Double toNullableDouble(Object obj) {
+        if (obj == null) {
+            return null;
+        }
+        if (obj instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return Double.parseDouble(obj.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private int toInt(Object obj) {
         if (obj instanceof Number) return ((Number) obj).intValue();
         try { return Integer.parseInt(obj.toString()); } catch (Exception e) { return 0; }
@@ -379,5 +434,15 @@ public class DynamicQueryEngine {
             }
         }
         return null;
+    }
+
+    private boolean hasValidCoordinates(Double lat, Double lng) {
+        if (lat == null || lng == null) {
+            return false;
+        }
+        if (lat.isNaN() || lng.isNaN() || lat.isInfinite() || lng.isInfinite()) {
+            return false;
+        }
+        return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     }
 }
