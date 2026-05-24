@@ -69,16 +69,16 @@ public class QueryContextEnricher {
                 Long entityId = validatedContext.getEntityId();
                 if ("ROOM".equals(entityType)) {
                     enrichedParams.put("roomId", entityId);
-                    assumptions.add("Sử dụng phòng ID=" + entityId + " từ ngữ cảnh trang.");
+                    assumptions.add("(Dữ liệu phòng được tự động trích xuất từ màn hình hiện tại)");
                 } else if ("PROPERTY".equals(entityType)) {
                     enrichedParams.put("propertyId", entityId);
-                    assumptions.add("Sử dụng khu trọ ID=" + entityId + " từ ngữ cảnh trang.");
+                    assumptions.add("(Dữ liệu khu trọ được tự động trích xuất từ màn hình hiện tại)");
                 } else if ("CONTRACT".equals(entityType)) {
                     enrichedParams.put("contractId", entityId);
-                    assumptions.add("Sử dụng hợp đồng ID=" + entityId + " từ ngữ cảnh trang.");
+                    assumptions.add("(Dữ liệu hợp đồng được tự động trích xuất từ màn hình hiện tại)");
                 } else if ("BILL".equals(entityType)) {
                     enrichedParams.put("billId", entityId);
-                    assumptions.add("Sử dụng hóa đơn ID=" + entityId + " từ ngữ cảnh trang.");
+                    assumptions.add("(Dữ liệu hóa đơn được tự động trích xuất từ màn hình hiện tại)");
                 }
             } else {
                 return clarification(
