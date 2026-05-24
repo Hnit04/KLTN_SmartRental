@@ -568,12 +568,7 @@ public class RecommendationService {
         if (tier == null) {
             return 0;
         }
-        return switch (tier) {
-            case FREE -> 0;
-            case SILVER -> 1;
-            case GOLD -> 2;
-            case PLATINUM -> 3;
-        };
+        return tier.getSearchBoostWeight();
     }
 
     private String normalizeText(String input) {

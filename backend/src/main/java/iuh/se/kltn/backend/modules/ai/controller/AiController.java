@@ -73,6 +73,9 @@ public class AiController {
     @Autowired
     private RagKnowledgeService ragKnowledgeService;
 
+    @Autowired
+    private iuh.se.kltn.backend.modules.subscription.service.VipSubscriptionService vipSubscriptionService;
+
     @Value("${ai.llm.mode:FULL}")
     private String aiLlmMode;
 
@@ -708,7 +711,13 @@ public class AiController {
      * Frontend gửi keywords (tên phòng, diện tích, giá, tiện ích) → AI viết mô tả chuẩn SEO.
      */
     @PostMapping("/generate-room-description")
-    public ResponseEntity<?> generateRoomDescription(@Valid @RequestBody AiRoomDescriptionRequest request) {
+    public ResponseEntity<?> generateRoomDescription(@Valid @RequestBody AiRoomDescriptionRequest request, @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser != null && "LANDLORD".equals(roleFrom(currentUser))) {
+            if (!vipSubscriptionService.canUseAiDescription(currentUser.getId())) {
+                return ResponseEntity.status(403).body(Map.of("status", "error", "message", "Vui lòng nâng cấp gói VIP để sử dụng tính năng AI tạo mô tả."));
+            }
+        }
+
         String prompt = request.getPrompt();
         if (prompt == null || prompt.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Vui long cung cap thong tin phong"));
@@ -738,6 +747,12 @@ public class AiController {
             @Valid @RequestBody AiSuggestRoomPriceRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
+        if (currentUser != null && "LANDLORD".equals(roleFrom(currentUser))) {
+            if (!vipSubscriptionService.canUseAiPriceSuggestion(currentUser.getId())) {
+                return ResponseEntity.status(403).body(Map.of("status", "error", "message", "Vui lòng nâng cấp gói VIP để sử dụng tính năng AI gợi ý giá."));
+            }
+        }
+
         long startTime = System.currentTimeMillis();
         String district = request.getDistrict();
         String city = request.getCity();

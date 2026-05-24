@@ -301,7 +301,7 @@ export interface SignContractPayload {
 // 4. UTILITY TYPES (Bills, Notifications...)
 // ==========================================
 
-export type NotificationType = "SYSTEM" | "PAYMENT_REMINDER" | "CONTRACT_UPDATE" | "NEW_REVIEW";
+export type NotificationType = "SYSTEM" | "PAYMENT_REMINDER" | "CONTRACT_UPDATE" | "NEW_REVIEW" | "APPOINTMENT_UPDATE" | "BILL_CREATED" | "ROOM_AVAILABLE" | "PROPERTY_APPROVED" | "PROPERTY_REJECTED" | "ROOM_APPROVED" | "ROOM_REJECTED" | "ROOM_UPDATED" | "KYC_UPDATE";
 export interface Notification {
   id: number;
   title: string;

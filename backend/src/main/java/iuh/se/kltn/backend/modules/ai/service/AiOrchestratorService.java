@@ -1963,12 +1963,13 @@ public class AiOrchestratorService {
 
         StringBuilder responseStr = new StringBuilder();
         if (cheapMode) {
-            responseStr.append("Minh dang hieu 'gia re' la nhom phong co gia thap trong khu vuc ban tim. ")
-                    .append("Ban co the nhap ngan sach cu the nhu 'duoi 3 trieu' de loc chinh xac hon.\n\n");
+            responseStr.append("Mình đang hiểu 'giá rẻ' là nhóm phòng có giá thấp trong khu vực bạn tìm. ")
+                    .append("Bạn có thể nhập ngân sách cụ thể như 'dưới 3 triệu' để lọc chính xác hơn.\n\n");
         }
         responseStr.append("Dạ, mình tìm được ").append(results.size())
                 .append(" phòng trống gần '").append(geoResult.displayName)
                 .append("' (trong bán kính ").append(safeRadius.intValue()).append("km):\n\n");
+
 
         int limit = Math.min(results.size(), 5);
         for (int i = 0; i < limit; i++) {
@@ -2035,23 +2036,23 @@ public class AiOrchestratorService {
                         false);
                 if (!relaxedResults.isEmpty()) {
                     saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, 0, null, "GPS");
-                    return "Hien tai chua co phong trong cho nuoi thu cung trong ban kinh " + safeRadius.intValue()
-                            + "km gan vi tri hien tai cua ban. Tuy nhien, minh co tim thay "
+                    return "Hiện tại chưa có phòng trống cho nuôi thú cưng trong bán kính " + safeRadius.intValue()
+                            + "km gần vị trí hiện tại của bạn. Tuy nhiên, mình có tìm thấy "
                             + relaxedResults.size()
-                            + " phong neu bo dieu kien thu cung. Ban co muon xem cac phong do khong?";
+                            + " phòng nếu bỏ điều kiện thú cưng. Bạn có muốn xem các phòng đó không?";
                 }
             }
             saveActionLog(userId, role, question, predictedIntent, confidence, false, startTime, true, "LOCATION_GPS", null, 0, null, "GPS");
             return "Hiện tại không tìm thấy phòng trống nào trong bán kính " + safeRadius.intValue()
-                    + "km gan vi tri hien tai cua ban.";
+                    + "km gần vị trí hiện tại của bạn.";
         }
 
         StringBuilder responseStr = new StringBuilder();
         if (cheapMode) {
-            responseStr.append("Minh dang hieu 'gia re' la nhom phong co gia thap trong khu vuc gan ban. ")
-                    .append("Ban co the nhap ngan sach cu the nhu 'duoi 3 trieu' de loc chinh xac hon.\n\n");
+            responseStr.append("Mình đang hiểu 'giá rẻ' là nhóm phòng có giá thấp trong khu vực gần bạn. ")
+                    .append("Bạn có thể nhập ngân sách cụ thể như 'dưới 3 triệu' để lọc chính xác hơn.\n\n");
         }
-        responseStr.append("Da, minh tim duoc ").append(results.size())
+        responseStr.append("Dạ, mình tìm được ").append(results.size())
                 .append(" phòng trống gần vị trí hiện tại của bạn (trong bán kính ")
                 .append(safeRadius.intValue()).append("km):\n\n");
 
@@ -2069,7 +2070,7 @@ public class AiOrchestratorService {
             String distanceStr = normalizeDistanceForCard(row.get("distance_km"));
             String firstImg = extractFirstImage(row.get("images"));
 
-            responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cach %skm]\n",
+            responseStr.append(String.format("[ROOM_CARD: %s | %s | %s | %s | cách %skm]\n",
                     roomId, name, priceStr, firstImg, distanceStr));
         }
 

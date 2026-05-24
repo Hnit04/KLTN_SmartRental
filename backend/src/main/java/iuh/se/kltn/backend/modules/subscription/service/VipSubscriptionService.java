@@ -81,7 +81,7 @@ public class VipSubscriptionService {
                 "isActive", sub.isActive(),
                 "currentPropertyCount", propertyCount,
                 "maxProperties", tier.getMaxProperties(),
-                "searchBoost", tier.getSearchBoost()
+                "searchBoostWeight", tier.getSearchBoostWeight()
         );
     }
 
@@ -104,9 +104,11 @@ public class VipSubscriptionService {
                 Map.entry("maxImagesPerProperty", tier.getMaxImagesPerProperty()),
                 Map.entry("maxImagesPerRoom", tier.getMaxImagesPerRoom()),
                 Map.entry("maxPanoramaPerRoom", tier.getMaxPanoramaPerRoom()),
-                Map.entry("aiDescMonthlyLimit", tier.getAiDescMonthlyLimit()),
-                Map.entry("searchBoost", tier.getSearchBoost()),
-                Map.entry("prioritySupport", tier.isPrioritySupport())
+                Map.entry("searchBoostWeight", tier.getSearchBoostWeight()),
+                Map.entry("aiDescriptionEnabled", tier.isAiDescriptionEnabled()),
+                Map.entry("aiPriceSuggestionEnabled", tier.isAiPriceSuggestionEnabled()),
+                Map.entry("advancedDashboardEnabled", tier.isAdvancedDashboardEnabled()),
+                Map.entry("autoApproveWhenSafe", tier.isAutoApproveWhenSafe())
         );
     }
 
@@ -291,11 +293,24 @@ public class VipSubscriptionService {
         }
     }
 
-    /**
-     * Lấy điểm boost tìm kiếm cho Landlord.
-     */
-    public int getSearchBoost(Long landlordId) {
-        return getCurrentTier(landlordId).getSearchBoost();
+    public int getSearchBoostWeight(Long landlordId) {
+        return getCurrentTier(landlordId).getSearchBoostWeight();
+    }
+
+    public boolean canUseAiDescription(Long landlordId) {
+        return getCurrentTier(landlordId).isAiDescriptionEnabled();
+    }
+
+    public boolean canUseAiPriceSuggestion(Long landlordId) {
+        return getCurrentTier(landlordId).isAiPriceSuggestionEnabled();
+    }
+
+    public boolean canUseAdvancedDashboard(Long landlordId) {
+        return getCurrentTier(landlordId).isAdvancedDashboardEnabled();
+    }
+
+    public boolean canAutoApproveWhenSafe(Long landlordId) {
+        return getCurrentTier(landlordId).isAutoApproveWhenSafe();
     }
 
     // ─── SCHEDULED: Hạ gói khi hết hạn ───

@@ -47,6 +47,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             JOIN properties p ON r.property_id = p.id
             WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
               AND r.status = 'AVAILABLE'
+              AND r.approval_status = 'APPROVED'
               AND p.status = 'APPROVED'
         ) nearby
         WHERE nearby.distance_km <= :radius
@@ -76,6 +77,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             JOIN properties p ON r.property_id = p.id
             WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
               AND r.status = 'AVAILABLE'
+              AND r.approval_status = 'APPROVED'
               AND p.status = 'APPROVED'
               AND r.price <= :maxPrice
         ) nearby
@@ -108,6 +110,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             JOIN properties p ON r.property_id = p.id
             WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
               AND r.status = 'AVAILABLE'
+              AND r.approval_status = 'APPROVED'
               AND p.status = 'APPROVED'
               AND r.price <= :maxPrice
               AND (:requiredOccupants = 0 OR r.max_occupants IS NULL OR r.max_occupants >= :requiredOccupants)

@@ -208,16 +208,29 @@ export default function NotificationBell() {
         navigate(`/properties/${noti.referenceId}`);
         break;
       case 'ROOM_UPDATED':
-        // Landlord: referenceId = propertyId → trang quản lý khu trọ
-        if (user?.role === 'LANDLORD') {
+      case 'ROOM_APPROVED':
+      case 'ROOM_REJECTED':
+      case 'PROPERTY_APPROVED':
+      case 'PROPERTY_REJECTED':
+        if (user?.role === 'ADMIN') {
+          navigate('/admin/approvals');
+        } else if (user?.role === 'LANDLORD') {
           navigate(`/landlord/properties/${noti.referenceId}`);
         } else {
           navigate(`/rooms/${noti.referenceId}`);
         }
         break;
+      case 'ROOM_AVAILABLE':
       case 'SYSTEM':
         // Tenant: referenceId = roomId → trang chi tiết phòng
         navigate(`/rooms/${noti.referenceId}`);
+        break;
+      case 'KYC_UPDATE':
+        if (user?.role === 'ADMIN') {
+          navigate('/admin/users');
+        } else {
+          navigate('/profile');
+        }
         break;
       default:
         break;

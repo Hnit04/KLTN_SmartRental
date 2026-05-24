@@ -48,7 +48,12 @@ const Sidebar = () => {
       {/* Navigation Links */}
       <div className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-4">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+          let isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+          // Highlight Contract tab for /contracts routes (e.g., /contracts/create, /contracts/:id/sign)
+          if (item.path.endsWith('/contracts') && location.pathname.startsWith('/contracts')) {
+            isActive = true;
+          }
+
           return (
             <Link
               key={item.path}

@@ -7,6 +7,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -95,6 +96,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(buildErrorResponse(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<ApiErrorResponse> handleTransactionSystemException(TransactionSystemException ex, HttpServletRequest request) {
+        Throwable cause = ex.getRootCause();
+        if (cause instanceof ConstraintViolationException) {
+            ConstraintViolationException cve = (ConstraintViolationException) cause;
+            String message = cve.getConstraintViolations().stream()
+                    .map(violation -> {
+                        String path = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "request";
+                        return path + ": " + violation.getMessage();
+                    })
+                    .collect(Collectors.joining(", "));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Lỗi dữ liệu (JPA): " + message, request));
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "TRANSACTION_ERROR", "Lỗi lưu dữ liệu: " + (cause != null ? cause.getMessage() : ex.getMessage()), request));
     }
 
     @ExceptionHandler(RuntimeException.class)
