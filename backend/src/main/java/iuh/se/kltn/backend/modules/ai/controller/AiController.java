@@ -129,7 +129,28 @@ public class AiController {
                 ));
             }
         } else {
-            System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Bỏ qua FAQ Cache, chuyển thẳng cho SmartRentalAi.");
+            System.out.println("🏠 [ROUTER] Phát hiện yêu cầu phân tích phòng trọ → Chuyển hướng sang truy vấn dữ liệu động.");
+            try {
+                Object result = aiOrchestratorService.processDataQuery(
+                        message,
+                        roleStr,
+                        userId,
+                        null,
+                        null,
+                        validatedContext
+                );
+                if (result instanceof String textResult) {
+                    String safeResponse = aiOrchestratorService.sanitizeForUserFacing(textResult);
+                    return ResponseEntity.ok(Map.of(
+                            "status", "success",
+                            "sessionId", sessionId,
+                            "reply", safeResponse,
+                            "source", "SYSTEM_DB"
+                    ));
+                }
+            } catch (Exception e) {
+                System.err.println("❌ [AI DATA ERROR] Lỗi khi xử lý phân tích phòng: " + e.getMessage());
+            }
         }
 
         if (!"FULL".equals(resolveLlmMode())) {

@@ -27,7 +27,8 @@ public interface DataPresenterAi {
                     "Đồng thời, mở đầu bằng câu giới thiệu như 'Dạ, mình tìm được X phòng gần [tên địa điểm]:'.",
             "6. Không bao giờ giải thích về SQL hay cấu trúc database cho khách hàng.",
             "7. KHÔNG dùng Markdown (như dấu * hay **) để định dạng văn bản. Dùng dấu gạch ngang (-) hoặc chấm tròn (•) để liệt kê.",
-            "8. Không dùng mã trạng thái kỹ thuật (LATE, UNPAID, PAID, PENDING_SIGNATURE...) khi trả lời người dùng. Hãy diễn giải bằng tiếng Việt dễ hiểu như: trễ hạn, chưa thanh toán, đã thanh toán, chờ ký."
+            "8. Không dùng mã trạng thái kỹ thuật (LATE, UNPAID, PAID, PENDING_SIGNATURE...) khi trả lời người dùng. Hãy diễn giải bằng tiếng Việt dễ hiểu như: trễ hạn, chưa thanh toán, đã thanh toán, chờ ký.",
+            "9. LUẬT PHÂN TÍCH (QUAN TRỌNG): Nếu câu hỏi yêu cầu đánh giá, phân tích ưu nhược điểm của phòng, bạn PHẢI phân tích dựa trên dữ liệu cung cấp (Ưu điểm: giá rẻ, diện tích rộng, tiện nghi đầy đủ... Nhược điểm: giá dịch vụ cao, thiếu tiện nghi...). Bắt buộc đưa ra lời khuyên khách quan."
     })
     @UserMessage("Câu hỏi của khách: {{question}}\nDữ liệu thô từ hệ thống: {{data}}")
     String generateNaturalResponse(@V("question") String question, @V("data") String data, @V("role") String role);
