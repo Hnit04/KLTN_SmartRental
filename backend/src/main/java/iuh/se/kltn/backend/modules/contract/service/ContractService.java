@@ -165,7 +165,7 @@ public class ContractService {
         contract.setActualPrice(room.getPrice());
         contract.setDepositAmount(request.getDepositAmount());
         contract.setSignMethod(request.getSignMethod());
-        contract.setStatus(ContractStatus.PENDING_SIGNATURE);
+        contract.setStatus(ContractStatus.PENDING_APPROVAL);
         contract.setDepositStatus(DepositStatus.UNPAID);
 
         // ✅ CHỤP ẢNH SNAPSHOT DỮ LIỆU ĐỂ GIỮ TÍNH BẤT BIẾN KHI SO SÁNH BLOCKCHAIN (CHỐNG LỖI KHI PROPERTY THAY ĐỔI)
@@ -209,11 +209,8 @@ public class ContractService {
             );
         }
 
-        // ✅ Cập nhật trạng thái phòng thành Đang giữ chỗ (nếu phòng đang trống)
-        if (room.getStatus() == RoomStatus.AVAILABLE) {
-            room.setStatus(RoomStatus.RESERVED);
-            roomRepository.save(room);
-        }
+        // ✅ LƯU Ý: Không đổi trạng thái phòng sang RESERVED nữa.
+        // Phòng vẫn giữ trạng thái AVAILABLE để nhận thêm các yêu cầu khác.
 
         // ✅ TỰ ĐỘNG TẠO ĐỀ XUẤT CHỈNH SỬA NẾU LÀ KHÁCH THUÊ TẠO HỢP ĐỒNG
         if (isTenantCreating) {
@@ -646,26 +643,89 @@ public class ContractService {
         return mapToResponse(saved, userId);
     }
 
+    // --- 2.5. Chấp nhận yêu cầu thuê (Chủ trọ chọn Khách) ---
+    @Transactional
+    public ContractResponse approveContractRequest(Long contractId, Long currentUserId) {
+        Contract contract = contractRepository.findByIdWithLock(contractId)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (contract.getStatus() != ContractStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("Hợp đồng này không ở trạng thái chờ duyệt!");
+        }
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        if (currentUser.getRole() != Role.LANDLORD) {
+            throw new RuntimeException("Chỉ chủ trọ mới có quyền chọn khách thuê!");
+        }
+
+        // Xác minh chủ nhà
+        if (!contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId)) {
+            throw new RuntimeException("Bạn không phải chủ của phòng này!");
+        }
+
+        // Khóa Room để chống Overbooking
+        Room room = roomRepository.findByIdForUpdate(contract.getRoom().getId())
+                .orElseThrow(() -> new RuntimeException("Phòng không tồn tại"));
+
+        // Kiểm tra xem phòng có hợp đồng sống không
+        if (contractRepository.existsLiveContractByRoomId(room.getId(), contractId, java.util.List.of(ContractStatus.ACTIVE, ContractStatus.AWAITING_DEPOSIT))) {
+            throw new RuntimeException("Phòng này đã có người thuê hoặc đang chờ cọc!");
+        }
+
+        // Cập nhật trạng thái hợp đồng được chọn
+        contract.setStatus(ContractStatus.PENDING_SIGNATURE);
+
+        // Giữ phòng
+        room.setStatus(RoomStatus.RESERVED);
+        roomRepository.save(room);
+
+        // Hủy các yêu cầu cạnh tranh khác
+        List<Contract> competingContracts = contractRepository.findCompetingContracts(room.getId(), contractId, java.util.List.of(ContractStatus.PENDING_APPROVAL, ContractStatus.PENDING_SIGNATURE));
+        for (Contract competing : competingContracts) {
+            competing.setStatus(ContractStatus.CANCELLED);
+            competing.setCancelReason("Phòng này đã được chủ trọ chọn cho người thuê khác.");
+            contractRepository.save(competing);
+            
+            if (competing.getTenant() != null) {
+                notificationService.createNotification(
+                    competing.getTenant(),
+                    "Yêu cầu thuê bị từ chối",
+                    "Rất tiếc, chủ trọ đã chọn người thuê khác cho phòng " + room.getName() + ".",
+                    iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+                    competing.getId()
+                );
+            }
+        }
+
+        return mapToResponse(contractRepository.save(contract), currentUserId);
+    }
+
     // --- 3. Hàm ký hợp đồng ---
     @Transactional
     public ContractResponse signContract(Long id, SignContractRequest request, Long currentUserId) {
-        Contract contract = contractRepository.findById(id)
+        Contract contract = contractRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE) {
+            // Nếu đã ở trạng thái nâng cao (ACTIVE hoặc AWAITING_DEPOSIT)
+            if (contract.getStatus() == ContractStatus.ACTIVE || contract.getStatus() == ContractStatus.AWAITING_DEPOSIT) {
+                // Nếu chính user này đã ký rồi, thì trả về thành công luôn (Idempotent)
+                User currentUser = userRepository.findById(currentUserId).orElseThrow();
+                if ((currentUser.getRole() == Role.TENANT && Boolean.TRUE.equals(contract.getIsTenantSigned())) ||
+                    (currentUser.getRole() == Role.LANDLORD && Boolean.TRUE.equals(contract.getIsLandlordSigned()))) {
+                    return mapToResponse(contract, currentUserId);
+                }
+                throw new RuntimeException("Hợp đồng này đã được ký hoàn tất hoặc đang chờ nạp cọc!");
+            }
+            throw new RuntimeException("Hợp đồng không ở trạng thái chờ ký!");
+        }
 
         // Lấy thông tin user đang thao tác
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
         ensureContractNotCompromised(contract);
-
-        // Nếu đã ở trạng thái nâng cao (ACTIVE hoặc AWAITING_DEPOSIT)
-        if (contract.getStatus() == ContractStatus.ACTIVE || contract.getStatus() == ContractStatus.AWAITING_DEPOSIT) {
-            // Nếu chính user này đã ký rồi, thì trả về thành công luôn (Idempotent)
-            if ((currentUser.getRole() == Role.TENANT && Boolean.TRUE.equals(contract.getIsTenantSigned())) ||
-                (currentUser.getRole() == Role.LANDLORD && Boolean.TRUE.equals(contract.getIsLandlordSigned()))) {
-                return mapToResponse(contract, currentUserId);
-            }
-            throw new RuntimeException("Hợp đồng này đã được ký hoàn tất hoặc đang chờ nạp cọc!");
-        }
 
         boolean hasPendingRequest = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.PENDING);
         if (hasPendingRequest) {
@@ -699,6 +759,15 @@ public class ContractService {
 
         // 2. NẾU CẢ 2 BÊN ĐÃ KÝ -> CHUYỂN SANG CHỜ ĐẶT CỌC
         if (Boolean.TRUE.equals(contract.getIsTenantSigned()) && Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
+            // Khóa Room để chống Overbooking
+            roomRepository.findByIdForUpdate(contract.getRoom().getId())
+                    .orElseThrow(() -> new RuntimeException("Phòng không tồn tại"));
+            
+            // Kiểm tra overbooking
+            if (contractRepository.existsLiveContractByRoomId(contract.getRoom().getId(), contract.getId(), java.util.List.of(ContractStatus.ACTIVE, ContractStatus.AWAITING_DEPOSIT))) {
+                throw new RuntimeException("Phòng này đã có hợp đồng khác đang chờ cọc hoặc đang hoạt động. Không thể ký thêm!");
+            }
+
             contract.setSignDate(LocalDateTime.now());
             contract.setStatus(ContractStatus.AWAITING_DEPOSIT);
             contract.setDepositStatus(DepositStatus.UNPAID); 
@@ -1170,8 +1239,8 @@ public class ContractService {
             throw new RuntimeException("Chỉ chủ trọ của phòng này mới có quyền từ chối yêu cầu!");
         }
 
-        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE) {
-            throw new RuntimeException("Chỉ có thể từ chối hợp đồng khi đang ở trạng thái chờ ký!");
+        if (contract.getStatus() != ContractStatus.PENDING_SIGNATURE && contract.getStatus() != ContractStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("Chỉ có thể từ chối hợp đồng khi đang ở trạng thái chờ duyệt hoặc chờ ký!");
         }
 
         // 1. Cập nhật trạng thái hợp đồng
@@ -1179,10 +1248,10 @@ public class ContractService {
         contract.setCancelReason(reason);
         contractRepository.save(contract);
 
-        // 🛡️ Vá lỗ hổng: Chỉ nhả phòng nếu đang RESERVED và không còn HĐ sống khác
+        // 🛡️ Vá lỗ hổng: Chỉ nhả phòng nếu đang RESERVED và không còn HĐ sống khác (ACTIVE/AWAITING_DEPOSIT)
         Room room = contract.getRoom();
         if (room.getStatus() == RoomStatus.RESERVED) {
-            boolean hasOtherLive = contractRepository.existsOtherLiveContract(room.getId(), contract.getId());
+            boolean hasOtherLive = contractRepository.existsLiveContractByRoomId(room.getId(), contract.getId(), java.util.List.of(ContractStatus.ACTIVE, ContractStatus.AWAITING_DEPOSIT));
             if (!hasOtherLive) {
                 room.setStatus(RoomStatus.AVAILABLE);
                 roomRepository.save(room);

@@ -29,6 +29,9 @@ export const contractApi = {
   getDetail: (id: number | string) => {
     return axiosClient.get<Contract>(`/contracts/${id}`);
   },
+  approveContract: (id: number) => {
+    return axiosClient.post<Contract>(`/contracts/${id}/approve`);
+  },
   signContract: (id: number, data: SignContractPayload) => {
     return axiosClient.post(`/contracts/${id}/sign`, data); 
   },

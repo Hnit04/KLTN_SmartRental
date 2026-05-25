@@ -25,13 +25,14 @@ const fmt = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", c
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 const ContractStatusBadge = ({ status }: { status: string }) => {
-  const map: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+  const statusMap: Record<string, { label: string; tone: "success" | "warning" | "danger" | "info" | "neutral" }> = {
+    PENDING_APPROVAL: { label: "Chờ chọn", tone: "info" },
     ACTIVE: { label: "Đang thuê", tone: "success" },
     PENDING_SIGNATURE: { label: "Chờ ký", tone: "warning" },
     EXPIRED: { label: "Hết hạn", tone: "neutral" },
     CANCELLED: { label: "Đã hủy", tone: "danger" },
   };
-  const cfg = map[status] ?? { label: status, tone: "neutral" as const };
+  const cfg = statusMap[status] ?? { label: status, tone: "neutral" as const };
   return <StatusBadge label={cfg.label} tone={cfg.tone} />;
 };
 

@@ -170,7 +170,6 @@ public class RuleEntityExtractor {
         if (!params.containsKey("max_price") && !params.containsKey("min_price")) {
             if (containsAny(q, "giá rẻ", "gia re", "giá mềm", "gia mem", "tiết kiệm", "tiet kiem", "sinh viên", "sinh vien")
                     || q.matches(".*\\brẻ\\b.*") || q.matches(".*\\bre\\b.*")) {
-                params.put("max_price", 3000000L); // Mặc định giá rẻ là <= 3 triệu
                 params.put("cheap_mode", true);
             }
         }

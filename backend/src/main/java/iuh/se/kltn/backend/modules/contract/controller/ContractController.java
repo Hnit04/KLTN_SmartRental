@@ -96,6 +96,13 @@ public class ContractController {
         }
     }
 
+    // 3.8. Chủ trọ chọn/khách (Duyệt yêu cầu thuê)
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<?> approveContractRequest(@AuthenticationPrincipal UserPrincipal currentUser,
+                                                    @PathVariable Long id) {
+        return ResponseEntity.ok(contractService.approveContractRequest(id, currentUser.getId()));
+    }
+
     // 4. Ký hợp đồng (✅ ĐÃ ĐỔI SANG POST VÀ BỔ SUNG currentUser)
     @PostMapping("/{id}/sign")
     public ResponseEntity<?> signContract(@AuthenticationPrincipal UserPrincipal currentUser,

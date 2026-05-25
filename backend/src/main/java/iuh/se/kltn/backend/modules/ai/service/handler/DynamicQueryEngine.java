@@ -137,6 +137,8 @@ public class DynamicQueryEngine {
             if (params.containsKey("max_price")) {
                 sql.append(" AND r.price <= ?");
                 queryParams.add(toDouble(params.get("max_price")));
+            } else if (params.containsKey("cheap_mode") && Boolean.TRUE.equals(params.get("cheap_mode"))) {
+                sql.append(" AND r.price <= 3000000"); // Mặc định ngân sách sinh viên/giá rẻ cho DQE
             }
             if (params.containsKey("room_type")) {
                 sql.append(" AND r.type = ?");

@@ -24,6 +24,8 @@ export default function ContractItem({ data }: ContractItemProps) {
 
   const renderStatus = (status: string) => {
     switch (status) {
+      case "PENDING_APPROVAL":
+        return <StatusBadge label="Chờ chọn" tone="info" className="px-2.5 py-1 text-xs font-semibold" />;
       case "ACTIVE":
         return <StatusBadge label="Hieu luc" tone="success" className="px-2.5 py-1 text-xs font-semibold" />;
       case "PENDING_SIGNATURE":

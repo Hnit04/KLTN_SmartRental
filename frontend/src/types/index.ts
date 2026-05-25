@@ -216,7 +216,7 @@ export interface Room {
 // 3. CONTRACT TYPES
 // ==========================================
 
-export type ContractStatus = "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY" | "CANCELLED" | "AWAITING_DEPOSIT";
+export type ContractStatus = "PENDING_APPROVAL" | "PENDING_SIGNATURE" | "ACTIVE" | "EXPIRED" | "TERMINATED_EARLY" | "CANCELLED" | "AWAITING_DEPOSIT";
 export type DepositStatus = "UNPAID" | "DEPOSITED" | "REFUNDED" | "PENALIZED";
 
 // ✅ 1. Thêm Enum phương thức ký

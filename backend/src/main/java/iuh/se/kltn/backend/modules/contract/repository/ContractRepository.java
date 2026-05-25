@@ -18,6 +18,10 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     List<Contract> findByTenantId(Long tenantId);
 
     Optional<Contract> findTopByRoomIdOrderByStartDateDesc(Long roomId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Contract c WHERE c.id = :id")
+    Optional<Contract> findByIdWithLock(@Param("id") Long id);
+
     @Query("SELECT c FROM Contract c WHERE c.room.property.landlord.id = :landlordId ORDER BY c.createdAt DESC")
     List<Contract> findContractsByLandlordId(@Param("landlordId") Long landlordId);
     boolean existsByRoomIdAndStatus(Long roomId, ContractStatus status);
@@ -98,4 +102,12 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     // ✅ Kiểm tra phòng có HĐ đang sống không (dùng cho fixOrphanRooms)
     @Query("SELECT COUNT(c) > 0 FROM Contract c WHERE c.room.id = :roomId AND c.status IN ('ACTIVE', 'AWAITING_DEPOSIT')")
     boolean existsLiveContractByRoomId(@Param("roomId") Long roomId);
+
+    // ✅ Kiểm tra phòng có HĐ đang sống không (ngoại trừ 1 contract cụ thể)
+    @Query("SELECT COUNT(c) > 0 FROM Contract c WHERE c.room.id = :roomId AND c.id != :excludedContractId AND c.status IN :statuses")
+    boolean existsLiveContractByRoomId(@Param("roomId") Long roomId, @Param("excludedContractId") Long excludedContractId, @Param("statuses") java.util.Collection<ContractStatus> statuses);
+
+    // ✅ Lấy danh sách các hợp đồng đang cạnh tranh cho cùng 1 phòng
+    @Query("SELECT c FROM Contract c WHERE c.room.id = :roomId AND c.id != :selectedContractId AND c.status IN :statuses")
+    List<Contract> findCompetingContracts(@Param("roomId") Long roomId, @Param("selectedContractId") Long selectedContractId, @Param("statuses") java.util.Collection<ContractStatus> statuses);
 }

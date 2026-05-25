@@ -57,7 +57,7 @@ export default function ContractList() {
   const summary = {
     total: contracts.length,
     active: contracts.filter(c => c.status === 'ACTIVE').length,
-    pending: contracts.filter(c => c.status === 'PENDING_SIGNATURE').length,
+    pending: contracts.filter(c => c.status === 'PENDING_SIGNATURE' || c.status === 'PENDING_APPROVAL').length,
     ended: contracts.filter(c => c.status === 'EXPIRED' || c.status === 'TERMINATED_EARLY').length,
   };
 
@@ -158,6 +158,7 @@ export default function ContractList() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="ALL">Tất cả trạng thái</option>
+              <option value="PENDING_APPROVAL">Chờ chọn</option>
               <option value="PENDING_SIGNATURE">Chờ ký tên</option>
               <option value="AWAITING_DEPOSIT">Chờ thanh toán</option>
               <option value="ACTIVE">Đang hiệu lực</option>

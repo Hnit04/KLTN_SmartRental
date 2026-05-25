@@ -126,6 +126,7 @@ export default function ContractDetailPage() {
   const [chainRiskMessage, setChainRiskMessage] = useState<string | null>(null);
 
   const [isSigning, setIsSigning] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
 
   // --- TRADITIONAL PAYMENT STATE ---
@@ -175,6 +176,7 @@ export default function ContractDetailPage() {
 
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [isRefundConfirmOpen, setIsRefundConfirmOpen] = useState(false);
   const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
@@ -280,8 +282,6 @@ export default function ContractDetailPage() {
     if (!isSilent) setIsLoading(true);
     try {
       const contractRes = await contractApi.getDetail(Number(id));
-      console.log("DEBUG: Contract Detail Loaded:", contractRes.data);
-      console.log("DEBUG: Tenant KYC Status:", contractRes.data?.tenantKycStatus);
       setContract(contractRes.data);
 
       try {
@@ -458,6 +458,18 @@ export default function ContractDetailPage() {
       setIsDownloading(false);
       toast.error("Lỗi khi xuất PDF.");
     });
+  };
+  const handleApproveContract = async () => {
+    setIsApproving(true);
+    try {
+      const result = await contractApi.approveContract(Number(id));
+      setContract(result.data);
+      toast.success("Đã chọn khách thuê thành công!");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi khi duyệt yêu cầu.");
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleSignContract = async () => {
@@ -2053,50 +2065,6 @@ export default function ContractDetailPage() {
               </div>
             )}
 
-            {changeRequests.length > 0 && (
-              <div className="bg-white rounded-2xl border shadow-sm p-6">
-                <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-gray-800">
-                  <Clock className="h-4 w-4 text-gray-500" /> Lịch sử Đề xuất chỉnh sửa
-                </h3>
-                <div className="space-y-4">
-                  {changeRequests.map((req) => (
-                    <div key={req.id} className="flex flex-col text-sm border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <span className="font-bold text-gray-800">{req.type}</span>
-                          <span className="text-gray-500 ml-2">({new Date(req.requestDate).toLocaleDateString()})</span>
-                          <span className="text-xs ml-2 px-2 py-0.5 bg-gray-100 rounded text-gray-600 border border-gray-200">
-                            Gửi bởi: {req.requestedByRole === 'LANDLORD' ? 'Chủ nhà' : 'Khách thuê'}
-                          </span>
-                        </div>
-                        <div>
-                          {req.status === 'ACCEPTED' && <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Đã duyệt</span>}
-                          {req.status === 'REJECTED' && <span className="text-red-500 font-bold flex items-center gap-1"><XCircle className="w-4 h-4" /> Đã từ chối</span>}
-                          {req.status === 'PENDING' && <span className="text-orange-500 font-bold">Đang chờ</span>}
-                        </div>
-                      </div>
-
-                      <p className="text-gray-500 text-xs mb-2 italic">Lý do: "{req.reason}"</p>
-
-                      <div className="grid grid-cols-2 gap-3 mt-1 opacity-75 hover:opacity-100 transition-opacity">
-                        <div className="bg-red-50/30 p-2.5 rounded-lg border border-red-100/50">
-                          <p className="text-red-400 text-[10px] uppercase font-bold mb-1">Bản gốc</p>
-                          <p className="text-gray-500 whitespace-pre-wrap line-through text-xs">
-                            {req.oldValue || 'Không có'}
-                          </p>
-                        </div>
-                        <div className="bg-green-50/30 p-2.5 rounded-lg border border-green-100/50">
-                          <p className="text-green-500 text-[10px] uppercase font-bold mb-1">Đề xuất ({req.status === 'ACCEPTED' ? 'Đã áp dụng' : 'Bị từ chối'})</p>
-                          <p className="font-medium text-gray-700 whitespace-pre-wrap text-xs">
-                            {req.newValue}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {contract.smartContractAddress && (
               <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6">
@@ -2233,19 +2201,38 @@ export default function ContractDetailPage() {
 
               {contract.status !== 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  <div className="flex flex-col gap-2 text-sm text-left bg-muted/40/50 p-4 rounded-xl border border-gray-100 mb-4">
-                    <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
-                    <div className="flex items-center justify-between">
-                      <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
-                      {contract.isLandlordSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                  {contract.status !== 'PENDING_APPROVAL' && (
+                    <div className="flex flex-col gap-2 text-sm text-left bg-muted/40/50 p-4 rounded-xl border border-gray-100 mb-4">
+                      <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
+                      <div className="flex items-center justify-between">
+                        <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
+                        {contract.isLandlordSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={contract.isTenantSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>2. Khách thuê</span>
+                        {contract.isTenantSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className={contract.isTenantSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>2. Khách thuê</span>
-                      {contract.isTenantSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
-                    </div>
-                  </div>
+                  )}
 
-                  {!isMeSigned && contract.status === 'PENDING_SIGNATURE' ? (
+                  {contract.status === 'PENDING_APPROVAL' && user?.role === 'LANDLORD' ? (
+                    <div className="space-y-3">
+                      <Button
+                        className="w-full gap-2 h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20"
+                        onClick={() => setIsApproveModalOpen(true)}
+                        isLoading={isApproving}
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> Chọn người thuê này
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 h-11 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => setIsRejectModalOpen(true)}
+                      >
+                        <XCircle className="h-4 w-4" /> Từ chối yêu cầu
+                      </Button>
+                    </div>
+                  ) : !isMeSigned && contract.status === 'PENDING_SIGNATURE' ? (
                     <div className="space-y-3">
                       <Button
                         className="w-full gap-2 h-11 shadow-md shadow-blue-500/20"
@@ -2347,7 +2334,7 @@ export default function ContractDetailPage() {
                         setIsRequestModalOpen(true);
                       }}
                     >
-                      <MessageSquare className="h-4 w-4 mr-2" /> Đề xuất Cập nhật / Ra đi
+                      <MessageSquare className="h-4 w-4 mr-2" /> {user?.role === 'TENANT' ? 'Đề xuất Trả phòng / Cập nhật' : 'Đề xuất Gia hạn / Cập nhật HĐ'}
                     </Button>
                   )}
                   {user?.role === 'TENANT' && (
@@ -2372,7 +2359,7 @@ export default function ContractDetailPage() {
             </Button>
 
             {/* ────── HỒ SƠ NGƯỜI THUÊ (DÀNH CHO CHỦ NHÀ) ────── */}
-            {user?.role === 'LANDLORD' && contract.status === 'PENDING_SIGNATURE' && (
+            {user?.role === 'LANDLORD' && (contract.status === 'PENDING_SIGNATURE' || contract.status === 'PENDING_APPROVAL') && (
               <div className="bg-white rounded-2xl border-2 border-indigo-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="p-4 bg-indigo-50 border-b border-indigo-100">
                   <h4 className="font-bold text-indigo-900 flex items-center gap-2">
@@ -2391,10 +2378,10 @@ export default function ContractDetailPage() {
                       <div className="text-right">
                          <div className={cn(
                            "text-xl font-black",
-                           (contract.tenantReputationScore || 0) >= 80 ? "text-green-500" :
-                           (contract.tenantReputationScore || 0) >= 50 ? "text-amber-500" : "text-rose-500"
+                           (contract.tenantReputationScore ?? 0) >= 80 ? "text-green-500" :
+                           (contract.tenantReputationScore ?? 0) >= 50 ? "text-amber-500" : "text-rose-500"
                          )}>
-                           {contract.tenantReputationScore || 50}
+                           {contract.tenantReputationScore ?? 0}
                          </div>
                          <p className="text-[9px] uppercase font-bold text-gray-400">Uy tín</p>
                       </div>
@@ -2420,15 +2407,20 @@ export default function ContractDetailPage() {
                       <div className="p-3 rounded-xl bg-muted/40 border border-gray-100">
                         <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Mức độ tin cậy</p>
                         <div className="flex items-center gap-1.5">
-                           {(contract.tenantReputationScore || 0) >= 80 ? (
+                           {(contract.tenantReputationScore ?? 0) >= 80 ? (
                               <>
                                 <CheckCircle2 className="w-3 h-3 text-green-500" /> 
                                 <span className="text-xs font-bold text-green-700">Rất cao</span>
                               </>
-                           ) : (
+                           ) : (contract.tenantReputationScore ?? 0) >= 50 ? (
                               <>
                                 <TrendingUp className="w-3 h-3 text-indigo-500" /> 
                                 <span className="text-xs font-bold text-indigo-700">Trung bình</span>
+                              </>
+                           ) : (
+                              <>
+                                <AlertCircle className="w-3 h-3 text-rose-500" /> 
+                                <span className="text-xs font-bold text-rose-700">Thấp</span>
                               </>
                            )}
                         </div>
@@ -2549,179 +2541,55 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {isRequestModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-orange-500" /> Đề xuất chỉnh sửa
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <Label className="text-gray-700 font-bold mb-3 block">Bạn muốn đề xuất điều gì?</Label>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  {[
-                    { type: 'EXTENSION', label: user?.role === 'LANDLORD' ? 'Gia hạn Hợp đồng' : 'Xin gia hạn Hợp đồng', desc: 'Đề xuất đổi ngày kết thúc', icon: <Calendar className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50 border-blue-200 ring-blue-500', hidden: contract.status !== 'ACTIVE' },
-                    { type: 'TERMINATION', label: user?.role === 'LANDLORD' ? 'Lấy lại phòng trước hạn' : 'Xin trả phòng trước hạn', desc: 'Chấm dứt hợp đồng sớm', icon: <LogOut className="w-5 h-5" />, color: 'text-red-600 bg-red-50 border-red-200 ring-red-500', hidden: contract.status !== 'ACTIVE' },
-                    { type: 'RENT_INCREASE', label: contract.status === 'ACTIVE' ? 'Điều chỉnh Giá thuê' : 'Thương lượng Giá thuê', desc: contract.status === 'ACTIVE' ? 'Đề xuất tăng/giảm giá' : 'Thương thảo lại giá', icon: <TrendingUp className="w-5 h-5" />, color: 'text-orange-600 bg-orange-50 border-orange-200 ring-orange-500', hidden: contract.status === 'ACTIVE' && user?.role === 'TENANT' },
-                    { type: 'CHANGE_TERMS', label: contract.status === 'ACTIVE' ? (user?.role === 'LANDLORD' ? 'Thay đổi Nội quy' : 'Xin thay đổi Nội quy') : 'Thương lượng Điều khoản', desc: 'Thêm bớt điều khoản', icon: <FileText className="w-5 h-5" />, color: 'text-green-600 bg-green-50 border-green-200 ring-green-500' },
-                    { type: 'CHANGE_SIGN_METHOD', label: 'Sửa cách ký', desc: 'Đổi phương thức ký', icon: <PenTool className="w-5 h-5" />, color: 'text-purple-600 bg-purple-50 border-purple-200 ring-purple-500', hidden: contract.status === 'ACTIVE' }
-                  ].filter(opt => !opt.hidden).map((opt) => (
-                    <div
-                      key={opt.type}
-                      onClick={() => setChangeForm({ ...changeForm, type: opt.type as RequestType, newValue: '' })}
-                      className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex flex-col items-center text-center gap-1 
-                        ${changeForm.type === opt.type ? `ring-2 ring-offset-1 ${opt.color} shadow-sm` : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-muted/40'}`}
-                    >
-                      <div className={`${changeForm.type === opt.type ? '' : 'text-gray-400'}`}>
-                        {opt.icon}
-                      </div>
-                      <span className={`font-bold text-xs ${changeForm.type === opt.type ? '' : 'text-gray-700'}`}>{opt.label}</span>
-                      <span className="text-[10px] text-gray-500 leading-tight">{opt.desc}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="min-h-[220px] flex flex-col justify-start transition-all duration-300">
-                <Label>Giá trị mới đề xuất</Label>
-
-                {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                    value={changeForm.newValue}
-                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
-                  >
-                    <option value="" disabled>-- Chọn phương thức bạn muốn --</option>
-                    <option value="BLOCKCHAIN">Ký bằng Smart Contract (Web3)</option>
-                    <option value="TRADITIONAL">Xác nhận điện tử (Nhanh)</option>
-                  </select>
-                ) : changeForm.type === 'RENT_INCREASE' ? (
-                  <Input
-                    type="number"
-                    placeholder="VD: 4500000"
-                    className="mt-1"
-                    value={changeForm.newValue}
-                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
-                  />
-                ) : (changeForm.type === 'EXTENSION' || changeForm.type === 'TERMINATION') ? (
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    min={new Date().toISOString().split('T')[0]}
-                    value={changeForm.newValue}
-                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
-                  />
-                ) : (
-                  <div className="space-y-3 mt-1 flex-1">
-                    <div className="flex flex-wrap gap-2">
-                      {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
-                        const isAdded = changeForm.newValue.includes(term);
-                        return (
-                          <span
-                            key={idx}
-                            onClick={() => !isAdded && handleAddTerm(term)}
-                            className={`text-[11px] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1 border ${isAdded
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : user?.role === 'LANDLORD'
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 cursor-pointer active:scale-95'
-                                  : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
-                              }`}
-                          >
-                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-primary'}`}>
-                              {isAdded ? '✓' : '+'}
-                            </span>
-                            {term.substring(0, 30)}...
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <textarea
-                      placeholder="Nhập nội dung mong muốn..."
-                      className="flex w-full rounded-xl border border-input bg-muted/40/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
-                      value={changeForm.newValue}
-                      onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label>Lý do đề xuất</Label>
-                
-                {/* 💡 Gợi ý lý do nhanh */}
-                <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
-                  {(() => {
-                    const presetReasons: Record<string, string[]> = {
-                      'TERMINATION': [
-                        'Công việc thay đổi/Chuyển chỗ làm',
-                        'Có việc gấp gia đình về quê',
-                        'Không còn phù hợp nhu cầu sử dụng',
-                        'Khách thuê vi phạm nội quy nhiều lần'
-                      ],
-                      'EXTENSION': [
-                        'Muốn tiếp tục thuê dài hạn',
-                        'Chưa tìm được chỗ ở mới, xin gia hạn thêm 1 tháng',
-                        'Công việc ổn định nên muốn thuê tiếp'
-                      ],
-                      'RENT_INCREASE': [
-                        'Điều chỉnh theo giá cả thị trường',
-                        'Mới bổ sung thêm nội thất/thiết bị mới',
-                        'Tình hình khó khăn, mong giảm giá'
-                      ],
-                      'CHANGE_TERMS': [
-                        'Xin phép được nuôi thú cưng nhỏ',
-                        'Bổ sung quyền lợi bảo trì máy lạnh',
-                        'Thêm người ở ghép'
-                      ],
-                      'CHANGE_SIGN_METHOD': [
-                        'Không rành Web3, xin đổi sang Xác nhận nhanh',
-                        'Muốn dùng Smart Contract cho an toàn'
-                      ]
-                    };
-                    return (presetReasons[changeForm.type] || []).map((reason, idx) => (
-                      <span
-                        key={idx}
-                        onClick={() => {
-                          const currentReason = changeForm.reason.trim();
-                          if (currentReason && !currentReason.endsWith(',')) {
-                            setChangeForm({ ...changeForm, reason: currentReason + ', ' + reason });
-                          } else {
-                            setChangeForm({ ...changeForm, reason: currentReason + reason });
-                          }
-                        }}
-                        className="text-[11px] px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-md cursor-pointer border border-gray-200 transition-colors"
-                      >
-                        + {reason}
-                      </span>
-                    ));
-                  })()}
-                </div>
-
-                <textarea
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 min-h-[80px]"
-                  placeholder="Giải thích lý do bạn muốn thay đổi..."
-                  value={changeForm.reason}
-                  onChange={(e) => setChangeForm({ ...changeForm, reason: e.target.value })}
-                />
-              </div>
+      {/* --- MODAL CHẤP NHẬN YÊU CẦU (Chủ trọ) --- */}
+      {isApproveModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border-4 border-white">
+            <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex items-center gap-3">
+               <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner">
+                  <CheckCircle2 className="w-6 h-6" />
+               </div>
+               <div>
+                  <h3 className="text-lg font-bold text-indigo-900">Xác nhận chốt khách</h3>
+                  <p className="text-xs text-indigo-600">Khách thuê sẽ được chuyển sang chờ ký kết</p>
+               </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-[11px] text-amber-800 leading-relaxed">
+                  <p className="font-bold mb-1 flex items-center gap-1 uppercase text-amber-700"><AlertCircle className="w-4 h-4" /> CẢNH BÁO QUAN TRỌNG:</p>
+                  Khi chọn yêu cầu này, hệ thống sẽ tự động <strong>TỪ CHỐI</strong> tất cả các yêu cầu thuê khác đang chờ duyệt cho cùng căn phòng này. Hành động này không thể hoàn tác.
+               </div>
+               <p className="text-sm text-gray-700 text-center font-medium mt-4">
+                  Bạn có chắc chắn muốn chọn khách thuê này không?
+               </p>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <Button variant="outline" className="flex-1" onClick={() => setIsRequestModalOpen(false)}>Hủy</Button>
-              <Button
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
-                onClick={handleSubmitChangeRequest}
-                isLoading={isSubmittingRequest}
-              >
-                Gửi Đề Xuất
-              </Button>
+            <div className="p-6 bg-muted/40 flex gap-3">
+               <Button 
+                 variant="ghost" 
+                 className="flex-1 text-gray-600 hover:bg-gray-100 h-12 rounded-2xl" 
+                 onClick={() => setIsApproveModalOpen(false)}
+                 disabled={isApproving}
+               >
+                 Hủy bỏ
+               </Button>
+               <Button 
+                 className="flex-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 h-12 rounded-2xl gap-2 font-bold" 
+                 onClick={() => {
+                   setIsApproveModalOpen(false);
+                   handleApproveContract();
+                 }}
+                 isLoading={isApproving}
+               >
+                 <CheckCircle2 className="w-4 h-4" /> Xác nhận chọn
+               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ GIAO DIỆN KHÓA CỨNG PHƯƠNG THỨC KÝ TRONG MODAL */}
+      {/* MODAL KÝ HỢP ĐỒNG */}
       {isSignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
@@ -2795,6 +2663,217 @@ export default function ContractDetailPage() {
           </div>
         </div>
       )}
+
+      {/* --- MODAL TỪ CHỐI --- */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h2 className="text-lg font-bold mb-4 text-rose-600">Xác nhận từ chối</h2>
+            <p className="text-sm text-gray-600 mb-4">Bạn chắc chắn muốn từ chối yêu cầu này? Vui lòng cho biết lý do:</p>
+            <Textarea
+              className="mb-4"
+              placeholder="Nhập lý do từ chối..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+            />
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setIsRejectModalOpen(false)}>Hủy</Button>
+              <Button
+                className="flex-1 bg-rose-600 hover:bg-rose-700"
+                onClick={handleRejectContract}
+                isLoading={isRejecting}
+              >
+                Xác nhận từ chối
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRequestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-orange-500" /> Đề xuất chỉnh sửa
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-gray-700 font-bold mb-3 block">Bạn muốn đề xuất điều gì?</Label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  {[
+                    { type: 'EXTENSION', label: user?.role === 'LANDLORD' ? 'Gia hạn Hợp đồng' : 'Xin gia hạn Hợp đồng', desc: 'Đề xuất đổi ngày kết thúc', icon: <Calendar className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50 border-blue-200 ring-blue-500', hidden: contract.status !== 'ACTIVE' },
+                    { type: 'TERMINATION', label: user?.role === 'LANDLORD' ? 'Lấy lại phòng trước hạn' : 'Xin trả phòng trước hạn', desc: 'Chấm dứt hợp đồng sớm', icon: <LogOut className="w-5 h-5" />, color: 'text-red-600 bg-red-50 border-red-200 ring-red-500', hidden: contract.status !== 'ACTIVE' },
+                    { type: 'RENT_INCREASE', label: contract.status === 'ACTIVE' ? 'Điều chỉnh Giá thuê' : 'Thương lượng Giá thuê', desc: contract.status === 'ACTIVE' ? 'Đề xuất tăng/giảm giá' : 'Thương thảo lại giá', icon: <TrendingUp className="w-5 h-5" />, color: 'text-orange-600 bg-orange-50 border-orange-200 ring-orange-500', hidden: contract.status === 'ACTIVE' && user?.role === 'TENANT' },
+                    { type: 'CHANGE_TERMS', label: contract.status === 'ACTIVE' ? (user?.role === 'LANDLORD' ? 'Thay đổi Nội quy' : 'Xin thay đổi Nội quy') : 'Thương lượng Điều khoản', desc: 'Thêm bớt điều khoản', icon: <FileText className="w-5 h-5" />, color: 'text-green-600 bg-green-50 border-green-200 ring-green-500' },
+                    { type: 'CHANGE_SIGN_METHOD', label: 'Sửa cách ký', desc: 'Đổi phương thức ký', icon: <PenTool className="w-5 h-5" />, color: 'text-purple-600 bg-purple-50 border-purple-200 ring-purple-500', hidden: contract.status === 'ACTIVE' }
+                  ].filter(opt => !opt.hidden).map((opt) => (
+                    <div
+                      key={opt.type}
+                      onClick={() => setChangeForm({ ...changeForm, type: opt.type as RequestType, newValue: '' })}
+                      className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex flex-col items-center text-center gap-1 
+                        ${changeForm.type === opt.type ? `ring-2 ring-offset-1 ${opt.color} shadow-sm` : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-muted/40'}`}
+                    >
+                      <div className={`${changeForm.type === opt.type ? '' : 'text-gray-400'}`}>
+                        {opt.icon}
+                      </div>
+                      <span className={`font-bold text-xs ${changeForm.type === opt.type ? '' : 'text-gray-700'}`}>{opt.label}</span>
+                      <span className="text-[10px] text-gray-500 leading-tight">{opt.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-start transition-all duration-300 mb-4">
+                <Label className="mb-1 text-gray-700">
+                  {changeForm.type === 'TERMINATION' ? 'Ngày mong muốn kết thúc hợp đồng' :
+                   changeForm.type === 'EXTENSION' ? 'Ngày mong muốn gia hạn đến' :
+                   changeForm.type === 'RENT_INCREASE' ? 'Mức giá mới đề xuất (VNĐ/tháng)' :
+                   changeForm.type === 'CHANGE_SIGN_METHOD' ? 'Phương thức ký mới' :
+                   'Nội dung Điều khoản / Nội quy mới đề xuất'}
+                </Label>
+
+                {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                    value={changeForm.newValue}
+                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
+                  >
+                    <option value="" disabled>-- Chọn phương thức bạn muốn --</option>
+                    <option value="BLOCKCHAIN">Ký bằng Smart Contract (Web3)</option>
+                    <option value="TRADITIONAL">Xác nhận điện tử (Nhanh)</option>
+                  </select>
+                ) : changeForm.type === 'RENT_INCREASE' ? (
+                  <Input
+                    type="number"
+                    placeholder="VD: 4500000"
+                    className="mt-1"
+                    value={changeForm.newValue}
+                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
+                  />
+                ) : (changeForm.type === 'EXTENSION' || changeForm.type === 'TERMINATION') ? (
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={changeForm.newValue}
+                    onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
+                  />
+                ) : (
+                  <div className="space-y-3 mt-1 flex-1">
+                    <div className="flex flex-wrap gap-2">
+                      {(user?.role === 'LANDLORD' ? LANDLORD_SUGGESTED_TERMS : TENANT_SUGGESTED_TERMS).map((term, idx) => {
+                        const isAdded = changeForm.newValue.includes(term);
+                        return (
+                          <span
+                            key={idx}
+                            onClick={() => !isAdded && handleAddTerm(term)}
+                            className={`text-[11px] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1 border ${isAdded
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : user?.role === 'LANDLORD'
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 cursor-pointer active:scale-95'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer active:scale-95'
+                              }`}
+                          >
+                            <span className={`font-bold ${isAdded ? 'text-gray-400' : 'text-primary'}`}>
+                              {isAdded ? '✓' : '+'}
+                            </span>
+                            {term.substring(0, 30)}...
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <textarea
+                      placeholder="Nhập nội dung mong muốn..."
+                      className="flex w-full rounded-xl border border-input bg-muted/40/50 px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[120px] resize-y placeholder:text-gray-400"
+                      value={changeForm.newValue}
+                      onChange={(e) => setChangeForm({ ...changeForm, newValue: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label>Lý do đề xuất</Label>
+                
+                {/* 💡 Gợi ý lý do nhanh */}
+                <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
+                  {(() => {
+                    const presetReasons: Record<string, string[]> = {
+                      'TERMINATION': user?.role === 'LANDLORD' ? [
+                        'Khách thuê vi phạm nội quy nhiều lần',
+                        'Chậm thanh toán nhiều tháng liên tiếp',
+                        'Cần lấy lại phòng để sửa chữa/sử dụng cá nhân'
+                      ] : [
+                        'Công việc thay đổi/Chuyển chỗ làm',
+                        'Có việc gấp gia đình về quê',
+                        'Không còn phù hợp nhu cầu sử dụng'
+                      ],
+                      'EXTENSION': [
+                        'Muốn tiếp tục thuê dài hạn',
+                        'Chưa tìm được chỗ ở mới, xin gia hạn thêm 1 tháng',
+                        'Công việc ổn định nên muốn thuê tiếp'
+                      ],
+                      'RENT_INCREASE': user?.role === 'LANDLORD' ? [
+                        'Điều chỉnh theo giá cả thị trường',
+                        'Mới bổ sung thêm nội thất/thiết bị mới'
+                      ] : [
+                        'Tình hình kinh tế khó khăn, mong giảm giá',
+                        'Chất lượng phòng không như cam kết ban đầu'
+                      ],
+                      'CHANGE_TERMS': [
+                        'Xin phép được nuôi thú cưng nhỏ',
+                        'Bổ sung quyền lợi bảo trì máy lạnh',
+                        'Thêm người ở ghép'
+                      ],
+                      'CHANGE_SIGN_METHOD': [
+                        'Không rành Web3, xin đổi sang Xác nhận nhanh',
+                        'Muốn dùng Smart Contract cho an toàn'
+                      ]
+                    };
+                    return (presetReasons[changeForm.type] || []).map((reason, idx) => (
+                      <span
+                        key={idx}
+                        onClick={() => {
+                          const currentReason = changeForm.reason.trim();
+                          if (currentReason && !currentReason.endsWith(',')) {
+                            setChangeForm({ ...changeForm, reason: currentReason + ', ' + reason });
+                          } else {
+                            setChangeForm({ ...changeForm, reason: currentReason + reason });
+                          }
+                        }}
+                        className="text-[11px] px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-md cursor-pointer border border-gray-200 transition-colors"
+                      >
+                        + {reason}
+                      </span>
+                    ));
+                  })()}
+                </div>
+
+                <textarea
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 min-h-[80px]"
+                  placeholder="Giải thích lý do bạn muốn thay đổi..."
+                  value={changeForm.reason}
+                  onChange={(e) => setChangeForm({ ...changeForm, reason: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" className="flex-1" onClick={() => setIsRequestModalOpen(false)}>Hủy</Button>
+              <Button
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={handleSubmitChangeRequest}
+                isLoading={isSubmittingRequest}
+              >
+                Gửi Đề Xuất
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       <ReviewModal
         isOpen={isReviewModalOpen}

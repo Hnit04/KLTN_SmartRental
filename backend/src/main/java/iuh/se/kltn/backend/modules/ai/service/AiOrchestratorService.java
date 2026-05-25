@@ -116,7 +116,6 @@ public class AiOrchestratorService {
      */
     @PostConstruct
     public void initVectorCache() {
-        // --- TỘI: Fix lỗi Data Truncated cho cột type (Chạy thủ công) ---
         try {
             System.out.println("🛠️ Đang cưỡng bức dọn dẹp cấu trúc bảng ai_sql_cache để hỗ trợ FAQ...");
             jdbcTemplate.execute("ALTER TABLE ai_sql_cache MODIFY COLUMN generated_sql VARCHAR(1000) NULL");
