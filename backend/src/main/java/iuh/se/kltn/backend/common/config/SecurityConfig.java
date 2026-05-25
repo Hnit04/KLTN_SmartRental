@@ -86,7 +86,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // API Auth (Đăng ký, Đăng nhập, Refresh Token)
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/outbox").permitAll()
                         // demo crawl data
                         .requestMatchers("/api/v1/crawler/**").permitAll()
                         // Swagger UI

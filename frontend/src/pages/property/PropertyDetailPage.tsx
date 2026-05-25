@@ -741,7 +741,7 @@ export default function PropertyDetailPage() {
                           : s === "AVAILABLE"
                             ? "Còn trống"
                             : s === "RESERVED"
-                              ? "Giữ chỗ"
+                              ? "Đang giữ chỗ"
                               : s === "MAINTENANCE"
                                 ? "Đang bảo trì"
                                 : "Đã thuê"

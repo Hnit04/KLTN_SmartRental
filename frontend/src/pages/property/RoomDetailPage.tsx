@@ -175,7 +175,7 @@ export default function RoomDetailPage() {
       return;
     }
     if (isReserved) {
-      toast.error("Phòng đã có người đặt cọc. Không thể đặt lịch xem.");
+      toast.error("Phòng đang được giữ chỗ. Không thể đặt lịch xem.");
       return;
     }
     // 🛡️ Cho phép đặt lịch xem phòng sắp trống (Pre-booking)
@@ -302,7 +302,7 @@ export default function RoomDetailPage() {
   // Text cho nút Đặt lịch
   const getBookingButtonText = () => {
     if (isMaintenance) return "Phòng đang bảo trì";
-    if (isReserved) return "Đã có người đặt cọc";
+    if (isReserved) return "Đang giữ chỗ";
     if (!isAvailable && room?.availableFromDate) return `Đặt lịch xem (Sắp trống)`;
     if (!isAvailable) return "Phòng đã có người thuê";
     return "Đặt lịch xem phòng";
@@ -353,7 +353,7 @@ export default function RoomDetailPage() {
   const statusSummary = isMaintenance
     ? 'Đang bảo trì'
     : isReserved
-      ? 'Đã đặt cọc'
+      ? 'Đang giữ chỗ'
       : isAvailable
         ? 'Đang trống'
         : room.status === 'RENTED' && room.availableFromDate
@@ -469,7 +469,7 @@ export default function RoomDetailPage() {
                   {isAvailable ? (
                     <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[13px] font-semibold whitespace-nowrap">Còn trống</span>
                   ) : isReserved ? (
-                    <span className="px-3 py-1 bg-yellow-50 text-yellow-600 rounded-full text-[13px] font-semibold whitespace-nowrap">Đã cọc</span>
+                    <span className="px-3 py-1 bg-yellow-50 text-yellow-600 rounded-full text-[13px] font-semibold whitespace-nowrap">Đang giữ chỗ</span>
                   ) : isMaintenance ? (
                     <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[13px] font-semibold whitespace-nowrap">Đang bảo trì</span>
                   ) : room.status === 'RENTED' && room.availableFromDate ? (

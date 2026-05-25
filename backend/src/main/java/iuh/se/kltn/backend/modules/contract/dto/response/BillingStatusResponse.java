@@ -11,6 +11,7 @@ public class BillingStatusResponse {
     private String tenantName;
 
     private Double actualPrice;
+    private Double expectedRoomCost;
     private Double elecPrice;
     private Double waterPrice;
     private Double internetPrice;

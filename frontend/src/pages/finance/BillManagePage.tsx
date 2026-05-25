@@ -131,7 +131,7 @@ export default function BillManagePage() {
     
     const elecCost = elecUsed * selectedContract.elecPrice;
     const waterCost = waterUsed * selectedContract.waterPrice;
-    const roomCost = selectedContract.actualPrice;
+    const roomCost = selectedContract.expectedRoomCost ?? selectedContract.actualPrice;
     const internetCost = selectedContract.internetPrice || 0;
     
     const extra = Number(additionalFee) || 0;
@@ -388,7 +388,11 @@ export default function BillManagePage() {
                 <div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Giá thuê</span>
-                    <span className="font-semibold tabular-nums text-foreground">{formatCurrency(contract.actualPrice)}</span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                        {contract.expectedRoomCost && contract.expectedRoomCost < contract.actualPrice 
+                            ? <><span className="line-through text-xs text-gray-400 mr-2">{formatCurrency(contract.actualPrice)}</span>{formatCurrency(contract.expectedRoomCost)}</>
+                            : formatCurrency(contract.actualPrice)}
+                    </span>
                   </div>
                   {contract.totalAmount && (
                     <div className="mt-2 flex justify-between border-t border-dashed border-border/60 pt-2 text-sm">
@@ -507,12 +511,12 @@ export default function BillManagePage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
-                        <div className="space-y-1">
-                            <label className="text-sm text-gray-600">Phụ phí phát sinh (VNĐ)</label>
+                        <div className="flex flex-col justify-end space-y-1">
+                            <label className="text-sm text-gray-600 line-clamp-1">Phụ phí (VNĐ)</label>
                             <Input type="number" placeholder="VD: 50000" value={additionalFee} onChange={(e) => setAdditionalFee(e.target.value)} />
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-sm text-gray-600">Giảm trừ (VNĐ)</label>
+                        <div className="flex flex-col justify-end space-y-1">
+                            <label className="text-sm text-gray-600 line-clamp-1">Giảm trừ (VNĐ)</label>
                             <Input type="number" placeholder="VD: 100000" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} />
                         </div>
                     </div>
@@ -546,7 +550,7 @@ export default function BillManagePage() {
                         <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Tiền phòng:</span>
-                                <span>{formatCurrency(selectedContract.actualPrice)}</span>
+                                <span>{formatCurrency(selectedContract.expectedRoomCost ?? selectedContract.actualPrice)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Tiền điện ({
@@ -647,7 +651,7 @@ export default function BillManagePage() {
               <div className="px-8 py-5 space-y-4 border-t border-dashed border-gray-300 bg-white">
                  <div className="flex justify-between text-sm">
                     <span className="font-medium text-gray-800">Tiền phòng</span>
-                    <span className="font-semibold">{formatCurrency(viewingContract.actualPrice)}</span>
+                    <span className="font-semibold">{formatCurrency(viewingContract.expectedRoomCost ?? viewingContract.actualPrice)}</span>
                  </div>
                  
                  <div className="flex justify-between text-sm">

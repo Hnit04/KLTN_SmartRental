@@ -30,6 +30,16 @@ public class Bill {
     private Integer oldWaterIndex;
     private Integer newWaterIndex;
 
+    private Double roomCost;
+    private Double elecCost;
+    private Double waterCost;
+    private Double internetCost;
+
+    private java.time.LocalDate periodStart;
+    private java.time.LocalDate periodEnd;
+    private java.time.LocalDate issueDate;
+    private Integer billingDay;
+
     private Double totalAmount;
     private Double exchangeRate; // Tỷ giá ETH/VND
 

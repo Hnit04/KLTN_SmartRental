@@ -58,6 +58,12 @@ import { ethers } from "ethers";
 import RiskNotice from "@/components/shared/RiskNotice";
 import ConfirmActionDialog from "@/components/shared/ConfirmActionDialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import {
   getBlockchainRuntimeConfig,
   isWalletOnExpectedChain,
 } from "@/config/blockchainConfig";
@@ -132,6 +138,7 @@ export default function ContractDetailPage() {
   // --- TRADITIONAL PAYMENT STATE ---
   const [isTraditionalPaymentModalOpen, setIsTraditionalPaymentModalOpen] = useState(false);
   const [selectedBillToPay, setSelectedBillToPay] = useState<any>(null);
+  const [selectedBillForDetail, setSelectedBillForDetail] = useState<Bill | null>(null);
   const [isNotifyingPayment, setIsNotifyingPayment] = useState(false);
 
   // --- SEPAY DEPOSIT QR STATE ---
@@ -612,9 +619,8 @@ export default function ContractDetailPage() {
       // Kết nối MetaMask
       await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-      // Quy đổi VND sang ETH rồi convert ra WEI (Dùng tỷ giá cấu hình từ SystemConfig)
-      const ethAmount = (bill.totalAmount / config.vndEthRate).toFixed(18);
-      const billAmountOnChain = ethers.parseEther(ethAmount);
+      // Fix: Dùng BigInt math giống hệt Backend để tránh sai số thập phân ở đơn vị wei
+      const billAmountOnChain = (BigInt(Math.round(bill.totalAmount)) * 10n ** 18n) / BigInt(config.vndEthRate);
 
       // Đồng bộ hóa đơn lên Blockchain (nếu chưa có trên chain)
       try {
@@ -2222,7 +2228,7 @@ export default function ContractDetailPage() {
                         onClick={() => setIsApproveModalOpen(true)}
                         isLoading={isApproving}
                       >
-                        <CheckCircle2 className="h-4 w-4" /> Chọn người thuê này
+                        <CheckCircle2 className="h-4 w-4" /> Phê duyệt người thuê này
                       </Button>
                       <Button
                         variant="outline"
@@ -2442,7 +2448,9 @@ export default function ContractDetailPage() {
           {contract.smartContractAddress && (
             <DashboardPanel
               title="Ví Web3 (Sổ dư chờ rút)"
-              description="Khoản tiền hóa đơn hoặc cọc đã được lưu trong Smart Contract và chờ bạn rút về ví MetaMask."
+              description={user?.role === 'LANDLORD' 
+                ? "Khoản tiền hóa đơn khách đã thanh toán được lưu trong Smart Contract, chờ bạn rút về ví MetaMask."
+                : "Khoản tiền cọc được hoàn trả (nếu có) lưu trong Smart Contract, chờ bạn rút về ví MetaMask."}
             >
               <div className="p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 shadow-inner">
@@ -2509,6 +2517,9 @@ export default function ContractDetailPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                       <p className="text-lg font-bold tabular-nums text-primary sm:text-right">{(bill.totalAmount).toLocaleString()} đ</p>
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedBillForDetail(bill)}>
+                        Chi tiết
+                      </Button>
                       {bill.status === 'PAID' ? (
                         <StatusBadge
                           label={user?.role === 'LANDLORD' ? 'Đã thu' : 'Đã thanh toán'}
@@ -2539,6 +2550,89 @@ export default function ContractDetailPage() {
           </div>
         </DashboardPanel>
         </div>
+      )}
+
+      {/* --- MODAL CHI TIẾT HÓA ĐƠN --- */}
+      {selectedBillForDetail && (
+        <Dialog open={!!selectedBillForDetail} onOpenChange={(open) => !open && setSelectedBillForDetail(null)}>
+          <DialogContent size="md" className="p-0 overflow-hidden bg-white/95 backdrop-blur-xl border-indigo-100/50">
+            <DialogHeader className="p-6 bg-gradient-to-r from-indigo-500 to-purple-600">
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-indigo-100" />
+                Chi tiết hóa đơn kỳ {selectedBillForDetail.month}/{selectedBillForDetail.year}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="p-6 space-y-4">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Trạng thái:</span>
+                <StatusBadge 
+                  label={selectedBillForDetail.status === 'PAID' ? 'Đã thanh toán' : selectedBillForDetail.status === 'LATE' ? 'Quá hạn' : 'Chưa thanh toán'} 
+                  tone={selectedBillForDetail.status === 'PAID' ? 'success' : selectedBillForDetail.status === 'LATE' ? 'danger' : 'warning'} 
+                />
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Kỳ tính tiền:</span>
+                <span className="font-medium text-gray-900">
+                  {selectedBillForDetail.periodStart ? new Date(selectedBillForDetail.periodStart).toLocaleDateString('vi-VN') : '---'} 
+                  {" -> "} 
+                  {selectedBillForDetail.periodEnd ? new Date(selectedBillForDetail.periodEnd).toLocaleDateString('vi-VN') : '---'}
+                </span>
+              </div>
+              <div className="h-px bg-gray-100 my-2" />
+              
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tiền phòng</span>
+                  <span className="font-semibold text-gray-900">{(selectedBillForDetail.roomCost || 0).toLocaleString()} đ</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tiền điện (Mới: {selectedBillForDetail.newElecIndex} - Cũ: {selectedBillForDetail.oldElecIndex})</span>
+                  <span className="font-semibold text-gray-900">{(selectedBillForDetail.elecCost || 0).toLocaleString()} đ</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tiền nước (Mới: {selectedBillForDetail.newWaterIndex} - Cũ: {selectedBillForDetail.oldWaterIndex})</span>
+                  <span className="font-semibold text-gray-900">{(selectedBillForDetail.waterCost || 0).toLocaleString()} đ</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tiền mạng (Internet)</span>
+                  <span className="font-semibold text-gray-900">{(selectedBillForDetail.internetCost || 0).toLocaleString()} đ</span>
+                </div>
+                
+                {(selectedBillForDetail.additionalFee || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-amber-600">
+                    <span>Phụ phí</span>
+                    <span className="font-semibold">+{(selectedBillForDetail.additionalFee || 0).toLocaleString()} đ</span>
+                  </div>
+                )}
+                
+                {(selectedBillForDetail.discountAmount || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Giảm trừ</span>
+                    <span className="font-semibold">-{(selectedBillForDetail.discountAmount || 0).toLocaleString()} đ</span>
+                  </div>
+                )}
+                
+                {selectedBillForDetail.note && (
+                  <div className="text-sm bg-gray-50 p-3 rounded-lg text-gray-600 border border-gray-100">
+                    <span className="font-medium">Ghi chú:</span> {selectedBillForDetail.note}
+                  </div>
+                )}
+              </div>
+              
+              <div className="h-px bg-gray-100 my-2" />
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-900">Tổng cộng</span>
+                <span className="text-xl font-black text-primary">{(selectedBillForDetail.totalAmount || 0).toLocaleString()} đ</span>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <Button variant="outline" onClick={() => setSelectedBillForDetail(null)}>Đóng</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* --- MODAL CHẤP NHẬN YÊU CẦU (Chủ trọ) --- */}

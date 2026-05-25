@@ -25,7 +25,7 @@ public class EmailService {
         headers.set("api-key", apiKey.trim());
 
         // Tạo link xác thực
-        String verifyLink = "http://localhost:8080/api/auth/verify-otp?email=" + toEmail + "&code=" + code;
+        String verifyLink = "http://13.228.75.30:8080/api/auth/verify-otp?email=" + toEmail + "&code=" + code;
         Map<String, Object> body = new HashMap<>();
         body.put("sender", Map.of("name", "SmartRental", "email", senderEmail));
         body.put("to", List.of(Map.of("email", toEmail)));
