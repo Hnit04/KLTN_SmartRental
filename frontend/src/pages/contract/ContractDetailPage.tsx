@@ -126,6 +126,7 @@ export default function ContractDetailPage() {
   const [chainRiskMessage, setChainRiskMessage] = useState<string | null>(null);
 
   const [isSigning, setIsSigning] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
 
   // --- TRADITIONAL PAYMENT STATE ---
@@ -175,6 +176,7 @@ export default function ContractDetailPage() {
 
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [isRefundConfirmOpen, setIsRefundConfirmOpen] = useState(false);
   const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
@@ -280,8 +282,6 @@ export default function ContractDetailPage() {
     if (!isSilent) setIsLoading(true);
     try {
       const contractRes = await contractApi.getDetail(Number(id));
-      console.log("DEBUG: Contract Detail Loaded:", contractRes.data);
-      console.log("DEBUG: Tenant KYC Status:", contractRes.data?.tenantKycStatus);
       setContract(contractRes.data);
 
       try {
@@ -458,6 +458,18 @@ export default function ContractDetailPage() {
       setIsDownloading(false);
       toast.error("Lỗi khi xuất PDF.");
     });
+  };
+  const handleApproveContract = async () => {
+    setIsApproving(true);
+    try {
+      const result = await contractApi.approveContract(Number(id));
+      setContract(result.data);
+      toast.success("Đã chọn khách thuê thành công!");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Lỗi khi duyệt yêu cầu.");
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleSignContract = async () => {
@@ -2053,50 +2065,6 @@ export default function ContractDetailPage() {
               </div>
             )}
 
-            {changeRequests.length > 0 && (
-              <div className="bg-white rounded-2xl border shadow-sm p-6">
-                <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-gray-800">
-                  <Clock className="h-4 w-4 text-gray-500" /> Lịch sử Đề xuất chỉnh sửa
-                </h3>
-                <div className="space-y-4">
-                  {changeRequests.map((req) => (
-                    <div key={req.id} className="flex flex-col text-sm border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <span className="font-bold text-gray-800">{req.type}</span>
-                          <span className="text-gray-500 ml-2">({new Date(req.requestDate).toLocaleDateString()})</span>
-                          <span className="text-xs ml-2 px-2 py-0.5 bg-gray-100 rounded text-gray-600 border border-gray-200">
-                            Gửi bởi: {req.requestedByRole === 'LANDLORD' ? 'Chủ nhà' : 'Khách thuê'}
-                          </span>
-                        </div>
-                        <div>
-                          {req.status === 'ACCEPTED' && <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Đã duyệt</span>}
-                          {req.status === 'REJECTED' && <span className="text-red-500 font-bold flex items-center gap-1"><XCircle className="w-4 h-4" /> Đã từ chối</span>}
-                          {req.status === 'PENDING' && <span className="text-orange-500 font-bold">Đang chờ</span>}
-                        </div>
-                      </div>
-
-                      <p className="text-gray-500 text-xs mb-2 italic">Lý do: "{req.reason}"</p>
-
-                      <div className="grid grid-cols-2 gap-3 mt-1 opacity-75 hover:opacity-100 transition-opacity">
-                        <div className="bg-red-50/30 p-2.5 rounded-lg border border-red-100/50">
-                          <p className="text-red-400 text-[10px] uppercase font-bold mb-1">Bản gốc</p>
-                          <p className="text-gray-500 whitespace-pre-wrap line-through text-xs">
-                            {req.oldValue || 'Không có'}
-                          </p>
-                        </div>
-                        <div className="bg-green-50/30 p-2.5 rounded-lg border border-green-100/50">
-                          <p className="text-green-500 text-[10px] uppercase font-bold mb-1">Đề xuất ({req.status === 'ACCEPTED' ? 'Đã áp dụng' : 'Bị từ chối'})</p>
-                          <p className="font-medium text-gray-700 whitespace-pre-wrap text-xs">
-                            {req.newValue}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {contract.smartContractAddress && (
               <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6">
@@ -2233,19 +2201,38 @@ export default function ContractDetailPage() {
 
               {contract.status !== 'ACTIVE' && (
                 <div className="mt-6 space-y-3">
-                  <div className="flex flex-col gap-2 text-sm text-left bg-muted/40/50 p-4 rounded-xl border border-gray-100 mb-4">
-                    <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
-                    <div className="flex items-center justify-between">
-                      <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
-                      {contract.isLandlordSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                  {contract.status !== 'PENDING_APPROVAL' && (
+                    <div className="flex flex-col gap-2 text-sm text-left bg-muted/40/50 p-4 rounded-xl border border-gray-100 mb-4">
+                      <p className="font-bold text-gray-800 mb-1">Tiến độ ký kết:</p>
+                      <div className="flex items-center justify-between">
+                        <span className={contract.isLandlordSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>1. Chủ nhà</span>
+                        {contract.isLandlordSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={contract.isTenantSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>2. Khách thuê</span>
+                        {contract.isTenantSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className={contract.isTenantSigned ? 'text-green-700 font-medium' : 'text-gray-500'}>2. Khách thuê</span>
-                      {contract.isTenantSigned ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
-                    </div>
-                  </div>
+                  )}
 
-                  {!isMeSigned && contract.status === 'PENDING_SIGNATURE' ? (
+                  {contract.status === 'PENDING_APPROVAL' && user?.role === 'LANDLORD' ? (
+                    <div className="space-y-3">
+                      <Button
+                        className="w-full gap-2 h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20"
+                        onClick={() => setIsApproveModalOpen(true)}
+                        isLoading={isApproving}
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> Chọn người thuê này
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 h-11 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => setIsRejectModalOpen(true)}
+                      >
+                        <XCircle className="h-4 w-4" /> Từ chối yêu cầu
+                      </Button>
+                    </div>
+                  ) : !isMeSigned && contract.status === 'PENDING_SIGNATURE' ? (
                     <div className="space-y-3">
                       <Button
                         className="w-full gap-2 h-11 shadow-md shadow-blue-500/20"
@@ -2347,7 +2334,7 @@ export default function ContractDetailPage() {
                         setIsRequestModalOpen(true);
                       }}
                     >
-                      <MessageSquare className="h-4 w-4 mr-2" /> Đề xuất Cập nhật / Ra đi
+                      <MessageSquare className="h-4 w-4 mr-2" /> {user?.role === 'TENANT' ? 'Đề xuất Trả phòng / Cập nhật' : 'Đề xuất Gia hạn / Cập nhật HĐ'}
                     </Button>
                   )}
                   {user?.role === 'TENANT' && (
@@ -2372,7 +2359,7 @@ export default function ContractDetailPage() {
             </Button>
 
             {/* ────── HỒ SƠ NGƯỜI THUÊ (DÀNH CHO CHỦ NHÀ) ────── */}
-            {user?.role === 'LANDLORD' && contract.status === 'PENDING_SIGNATURE' && (
+            {user?.role === 'LANDLORD' && (contract.status === 'PENDING_SIGNATURE' || contract.status === 'PENDING_APPROVAL') && (
               <div className="bg-white rounded-2xl border-2 border-indigo-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="p-4 bg-indigo-50 border-b border-indigo-100">
                   <h4 className="font-bold text-indigo-900 flex items-center gap-2">
@@ -2391,10 +2378,10 @@ export default function ContractDetailPage() {
                       <div className="text-right">
                          <div className={cn(
                            "text-xl font-black",
-                           (contract.tenantReputationScore || 0) >= 80 ? "text-green-500" :
-                           (contract.tenantReputationScore || 0) >= 50 ? "text-amber-500" : "text-rose-500"
+                           (contract.tenantReputationScore ?? 0) >= 80 ? "text-green-500" :
+                           (contract.tenantReputationScore ?? 0) >= 50 ? "text-amber-500" : "text-rose-500"
                          )}>
-                           {contract.tenantReputationScore || 50}
+                           {contract.tenantReputationScore ?? 0}
                          </div>
                          <p className="text-[9px] uppercase font-bold text-gray-400">Uy tín</p>
                       </div>
@@ -2420,15 +2407,20 @@ export default function ContractDetailPage() {
                       <div className="p-3 rounded-xl bg-muted/40 border border-gray-100">
                         <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Mức độ tin cậy</p>
                         <div className="flex items-center gap-1.5">
-                           {(contract.tenantReputationScore || 0) >= 80 ? (
+                           {(contract.tenantReputationScore ?? 0) >= 80 ? (
                               <>
                                 <CheckCircle2 className="w-3 h-3 text-green-500" /> 
                                 <span className="text-xs font-bold text-green-700">Rất cao</span>
                               </>
-                           ) : (
+                           ) : (contract.tenantReputationScore ?? 0) >= 50 ? (
                               <>
                                 <TrendingUp className="w-3 h-3 text-indigo-500" /> 
                                 <span className="text-xs font-bold text-indigo-700">Trung bình</span>
+                              </>
+                           ) : (
+                              <>
+                                <AlertCircle className="w-3 h-3 text-rose-500" /> 
+                                <span className="text-xs font-bold text-rose-700">Thấp</span>
                               </>
                            )}
                         </div>
@@ -2549,6 +2541,155 @@ export default function ContractDetailPage() {
         </div>
       )}
 
+      {/* --- MODAL CHẤP NHẬN YÊU CẦU (Chủ trọ) --- */}
+      {isApproveModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border-4 border-white">
+            <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex items-center gap-3">
+               <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner">
+                  <CheckCircle2 className="w-6 h-6" />
+               </div>
+               <div>
+                  <h3 className="text-lg font-bold text-indigo-900">Xác nhận chốt khách</h3>
+                  <p className="text-xs text-indigo-600">Khách thuê sẽ được chuyển sang chờ ký kết</p>
+               </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-[11px] text-amber-800 leading-relaxed">
+                  <p className="font-bold mb-1 flex items-center gap-1 uppercase text-amber-700"><AlertCircle className="w-4 h-4" /> CẢNH BÁO QUAN TRỌNG:</p>
+                  Khi chọn yêu cầu này, hệ thống sẽ tự động <strong>TỪ CHỐI</strong> tất cả các yêu cầu thuê khác đang chờ duyệt cho cùng căn phòng này. Hành động này không thể hoàn tác.
+               </div>
+               <p className="text-sm text-gray-700 text-center font-medium mt-4">
+                  Bạn có chắc chắn muốn chọn khách thuê này không?
+               </p>
+            </div>
+
+            <div className="p-6 bg-muted/40 flex gap-3">
+               <Button 
+                 variant="ghost" 
+                 className="flex-1 text-gray-600 hover:bg-gray-100 h-12 rounded-2xl" 
+                 onClick={() => setIsApproveModalOpen(false)}
+                 disabled={isApproving}
+               >
+                 Hủy bỏ
+               </Button>
+               <Button 
+                 className="flex-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 h-12 rounded-2xl gap-2 font-bold" 
+                 onClick={() => {
+                   setIsApproveModalOpen(false);
+                   handleApproveContract();
+                 }}
+                 isLoading={isApproving}
+               >
+                 <CheckCircle2 className="w-4 h-4" /> Xác nhận chọn
+               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KÝ HỢP ĐỒNG */}
+      {isSignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            <h2 className="text-xl font-bold mb-2">Ký/xác nhận hợp đồng điện tử</h2>
+            <p className="text-sm text-gray-500 mb-6">Bạn đang xác nhận nội dung hợp đồng cho phòng <span className="font-bold text-gray-800">{contract.roomName}</span> trên hệ thống SmartRental.</p>
+
+            <div className="space-y-3 mb-8">
+              {contract.signMethod === 'BLOCKCHAIN' ? (
+                <div className="flex gap-4 p-4 rounded-xl border-2 border-indigo-500 bg-indigo-50/50">
+                  <div className="mt-1 shrink-0 text-indigo-600">
+                    <CheckCircle className="h-6 w-6 fill-indigo-100" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm flex items-center gap-2 text-indigo-900">
+                      Ký giao dịch đặt cọc (Web3) <Blocks className="h-4 w-4 text-indigo-500" />
+                      <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-1" />
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Sử dụng MetaMask để xác nhận giao dịch blockchain. Nội dung hợp đồng được lưu trong hệ thống.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-4 p-4 rounded-xl border-2 border-blue-500 bg-blue-50/50">
+                  <div className="mt-1 shrink-0 text-blue-600">
+                    <CheckCircle className="h-6 w-6 fill-blue-100" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm flex items-center gap-2 text-blue-700">
+                      Xác nhận điện tử (Nhanh)
+                      <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-2" />
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Kích hoạt ngay bằng cách xác nhận đồng ý các điều khoản trên hệ thống. Không dùng Web3.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Phần yêu cầu thanh toán cọc cho KHÁCH THUÊ (Chỉ BLOCKCHAIN) */}
+              {user?.role === 'TENANT' && contract.depositStatus !== 'DEPOSITED' && contract.signMethod === 'BLOCKCHAIN' && (
+                <div className="mt-4 p-4 rounded-xl border-2 border-orange-200 bg-orange-50 space-y-3">
+                  <h4 className="font-bold text-orange-900 flex items-center gap-2">
+                    💰 Cần Thanh toán Cọc: {contract.depositAmount?.toLocaleString()}đ
+                  </h4>
+                  <p className="text-xs text-orange-800 leading-relaxed">
+                    Khi bấm "Ký giao dịch đặt cọc", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-[11px] text-gray-400 text-center italic mt-3">
+                * Phương thức ký đã được chốt. Nếu muốn thay đổi, vui lòng đóng hộp thoại này và dùng tính năng "Đề xuất chỉnh sửa".
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setIsSignModalOpen(false)}>
+                Để sau
+              </Button>
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleSignContract}
+                isLoading={isSigning}
+                disabled={!!chainRiskMessage && contract?.signMethod === "BLOCKCHAIN"}
+              >
+                {contract.signMethod === 'BLOCKCHAIN' ? 'Ký giao dịch đặt cọc' : 'Xác nhận hợp đồng'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL TỪ CHỐI --- */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h2 className="text-lg font-bold mb-4 text-rose-600">Xác nhận từ chối</h2>
+            <p className="text-sm text-gray-600 mb-4">Bạn chắc chắn muốn từ chối yêu cầu này? Vui lòng cho biết lý do:</p>
+            <Textarea
+              className="mb-4"
+              placeholder="Nhập lý do từ chối..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+            />
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setIsRejectModalOpen(false)}>Hủy</Button>
+              <Button
+                className="flex-1 bg-rose-600 hover:bg-rose-700"
+                onClick={handleRejectContract}
+                isLoading={isRejecting}
+              >
+                Xác nhận từ chối
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -2583,8 +2724,14 @@ export default function ContractDetailPage() {
                 </div>
               </div>
 
-              <div className="min-h-[220px] flex flex-col justify-start transition-all duration-300">
-                <Label>Giá trị mới đề xuất</Label>
+              <div className="flex flex-col justify-start transition-all duration-300 mb-4">
+                <Label className="mb-1 text-gray-700">
+                  {changeForm.type === 'TERMINATION' ? 'Ngày mong muốn kết thúc hợp đồng' :
+                   changeForm.type === 'EXTENSION' ? 'Ngày mong muốn gia hạn đến' :
+                   changeForm.type === 'RENT_INCREASE' ? 'Mức giá mới đề xuất (VNĐ/tháng)' :
+                   changeForm.type === 'CHANGE_SIGN_METHOD' ? 'Phương thức ký mới' :
+                   'Nội dung Điều khoản / Nội quy mới đề xuất'}
+                </Label>
 
                 {changeForm.type === 'CHANGE_SIGN_METHOD' ? (
                   <select
@@ -2653,21 +2800,26 @@ export default function ContractDetailPage() {
                 <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
                   {(() => {
                     const presetReasons: Record<string, string[]> = {
-                      'TERMINATION': [
+                      'TERMINATION': user?.role === 'LANDLORD' ? [
+                        'Khách thuê vi phạm nội quy nhiều lần',
+                        'Chậm thanh toán nhiều tháng liên tiếp',
+                        'Cần lấy lại phòng để sửa chữa/sử dụng cá nhân'
+                      ] : [
                         'Công việc thay đổi/Chuyển chỗ làm',
                         'Có việc gấp gia đình về quê',
-                        'Không còn phù hợp nhu cầu sử dụng',
-                        'Khách thuê vi phạm nội quy nhiều lần'
+                        'Không còn phù hợp nhu cầu sử dụng'
                       ],
                       'EXTENSION': [
                         'Muốn tiếp tục thuê dài hạn',
                         'Chưa tìm được chỗ ở mới, xin gia hạn thêm 1 tháng',
                         'Công việc ổn định nên muốn thuê tiếp'
                       ],
-                      'RENT_INCREASE': [
+                      'RENT_INCREASE': user?.role === 'LANDLORD' ? [
                         'Điều chỉnh theo giá cả thị trường',
-                        'Mới bổ sung thêm nội thất/thiết bị mới',
-                        'Tình hình khó khăn, mong giảm giá'
+                        'Mới bổ sung thêm nội thất/thiết bị mới'
+                      ] : [
+                        'Tình hình kinh tế khó khăn, mong giảm giá',
+                        'Chất lượng phòng không như cam kết ban đầu'
                       ],
                       'CHANGE_TERMS': [
                         'Xin phép được nuôi thú cưng nhỏ',
@@ -2721,80 +2873,7 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {/* ✅ GIAO DIỆN KHÓA CỨNG PHƯƠNG THỨC KÝ TRONG MODAL */}
-      {isSignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-            <h2 className="text-xl font-bold mb-2">Xác nhận ký Hợp đồng</h2>
-            <p className="text-sm text-gray-500 mb-6">Bạn đang ký hợp đồng cho phòng <span className="font-bold text-gray-800">{contract.roomName}</span>.</p>
 
-            <div className="space-y-3 mb-8">
-              {contract.signMethod === 'BLOCKCHAIN' ? (
-                <div className="flex gap-4 p-4 rounded-xl border-2 border-indigo-500 bg-indigo-50/50">
-                  <div className="mt-1 shrink-0 text-indigo-600">
-                    <CheckCircle className="h-6 w-6 fill-indigo-100" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm flex items-center gap-2 text-indigo-900">
-                      Ký bằng Smart Contract <Blocks className="h-4 w-4 text-indigo-500" />
-                      <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-1" />
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Sử dụng MetaMask để xác nhận giao dịch và lưu trên mạng lưới {runtimeBlockchainConfig.chainName}.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-4 p-4 rounded-xl border-2 border-blue-500 bg-blue-50/50">
-                  <div className="mt-1 shrink-0 text-blue-600">
-                    <CheckCircle className="h-6 w-6 fill-blue-100" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm flex items-center gap-2 text-blue-700">
-                      Xác nhận điện tử (Nhanh)
-                      <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-2" />
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Kích hoạt ngay bằng cách xác nhận đồng ý các điều khoản trên hệ thống. Không dùng Web3.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Phần yêu cầu thanh toán cọc cho KHÁCH THUÊ (Chỉ BLOCKCHAIN) */}
-              {user?.role === 'TENANT' && contract.depositStatus !== 'DEPOSITED' && contract.signMethod === 'BLOCKCHAIN' && (
-                <div className="mt-4 p-4 rounded-xl border-2 border-orange-200 bg-orange-50 space-y-3">
-                  <h4 className="font-bold text-orange-900 flex items-center gap-2">
-                    💰 Cần Thanh toán Cọc: {contract.depositAmount?.toLocaleString()}đ
-                  </h4>
-                  <p className="text-xs text-orange-800 leading-relaxed">
-                    Khi bấm "Ký Web3 ngay", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
-                  </p>
-                </div>
-              )}
-
-              <p className="text-[11px] text-gray-400 text-center italic mt-3">
-                * Phương thức ký đã được chốt. Nếu muốn thay đổi, vui lòng đóng hộp thoại này và dùng tính năng "Đề xuất chỉnh sửa".
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setIsSignModalOpen(false)}>
-                Để sau
-              </Button>
-              <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleSignContract}
-                isLoading={isSigning}
-                disabled={!!chainRiskMessage && contract?.signMethod === "BLOCKCHAIN"}
-              >
-                {contract.signMethod === 'BLOCKCHAIN' ? 'Ký Web3 ngay' : 'Xác nhận ngay'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ReviewModal
         isOpen={isReviewModalOpen}

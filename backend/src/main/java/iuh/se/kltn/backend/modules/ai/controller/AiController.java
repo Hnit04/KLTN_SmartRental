@@ -262,6 +262,20 @@ public class AiController {
         return ResponseEntity.ok(aiOrchestratorService.getAnalytics());
     }
 
+    // Admin: AI Pipeline Debugger — chạy pipeline thật ở chế độ trace
+    @PostMapping("/admin/debug")
+    public ResponseEntity<?> debugAiPipeline(@RequestBody iuh.se.kltn.backend.modules.ai.dto.AiDebugRequest request) {
+        try {
+            iuh.se.kltn.backend.modules.ai.dto.AiDebugResponse response = aiOrchestratorService.debugPipeline(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Lỗi khi chạy debug pipeline",
+                    "message", e.getMessage() != null ? e.getMessage() : "Unknown error"
+            ));
+        }
+    }
+
     // Admin: Observability — AI pipeline logs with responseSource distribution
     @GetMapping("/admin/observability")
     public ResponseEntity<?> getAiObservability(
@@ -314,6 +328,7 @@ public class AiController {
                         m.put("rowCount", l.getResultRowCount());
                         m.put("cacheScore", l.getCacheScore());
                         m.put("locationSource", l.getLocationSource());
+                        m.put("sql", l.getGeneratedSql()); // Thêm SQL để Admin xem chi tiết
                         m.put("createdAt", l.getCreatedAt());
                         return m;
                     })

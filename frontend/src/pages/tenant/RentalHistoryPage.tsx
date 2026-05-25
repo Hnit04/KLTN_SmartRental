@@ -74,7 +74,7 @@ export default function RentalHistoryPage() {
       const matchesYear = filterYear === 'ALL' || year === filterYear;
       
       // Tab filter
-      const isOngoing = item.status === 'ACTIVE' || item.status === 'PENDING_SIGNATURE';
+      const isOngoing = item.status === 'ACTIVE' || item.status === 'PENDING_SIGNATURE' || item.status === 'PENDING_APPROVAL';
       const matchesTab = activeTab === 'ONGOING' ? isOngoing : !isOngoing;
 
       return matchesSearch && matchesYear && matchesTab;
@@ -94,7 +94,9 @@ export default function RentalHistoryPage() {
         return { label: 'Đã hết hạn', tone: 'neutral' as const, icon: Clock };
       case 'TERMINATED_EARLY':
         return { label: 'Kết thúc sớm', tone: 'warning' as const, icon: AlertCircle };
-       case 'PENDING_SIGNATURE':
+      case 'PENDING_APPROVAL':
+        return { label: 'Đang chờ duyệt', tone: 'info' as const, icon: Clock };
+      case 'PENDING_SIGNATURE':
         return { label: 'Chờ ký tên', tone: 'info' as const, icon: HelpCircle };
       default:
         return { label: status, tone: 'neutral' as const, icon: HelpCircle };
@@ -162,7 +164,7 @@ export default function RentalHistoryPage() {
                 : "text-gray-500 hover:text-gray-700"
             )}
           >
-            Đang cư trú ({history.filter(c => c.status === 'ACTIVE' || c.status === 'PENDING_SIGNATURE').length})
+            Đang cư trú ({history.filter(c => c.status === 'ACTIVE' || c.status === 'PENDING_SIGNATURE' || c.status === 'PENDING_APPROVAL').length})
           </button>
           <button
             onClick={() => setActiveTab('PAST')}
@@ -173,7 +175,7 @@ export default function RentalHistoryPage() {
                     : "text-gray-500 hover:text-gray-700"
                 )}
           >
-            Lịch sử cũ ({history.filter(c => c.status !== 'ACTIVE' && c.status !== 'PENDING_SIGNATURE').length})
+            Lịch sử cũ ({history.filter(c => c.status !== 'ACTIVE' && c.status !== 'PENDING_SIGNATURE' && c.status !== 'PENDING_APPROVAL').length})
           </button>
         </div>
 
