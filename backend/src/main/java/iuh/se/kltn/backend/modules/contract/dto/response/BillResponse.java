@@ -20,4 +20,17 @@ public class BillResponse {
     private LocalDateTime deadline;
     private String paymentTxHash;
     private Double exchangeRate;
+
+    private Long contractId;
+    private Integer oldElecIndex;
+    private Integer newElecIndex;
+    private Integer oldWaterIndex;
+    private Integer newWaterIndex;
+    private Double internetCost;
+    private Double additionalFee;
+    private Double discountAmount;
+    private String note;
+    private java.time.LocalDate periodStart;
+    private java.time.LocalDate periodEnd;
+    private java.time.LocalDate issueDate;
 }

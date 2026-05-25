@@ -75,6 +75,18 @@ export const aiApi = {
     return axiosClient.get("/ai/admin/observability");
   },
 
+  // Admin: AI Pipeline Debugger — chạy pipeline thật ở chế độ trace
+  debugPipeline: async (payload: {
+    question: string;
+    simulatedRole: string;
+    simulatedUserId?: number | null;
+    execute?: boolean;
+    includePrompt?: boolean;
+  }) => {
+    const response = await axiosClient.post('/ai/admin/debug', payload);
+    return response.data;
+  },
+
   // Actionable AI: generate reminder drafts for overdue or due-soon bills
   generateReminders: async (
     scope: "OVERDUE" | "DUE_SOON" = "OVERDUE",

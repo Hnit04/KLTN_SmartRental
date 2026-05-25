@@ -73,7 +73,7 @@ public class PropertyService {
     @Autowired
     private BillRepository billRepository;
 
-    // 1. API Má»I: Lấy táº¥t cáº£ danh sách nhà  trá» (Public) - CHỈ LẤY "APPROVED"
+
     private static final double FALLBACK_SYSTEM_AVERAGE_RATING = 4.2;
     private static final double DISTANCE_MAX_KM = 20.0;
     private static final double RATING_PRIOR_COUNT = 12.0;

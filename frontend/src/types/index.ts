@@ -394,6 +394,7 @@ export interface ContractBilling {
   roomName: string;
   tenantName: string;
   actualPrice: number;
+  expectedRoomCost?: number;
   elecPrice: number;
   waterPrice: number;
   internetPrice: number;
@@ -414,13 +415,29 @@ export interface ContractBilling {
 
 export interface Bill {
   id: number;
+  contractId: number;
   roomName: string;
   month: number;
   year: number;
+  
   totalAmount: number;
   elecCost: number;
   waterCost: number;
   roomCost: number;
+  internetCost?: number;
+  additionalFee?: number;
+  discountAmount?: number;
+  
+  oldElecIndex?: number;
+  newElecIndex?: number;
+  oldWaterIndex?: number;
+  newWaterIndex?: number;
+  
+  periodStart?: string;
+  periodEnd?: string;
+  issueDate?: string;
+  note?: string;
+  
   status: BillStatus;
   deadline: string;
   paymentTxHash?: string;

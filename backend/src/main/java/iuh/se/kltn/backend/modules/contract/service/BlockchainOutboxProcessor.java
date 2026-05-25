@@ -5,7 +5,6 @@ import iuh.se.kltn.backend.modules.contract.entity.Contract;
 
 import iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository;
 import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +47,6 @@ public class BlockchainOutboxProcessor {
      * ✅ FIX: Batch limit + respects nextAttemptAt for exponential backoff.
      */
     @Scheduled(fixedDelay = 10000)
-    @SchedulerLock(name = "outbox_processor", lockAtMostFor = "5m", lockAtLeastFor = "9s")
     @Transactional
     public void processOutboxEvents() {
         List<BlockchainOutboxEvent> pendingEvents = outboxRepository.findPendingEventsForProcessing(PageRequest.of(0, BATCH_SIZE));

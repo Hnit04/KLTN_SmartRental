@@ -139,7 +139,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
             {isAvailable ? (
               <StatusBadge label="Còn trống" tone="success" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : isReserved ? (
-              <StatusBadge label="Giữ chỗ" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
+              <StatusBadge label="Đang giữ chỗ" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : isMaintenance ? (
               <StatusBadge label="Đang bảo trì" tone="warning" className="text-[10px] font-bold uppercase tracking-wider" />
             ) : data.status === 'RENTED' && data.availableFromDate ? (
@@ -164,11 +164,6 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
 
           {/* --- NÚT TIM & NÚT SO SÁNH --- */}
           <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
-            {/* Nếu đã có Status Badge, ta dời nó sang trái hoặc để nó bên dưới.
-                Tạm thời Status Badge ở dòng 121 đã chiếm top-3 right-3.
-                Tôi sẽ đổi chỗ nút Tim lên góc trái, và Status Badge sang góc phải. Hoặc đẩy Tim xuống.
-                Sửa lại: Tim ở top-3 right-3, Status Badge dời xuống top-12 right-3.
-                Vì Status Badge đã render ở trên, tôi sẽ đặt Tim ở top-12 right-3. */}
           </div>
           
           <button
@@ -340,7 +335,7 @@ export default function RoomCard({ data, onBookAppointment }: RoomCardProps) {
                     {isAvailable
                       ? "Sẵn sàng đón khách"
                       : isReserved
-                        ? "Đang có người đợi ký HĐ"
+                        ? 'Đang giữ chỗ'
                         : isMaintenance
                           ? "Đang bảo trì / Sửa chữa"
                           : data.status === 'RENTED' && data.availableFromDate
