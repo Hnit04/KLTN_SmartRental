@@ -29,6 +29,7 @@ export default function CreateContractPage() {
   const roomId = searchParams.get("roomId");
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
   const [room, setRoom] = useState<any>(null);
   const [existingContract, setExistingContract] = useState<any>(null);
 
@@ -45,7 +46,7 @@ export default function CreateContractPage() {
     signMethod: "TRADITIONAL" as ContractSignMethod,
   }), []);
 
-  const { formData, setFormData, clearDraft, isDirty } = useAutoSaveForm(
+  const { formData, setFormData, clearDraft, resetForm, isDirty } = useAutoSaveForm(
     `draft_contract_create_${roomId}`,
     INITIAL_DATA
   );
@@ -192,12 +193,18 @@ export default function CreateContractPage() {
 
       const res = await contractApi.createContract(payload as any);
       
-      clearDraft();
+      resetForm();
+      setIsSubmitSuccess(true);
       toast.success(user?.role === 'LANDLORD' ? "Đã tạo hợp đồng nháp thành công!" : "Đã gửi yêu cầu thuê thành công!");
       
       const newContractId = (res as any).data?.id || (res as any).id;
       const prefix = user?.role === 'LANDLORD' ? '/landlord' : '/tenant';
-      navigate(`${prefix}/contracts/${newContractId}`); 
+      
+      // Delay navigation to allow React to update isSubmitSuccess state
+      // and unmount FormBlocker before pushing history
+      setTimeout(() => {
+        navigate(`${prefix}/contracts/${newContractId}`); 
+      }, 100);
       
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Lỗi tạo hợp đồng.");
@@ -211,7 +218,7 @@ export default function CreateContractPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background py-6 md:py-10 animate-fade-in-up">
-      <FormBlocker isDirty={isDirty} />
+      <FormBlocker isDirty={isDirty && !isSubmitSuccess} />
       <div className="page-shell app-panel">
         {existingContract && user?.role === 'TENANT' && (
           <div className="mb-5 rounded-2xl border border-orange-200/90 bg-orange-50/90 p-4 shadow-sm sm:p-5">

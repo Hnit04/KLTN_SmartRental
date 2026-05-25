@@ -14,6 +14,8 @@ import iuh.se.kltn.backend.modules.ai.entity.AiActionLog;
 import iuh.se.kltn.backend.modules.ai.entity.AiUnrecognizedQuery;
 import iuh.se.kltn.backend.modules.ai.dto.AiRawResult;
 import iuh.se.kltn.backend.modules.ai.dto.EnrichedQuery;
+import iuh.se.kltn.backend.modules.ai.dto.AiDebugRequest;
+import iuh.se.kltn.backend.modules.ai.dto.AiDebugResponse;
 import iuh.se.kltn.backend.modules.ai.repository.AiSqlCacheRepository;
 import iuh.se.kltn.backend.modules.ai.repository.AiActionLogRepository;
 import iuh.se.kltn.backend.modules.ai.repository.AiUnrecognizedQueryRepository;
@@ -2419,4 +2421,625 @@ public class AiOrchestratorService {
             System.err.println("⚠️ [OBSERVABILITY] Lỗi ghi AiActionLog: " + e.getMessage());
         }
     }
+
+    // =========================================================================
+    // 🔍 AI PIPELINE DEBUGGER — chạy pipeline thật ở chế độ trace
+    // =========================================================================
+
+    /**
+     * Chạy pipeline AI thật nhưng ở chế độ DEBUG: ghi lại traceSteps ở từng bước.
+     * Không tạo pipeline mô phỏng riêng — dùng lại chính xác logic thật.
+     */
+    public AiDebugResponse debugPipeline(AiDebugRequest request) {
+        List<AiDebugResponse.AiTraceStep> traceSteps = new ArrayList<>();
+        String question = request.getQuestion();
+        String role = request.getSimulatedRole() != null ? request.getSimulatedRole() : "GUEST";
+        Long userId = request.getSimulatedUserId();
+        boolean executeFlag = Boolean.TRUE.equals(request.getExecute());
+
+        String rawSql = null;
+        String finalSql = null;
+        String finalStatus = "PASSED";
+        boolean llmUsed = false;
+        String route = "UNKNOWN";
+
+        // ─── BƯỚC 1: PREPROCESSING ───
+        long stepStart = System.currentTimeMillis();
+        String normalizedQuestion = normalizeText(question);
+        Map<String, Object> preprocessMeta = new java.util.LinkedHashMap<>();
+        preprocessMeta.put("lowercase", true);
+        preprocessMeta.put("unicodeNFC", true);
+        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                .step("PREPROCESSING")
+                .title("Chuẩn hóa câu hỏi")
+                .status("PASSED")
+                .input(question)
+                .output(normalizedQuestion)
+                .metadata(preprocessMeta)
+                .durationMs(System.currentTimeMillis() - stepStart)
+                .build());
+
+        // ─── Kiểm tra GUEST bị chặn sớm ───
+        if (role.equalsIgnoreCase("GUEST")) {
+            String sensitivePattern = ".*("
+                    + "hóa đơn|hoá đơn|bill|invoice|payment"
+                    + "|nợ|thanh toán|trả tiền|chưa trả|đóng tiền|chưa đóng"
+                    + "|tiền phòng|tiền thuê|tiền cọc|đặt cọc|cọc"
+                    + "|doanh thu|revenue|phí|quá hạn|trễ hạn"
+                    + "|hợp đồng|contract|gia hạn|chấm dứt|terminate"
+                    + "|lịch hẹn|appointment|booking"
+                    + "|của khách|của người|của ai|của bạn|của tôi|của mình"
+                    + "|blockchain|smart contract|giao dịch|transaction"
+                    + "|lịch sử|history|thống kê|statistic|báo cáo|report"
+                    + ").*";
+            if (normalizedQuestion.matches(sensitivePattern)) {
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SECURITY_GATE")
+                        .title("Chặn sớm — GUEST truy vấn nhạy cảm")
+                        .status("BLOCKED")
+                        .output(Map.of(
+                                "blockedReason", "GUEST không được truy cập dữ liệu nhạy cảm (hóa đơn, hợp đồng, lịch sử...).",
+                                "violatedRules", List.of("ROLE_ISOLATION", "SENSITIVE_BUSINESS_DATA_ACCESS")
+                        ))
+                        .build());
+                return AiDebugResponse.builder()
+                        .question(question).normalizedQuestion(normalizedQuestion)
+                        .finalStatus("BLOCKED").llmUsed(false).quotaImpact("NONE")
+                        .route("SECURITY_BLOCKED_EARLY").traceSteps(traceSteps).build();
+            }
+        }
+
+        // ─── Kiểm tra FAQ/Policy ───
+        if (isPolicyStyleQuestion(question) && !hasPersonalDataCue(question)) {
+            route = "FAQ_CACHE_HIT";
+            String faqAnswer = searchFaq(question);
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("ROUTING")
+                    .title("Phân luồng xử lý")
+                    .status("PASSED")
+                    .output(Map.of(
+                            "route", "FAQ_CACHE_HIT",
+                            "reason", "Câu hỏi thuộc nhóm chính sách/hướng dẫn, ưu tiên trả lời từ FAQ cache."
+                    ))
+                    .build());
+            return AiDebugResponse.builder()
+                    .question(question).normalizedQuestion(normalizedQuestion)
+                    .finalStatus("PASSED").llmUsed(false).quotaImpact("NONE")
+                    .route(route).traceSteps(traceSteps).build();
+        }
+
+        // ─── BƯỚC 2: INTENT EXTRACTION ───
+        stepStart = System.currentTimeMillis();
+        IntentExtractionResult extraction = null;
+        String intentSource = "UNKNOWN";
+        String predictedIntent = "UNKNOWN";
+        Double confidence = 0.0;
+
+        Optional<RuleIntentResult> ruleResult = ruleIntentRouter.classify(question, role);
+        if (ruleResult.isPresent() && ruleResult.get().matchScore() >= ruleIntentRouter.getAcceptThreshold()) {
+            RuleIntentResult matchedRule = ruleResult.get();
+            Map<String, Object> ruleParams = new HashMap<>(ruleEntityExtractor.extract(question, matchedRule.intent()));
+            extraction = new IntentExtractionResult(matchedRule.intent(), matchedRule.matchScore(), ruleParams);
+            predictedIntent = matchedRule.intent().name();
+            confidence = matchedRule.matchScore();
+            intentSource = matchedRule.source();
+        }
+
+        String intentMethod = intentSource;
+        if (extraction == null) {
+            // Trong debug mode: nếu rule không match, thử LLM nếu đang ở FULL mode
+            String llmMode = resolveLlmMode();
+            if ("FULL".equals(llmMode)) {
+                try {
+                    String rawJson = intentExtractorAi.extractIntent(question, role);
+                    rawJson = rawJson.replace("```json", "").replace("```", "").trim();
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    com.fasterxml.jackson.databind.JsonNode jsonNode = mapper.readTree(rawJson);
+                    String intentStr = jsonNode.has("intent") ? jsonNode.get("intent").asText() : "UNKNOWN";
+                    confidence = jsonNode.has("confidenceScore") ? jsonNode.get("confidenceScore").asDouble() : 0.0;
+                    predictedIntent = intentStr;
+                    Map<String, Object> extractedParams = new HashMap<>();
+                    if (jsonNode.has("params") && jsonNode.get("params").isObject()) {
+                        jsonNode.get("params").fields().forEachRemaining(entry -> {
+                            com.fasterxml.jackson.databind.JsonNode val = entry.getValue();
+                            if (val.isNumber()) extractedParams.put(entry.getKey(), val.numberValue());
+                            else if (val.isBoolean()) extractedParams.put(entry.getKey(), val.booleanValue());
+                            else extractedParams.put(entry.getKey(), val.asText());
+                        });
+                    }
+                    SystemIntent systemIntent;
+                    try { systemIntent = SystemIntent.valueOf(intentStr); }
+                    catch (IllegalArgumentException e) { systemIntent = SystemIntent.UNKNOWN; }
+                    extraction = new IntentExtractionResult(systemIntent, confidence, extractedParams);
+                    intentSource = "LLM";
+                    intentMethod = "LLM";
+                    llmUsed = true;
+                } catch (Exception e) {
+                    intentMethod = "FALLBACK";
+                }
+            } else {
+                intentMethod = "RULE_MISS_LLM_DISABLED";
+            }
+        }
+
+        Map<String, Object> intentOutput = new java.util.LinkedHashMap<>();
+        intentOutput.put("intent", predictedIntent);
+        intentOutput.put("confidence", confidence);
+        intentOutput.put("method", intentMethod);
+        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                .step("INTENT_EXTRACTION")
+                .title("Nhận diện ý định")
+                .status(extraction != null ? "PASSED" : "SKIPPED")
+                .output(intentOutput)
+                .durationMs(System.currentTimeMillis() - stepStart)
+                .build());
+
+        // ─── BƯỚC 3: ENTITY EXTRACTION ───
+        stepStart = System.currentTimeMillis();
+        Map<String, Object> entities = new HashMap<>();
+        if (extraction != null) {
+            entities = new HashMap<>(extraction.getParams() != null ? extraction.getParams() : Map.of());
+        } else {
+            // Cố gắng bóc tách bằng rule dù không có intent rõ
+            entities = new HashMap<>(ruleEntityExtractor.extract(question, SystemIntent.SEARCH_ROOM));
+        }
+
+        Map<String, Object> entityMeta = new java.util.LinkedHashMap<>();
+        entityMeta.put("method", extraction != null ? intentMethod : "REGEX_AND_DICTIONARY");
+        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                .step("ENTITY_EXTRACTION")
+                .title("Bóc tách tham số")
+                .status(entities.isEmpty() ? "SKIPPED" : "PASSED")
+                .output(entities)
+                .metadata(entityMeta)
+                .durationMs(System.currentTimeMillis() - stepStart)
+                .build());
+
+        // ─── BƯỚC 4: ROUTING ───
+        stepStart = System.currentTimeMillis();
+        boolean dqeHit = false;
+        boolean sqlCacheHit = false;
+        String routeReason = "";
+
+        // Kiểm tra Security block sớm cho role
+        if (extraction != null && role.equalsIgnoreCase("GUEST")
+                && extraction.getIntent() != SystemIntent.SEARCH_ROOM) {
+            route = "SECURITY_BLOCKED_EARLY";
+            routeReason = "GUEST chỉ được phép tìm kiếm phòng. Intent " + predictedIntent + " bị chặn.";
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("ROUTING").title("Phân luồng xử lý").status("BLOCKED")
+                    .output(Map.of("route", route, "reason", routeReason))
+                    .durationMs(System.currentTimeMillis() - stepStart).build());
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("SECURITY_GATE").title("Kiểm tra bảo mật").status("BLOCKED")
+                    .output(Map.of("blockedReason", routeReason, "violatedRules", List.of("ROLE_ISOLATION"))).build());
+            return AiDebugResponse.builder()
+                    .question(question).normalizedQuestion(normalizedQuestion)
+                    .finalStatus("BLOCKED").llmUsed(llmUsed)
+                    .quotaImpact(llmUsed ? "NORMAL" : "NONE")
+                    .route(route).traceSteps(traceSteps).build();
+        }
+
+        if (extraction != null && role.equalsIgnoreCase("TENANT")) {
+            SystemIntent intent = extraction.getIntent();
+            if (intent == SystemIntent.VIEW_REVENUE
+                    || intent == SystemIntent.VIEW_DEBTORS
+                    || intent == SystemIntent.VIEW_OCCUPANCY
+                    || intent == SystemIntent.VIEW_RISK) {
+                route = "SECURITY_BLOCKED_EARLY";
+                routeReason = "Thông tin này thuộc về nội bộ quản lý, TENANT không có quyền xem.";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("ROUTING").title("Phân luồng xử lý").status("BLOCKED")
+                        .output(Map.of("route", route, "reason", routeReason))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SECURITY_GATE").title("Kiểm tra bảo mật").status("BLOCKED")
+                        .output(Map.of("blockedReason", routeReason, "violatedRules", List.of("ROLE_ISOLATION"))).build());
+                return AiDebugResponse.builder()
+                        .question(question).normalizedQuestion(normalizedQuestion)
+                        .finalStatus("BLOCKED").llmUsed(llmUsed)
+                        .quotaImpact(llmUsed ? "NORMAL" : "NONE")
+                        .route(route).traceSteps(traceSteps).build();
+            }
+        }
+
+        if (extraction != null && confidence >= 0.7) {
+            if (isPolicyIntent(extraction.getIntent())) {
+                route = "POLICY_FAQ_HIT";
+                routeReason = "Intent thuộc nhóm Policy/FAQ, sẽ dùng câu trả lời tĩnh có sẵn.";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("ROUTING").title("Phân luồng xử lý").status("PASSED")
+                        .output(Map.of("route", route, "reason", routeReason))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("FINAL_SQL").title("SQL cuối cùng").status("SKIPPED")
+                        .output(Map.of("reason", "Câu hỏi FAQ không dùng SQL")).build());
+                return AiDebugResponse.builder()
+                        .question(question).normalizedQuestion(normalizedQuestion)
+                        .finalStatus("PASSED").llmUsed(llmUsed)
+                        .quotaImpact(llmUsed ? "NORMAL" : "NONE")
+                        .route(route).traceSteps(traceSteps).build();
+            }
+
+            if (extraction.getIntent() == SystemIntent.LOCATION_SEARCH) {
+                route = "LOCATION_SEARCH_HIT";
+                routeReason = "Intent tìm kiếm vị trí (LOCATION_SEARCH), sẽ dùng module tích hợp bản đồ Geocoding.";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("ROUTING").title("Phân luồng xử lý").status("PASSED")
+                        .output(Map.of("route", route, "reason", routeReason))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("FINAL_SQL").title("SQL cuối cùng").status("SKIPPED")
+                        .output(Map.of("reason", "Tìm kiếm vị trí dùng hàm Geocoding riêng, không qua Text-to-SQL thông thường")).build());
+                
+                if (executeFlag) {
+                    try {
+                        String locationName = extraction.getParams().containsKey("location") ? extraction.getParams().get("location").toString() : null;
+                        Long maxPrice = extractMaxPriceFromParams(extraction.getParams(), question);
+                        boolean cheapMode = shouldUseCheapMode(question, maxPrice);
+                        Integer requiredOccupants = extractRequiredOccupantsFromParams(extraction.getParams(), question);
+                        boolean requirePetFriendly = extractRequirePetFriendlyFromParams(extraction.getParams(), question);
+                        
+                        String result = handleLocationSearchFlow(locationName, 3.0, maxPrice, cheapMode, requiredOccupants, requirePetFriendly, question, role, userId != null ? userId : 0L, predictedIntent, confidence, stepStart, false);
+                        
+                        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                            .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("PASSED")
+                            .output(Map.of("executed", true, "source", "Geocoding Module", "result_text", result)).build());
+                    } catch(Exception e) {
+                        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                            .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("ERROR")
+                            .output(Map.of("executed", true, "error", e.getMessage())).build());
+                    }
+                } else {
+                    traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                            .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("SKIPPED")
+                            .output(Map.of("executed", false, "reason", "Dry-run mode (Chưa tick ô Cho phép thực thi)")).build());
+                }
+
+                return AiDebugResponse.builder()
+                        .question(question).normalizedQuestion(normalizedQuestion)
+                        .finalStatus("PASSED").llmUsed(llmUsed)
+                        .quotaImpact(llmUsed ? "NORMAL" : "NONE")
+                        .route(route).traceSteps(traceSteps).build();
+            }
+        }
+
+        // Kiểm tra DynamicQueryEngine
+        if (extraction != null && confidence >= 0.7 && dynamicQueryEngine.canHandle(extraction.getIntent())) {
+            dqeHit = true;
+            route = "DYNAMIC_QUERY_ENGINE_HIT";
+            routeReason = "Intent " + predictedIntent + " có handler phù hợp trong DynamicQueryEngine.";
+        }
+
+        if (!dqeHit) {
+            // Thử SQL semantic cache
+            try {
+                dev.langchain4j.data.embedding.Embedding queryEmbedding = embeddingModel.embed(question).content();
+                dev.langchain4j.store.embedding.EmbeddingSearchRequest searchReq = dev.langchain4j.store.embedding.EmbeddingSearchRequest.builder()
+                        .queryEmbedding(queryEmbedding).maxResults(1).minScore(0.85)
+                        .filter(metadataKey("type").isEqualTo("SQL")).build();
+                dev.langchain4j.store.embedding.EmbeddingSearchResult<TextSegment> searchRes = embeddingStore.search(searchReq);
+                if (!searchRes.matches().isEmpty()) {
+                    String candidateSql = searchRes.matches().get(0).embedded().metadata().getString("sql");
+                    if (isLikelySemanticSqlMatch(question, candidateSql, role)) {
+                        sqlCacheHit = true;
+                        rawSql = candidateSql;
+                        route = "SQL_CACHE_HIT";
+                        routeReason = "SQL semantic cache hit với similarity " +
+                                String.format("%.2f", searchRes.matches().get(0).score()) + ".";
+                    } else {
+                        route = "SQL_CACHE_MISS";
+                        routeReason = "SQL cache có kết quả nhưng bị bỏ qua do lệch ngữ nghĩa.";
+                    }
+                } else {
+                    route = "SQL_CACHE_MISS";
+                    routeReason = "Không tìm thấy SQL tương tự trong cache (dưới ngưỡng 0.85).";
+                }
+            } catch (Exception e) {
+                route = "SQL_CACHE_MISS";
+                routeReason = "Lỗi khi tìm kiếm SQL cache: " + e.getMessage();
+            }
+
+            if (!sqlCacheHit && !dqeHit) {
+                if (isSqlGeneratorEnabled()) {
+                    route = "LLM_SQL_GENERATION";
+                    routeReason = "DynamicQueryEngine không xử lý được và SQL cache không đạt ngưỡng. Gọi Gemini sinh SQL.";
+                } else {
+                    route = "SQL_GENERATOR_DISABLED";
+                    routeReason = "Gemini SQL Generator đang bị tắt trong cấu hình.";
+                }
+            }
+        }
+
+        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                .step("ROUTING").title("Phân luồng xử lý").status("PASSED")
+                .output(Map.of("route", route, "reason", routeReason))
+                .durationMs(System.currentTimeMillis() - stepStart).build());
+
+        // ─── BƯỚC 5+6: SQL GENERATION / SELECTION ───
+        stepStart = System.currentTimeMillis();
+        String sqlSource = route;
+
+        if (dqeHit && extraction != null) {
+            // DQE hit: lấy SQL từ DynamicQueryEngine (chạy thật)
+            try {
+                List<Map<String, Object>> dqeResults = dynamicQueryEngine.execute(extraction, userId != null ? userId : 0L, role);
+                rawSql = "[DynamicQueryEngine — truy vấn tham số hóa, không dùng SQL text]";
+                sqlSource = "DYNAMIC_QUERY_ENGINE";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SQL_GENERATION").title("Tạo SQL từ DynamicQueryEngine")
+                        .status("PASSED")
+                        .output(Map.of("source", sqlSource, "rawSql", rawSql,
+                                "resultCount", dqeResults.size()))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+            } catch (Exception e) {
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SQL_GENERATION").title("Tạo SQL từ DynamicQueryEngine")
+                        .status("ERROR").output(Map.of("error", e.getMessage()))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+                finalStatus = "ERROR";
+            }
+        } else if (sqlCacheHit && rawSql != null) {
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("SQL_GENERATION").title("Sử dụng SQL từ Semantic Cache")
+                    .status("PASSED")
+                    .output(Map.of("source", "SQL_CACHE", "rawSql", rawSql))
+                    .durationMs(System.currentTimeMillis() - stepStart).build());
+        } else if ("LLM_SQL_GENERATION".equals(route)) {
+            // Gọi Gemini sinh SQL (chạy pipeline thật)
+            try {
+                String schemaContext = buildSchemaForRole(role);
+                String roleRules = buildRoleRules(role);
+                rawSql = sqlGeneratorAi.generateSql(question, role, userId != null ? userId : 0L, schemaContext, roleRules);
+                if (rawSql != null) {
+                    rawSql = rawSql.replace("```sql", "").replace("```", "").trim();
+                    int selectIdx = rawSql.toUpperCase().indexOf("SELECT");
+                    if (selectIdx >= 0) rawSql = rawSql.substring(selectIdx);
+                    rawSql = normalizeSqlDialectForPostgres(rawSql);
+                }
+                llmUsed = true;
+                sqlSource = "GEMINI";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SQL_GENERATION").title("Sinh SQL bằng Gemini")
+                        .status("PASSED")
+                        .output(Map.of("source", "GEMINI", "rawSql", rawSql != null ? rawSql : ""))
+                        .metadata(Map.of("llmUsed", true, "quotaImpact", "NORMAL"))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+            } catch (Exception e) {
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SQL_GENERATION").title("Sinh SQL bằng Gemini")
+                        .status("ERROR").output(Map.of("error", e.getMessage()))
+                        .metadata(Map.of("llmUsed", true)).durationMs(System.currentTimeMillis() - stepStart).build());
+                finalStatus = "ERROR";
+                llmUsed = true;
+            }
+        } else {
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("SQL_GENERATION").title("Không sinh được SQL")
+                    .status("SKIPPED").output(Map.of("reason", routeReason)).build());
+        }
+
+        // ─── BƯỚC 5: NL-to-SQL MAPPING (rule-based, không gọi Gemini thêm) ───
+        List<AiDebugResponse.NlSqlMapping> mappings = buildNlSqlMapping(question, entities, rawSql, predictedIntent);
+        traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                .step("NL_SQL_MAPPING").title("Ánh xạ ngôn ngữ tự nhiên sang SQL")
+                .status(mappings.isEmpty() ? "SKIPPED" : "PASSED")
+                .output(mappings).build());
+
+        // ─── BƯỚC 7: SECURITY GATE ───
+        if (rawSql != null && !rawSql.startsWith("[")) {
+            stepStart = System.currentTimeMillis();
+            SecurityGateService.SecurityResult secResult = securityGateService.validateAndSanitize(rawSql, role);
+            if (secResult.isBlocked()) {
+                finalStatus = "BLOCKED";
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SECURITY_GATE").title("Kiểm tra bảo mật").status("BLOCKED")
+                        .output(Map.of("blockedReason", secResult.getMessage(),
+                                "violatedRules", List.of("ROLE_ISOLATION", "SENSITIVE_DATA")))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+            } else {
+                finalSql = secResult.getSanitizedSql();
+                if (userId != null) {
+                    finalSql = finalSql.replace("USER_ID_PLACEHOLDER", userId.toString());
+                }
+                List<String> rulesApplied = new ArrayList<>();
+                rulesApplied.add("SELECT_ONLY");
+                rulesApplied.add("BLOCK_DML_DDL");
+                rulesApplied.add("SENSITIVE_COLUMN_DENYLIST");
+                rulesApplied.add("ROLE_ISOLATION");
+                if (!rawSql.toUpperCase().contains("LIMIT")) rulesApplied.add("AUTO_LIMIT_50");
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("SECURITY_GATE").title("Kiểm tra bảo mật").status("PASSED")
+                        .output(Map.of("rulesApplied", rulesApplied, "blockedReason", ""))
+                        .durationMs(System.currentTimeMillis() - stepStart).build());
+            }
+        }
+
+        // ─── BƯỚC 8: FINAL SQL ───
+        if (finalSql != null) {
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("FINAL_SQL").title("SQL cuối cùng").status("PASSED")
+                    .output(Map.of("finalSql", finalSql)).build());
+        }
+
+        // ─── BƯỚC 9: EXECUTION SUMMARY ───
+        AiDebugResponse.AiExecutionSummary execSummary = null;
+        if (!executeFlag || (finalSql == null && !dqeHit)) {
+            String skipReason = !executeFlag ? "Dry-run mode (Chưa tick ô Cho phép thực thi)" : "Không có SQL để thực thi";
+            traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                    .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("SKIPPED")
+                    .output(Map.of("executed", false, "reason", skipReason)).build());
+            execSummary = AiDebugResponse.AiExecutionSummary.builder().executed(false).build();
+        } else {
+            // Thực thi SQL thật hoặc DQE
+            stepStart = System.currentTimeMillis();
+            try {
+                List<Map<String, Object>> results;
+                if (dqeHit) {
+                    results = dynamicQueryEngine.execute(extraction, userId, role);
+                } else {
+                    jdbcTemplate.setQueryTimeout(1);
+                    results = jdbcTemplate.queryForList(finalSql);
+                }
+                
+                long execMs = System.currentTimeMillis() - stepStart;
+                List<Map<String, Object>> sampleData = results.size() > 3 ? results.subList(0, 3) : results;
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("PASSED")
+                        .output(Map.of("executed", true, "rowCount", results.size(),
+                                "sampleSize", sampleData.size(), "executionTimeMs", execMs,
+                                "source", dqeHit ? "DynamicQueryEngine" : "PostgreSQL",
+                                "sampleData", sampleData)).build());
+                execSummary = AiDebugResponse.AiExecutionSummary.builder()
+                        .executed(true).rowCount(results.size())
+                        .sampleSize(Math.min(results.size(), 3))
+                        .executionTimeMs(execMs).build();
+            } catch (Exception e) {
+                long execMs = System.currentTimeMillis() - stepStart;
+                traceSteps.add(AiDebugResponse.AiTraceStep.builder()
+                        .step("EXECUTION_SUMMARY").title("Kết quả chạy thử").status("ERROR")
+                        .output(Map.of("executed", true, "error", e.getMessage())).build());
+                execSummary = AiDebugResponse.AiExecutionSummary.builder()
+                        .executed(true).error(e.getMessage()).executionTimeMs(execMs).build();
+            } finally {
+                jdbcTemplate.setQueryTimeout(0);
+            }
+        }
+
+        return AiDebugResponse.builder()
+                .question(question)
+                .normalizedQuestion(normalizedQuestion)
+                .finalStatus(finalStatus)
+                .llmUsed(llmUsed)
+                .quotaImpact(llmUsed ? "NORMAL" : "NONE")
+                .route(route)
+                .rawSql(rawSql)
+                .finalSql(finalSql)
+                .traceSteps(traceSteps)
+                .executionSummary(execSummary)
+                .build();
+    }
+
+    /**
+     * NL-to-SQL Mapping: giải thích rule-based, không gọi Gemini thêm.
+     */
+    private List<AiDebugResponse.NlSqlMapping> buildNlSqlMapping(
+            String question, Map<String, Object> entities, String sql, String intent) {
+        List<AiDebugResponse.NlSqlMapping> mappings = new ArrayList<>();
+        String q = normalizeText(question);
+
+        // SELECT mapping
+        if (q.contains("liệt kê") || q.contains("danh sách") || q.contains("list") || q.contains("cho xem") || q.contains("tìm")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("liệt kê / tìm / cho xem", "SELECT", "Người dùng muốn xem danh sách dữ liệu."));
+        } else if (q.contains("bao nhiêu") || q.contains("tổng") || q.contains("đếm")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("bao nhiêu / tổng / đếm", "SELECT COUNT / SUM", "Người dùng muốn tính toán tổng hợp."));
+        }
+
+        // FROM mapping
+        if (q.contains("phòng") || "SEARCH_ROOM".equals(intent)) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("phòng trọ / phòng", "FROM rooms r", "Đối tượng chính cần truy vấn là phòng."));
+        }
+        if (q.contains("hóa đơn") || q.contains("hoá đơn") || q.contains("bill") || "VIEW_BILL".equals(intent)) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("hóa đơn", "FROM bills b", "Đối tượng chính cần truy vấn là hóa đơn."));
+        }
+        if (q.contains("hợp đồng") || q.contains("contract")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("hợp đồng", "FROM contracts c", "Đối tượng chính cần truy vấn là hợp đồng."));
+        }
+        if (q.contains("doanh thu") || q.contains("revenue") || "VIEW_REVENUE".equals(intent)) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("doanh thu", "SUM(bills.total_amount) WHERE status='PAID'", "Tổng hợp doanh thu từ hóa đơn đã thanh toán."));
+        }
+
+        // WHERE mapping từ entities
+        if (entities.containsKey("district")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    entities.get("district").toString(),
+                    "p.address ILIKE '%" + entities.get("district") + "%'",
+                    "Địa điểm được chuyển thành điều kiện lọc địa chỉ."));
+        }
+        if (entities.containsKey("location")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    entities.get("location").toString(),
+                    "p.address ILIKE '%" + entities.get("location") + "%'",
+                    "Vị trí tìm kiếm được chuyển thành điều kiện lọc."));
+        }
+        if (entities.containsKey("max_price")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    "dưới " + formatPrice(entities.get("max_price")),
+                    "r.price <= " + entities.get("max_price"),
+                    "Mức giá tối đa được chuyển thành điều kiện so sánh."));
+        }
+        if (entities.containsKey("min_price")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    "từ " + formatPrice(entities.get("min_price")),
+                    "r.price >= " + entities.get("min_price"),
+                    "Mức giá tối thiểu được chuyển thành điều kiện so sánh."));
+        }
+        if (entities.containsKey("room_type")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    entities.get("room_type").toString(),
+                    "r.type = '" + entities.get("room_type") + "'",
+                    "Loại phòng được chuyển thành điều kiện lọc."));
+        }
+        if (entities.containsKey("occupants")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping(
+                    entities.get("occupants") + " người",
+                    "r.max_occupants >= " + entities.get("occupants"),
+                    "Số người ở được chuyển thành điều kiện sức chứa."));
+        }
+
+        // Implicit conditions
+        if (q.contains("còn trống") || q.contains("trống") || "SEARCH_ROOM".equals(intent)) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("còn trống", "r.status = 'AVAILABLE'", "Chỉ lấy các phòng đang khả dụng."));
+        }
+        if (q.contains("của tôi") || q.contains("của mình") || q.contains("của em")) {
+            mappings.add(new AiDebugResponse.NlSqlMapping("của tôi", "tenant_id/landlord_id = :currentUserId", "Ràng buộc theo người dùng hiện tại."));
+        }
+
+        if (entities.containsKey("month") || entities.containsKey("year")) {
+            String desc = "";
+            if (entities.containsKey("month")) desc += "tháng " + entities.get("month");
+            if (entities.containsKey("year")) desc += "/" + entities.get("year");
+            mappings.add(new AiDebugResponse.NlSqlMapping(desc.isEmpty() ? "tháng/năm" : desc.trim(),
+                    "month = " + entities.getOrDefault("month", "?") + " AND year = " + entities.getOrDefault("year", "?"),
+                    "Khoảng thời gian được chuyển thành điều kiện lọc."));
+        }
+
+        return mappings;
+    }
+
+    private String formatPrice(Object price) {
+        if (price instanceof Number) {
+            long p = ((Number) price).longValue();
+            if (p >= 1_000_000) return (p / 1_000_000) + " triệu";
+            return String.valueOf(p);
+        }
+        return String.valueOf(price);
+    }
+
+    /**
+     * Trả về schemaContext cho role (dùng trong debug).
+     */
+    private String buildSchemaForRole(String role) {
+        String schemaGeneral = "Sơ đồ cơ sở dữ liệu thực tế:\n" +
+                "- properties: id, landlord_id, name, address, district, city, latitude, longitude, description, elec_price, water_price, internet_price, status\n" +
+                "- rooms: id, property_id, name, price, area, max_occupants, current_occupants, type, has_mezzanine, has_balcony, status, amenities, default_terms\n";
+        if (role.equalsIgnoreCase("GUEST")) return schemaGeneral;
+        return schemaGeneral +
+                "- contracts: id, tenant_id, room_id, actual_price, sign_date, start_date, end_date, deposit_amount, status, is_tenant_signed, is_landlord_signed\n" +
+                "- bills: id, contract_id, month, year, old_elec_index, new_elec_index, old_water_index, new_water_index, total_amount, payment_tx_hash, status, penalty_fee, paid_at\n" +
+                "- appointments: id, tenant_id, landlord_id, room_id, meet_time, status, meeting_link\n" +
+                "- reviews: id, contract_id, reviewer_id, target_id, rating, comment, created_at\n" +
+                (role.equalsIgnoreCase("LANDLORD") ? "- users: id, username, full_name, email, phone_number, role, reputation_score, kyc_status\n" : "");
+    }
+
+    private String buildRoleRules(String role) {
+        if (role.equalsIgnoreCase("GUEST")) {
+            return "GUEST KHÔNG ĐƯỢC truy cập contracts, bills, users. Chỉ truy vấn rooms và properties.";
+        } else if (role.equalsIgnoreCase("TENANT")) {
+            return "TENANT phải lọc contracts.tenant_id = USER_ID_PLACEHOLDER. Không xem doanh thu chủ trọ.";
+        } else {
+            return "LANDLORD phải lọc properties.landlord_id = USER_ID_PLACEHOLDER.";
+        }
+    }
 }
+

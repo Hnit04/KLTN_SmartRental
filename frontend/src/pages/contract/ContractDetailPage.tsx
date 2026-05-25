@@ -2726,8 +2726,8 @@ export default function ContractDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-            <h2 className="text-xl font-bold mb-2">Xác nhận ký Hợp đồng</h2>
-            <p className="text-sm text-gray-500 mb-6">Bạn đang ký hợp đồng cho phòng <span className="font-bold text-gray-800">{contract.roomName}</span>.</p>
+            <h2 className="text-xl font-bold mb-2">Ký/xác nhận hợp đồng điện tử</h2>
+            <p className="text-sm text-gray-500 mb-6">Bạn đang xác nhận nội dung hợp đồng cho phòng <span className="font-bold text-gray-800">{contract.roomName}</span> trên hệ thống SmartRental.</p>
 
             <div className="space-y-3 mb-8">
               {contract.signMethod === 'BLOCKCHAIN' ? (
@@ -2737,11 +2737,11 @@ export default function ContractDetailPage() {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm flex items-center gap-2 text-indigo-900">
-                      Ký bằng Smart Contract <Blocks className="h-4 w-4 text-indigo-500" />
+                      Ký giao dịch đặt cọc (Web3) <Blocks className="h-4 w-4 text-indigo-500" />
                       <StatusBadge label="Đã chốt" tone="info" className="text-[10px] ml-1" />
                     </h4>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Sử dụng MetaMask để xác nhận giao dịch và lưu trên mạng lưới {runtimeBlockchainConfig.chainName}.
+                      Sử dụng MetaMask để xác nhận giao dịch blockchain. Nội dung hợp đồng được lưu trong hệ thống.
                     </p>
                   </div>
                 </div>
@@ -2769,7 +2769,7 @@ export default function ContractDetailPage() {
                     💰 Cần Thanh toán Cọc: {contract.depositAmount?.toLocaleString()}đ
                   </h4>
                   <p className="text-xs text-orange-800 leading-relaxed">
-                    Khi bấm "Ký Web3 ngay", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
+                    Khi bấm "Ký giao dịch đặt cọc", MetaMask sẽ yêu cầu bạn chuyển khoản trực tiếp khoản Tiền cọc tương đương <strong>{((contract.depositAmount || 0) / config.vndEthRate).toFixed(4)} ETH</strong> tới ví của Chủ trọ để làm bằng chứng xác nhận ký.
                   </p>
                 </div>
               )}
@@ -2789,7 +2789,7 @@ export default function ContractDetailPage() {
                 isLoading={isSigning}
                 disabled={!!chainRiskMessage && contract?.signMethod === "BLOCKCHAIN"}
               >
-                {contract.signMethod === 'BLOCKCHAIN' ? 'Ký Web3 ngay' : 'Xác nhận ngay'}
+                {contract.signMethod === 'BLOCKCHAIN' ? 'Ký giao dịch đặt cọc' : 'Xác nhận hợp đồng'}
               </Button>
             </div>
           </div>

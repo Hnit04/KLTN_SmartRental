@@ -165,6 +165,15 @@ public class RuleEntityExtractor {
         if (standaloneMatcher.find() && !containsAny(priceText, "hóa đơn", "hoá đơn", "doanh thu", "nợ", "tháng")) {
             params.put("max_price", parsePrice(standaloneMatcher.group(1)));
         }
+
+        // Bổ sung: Xử lý các từ khoá "giá rẻ", "sinh viên" nếu chưa có max_price/min_price
+        if (!params.containsKey("max_price") && !params.containsKey("min_price")) {
+            if (containsAny(q, "giá rẻ", "gia re", "giá mềm", "gia mem", "tiết kiệm", "tiet kiem", "sinh viên", "sinh vien")
+                    || q.matches(".*\\brẻ\\b.*") || q.matches(".*\\bre\\b.*")) {
+                params.put("max_price", 3000000L); // Mặc định giá rẻ là <= 3 triệu
+                params.put("cheap_mode", true);
+            }
+        }
     }
 
     private long parsePrice(String number) {

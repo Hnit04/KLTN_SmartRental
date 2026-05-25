@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { aiApi } from '@/api/aiApi';
 import { toast } from 'sonner';
 import {
@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { DashboardPanel } from '@/components/dashboard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ConfirmActionDialog from '@/components/shared/ConfirmActionDialog';
+import AiDebuggerPanel from '@/components/admin/AiDebuggerPanel';
 
 interface CacheEntry {
   id: number;
@@ -47,6 +48,7 @@ interface ObservabilityData {
     confidence: number; source: string; latencyMs: number;
     success: boolean; rowCount: number; cacheScore: number;
     locationSource: string; createdAt: string;
+    sql?: string;
   }>;
   totalLogs: number;
 }
@@ -96,6 +98,19 @@ export default function AiAnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // Tabs & Debugger State
+  const [mainTab, setMainTab] = useState<'analytics' | 'debugger'>('analytics');
+  const [debugQ, setDebugQ] = useState('');
+  const [debugR, setDebugR] = useState('GUEST');
+  const [debugTrigger, setDebugTrigger] = useState(false);
+
+  const handleDebugQuery = (question: string, role: string) => {
+    setDebugQ(question);
+    setDebugR(role || 'GUEST');
+    setDebugTrigger(true);
+    setMainTab('debugger');
+  };
+  
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'valid' | 'invalid'>('all');
@@ -106,6 +121,7 @@ export default function AiAnalyticsPage() {
   
   // UI States
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
 
   // Edit State (Human in the loop)
@@ -256,6 +272,11 @@ export default function AiAnalyticsPage() {
     { id: 'invalid', label: 'Sai / cần sửa' },
   ];
 
+  const mainTabs: SegmentItem[] = [
+    { id: 'analytics', label: 'Thống kê & Quan sát' },
+    { id: 'debugger', label: 'Pipeline Debugger' },
+  ];
+
   if (loading && !data) {
     return (
       <div className="mx-auto max-w-[1400px] space-y-6 pb-10">
@@ -313,7 +334,19 @@ export default function AiAnalyticsPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-4">
+        <SegmentedControl items={mainTabs} value={mainTab} onChange={(val) => setMainTab(val as any)} />
+      </div>
+
+      {mainTab === 'debugger' ? (
+        <AiDebuggerPanel 
+          initialQuestion={debugQ} 
+          initialRole={debugR} 
+          autoRun={debugTrigger} 
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatKpiCard
           icon={<Activity className="h-5 w-5" />}
           iconClassName="text-blue-600"
@@ -522,7 +555,11 @@ export default function AiAnalyticsPage() {
                         </span>
                       ))}
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-3 py-2 text-center flex items-center justify-center gap-2">
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-violet-600 border-violet-300 hover:bg-violet-50"
+                        onClick={() => handleDebugQuery(flag.question, 'GUEST')}>
+                        <PlayCircle className="h-3 w-3 mr-1" /> Debug
+                      </Button>
                       <Button size="sm" variant="outline" className="h-6 px-2 text-destructive border-destructive/30 hover:bg-destructive/5"
                         onClick={async () => {
                           try { await aiApi.deleteCache(flag.id); toast.success(`Đã xóa #${flag.id}`); fetchData(); }
@@ -566,27 +603,83 @@ export default function AiAnalyticsPage() {
                     LOCATION_LANDMARK: 'bg-purple-100 text-purple-700',
                   };
                   const cls = sourceColor[log.source] || 'bg-gray-100 text-gray-700';
+                  const isLogExpanded = expandedLogId === log.id;
                   return (
-                    <tr key={log.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-3 py-2 max-w-[280px] truncate font-medium" title={log.query}>{log.query}</td>
-                      <td className="px-3 py-2">
-                        <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">{log.role}</code>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground font-mono text-[10px]">{log.intent || '—'}</td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${cls}`}>
-                          {log.source || '—'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        <span className={`font-semibold ${(log.latencyMs ?? 0) > 2000 ? 'text-red-600' : (log.latencyMs ?? 0) > 500 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {log.latencyMs != null ? `${log.latencyMs}ms` : '—'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                        {log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : '—'}
-                      </td>
-                    </tr>
+                    <React.Fragment key={log.id}>
+                      <tr className={`hover:bg-muted/30 transition-colors cursor-pointer ${isLogExpanded ? 'bg-muted/20' : ''}`} onClick={() => setExpandedLogId(isLogExpanded ? null : log.id)}>
+                        <td className="px-3 py-2 max-w-[280px] truncate font-medium" title={log.query}>{log.query}</td>
+                        <td className="px-3 py-2">
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">{log.role}</code>
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground font-mono text-[10px]">{log.intent || '—'}</td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${cls}`}>
+                            {log.source || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                          <span className={`font-semibold ${(log.latencyMs ?? 0) > 2000 ? 'text-red-600' : (log.latencyMs ?? 0) > 500 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {log.latencyMs != null ? `${log.latencyMs}ms` : '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-muted-foreground flex items-center justify-between">
+                          <span>{log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : '—'}</span>
+                          {isLogExpanded ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                        </td>
+                      </tr>
+                      {isLogExpanded && (
+                        <tr>
+                          <td colSpan={6} className="bg-muted/10 px-4 py-4 border-b border-border/50">
+                            <div className="bg-slate-950 rounded-xl p-4 text-xs font-mono text-gray-300 shadow-inner border border-slate-800">
+                              <div className="mb-1.5 flex items-center gap-2">
+                                <span className="text-emerald-400 font-semibold">// Tách Ý định (Intent):</span>
+                                <span className="bg-emerald-900/40 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-800/50">{log.intent || 'UNKNOWN'}</span>
+                                {log.confidence != null && (
+                                  <span className="text-emerald-500 text-[10px]">(Độ tin cậy: {log.confidence.toFixed(2)})</span>
+                                )}
+                              </div>
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-sky-400 font-semibold">// Nguồn xử lý (Pipeline):</span>
+                                <span className="bg-sky-900/40 text-sky-300 px-2 py-0.5 rounded-md border border-sky-800/50">{log.source}</span>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t border-slate-800/80">
+                                {log.sql ? (
+                                  <>
+                                    <div className="text-amber-500 mb-2 font-semibold flex items-center gap-2">
+                                      // SQL được sinh ra tự động:
+                                      <button onClick={() => copyToClipboard(log.sql || '')} className="text-slate-500 hover:text-white transition-colors" title="Copy SQL">
+                                        <Copy className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    <div className="whitespace-pre-wrap leading-relaxed bg-black/40 p-3 rounded-lg border border-slate-800/50 overflow-x-auto">{highlightSql(log.sql)}</div>
+                                  </>
+                                ) : (
+                                  <div className="text-gray-500 italic flex items-center gap-1.5">
+                                    <Shield className="h-3.5 w-3.5" />
+                                    // Không dùng câu lệnh SQL cho truy vấn này (Trả lời tĩnh hoặc Semantic SQL Hit).
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="mt-3 flex justify-end">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-7 px-3 bg-violet-600/10 border-violet-500/30 text-violet-400 hover:bg-violet-600/20 hover:text-violet-300"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDebugQuery(log.query, log.role);
+                                  }}
+                                >
+                                  <PlayCircle className="h-3.5 w-3.5 mr-1.5" /> Debug câu hỏi này
+                                </Button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -794,6 +887,9 @@ export default function AiAnalyticsPage() {
                               <button onClick={() => { setEditingId(entry.id); setEditSql(entry.generatedSql || ''); }} className="text-emerald-400 hover:text-white hover:bg-emerald-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold" title="Sửa SQL">
                                 <Edit3 className="h-4 w-4" /> Dạy lại AI
                               </button>
+                              <button onClick={() => handleDebugQuery(entry.question, 'GUEST')} className="text-violet-400 hover:text-white hover:bg-violet-900 p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold" title="Debug">
+                                <PlayCircle className="h-4 w-4" /> Debug
+                              </button>
                               <button onClick={() => handleDeleteEntry(entry.id)} disabled={deletingId === entry.id} className="text-red-400 hover:text-white hover:bg-red-900 p-1.5 rounded-md transition-all active:scale-95" title="Xoá">
                                 {deletingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                               </button>
@@ -944,6 +1040,8 @@ export default function AiAnalyticsPage() {
           );
         })()}
       </DashboardPanel>
+        </>
+      )}
 
       <ConfirmActionDialog
         open={isClearConfirmOpen}

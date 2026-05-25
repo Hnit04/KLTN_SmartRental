@@ -57,8 +57,10 @@ public class ReputationService {
         String typeStr = points >= 0 ? "cộng" : "trừ";
         String absPoints = String.valueOf(Math.abs(points));
         String title = "Điểm uy tín thay đổi";
-        String message = String.format("Bạn vừa bị %s %s điểm uy tín. Lý do: %s. Điểm hiện tại: %d/100", 
-                typeStr, absPoints, description, newScore);
+        
+        String actionVerb = points >= 0 ? "được cộng" : "bị trừ";
+        String message = String.format("Bạn vừa %s %s điểm uy tín. Lý do: %s. Điểm hiện tại: %d/100", 
+                actionVerb, absPoints, description, newScore);
 
         notificationService.createNotification(
                 user,
