@@ -13,6 +13,8 @@ public class BackendApplication {
         return args -> {
             System.out.println("================= OUTBOX STATUS =================");
             try {
+                jdbcTemplate.execute("ALTER TABLE contracts ALTER COLUMN landlord_sig_hash TYPE varchar(255)");
+                jdbcTemplate.execute("ALTER TABLE contracts ALTER COLUMN tenant_sig_hash TYPE varchar(255)");
                 jdbcTemplate.update("UPDATE blockchain_outbox_events SET payload = payload - 'smartContractAddress' || jsonb_build_object('contractAddress', payload->'smartContractAddress') WHERE payload->'smartContractAddress' IS NOT NULL");
                 jdbcTemplate.update("UPDATE blockchain_outbox_events SET status = 'PENDING', retry_count = 0, next_attempt_at = NULL WHERE status IN ('FAILED', 'DEAD_LETTER', 'PROCESSING')");
             } catch (Exception e) {

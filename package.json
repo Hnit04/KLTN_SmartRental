@@ -1,6 +1,7 @@
 {
+  "type": "module",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.3",
+    "@openzeppelin/contracts": "^5.0.2",
     "semver": "^7.7.4",
     "solc": "^0.8.34"
   },

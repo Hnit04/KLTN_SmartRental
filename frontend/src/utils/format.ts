@@ -51,3 +51,13 @@ export const formatNumber = (value: number | string | null | undefined): string 
   if (isNaN(num)) return '0';
   return num.toLocaleString('en-US'); // dùng en-US để hiển thị dấu phẩy 1,000
 };
+
+export const renderMarkdown = (text: string) => {
+  if (!text) return { __html: '' };
+  // Basic markdown parsing for bold, lists, and line breaks
+  let html = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n- (.*?)/g, '<br/>• $1')
+    .replace(/\n/g, '<br/>');
+  return { __html: html };
+};

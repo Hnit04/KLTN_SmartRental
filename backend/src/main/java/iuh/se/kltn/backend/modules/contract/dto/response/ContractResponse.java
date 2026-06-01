@@ -40,6 +40,8 @@ public class ContractResponse {
     private String smartContractAddress;
     private String deployTxHash;
     private LocalDateTime signDate;
+    private String tenantSigHash;
+    private String landlordSigHash;
 
     // 💰 Thông tin thanh toán/hoàn cọc của Khách thuê
     private String tenantPhone;

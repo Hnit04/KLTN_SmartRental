@@ -14,6 +14,7 @@ import {
   Heart,
   Crown,
   Flag,
+  Gavel,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +56,7 @@ export const ROLE_NAV_ITEMS: Record<AppRole, NavItem[]> = {
     { title: "Quản lý người dùng", path: "/admin/users", icon: Users, mobileLabel: "Người dùng" },
     { title: "Logs Blockchain", path: "/admin/blockchain-logs", icon: Database, mobileLabel: "Blockchain" },
     { title: "Thống kê AI & NLP", path: "/admin/ai-analytics", icon: BrainCircuit, mobileLabel: "AI" },
+    { title: "Giải quyết Tranh chấp", path: "/admin/disputes", icon: Gavel, mobileLabel: "Tranh chấp" },
     { title: "Quyết toán & Đối soát", path: "/admin/settlements", icon: ArrowRightLeft, mobileLabel: "Quyết toán" },
     { title: "Quản lý Báo cáo", path: "/admin/reports", icon: Flag, mobileLabel: "Báo cáo" },
   ],

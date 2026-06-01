@@ -32,11 +32,39 @@ export const contractApi = {
   approveContract: (id: number) => {
     return axiosClient.post<Contract>(`/contracts/${id}/approve`);
   },
+  signContractEip712: (id: number | string, data: { signature: string; nonce?: number; typedDataJson?: string }) => {
+    return axiosClient.post(`/contracts/${id}/sign-eip712`, data); 
+  },
   signContract: (id: number, data: SignContractPayload) => {
     return axiosClient.post(`/contracts/${id}/sign`, data); 
   },
   rejectContract: (id: number | string, reason?: string) => {
     return axiosClient.post(`/contracts/${id}/reject`, { reason });
+  },
+  cancelContract: (id: number | string) => {
+    return axiosClient.post(`/contracts/${id}/cancel`);
+  },
+  // --- ⚖️ TRANH CHẤP HỢP ĐỒNG ---
+  openDispute: (id: number | string, payload: { violationType: string; evidenceUrls?: string[]; description?: string }) => {
+    return axiosClient.post(`/contracts/${id}/disputes`, payload);
+  },
+  getDisputes: (id: number | string) => {
+    return axiosClient.get(`/contracts/${id}/disputes`);
+  },
+  getOpenDispute: (id: number | string) => {
+    return axiosClient.get(`/contracts/${id}/disputes/open`);
+  },
+  getAllDisputes: () => {
+    return axiosClient.get('/contracts/admin/disputes');
+  },
+  resolveDispute: (disputeId: number | string, payload: { tenantRefundAmount: number; landlordDeductionAmount: number; resolutionNote: string; terminateContract: boolean }) => {
+    return axiosClient.post(`/contracts/admin/disputes/${disputeId}/resolve`, payload);
+  },
+  rejectDispute: (disputeId: number | string, payload: { resolutionNote: string }) => {
+    return axiosClient.post(`/contracts/admin/disputes/${disputeId}/reject`, payload);
+  },
+  getBlockchainTimeline: (id: number | string) => {
+    return axiosClient.get(`/contracts/${id}/timeline`);
   },
   
   // --- CÁC API CHO ĐỀ XUẤT CHỈNH SỬA (NEGOTIATION) ---

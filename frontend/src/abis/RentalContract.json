@@ -31,17 +31,6 @@
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "AddressInsufficientBalance",
-		"type": "error"
-	},
-	{
 		"inputs": [],
 		"name": "EnforcedPause",
 		"type": "error"
@@ -53,7 +42,23 @@
 	},
 	{
 		"inputs": [],
-		"name": "FailedInnerCall",
+		"name": "FailedCall",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "balance",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "needed",
+				"type": "uint256"
+			}
+		],
+		"name": "InsufficientBalance",
 		"type": "error"
 	},
 	{
@@ -140,6 +145,19 @@
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "cancelledBy",
+				"type": "address"
+			}
+		],
+		"name": "ContractCancelled",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "oldRent",
@@ -216,6 +234,56 @@
 		"inputs": [
 			{
 				"indexed": true,
+				"internalType": "address",
+				"name": "openedBy",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "violationType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "evidenceHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "DisputeOpened",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tenantAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "landlordAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "resolutionHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "DisputeResolved",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
 				"internalType": "uint256",
 				"name": "id",
 				"type": "uint256"
@@ -234,6 +302,25 @@
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "landlord",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "sigHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "LandlordSigned",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": false,
 				"internalType": "address",
 				"name": "account",
@@ -245,8 +332,46 @@
 	},
 	{
 		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "billId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "PenaltyApplied",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
 		"inputs": [],
 		"name": "TenantConsentGiven",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "tenant",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "sigHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "TenantSigned",
 		"type": "event"
 	},
 	{
@@ -360,6 +485,24 @@
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_billId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_penaltyAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "applyLatePaymentPenalty",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "backend",
 		"outputs": [
@@ -465,6 +608,39 @@
 	},
 	{
 		"inputs": [],
+		"name": "cancelContract",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_sigHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "confirmLandlordSignature",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_sigHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "confirmTenantSignature",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "consentEndContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -514,6 +690,39 @@
 		"name": "createBill",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "currentDispute",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "openedBy",
+				"type": "address"
+			},
+			{
+				"internalType": "uint8",
+				"name": "violationType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "evidenceHash",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "openedAt",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "resolved",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -725,6 +934,19 @@
 	},
 	{
 		"inputs": [],
+		"name": "landlordSigHash",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "latePenaltyPercent",
 		"outputs": [
 			{
@@ -734,6 +956,24 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "_violationType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "_evidenceHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "openDispute",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -851,6 +1091,34 @@
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_tenantAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_landlordAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "_resolutionHash",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bool",
+				"name": "_terminateContract",
+				"type": "bool"
+			}
+		],
+		"name": "resolveDispute",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "roomName",
 		"outputs": [
@@ -897,6 +1165,19 @@
 				"internalType": "address payable",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "tenantSigHash",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",

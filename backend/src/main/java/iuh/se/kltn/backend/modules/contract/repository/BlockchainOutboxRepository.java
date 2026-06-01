@@ -25,6 +25,8 @@ public interface BlockchainOutboxRepository extends JpaRepository<BlockchainOutb
     @Query("SELECT e FROM BlockchainOutboxEvent e WHERE e.status = 'PENDING' AND (e.nextAttemptAt IS NULL OR e.nextAttemptAt <= CURRENT_TIMESTAMP) ORDER BY e.createdAt ASC")
     List<BlockchainOutboxEvent> findPendingEventsForProcessing(Pageable pageable);
 
+    List<BlockchainOutboxEvent> findByContractIdOrderByCreatedAtDesc(Long contractId);
+
     List<BlockchainOutboxEvent> findByContractIdAndEventType(Long contractId, String eventType);
 
     List<BlockchainOutboxEvent> findByStatus(String status);

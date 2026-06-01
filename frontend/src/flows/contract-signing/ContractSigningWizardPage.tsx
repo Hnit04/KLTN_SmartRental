@@ -11,7 +11,7 @@ import type { BlockchainRuntimeConfig } from "@/config/blockchainConfig";
 import { featureFlags } from "@/config/featureFlags";
 import type { Contract } from "@/types";
 import { trackEvent } from "@/utils/analytics";
-import { depositContract } from "@/utils/contractHelper";
+import { depositContract, signContractEIP712 } from "@/utils/contractHelper";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import RiskNotice from "@/components/shared/RiskNotice";
@@ -41,7 +41,7 @@ type WalletGuideState = {
 };
 
 async function requestBlockchainSignature(params: {
-  contractHash: string;
+  contract: Contract;
   runtimeConfig: BlockchainRuntimeConfig;
   walletAddress?: string;
 }) {
@@ -83,13 +83,30 @@ async function requestBlockchainSignature(params: {
     throw new Error(`Vi chua o dung mang ${params.runtimeConfig.chainName}.`);
   }
 
-  const signature = await ethereum.request({
-    method: "personal_sign",
-    params: [params.contractHash, connectedWallet],
-  });
+  const chainId = parseInt(params.runtimeConfig.chainIdHex, 16);
+  // Address có thể null hoặc empty, nên fallback tạm để tránh lỗi EIP-712 nếu chưa deploy
+  // Trong MVP thì address chưa deploy sẽ không ảnh hưởng việc sign (off-chain), nhưng EIP-712 cần một verifyingContract hợp lệ, ta có thể dùng address rỗng tạm.
+  const contractAddress = params.contract.smartContractAddress || "0x0000000000000000000000000000000000000000"; 
+  
+  const signedData = await signContractEIP712(
+    contractAddress,
+    chainId,
+    {
+      roomName: params.contract.roomName || "Room",
+      rentAmount: params.contract.actualPrice?.toString() || "0",
+      depositAmount: params.contract.depositAmount?.toString() || "0",
+      startDate: params.contract.startDate ? new Date(params.contract.startDate).getTime() / 1000 : 0,
+      endDate: params.contract.endDate ? new Date(params.contract.endDate).getTime() / 1000 : 0,
+      contractHash: params.contract.contractHash || "",
+    }
+  );
 
-  if (!signature) throw new Error("Ban da tu choi ky giao dich.");
-  return { walletAddress: connectedWallet, signature };
+  if (!signedData.signature) throw new Error("Ban da tu choi ky giao dich.");
+  return { 
+    walletAddress: connectedWallet, 
+    signature: signedData.signature,
+    typedDataJson: JSON.stringify(signedData.typedData)
+  };
 }
 
 export default function ContractSigningWizardPage() {
@@ -314,23 +331,32 @@ export default function ContractSigningWizardPage() {
 
     try {
       let signature: string | undefined;
+      let typedDataJson: string | undefined;
       if (context.selectedMethod === "BLOCKCHAIN") {
         if (!contract.contractHash) {
           throw new Error("Hop dong chua co hash de ky blockchain.");
         }
 
         const signed = await requestBlockchainSignature({
-          contractHash: contract.contractHash,
+          contract: contract,
           runtimeConfig,
           walletAddress: user?.walletAddress,
         });
         signature = signed.signature;
+        typedDataJson = signed.typedDataJson;
       }
 
-      await contractApi.signContract(contract.id, {
-        signMethod: context.selectedMethod,
-        signature,
-      });
+      if (context.selectedMethod === "BLOCKCHAIN" && signature && typedDataJson) {
+        await contractApi.signContractEip712(contract.id, {
+          signature,
+          typedDataJson
+        });
+      } else {
+        await contractApi.signContract(contract.id, {
+          signMethod: context.selectedMethod,
+          signature,
+        });
+      }
 
       const signedAt = new Date().toISOString();
       markSigned(signedAt);

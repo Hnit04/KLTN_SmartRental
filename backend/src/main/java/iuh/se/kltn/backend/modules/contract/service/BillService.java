@@ -49,6 +49,8 @@ public class BillService {
     private BlockchainService blockchainService;
     @Autowired
     private iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository outboxRepository;
+    @Autowired
+    private iuh.se.kltn.backend.modules.contract.repository.ContractPenaltyRepository contractPenaltyRepository;
 
     // 🛡️ SECURITY: Default = false để production an toàn. Chỉ set true trong .env dev/test.
     @org.springframework.beans.factory.annotation.Value("${sepay.mock.amount-override:false}")
@@ -712,6 +714,76 @@ public class BillService {
                 .distribution(distribution)
                 .propertyDetails(propertyDetails)
                 .build();
+    }
+
+    @Transactional
+    public void processOverdueBills() {
+        System.out.println("🔄 Đang chạy tiến trình quét hóa đơn trễ hạn...");
+        List<Bill> unpaidBills = billRepository.findByStatusAndDeadlineBefore(BillStatus.UNPAID, LocalDateTime.now());
+        
+        for (Bill bill : unpaidBills) {
+            Contract contract = bill.getContract();
+            if (contract.getStatus() != ContractStatus.ACTIVE) continue;
+
+            // Chuyển sang quá hạn
+            bill.setStatus(BillStatus.LATE);
+            
+            // Tính số tiền phạt (Mặc định penaltyPercent = 5% nếu null)
+            int penaltyPercent = contract.getLatePenaltyPercent() != null ? contract.getLatePenaltyPercent() : 5;
+            double penaltyAmount = bill.getTotalAmount() * penaltyPercent / 100.0;
+            bill.setPenaltyFee(penaltyAmount);
+            billRepository.save(bill);
+
+            // Ghi nhận vào bảng ContractPenalty
+            iuh.se.kltn.backend.modules.contract.entity.ContractPenalty penalty = new iuh.se.kltn.backend.modules.contract.entity.ContractPenalty();
+            penalty.setContract(contract);
+            penalty.setBill(bill);
+            penalty.setPenaltyType("LATE_PAYMENT");
+            penalty.setAmount(penaltyAmount);
+            
+            // Giao tiếp Smart Contract nếu là Hợp đồng Blockchain
+            if ("BLOCKCHAIN".equals(contract.getSignMethod()) && contract.getSmartContractAddress() != null) {
+                try {
+                    long EXCHANGE_RATE = vndEthRate;
+                    java.math.BigInteger WEI_MULT = java.math.BigInteger.TEN.pow(18);
+                    java.math.BigInteger penaltyAmountWei = java.math.BigInteger.valueOf(Math.round(penaltyAmount))
+                            .multiply(WEI_MULT).divide(java.math.BigInteger.valueOf(EXCHANGE_RATE));
+                    
+                    penalty.setAmountWei(penaltyAmountWei.toString());
+                    penalty.setDeductedFromDeposit(true);
+                    
+                    // Thực thi on-chain
+                    String txHash = blockchainService.applyLatePaymentPenaltyOnChain(contract.getSmartContractAddress(), bill.getId(), penaltyAmountWei);
+                    penalty.setTxHash(txHash);
+                    System.out.println("✅ Đã phạt hợp đồng " + contract.getId() + " - Tx: " + txHash);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Lỗi gọi Smart Contract khi phạt hợp đồng " + contract.getId() + ": " + e.getMessage());
+                    penalty.setDeductedFromDeposit(false);
+                }
+            } else {
+                penalty.setDeductedFromDeposit(false); // Off-chain
+            }
+            contractPenaltyRepository.save(penalty);
+
+            // Thông báo
+            notificationService.createNotification(
+                    contract.getTenant(),
+                    "Phạt trễ hạn hóa đơn",
+                    "Hóa đơn tháng " + bill.getMonth() + " của bạn đã quá hạn. " + 
+                    (penalty.getDeductedFromDeposit() ? "Hệ thống đã tự động trừ " + String.format("%,.0f", penaltyAmount) + " VNĐ từ tiền cọc." : "Bạn bị tính thêm phí phạt " + String.format("%,.0f", penaltyAmount) + " VNĐ."),
+                    NotificationType.PAYMENT_REMINDER,
+                    contract.getId()
+            );
+            
+            notificationService.createNotification(
+                    contract.getRoom().getProperty().getLandlord(),
+                    "Khách thuê bị phạt trễ hạn",
+                    "Hóa đơn tháng " + bill.getMonth() + " của phòng " + contract.getRoom().getName() + " đã quá hạn. Khách thuê đã bị phạt " + String.format("%,.0f", penaltyAmount) + " VNĐ.",
+                    NotificationType.PAYMENT_REMINDER,
+                    contract.getId()
+            );
+        }
+        System.out.println("✅ Hoàn tất quét hóa đơn trễ hạn. Đã xử lý: " + unpaidBills.size());
     }
 
     @Transactional

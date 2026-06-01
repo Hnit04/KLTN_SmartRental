@@ -1,4 +1,4 @@
-﻿import { ethers } from "ethers";
+import { ethers } from "ethers";
 import RentalContractABI from "../abis/RentalContract.json";
 import { trackEvent } from "@/utils/analytics";
 
@@ -9,7 +9,12 @@ type ContractAction =
   | "propose_deduction"
   | "consent_end_contract"
   | "execute_end_contract"
-  | "withdraw_funds";
+  | "withdraw_funds"
+  | "sign_eip712"
+  | "cancel_contract"
+  | "open_dispute"
+  | "resolve_dispute"
+  | "apply_penalty";
 
 function trackBlockchainTx(
   action: ContractAction,
@@ -66,6 +71,74 @@ export const depositContract = async (
     trackBlockchainTx("deposit", "failed", {
       contractAddress,
       amountWei,
+      message: getErrorMessage(error),
+    });
+    throw error;
+  }
+};
+
+// ======================== PHASE 1 MVP: EIP-712 SIGNATURE ========================
+
+export const signContractEIP712 = async (
+  contractAddress: string,
+  chainId: number,
+  contractDetails: {
+    roomName: string;
+    rentAmount: string;
+    depositAmount: string;
+    startDate: number;
+    endDate: number;
+    contractHash: string;
+  }
+) => {
+  if (!window.ethereum) {
+    throw new Error("MetaMask is not installed!");
+  }
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const signerAddress = await signer.getAddress();
+
+  const domain = {
+    name: "SmartRentalContract",
+    version: "1",
+    chainId: chainId,
+    verifyingContract: contractAddress,
+  };
+
+  const types = {
+    ContractTerms: [
+      { name: "roomName", type: "string" },
+      { name: "rentAmount", type: "uint256" },
+      { name: "depositAmount", type: "uint256" },
+      { name: "startDate", type: "uint256" },
+      { name: "endDate", type: "uint256" },
+      { name: "contractHash", type: "string" },
+    ],
+  };
+
+  const value = {
+    roomName: contractDetails.roomName,
+    rentAmount: contractDetails.rentAmount,
+    depositAmount: contractDetails.depositAmount,
+    startDate: contractDetails.startDate,
+    endDate: contractDetails.endDate,
+    contractHash: contractDetails.contractHash,
+  };
+
+  try {
+    trackBlockchainTx("sign_eip712", "started", { contractAddress });
+    const signature = await signer.signTypedData(domain, types, value);
+    trackBlockchainTx("sign_eip712", "confirmed", { contractAddress });
+    
+    return {
+      signature,
+      signerAddress,
+      typedData: { domain, types, message: value }
+    };
+  } catch (error) {
+    trackBlockchainTx("sign_eip712", "failed", {
+      contractAddress,
       message: getErrorMessage(error),
     });
     throw error;
