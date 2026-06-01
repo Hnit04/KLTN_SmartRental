@@ -3,8 +3,15 @@ package iuh.se.kltn.backend.modules.contract.service;
 import iuh.se.kltn.backend.common.enums.Role;
 import iuh.se.kltn.backend.modules.contract.dto.request.ContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.SignEip712Request;
 import iuh.se.kltn.backend.modules.contract.dto.response.ContractResponse;
+import iuh.se.kltn.backend.modules.contract.entity.ContractSignature;
+import iuh.se.kltn.backend.modules.contract.entity.ContractStateHistory;
+import iuh.se.kltn.backend.modules.contract.repository.ContractStateHistoryRepository;
+import iuh.se.kltn.backend.modules.contract.entity.ContractDispute;
+import iuh.se.kltn.backend.modules.contract.repository.ContractDisputeRepository;
 import iuh.se.kltn.backend.modules.contract.dto.response.DashboardInsightsResponse;
+import iuh.se.kltn.backend.modules.contract.dto.response.DisputeResponse;
 import iuh.se.kltn.backend.modules.contract.entity.Contract;
 import iuh.se.kltn.backend.modules.contract.entity.ContractChangeRequest; // ✅ BỔ SUNG IMPORT
 import iuh.se.kltn.backend.modules.contract.enums.ContractStatus;
@@ -17,6 +24,9 @@ import iuh.se.kltn.backend.modules.contract.repository.ContractRepository;
 import iuh.se.kltn.backend.modules.property.entity.Room;
 import iuh.se.kltn.backend.modules.property.enums.RoomStatus;
 import iuh.se.kltn.backend.modules.property.repository.RoomRepository;
+import iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository;
+import iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent;
+import org.springframework.transaction.support.TransactionTemplate;
 import iuh.se.kltn.backend.modules.user.entity.Tenant;
 import iuh.se.kltn.backend.modules.user.entity.User;
 import iuh.se.kltn.backend.modules.user.repository.UserRepository;
@@ -52,10 +62,22 @@ public class ContractService {
     @Autowired private RoomRepository roomRepository;
     @Autowired private UserRepository userRepository;
     
+    @Autowired private ContractSignatureService signatureService;
+    @Autowired private ContractStateHistoryRepository stateHistoryRepository;
+    @Autowired private ContractDisputeRepository disputeRepository;
+    
     private final ModelMapper modelMapper;
     
     @Autowired private BlockchainService blockchainService;
-    @Autowired private iuh.se.kltn.backend.modules.contract.repository.BlockchainOutboxRepository outboxRepository;
+    @Autowired private TransactionTemplate transactionTemplate;
+    @Autowired private BlockchainOutboxRepository outboxRepository;
+
+    public List<BlockchainOutboxEvent> getBlockchainTimeline(Long contractId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new RuntimeException("Contract not found"));
+        return outboxRepository.findByContractIdOrderByCreatedAtDesc(contractId);
+    }
+    
     @Autowired private iuh.se.kltn.backend.modules.user.service.ReputationService reputationService;
     @Autowired private iuh.se.kltn.backend.modules.interaction.service.NotificationService notificationService;
     @Autowired private iuh.se.kltn.backend.modules.contract.repository.ContractChangeRequestRepository changeRequestRepository;
@@ -702,6 +724,118 @@ public class ContractService {
         return mapToResponse(contractRepository.save(contract), currentUserId);
     }
 
+    // --- 3. Hàm ký hợp đồng EIP-712 ---
+    @Transactional
+    public ContractResponse signContractEip712(Long id, SignEip712Request request, Long currentUserId) {
+        Contract contract = contractRepository.findByIdWithLock(id)
+                .orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        ensureContractNotCompromised(contract);
+
+        boolean hasPendingRequest = changeRequestRepository.existsByContractIdAndStatus(id, RequestStatus.PENDING);
+        if (hasPendingRequest) {
+            throw new RuntimeException("Không thể ký! Đang có đề xuất chỉnh sửa chờ xác nhận.");
+        }
+
+        String currentStatus = contract.getStatus() != null ? contract.getStatus().name() : "";
+        if (!"CREATED".equals(currentStatus) && 
+            !"PENDING_SIGNATURE".equals(currentStatus) && 
+            !"LANDLORD_SIGNED".equals(currentStatus)) {
+            throw new RuntimeException("Hợp đồng không ở trạng thái chờ ký!");
+        }
+
+        String role = "";
+        String expectedAddress = currentUser.getWalletAddress();
+        if (expectedAddress == null || expectedAddress.isEmpty()) {
+            throw new RuntimeException("Bạn chưa liên kết địa chỉ ví trên hệ thống!");
+        }
+
+        if (currentUser.getRole() == Role.LANDLORD) {
+            if (!contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId)) {
+                throw new RuntimeException("Bạn không phải chủ nhà của hợp đồng này!");
+            }
+            role = "LANDLORD";
+        } else if (currentUser.getRole() == Role.TENANT) {
+            if (!contract.getTenant().getId().equals(currentUserId)) {
+                throw new RuntimeException("Bạn không phải người thuê của hợp đồng này!");
+            }
+            role = "TENANT";
+        } else {
+            throw new RuntimeException("Quyền không hợp lệ!");
+        }
+
+        // Verify and Save Signature
+        signatureService.verifyAndSaveSignature(
+                contract, 
+                role, 
+                expectedAddress, 
+                request.getSignature(), 
+                request.getNonce(), 
+                request.getTypedDataJson()
+        );
+
+        // Update status & Create State History
+        ContractStateHistory history = new ContractStateHistory();
+        history.setContract(contract);
+        history.setActorAddress(currentUser.getWalletAddress());
+        history.setActorRole(currentUser.getRole().name());
+        history.setFromState(currentStatus);
+
+        if ("LANDLORD".equals(role)) {
+            contract.setIsLandlordSigned(true);
+            contract.setStatus(ContractStatus.LANDLORD_SIGNED);
+            
+            history.setMetadataJson("{\"event\":\"CONFIRM_LANDLORD_SIG\"}");
+            history.setToState(ContractStatus.LANDLORD_SIGNED.name());
+
+            pushStateTransitionOutboxEvent(contract, "CONFIRM_LANDLORD_SIG", request.getSignature());
+        } else if ("TENANT".equals(role)) {
+            contract.setIsTenantSigned(true);
+            
+            if (Boolean.TRUE.equals(contract.getIsLandlordSigned())) {
+                contract.setStatus(ContractStatus.AWAITING_DEPOSIT);
+                contract.setDepositStatus(DepositStatus.UNPAID);
+                contract.setSignDate(LocalDateTime.now());
+                history.setToState(ContractStatus.AWAITING_DEPOSIT.name());
+            } else {
+                history.setToState(currentStatus);
+            }
+            history.setMetadataJson("{\"event\":\"CONFIRM_TENANT_SIG\"}");
+            
+            pushStateTransitionOutboxEvent(contract, "CONFIRM_TENANT_SIG", request.getSignature());
+        }
+
+        stateHistoryRepository.save(history);
+        Contract savedContract = contractRepository.save(contract);
+        
+        return mapToResponse(savedContract, currentUserId);
+    }
+
+    private void pushStateTransitionOutboxEvent(Contract contract, String eventType, String sigHash) {
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            if (contract.getSmartContractAddress() != null) {
+                payload.put("contractAddress", contract.getSmartContractAddress());
+            }
+            if (sigHash != null) {
+                payload.put("sigHash", sigHash);
+            }
+            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = 
+                iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                    .eventType(eventType)
+                    .contractId(contract.getId())
+                    .correlationId(eventType + "-" + contract.getId() + "-" + System.currentTimeMillis())
+                    .payload(payload)
+                    .build();
+            outboxRepository.save(event);
+        } catch (Exception e) {
+            log.error("Lỗi push outbox event: " + e.getMessage());
+        }
+    }
+
     // --- 3. Hàm ký hợp đồng ---
     @Transactional
     public ContractResponse signContract(Long id, SignContractRequest request, Long currentUserId) {
@@ -747,11 +881,17 @@ public class ContractService {
             verifyWeb3Signature(contract.getContractHash(), request.getSignature(), userWallet);
         }
 
-        // 1. Cập nhật trạng thái ký của từng người
+        // 1. Cập nhật trạng thái ký của từng người và lưu lại chữ ký (Signature Hash)
         if (currentUser.getRole() == Role.TENANT) {
             contract.setIsTenantSigned(true);
+            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+                contract.setTenantSigHash(request.getSignature());
+            }
         } else if (currentUser.getRole() == Role.LANDLORD) {
             contract.setIsLandlordSigned(true);
+            if (request.getSignMethod() == ContractSignMethod.BLOCKCHAIN) {
+                contract.setLandlordSigHash(request.getSignature());
+            }
         }
 
         // Lưu tạm phương thức ký của người thao tác cuối cùng
@@ -935,6 +1075,8 @@ public class ContractService {
             res.setTenantKycStatus(tenant.getKycStatus() != null ? tenant.getKycStatus().name() : "PENDING");
         }
         res.setActualPrice(contract.getActualPrice());
+        res.setTenantSigHash(contract.getTenantSigHash());
+        res.setLandlordSigHash(contract.getLandlordSigHash());
 
         // 🔗 Fetch Blockchain Settlement Info
         if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty() 
@@ -1425,5 +1567,232 @@ public class ContractService {
         }
 
         return mapToResponse(contract, currentUserId);
+    }
+
+    @Transactional
+    public ContractResponse cancelContract(Long id, Long currentUserId) {
+        Contract contract = contractRepository.findById(id).orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        User currentUser = userRepository.findById(currentUserId).orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        
+        if (contract.getStatus() == ContractStatus.ACTIVE) {
+            throw new RuntimeException("Không thể hủy hợp đồng đang có hiệu lực.");
+        }
+        
+        contract.setStatus(ContractStatus.CANCELLED);
+        contract.setCancelReason("Đã bị hủy bởi người dùng " + currentUser.getFullName());
+        
+        if (contract.getSmartContractAddress() != null && !contract.getSmartContractAddress().isEmpty()) {
+            iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent event = iuh.se.kltn.backend.modules.contract.entity.BlockchainOutboxEvent.builder()
+                .eventType("CANCEL_CONTRACT")
+                .contractId(contract.getId())
+                .payload(java.util.Map.of("contractAddress", contract.getSmartContractAddress()))
+                .build();
+            outboxRepository.save(event);
+        }
+        
+        Contract saved = contractRepository.save(contract);
+        return mapToResponse(saved, currentUserId);
+    }
+    
+    @Transactional
+    public ContractResponse openDispute(Long id, Long currentUserId, iuh.se.kltn.backend.modules.contract.dto.request.OpenDisputeRequest request) {
+        Contract contract = contractRepository.findById(id).orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        User currentUser = userRepository.findById(currentUserId).orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        
+        if (!contract.getTenant().getId().equals(currentUserId) && !contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId)) {
+            throw new RuntimeException("Chỉ khách thuê hoặc chủ trọ mới có quyền mở tranh chấp.");
+        }
+        
+        if (contract.getStatus() != ContractStatus.ACTIVE && contract.getStatus() != ContractStatus.AWAITING_DEPOSIT) {
+            throw new RuntimeException("Chỉ có thể mở tranh chấp khi hợp đồng đang hoạt động hoặc chờ đặt cọc.");
+        }
+        
+        boolean hasOpenDispute = disputeRepository.findByContractIdOrderByCreatedAtDesc(id).stream().anyMatch(d -> "OPEN".equals(d.getStatus()));
+        if (hasOpenDispute) {
+            throw new RuntimeException("Hợp đồng này đang có một tranh chấp chưa được giải quyết.");
+        }
+        
+        String previousStatus = contract.getStatus().name();
+        contract.setStatus(ContractStatus.DISPUTE);
+        
+        ContractDispute dispute = new ContractDispute();
+        dispute.setContract(contract);
+        dispute.setOpenedBy(currentUser);
+        dispute.setViolationType(request.getViolationType());
+        if (request.getEvidenceUrls() != null) {
+            try {
+                dispute.setEvidenceUrls(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getEvidenceUrls()));
+            } catch (Exception e) {
+                log.warn("Lỗi serialize evidence urls: {}", e.getMessage());
+            }
+        }
+        dispute.setDescription(request.getDescription());
+        dispute.setStatus("OPEN");
+        dispute.setPreviousContractStatus(previousStatus);
+        disputeRepository.save(dispute);
+        
+        // Không gọi outbox cho OPEN_DISPUTE on-chain nữa (Phase 1)
+        
+        Contract saved = contractRepository.save(contract);
+        
+        // Thông báo cho bên còn lại
+        User notifyUser = (currentUserId.equals(contract.getTenant().getId())) ? contract.getRoom().getProperty().getLandlord() : contract.getTenant();
+        notificationService.createNotification(
+            notifyUser,
+            "Tranh chấp hợp đồng được mở",
+            "Hợp đồng phòng " + contract.getRoom().getName() + " vừa bị báo cáo tranh chấp. Vui lòng chờ Admin xử lý.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+        
+        return mapToResponse(saved, currentUserId);
+    }
+    
+    @Transactional
+    public ContractResponse resolveDispute(Long disputeId, Long currentUserId, iuh.se.kltn.backend.modules.contract.dto.request.ResolveDisputeRequest request) {
+        ContractDispute dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new RuntimeException("Tranh chấp không tồn tại"));
+        User currentUser = userRepository.findById(currentUserId).orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        
+        if (currentUser.getRole() != iuh.se.kltn.backend.common.enums.Role.ADMIN) {
+            throw new RuntimeException("Chỉ Admin mới có quyền giải quyết tranh chấp.");
+        }
+        
+        if (!"OPEN".equals(dispute.getStatus())) {
+            throw new RuntimeException("Tranh chấp này đã được xử lý hoặc bị từ chối.");
+        }
+        
+        Contract contract = dispute.getContract();
+        Double deposit = contract.getDepositAmount() != null ? contract.getDepositAmount() : 0.0;
+        if (request.getTenantRefundAmount() + request.getLandlordDeductionAmount() > deposit) {
+            throw new RuntimeException("Tổng tiền hoàn cọc và tiền phạt không được vượt quá số tiền cọc hiện tại (" + deposit + ").");
+        }
+        
+        dispute.setStatus("RESOLVED");
+        dispute.setResolutionNote(request.getResolutionNote());
+        dispute.setTenantRefundAmount(request.getTenantRefundAmount());
+        dispute.setLandlordDeductionAmount(request.getLandlordDeductionAmount());
+        dispute.setResolvedBy(currentUser);
+        dispute.setResolvedAt(LocalDateTime.now());
+        disputeRepository.save(dispute);
+        
+        if (request.getTerminateContract()) {
+            boolean isEarly = java.time.LocalDate.now().isBefore(contract.getEndDate());
+            contract.setStatus(isEarly ? ContractStatus.TERMINATED_EARLY : ContractStatus.EXPIRED);
+            
+            if (contract.getRoom() != null) {
+                contract.getRoom().setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(contract.getRoom());
+            }
+        } else {
+            try {
+                contract.setStatus(ContractStatus.valueOf(dispute.getPreviousContractStatus()));
+            } catch (Exception e) {
+                contract.setStatus(ContractStatus.ACTIVE);
+            }
+        }
+        
+        // Không gọi outbox cho RESOLVE_DISPUTE on-chain nữa (Phase 1)
+        
+        Contract saved = contractRepository.save(contract);
+        
+        // Thông báo
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Tranh chấp hợp đồng đã được giải quyết",
+            "Admin đã phán quyết tranh chấp phòng " + contract.getRoom().getName() + ". Vui lòng xem chi tiết.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+        notificationService.createNotification(
+            contract.getRoom().getProperty().getLandlord(),
+            "Tranh chấp hợp đồng đã được giải quyết",
+            "Admin đã phán quyết tranh chấp phòng " + contract.getRoom().getName() + ". Vui lòng xem chi tiết.",
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+        
+        return mapToResponse(saved, currentUserId);
+    }
+
+    @Transactional
+    public ContractResponse rejectDispute(Long disputeId, Long currentUserId, iuh.se.kltn.backend.modules.contract.dto.request.RejectDisputeRequest request) {
+        ContractDispute dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new RuntimeException("Tranh chấp không tồn tại"));
+        User currentUser = userRepository.findById(currentUserId).orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        
+        if (currentUser.getRole() != iuh.se.kltn.backend.common.enums.Role.ADMIN) {
+            throw new RuntimeException("Chỉ Admin mới có quyền từ chối tranh chấp.");
+        }
+        
+        if (!"OPEN".equals(dispute.getStatus())) {
+            throw new RuntimeException("Tranh chấp này đã được xử lý hoặc bị từ chối.");
+        }
+        
+        Contract contract = dispute.getContract();
+        
+        dispute.setStatus("REJECTED");
+        dispute.setResolutionNote(request.getResolutionNote());
+        dispute.setResolvedBy(currentUser);
+        dispute.setResolvedAt(LocalDateTime.now());
+        disputeRepository.save(dispute);
+        
+        try {
+            contract.setStatus(ContractStatus.valueOf(dispute.getPreviousContractStatus()));
+        } catch (Exception e) {
+            contract.setStatus(ContractStatus.ACTIVE);
+        }
+        
+        Contract saved = contractRepository.save(contract);
+        
+        // Thông báo
+        notificationService.createNotification(
+            contract.getTenant(),
+            "Tranh chấp hợp đồng bị từ chối",
+            "Admin đã từ chối tranh chấp phòng " + contract.getRoom().getName() + ". Lý do: " + request.getResolutionNote(),
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+        notificationService.createNotification(
+            contract.getRoom().getProperty().getLandlord(),
+            "Tranh chấp hợp đồng bị từ chối",
+            "Admin đã từ chối tranh chấp phòng " + contract.getRoom().getName() + ". Lý do: " + request.getResolutionNote(),
+            iuh.se.kltn.backend.modules.interaction.enums.NotificationType.CONTRACT_UPDATE,
+            contract.getId()
+        );
+        
+        return mapToResponse(saved, currentUserId);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<DisputeResponse> getAllDisputes() {
+        return disputeRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))
+            .stream()
+            .map(DisputeResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DisputeResponse> getDisputesByContractId(Long contractId, Long currentUserId) {
+        Contract contract = contractRepository.findById(contractId).orElseThrow(() -> new RuntimeException("Hợp đồng không tồn tại"));
+        
+        boolean isAdmin = userRepository.findById(currentUserId).map(u -> u.getRole() == iuh.se.kltn.backend.common.enums.Role.ADMIN).orElse(false);
+        boolean isTenant = contract.getTenant().getId().equals(currentUserId);
+        boolean isLandlord = contract.getRoom().getProperty().getLandlord().getId().equals(currentUserId);
+        
+        if (!isAdmin && !isTenant && !isLandlord) {
+            throw new RuntimeException("Bạn không có quyền xem tranh chấp của hợp đồng này.");
+        }
+        
+        return disputeRepository.findByContractIdOrderByCreatedAtDesc(contractId)
+            .stream()
+            .map(DisputeResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public DisputeResponse getOpenDisputeByContractId(Long contractId, Long currentUserId) {
+        return getDisputesByContractId(contractId, currentUserId).stream()
+                .filter(d -> "OPEN".equals(d.getStatus()))
+                .findFirst()
+                .orElse(null);
     }
 }
