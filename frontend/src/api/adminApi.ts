@@ -24,6 +24,13 @@ export interface SettlementItemDetail {
   referenceCode: string;
 }
 
+export type ResolveDisputeRequest = {
+  tenantRefundAmount: number;
+  landlordDeductionAmount: number;
+  resolutionNote: string;
+  terminateContract: boolean;
+};
+
 export const adminApi = {
   getPendingSettlements: () => {
     return axiosClient.get<LandlordSettlement[]>("/admin/settlements/pending");
@@ -39,5 +46,14 @@ export const adminApi = {
   },
   processPayout: (landlordId: number) => {
     return axiosClient.post(`/admin/settlements/${landlordId}/payout`);
+  },
+  getAdminDisputes: () => {
+    return axiosClient.get("/contracts/admin/disputes");
+  },
+  resolveDispute: (disputeId: number, data: ResolveDisputeRequest) => {
+    return axiosClient.post(`/contracts/admin/disputes/${disputeId}/resolve`, data);
+  },
+  rejectDispute: (disputeId: number, data: { resolutionNote: string }) => {
+    return axiosClient.post(`/contracts/admin/disputes/${disputeId}/reject`, data);
   }
 };

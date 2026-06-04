@@ -32,6 +32,8 @@ public class RoomReportService {
     private final RoomRepository roomRepository;
     private final NotificationService notificationService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final iuh.se.kltn.backend.modules.contract.repository.ContractRepository contractRepository;
+    private final iuh.se.kltn.backend.modules.contract.service.ContractService contractService;
 
     /**
      * Tenant gửi báo cáo phòng trọ.
@@ -173,6 +175,33 @@ public class RoomReportService {
             // Ẩn phòng vi phạm (dùng MAINTENANCE vì DB ENUM chưa có HIDDEN)
             room.setStatus(RoomStatus.MAINTENANCE);
             roomRepository.save(room);
+
+            // ================== TẠO TRANH CHẤP TỰ ĐỘNG ==================
+            try {
+                // Lấy tất cả hợp đồng của phòng này
+                List<iuh.se.kltn.backend.modules.contract.entity.Contract> contracts = contractRepository.findByRoomIdOrderByStartDateDesc(room.getId());
+                
+                for (iuh.se.kltn.backend.modules.contract.entity.Contract c : contracts) {
+                    if (c.getStatus() == iuh.se.kltn.backend.modules.contract.enums.ContractStatus.ACTIVE || 
+                        c.getStatus() == iuh.se.kltn.backend.modules.contract.enums.ContractStatus.AWAITING_DEPOSIT) {
+                        
+                        iuh.se.kltn.backend.modules.contract.dto.request.OpenDisputeRequest disputeReq = new iuh.se.kltn.backend.modules.contract.dto.request.OpenDisputeRequest();
+                        disputeReq.setViolationType("OTHER");
+                        disputeReq.setDescription("Hệ thống tự động tạo tranh chấp do phòng bị báo cáo vi phạm nghiêm trọng. Lý do vi phạm: " + request.getAdminNotes());
+                        disputeReq.setEvidenceUrls(report.getEvidenceUrls() != null && !report.getEvidenceUrls().isEmpty() ? 
+                            report.getEvidenceUrls() : null);
+                        
+                        // Gọi ContractService bằng quyền của hệ thống (Admin)
+                        // Ở đây chúng ta tạm lấy ID của reporter làm người mở tranh chấp vì hàm yêu cầu currentUserId
+                        // Hoặc lý tưởng nhất là truyền ID của Admin đang thao tác (lấy từ request context, nhưng service này hiện chưa nhận currentAdminId)
+                        // Tạm thời lấy ID của Reporter để đại diện cho người phát hiện vi phạm
+                        contractService.openDispute(c.getId(), reporter.getId(), disputeReq);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi tạo tranh chấp tự động khi xử lý báo cáo: " + e.getMessage());
+            }
+            // ============================================================
 
             // Thông báo cho người báo cáo
             notificationService.createNotification(

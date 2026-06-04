@@ -95,7 +95,18 @@ export default function ContractSettlementWizardPage() {
   }
 
   const isWeb3 = contract.signMethod === "BLOCKCHAIN";
-  const isEarlyTermination = contract.status === "TERMINATED_EARLY" || (contract.endDate && new Date(contract.endDate) > new Date());
+  
+  // Safely parse endDate (could be string or array from backend)
+  let parsedEndDate: Date | null = null;
+  if (contract.endDate) {
+    if (Array.isArray(contract.endDate)) {
+      parsedEndDate = new Date(contract.endDate[0], contract.endDate[1] - 1, contract.endDate[2]);
+    } else {
+      parsedEndDate = new Date(contract.endDate);
+    }
+  }
+  const isEarlyTermination = contract.status === "TERMINATED_EARLY" || (parsedEndDate && parsedEndDate > new Date());
+  
   const isLandlord = user?.role === "LANDLORD";
   const isTenant = user?.role === "TENANT";
 

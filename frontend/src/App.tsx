@@ -49,6 +49,7 @@ import BlockchainLogsPage from "./pages/admin/BlockchainLogsPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import AiAnalyticsPage from "./pages/admin/AiAnalyticsPage";
 import AdminSettlementPage from "./pages/admin/AdminSettlementPage";
+import AdminDisputePage from "./pages/admin/AdminDisputePage";
 import AdminReportPage from "./pages/admin/AdminReportPage";
 import AppointmentManagePage from "./pages/interaction/AppointmentManagePage";
 import AiChatBot from "./components/shared/AiChatBot"; // Nhúng Chatbot Toàn cầu
@@ -221,8 +222,10 @@ function AppRoutesAndChrome() {
                 <Route path="users" element={<UserManagementPage />} />
                 <Route path="blockchain-logs" element={<BlockchainLogsPage />} />
                 <Route path="ai-analytics" element={<AiAnalyticsPage />} />
+                <Route path="disputes" element={<AdminDisputePage />} />
                 <Route path="settlements" element={<AdminSettlementPage />} />
                 <Route path="reports" element={<AdminReportPage />} />
+                <Route path="contracts/:id" element={<ContractDetailPage />} />
               </Route>
             </Route> 
 

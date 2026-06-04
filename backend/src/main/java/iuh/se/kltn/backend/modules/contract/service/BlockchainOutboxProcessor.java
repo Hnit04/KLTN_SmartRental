@@ -70,6 +70,13 @@ public class BlockchainOutboxProcessor {
                 case "PROPOSE_DEDUCTION" -> handleProposeDeduction(event);
                 case "CONSENT_END" -> handleConsentEnd(event);
                 case "RECORD_BILL" -> handleRecordBill(event);
+                // Phase 1 MVP: State Machine events
+                case "CONFIRM_LANDLORD_SIG" -> handleConfirmLandlordSig(event);
+                case "CONFIRM_TENANT_SIG" -> handleConfirmTenantSig(event);
+                case "CANCEL_CONTRACT" -> handleCancelContract(event);
+                case "OPEN_DISPUTE" -> handleOpenDispute(event);
+                case "RESOLVE_DISPUTE" -> handleResolveDispute(event);
+                case "APPLY_PENALTY" -> handleApplyPenalty(event);
                 default -> throw new RuntimeException("Unknown event type: " + event.getEventType());
             };
 
@@ -150,6 +157,60 @@ public class BlockchainOutboxProcessor {
         return blockchainService.registerExternalBill(contractAddress, billId, amount);
     }
 
+    // ======================== PHASE 1 MVP HANDLERS ========================
+
+    private String handleConfirmLandlordSig(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        byte[] sigHash = org.web3j.utils.Numeric.hexStringToByteArray((String) p.get("sigHash"));
+        blockchainService.confirmLandlordSignatureOnChain(contractAddress, sigHash);
+        return "landlord_signed";
+    }
+
+    private String handleConfirmTenantSig(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        byte[] sigHash = org.web3j.utils.Numeric.hexStringToByteArray((String) p.get("sigHash"));
+        blockchainService.confirmTenantSignatureOnChain(contractAddress, sigHash);
+        return "tenant_signed";
+    }
+
+    private String handleCancelContract(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        blockchainService.cancelContractOnChain(contractAddress);
+        return "cancelled";
+    }
+
+    private String handleOpenDispute(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        int violationType = ((Number) p.get("violationType")).intValue();
+        byte[] evidenceHash = org.web3j.utils.Numeric.hexStringToByteArray((String) p.get("evidenceHash"));
+        blockchainService.openDisputeOnChain(contractAddress, violationType, evidenceHash);
+        return "dispute_opened";
+    }
+
+    private String handleResolveDispute(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        BigInteger tenantAmount = new BigInteger(p.get("tenantAmount").toString());
+        BigInteger landlordAmount = new BigInteger(p.get("landlordAmount").toString());
+        byte[] resolutionHash = org.web3j.utils.Numeric.hexStringToByteArray((String) p.get("resolutionHash"));
+        boolean terminate = (Boolean) p.get("terminateContract");
+        blockchainService.resolveDisputeOnChain(contractAddress, tenantAmount, landlordAmount, resolutionHash, terminate);
+        return terminate ? "dispute_resolved_terminated" : "dispute_resolved_active";
+    }
+
+    private String handleApplyPenalty(BlockchainOutboxEvent event) throws Exception {
+        Map<String, Object> p = event.getPayload();
+        String contractAddress = (String) p.get("contractAddress");
+        long billId = ((Number) p.get("billId")).longValue();
+        BigInteger penaltyAmount = new BigInteger(p.get("penaltyAmount").toString());
+        blockchainService.applyLatePaymentPenaltyOnChain(contractAddress, billId, penaltyAmount);
+        return "penalty_applied";
+    }
+
     // ======================== POST-CONFIRMATION ========================
 
     /**
@@ -167,11 +228,40 @@ public class BlockchainOutboxProcessor {
                 contract.setSmartContractAddress(result);
                 contract.setContractHash((String) event.getPayload().get("contractHash"));
                 contract.setDeployTxHash("Deployed via Outbox #" + event.getId());
+                contract.setBlockchainState("CREATED");
                 contractRepository.save(contract);
                 log.info("📝 Contract #{} updated with blockchain address: {}", contract.getId(), result);
             }
+            case "CONFIRM_LANDLORD_SIG" -> {
+                contract.setBlockchainState("LANDLORD_SIGNED");
+                contract.setLandlordSigHash((String) event.getPayload().get("sigHash"));
+                contractRepository.save(contract);
+                log.info("✍️ Contract #{} landlord signature confirmed on-chain", contract.getId());
+            }
+            case "CONFIRM_TENANT_SIG" -> {
+                contract.setBlockchainState("FULLY_SIGNED");
+                contract.setTenantSigHash((String) event.getPayload().get("sigHash"));
+                contractRepository.save(contract);
+                log.info("✍️ Contract #{} tenant signature confirmed on-chain → FULLY_SIGNED", contract.getId());
+            }
+            case "CANCEL_CONTRACT" -> {
+                contract.setBlockchainState("CANCELLED");
+                contractRepository.save(contract);
+                log.info("🚫 Contract #{} cancelled on-chain", contract.getId());
+            }
+            case "OPEN_DISPUTE" -> {
+                contract.setBlockchainState("DISPUTE");
+                contractRepository.save(contract);
+                log.info("⚠️ Contract #{} dispute opened on-chain", contract.getId());
+            }
+            case "RESOLVE_DISPUTE" -> {
+                String newState = result.contains("terminated") ? "TERMINATED" : "ACTIVE";
+                contract.setBlockchainState(newState);
+                contractRepository.save(contract);
+                log.info("✅ Contract #{} dispute resolved on-chain → {}", contract.getId(), newState);
+            }
             case "END_CONTRACT" -> {
-                // Settlement already updated DB state before outbox write
+                contract.setBlockchainState("TERMINATED");
                 log.info("📝 Contract #{} blockchain settlement confirmed", contract.getId());
             }
         }

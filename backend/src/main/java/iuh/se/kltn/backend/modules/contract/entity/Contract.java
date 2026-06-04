@@ -65,6 +65,20 @@ public class Contract {
 
     private Boolean isTenantSigned = false;
     private Boolean isLandlordSigned = false;
+
+    // ===== PHASE 1 MVP: Blockchain State Machine =====
+    @Column(name = "blockchain_state", length = 30)
+    private String blockchainState; // On-chain state mirror
+
+    @Column(name = "landlord_sig_hash", length = 255)
+    private String landlordSigHash;
+
+    @Column(name = "tenant_sig_hash", length = 255)
+    private String tenantSigHash;
+
+    @Column(name = "signing_nonce")
+    private Long signingNonce = 0L;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private DepositStatus depositStatus;

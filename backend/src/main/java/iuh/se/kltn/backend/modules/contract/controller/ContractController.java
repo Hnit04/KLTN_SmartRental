@@ -6,6 +6,9 @@ import iuh.se.kltn.backend.modules.contract.dto.request.ContractTermsRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.RejectReasonRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.SignContractRequest;
 import iuh.se.kltn.backend.modules.contract.dto.request.TransactionHashRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.OpenDisputeRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.ResolveDisputeRequest;
+import iuh.se.kltn.backend.modules.contract.dto.request.RejectDisputeRequest;
 import iuh.se.kltn.backend.modules.contract.service.ContractChangeService;
 import iuh.se.kltn.backend.modules.contract.service.ContractService;
 import jakarta.validation.Valid;
@@ -62,6 +65,11 @@ public class ContractController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getContractById(@PathVariable Long id) {
         return ResponseEntity.ok(contractService.getContractById(id));
+    }
+
+    @GetMapping("/{id}/timeline")
+    public ResponseEntity<?> getBlockchainTimeline(@PathVariable Long id) {
+        return ResponseEntity.ok(contractService.getBlockchainTimeline(id));
     }
 
     @GetMapping("/history/{userId}")
@@ -243,6 +251,58 @@ public class ContractController {
             @Valid @RequestBody iuh.se.kltn.backend.modules.contract.dto.request.SettlementProposalRequest request) {
         return ResponseEntity.ok(contractService.proposeSettlement(id, currentUser.getId(), request));
     }
+
+    // ======================== ⚖️ PHASE 2: CONTRACT DISPUTES ========================
+
+    @PostMapping("/{id}/disputes")
+    public ResponseEntity<?> openDispute(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id,
+            @Valid @RequestBody OpenDisputeRequest request) {
+        return ResponseEntity.ok(contractService.openDispute(id, currentUser.getId(), request));
+    }
+
+    @GetMapping("/{id}/disputes")
+    public ResponseEntity<?> getDisputesByContractId(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(contractService.getDisputesByContractId(id, currentUser.getId()));
+    }
+
+    @GetMapping("/{id}/disputes/open")
+    public ResponseEntity<?> getOpenDisputeByContractId(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(contractService.getOpenDisputeByContractId(id, currentUser.getId()));
+    }
+
+    @GetMapping("/admin/disputes")
+    public ResponseEntity<?> getAllDisputes(@AuthenticationPrincipal UserPrincipal currentUser) {
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN"));
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body(java.util.Collections.singletonMap("message", "Chỉ Admin mới có quyền xem danh sách tranh chấp"));
+        }
+        return ResponseEntity.ok(contractService.getAllDisputes());
+    }
+
+    @PostMapping("/admin/disputes/{disputeId}/resolve")
+    public ResponseEntity<?> resolveDispute(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long disputeId,
+            @Valid @RequestBody ResolveDisputeRequest request) {
+        return ResponseEntity.ok(contractService.resolveDispute(disputeId, currentUser.getId(), request));
+    }
+
+    @PostMapping("/admin/disputes/{disputeId}/reject")
+    public ResponseEntity<?> rejectDispute(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long disputeId,
+            @Valid @RequestBody RejectDisputeRequest request) {
+        return ResponseEntity.ok(contractService.rejectDispute(disputeId, currentUser.getId(), request));
+    }
+
+    // ======================== 💰 PHASE 2: SETTLEMENT ========================
 
     @PostMapping("/{id}/settle/consent")
     public ResponseEntity<?> consentSettlement(

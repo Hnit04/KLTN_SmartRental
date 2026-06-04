@@ -23,6 +23,8 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     Optional<Bill> findFirstByContractIdOrderByYearDescMonthDesc(Long contractId);
 
+    List<Bill> findByStatusAndDeadlineBefore(BillStatus status, java.time.LocalDateTime deadline);
+
     @Query("SELECT COALESCE(SUM(b.totalAmount), 0) " +
            "FROM Bill b " +
            "WHERE b.contract.room.property.landlord.id = :landlordId " +

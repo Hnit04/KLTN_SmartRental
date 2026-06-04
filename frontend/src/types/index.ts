@@ -255,6 +255,8 @@ export interface Contract {
   // Blockchain fields
   smartContractAddress?: string;
   deployTxHash?: string;
+  tenantSigHash?: string;
+  landlordSigHash?: string;
   contractHash?: string;
   userRole?: string; // Vai trò của người xem: "CHỦ PHÒNG" hoặc "THÀNH VIÊN"
   tenantReputationScore?: number;
